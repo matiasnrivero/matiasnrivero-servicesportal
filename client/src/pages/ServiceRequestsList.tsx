@@ -66,7 +66,9 @@ export default function ServiceRequestsList() {
     },
     onSuccess: async () => {
       await refetchUser();
+      // Invalidate all relevant queries so they refetch with new session
       queryClient.invalidateQueries({ queryKey: ["/api/default-user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
       toast({ 
         title: "Role switched", 
         description: `You are now viewing as ${currentUser?.role === "designer" ? "Client" : "Designer"}` 

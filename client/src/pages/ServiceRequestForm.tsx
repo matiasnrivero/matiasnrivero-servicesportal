@@ -95,7 +95,7 @@ export default function ServiceRequestForm() {
       reset();
       setSelectedServiceId("");
       setUploadedFiles([]);
-      queryClient.invalidateQueries({ queryKey: ["service-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
       navigate("/service-requests");
     },
     onError: () => {
