@@ -1,5 +1,6 @@
 import { ChevronDownIcon } from "lucide-react";
 import React from "react";
+import { Link, useLocation } from "wouter";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -10,81 +11,82 @@ const menuItems = [
     label: "Orders",
     icon: "/figmaAssets/icon---sidebar---orders.svg",
     hasDropdown: true,
-    isActive: false,
+    path: "#",
   },
   {
     id: "missing-production-files",
     label: "Missing Production Files",
     icon: "/figmaAssets/icon---sidebar---missing-production-files.svg",
     hasDropdown: false,
-    isActive: false,
+    path: "#",
   },
   {
     id: "proof-approvals",
     label: "Proof Approvals",
     icon: "/figmaAssets/icon---sidebar---proof-approvals.svg",
     hasDropdown: false,
-    isActive: false,
+    path: "#",
   },
   {
     id: "services-request",
     label: "Services Request",
     icon: "/figmaAssets/icon---sidebar---service-request.svg",
     hasDropdown: false,
-    isActive: true,
+    path: "/service-requests",
   },
   {
     id: "vendors",
     label: "Vendors",
     icon: "/figmaAssets/icon---sidebar---vendors.svg",
     hasDropdown: true,
-    isActive: false,
+    path: "#",
   },
   {
     id: "workspaces",
     label: "Workspaces",
     icon: "/figmaAssets/icon---sidebar---workspaces.svg",
     hasDropdown: false,
-    isActive: false,
+    path: "#",
   },
   {
     id: "tutorials",
     label: "Tutorials",
     icon: "/figmaAssets/icon---sidebar---tutorials.svg",
     hasDropdown: false,
-    isActive: false,
+    path: "#",
   },
   {
     id: "users",
     label: "Users",
     icon: "/figmaAssets/icon---sidebar---users.svg",
     hasDropdown: false,
-    isActive: false,
+    path: "#",
   },
   {
     id: "reports",
     label: "Reports",
     icon: "/figmaAssets/icon---sidebar---reports.svg",
     hasDropdown: true,
-    isActive: false,
+    path: "#",
   },
   {
     id: "help-center",
     label: "Help Center",
     icon: "/figmaAssets/icons-4.svg",
     hasDropdown: false,
-    isActive: false,
+    path: "#",
   },
   {
     id: "admin",
     label: "Admin",
     icon: "/figmaAssets/icon---sidebar---admin.svg",
     hasDropdown: true,
-    isActive: false,
+    path: "#",
   },
 ];
 
 export const NavigationMenuSection = (): JSX.Element => {
+  const [location] = useLocation();
   return (
     <aside className="flex flex-col w-full h-[700px] bg-white overflow-hidden">
       <header className="flex items-center justify-between px-4 h-[66px] border-b border-[#f0f0f5]">
@@ -102,35 +104,40 @@ export const NavigationMenuSection = (): JSX.Element => {
 
       <ScrollArea className="flex-1">
         <nav className="flex flex-col gap-1.5 p-2">
-          {menuItems.map((item) => (
-            <Button
-              key={item.id}
-              variant="ghost"
-              className={`w-full h-auto justify-between px-3.5 py-3 rounded ${
-                item.isActive
-                  ? "bg-blue-space-cadet hover:bg-blue-space-cadet"
-                  : "hover:bg-gray-100"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <img className="w-6 h-6" alt={item.label} src={item.icon} />
-                <span
-                  className={`[font-family:'IBM_Plex_Sans',Helvetica] font-medium text-sm tracking-[0] leading-[19.6px] whitespace-nowrap ${
-                    item.isActive ? "text-white" : "text-dark-blue-night"
+          {menuItems.map((item) => {
+            const isActive = location === item.path || 
+                           (item.id === "services-request" && location.startsWith("/service-requests"));
+            return (
+              <Link key={item.id} href={item.path}>
+                <Button
+                  variant="ghost"
+                  className={`w-full h-auto justify-between px-3.5 py-3 rounded ${
+                    isActive
+                      ? "bg-blue-space-cadet hover:bg-blue-space-cadet"
+                      : "hover:bg-gray-100"
                   }`}
                 >
-                  {item.label}
-                </span>
-              </div>
-              {item.hasDropdown && (
-                <ChevronDownIcon
-                  className={`w-6 h-6 ${
-                    item.isActive ? "text-white" : "text-dark-blue-night"
-                  }`}
-                />
-              )}
-            </Button>
-          ))}
+                  <div className="flex items-center gap-2">
+                    <img className="w-6 h-6" alt={item.label} src={item.icon} />
+                    <span
+                      className={`[font-family:'IBM_Plex_Sans',Helvetica] font-medium text-sm tracking-[0] leading-[19.6px] whitespace-nowrap ${
+                        isActive ? "text-white" : "text-dark-blue-night"
+                      }`}
+                    >
+                      {item.label}
+                    </span>
+                  </div>
+                  {item.hasDropdown && (
+                    <ChevronDownIcon
+                      className={`w-6 h-6 ${
+                        isActive ? "text-white" : "text-dark-blue-night"
+                      }`}
+                    />
+                  )}
+                </Button>
+              </Link>
+            );
+          })}
         </nav>
       </ScrollArea>
 

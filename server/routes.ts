@@ -9,7 +9,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const services = await storage.getAllServices();
       res.json(services);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch services" });
+      console.error("Error fetching services:", error);
+      res.status(500).json({ error: "Failed to fetch services", details: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -112,11 +113,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Seed initial services data
   app.post("/api/seed", async (req, res) => {
     try {
+      console.log("Checking for existing services...");
       const existingServices = await storage.getAllServices();
+      console.log("Found", existingServices.length, "existing services");
       if (existingServices.length > 0) {
         return res.json({ message: "Services already seeded" });
       }
 
+      console.log("Seeding services...");
       const servicesData = [
         {
           title: "Vectorization & Color Separation",
@@ -201,12 +205,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ];
 
       for (const serviceData of servicesData) {
+        console.log("Creating service:", serviceData.title);
         await storage.createService(serviceData);
       }
 
+      console.log("Services seeded successfully");
       res.json({ message: "Services seeded successfully" });
     } catch (error) {
-      res.status(500).json({ error: "Failed to seed services" });
+      console.error("Error seeding services:", error);
+      res.status(500).json({ error: "Failed to seed services", details: error instanceof Error ? error.message : String(error) });
     }
   });
 

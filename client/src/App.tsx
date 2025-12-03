@@ -6,12 +6,16 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 
 import { ServicesRequestAd } from "@/pages/ServicesRequestAd";
+import ServiceRequestForm from "@/pages/ServiceRequestForm";
+import ServiceRequestsList from "@/pages/ServiceRequestsList";
 
 function Router() {
   return (
     <Switch>
       {/* Add pages below */}
       <Route path="/" component={ServicesRequestAd} />
+      <Route path="/service-requests" component={ServiceRequestsList} />
+      <Route path="/service-requests/new" component={ServiceRequestForm} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>
