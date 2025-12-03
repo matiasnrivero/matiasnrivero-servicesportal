@@ -650,7 +650,7 @@ export default function JobDetailView() {
                 {isDesigner && (request.status === "in-progress" || request.status === "change-request") && (
                   <Button
                     onClick={handleDeliver}
-                    disabled={deliverMutation.isPending}
+                    disabled={deliverMutation.isPending || (deliverableAttachments.length === 0 && deliverableUrls.length === 0)}
                     className="w-full bg-green-600 hover:bg-green-700"
                     data-testid="button-save-deliver"
                   >
