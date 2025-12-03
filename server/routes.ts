@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Services routes
@@ -235,6 +236,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error seeding services:", error);
       res.status(500).json({ error: "Failed to seed services", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // Object storage routes for file uploads (public file uploading)
+  app.get("/objects/:objectPath(*)", async (req, res) => {
+    const objectStorageService = new ObjectStorageService();
+    try {
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error checking object access:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
+  app.post("/api/objects/upload", async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error("Error getting upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
+  app.put("/api/artwork-files", async (req, res) => {
+    if (!req.body.fileURL) {
+      return res.status(400).json({ error: "fileURL is required" });
+    }
+
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const objectPath = objectStorageService.normalizeObjectEntityPath(req.body.fileURL);
+
+      res.status(200).json({
+        objectPath: objectPath,
+        fileName: req.body.fileName || "uploaded-file",
+      });
+    } catch (error) {
+      console.error("Error processing artwork file:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 

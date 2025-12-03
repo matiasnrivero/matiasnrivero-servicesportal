@@ -17,6 +17,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import type { Service, InsertServiceRequest } from "@shared/schema";
 import { Header } from "@/components/Header";
+import { FileUploader } from "@/components/FileUploader";
 
 async function fetchServices(): Promise<Service[]> {
   const response = await fetch("/api/services");
@@ -60,7 +61,23 @@ export default function ServiceRequestForm() {
   const preSelectedServiceId = urlParams.get("serviceId") || "";
 
   const [selectedServiceId, setSelectedServiceId] = React.useState<string>(preSelectedServiceId);
+  const [uploadedFiles, setUploadedFiles] = React.useState<Array<{ url: string; name: string }>>([]);
   const { register, handleSubmit, reset, setValue } = useForm();
+
+  const servicesRequiringArtwork = [
+    "Vectorization",
+    "Artwork Touch-Ups",
+    "Embroidery Digitization",
+    "Artwork Composition",
+    "Creative Art",
+  ];
+
+  const requiresArtworkUpload = (service: Service | undefined): boolean => {
+    if (!service) return false;
+    return servicesRequiringArtwork.some(
+      (name) => service.title.toLowerCase().includes(name.toLowerCase())
+    );
+  };
 
   React.useEffect(() => {
     if (preSelectedServiceId && services.length > 0) {
@@ -77,6 +94,7 @@ export default function ServiceRequestForm() {
       });
       reset();
       setSelectedServiceId("");
+      setUploadedFiles([]);
       queryClient.invalidateQueries({ queryKey: ["service-requests"] });
       navigate("/service-requests");
     },
@@ -94,11 +112,17 @@ export default function ServiceRequestForm() {
   const onSubmit = async (data: any) => {
     try {
       const userId = await getDefaultUserId();
+      
+      const notesWithFiles = uploadedFiles.length > 0
+        ? `${data.notes || ""}\n\nAttached Files:\n${uploadedFiles.map((f) => `- ${f.name}: ${f.url}`).join("\n")}`.trim()
+        : data.notes;
+
       mutation.mutate({
         userId,
         serviceId: selectedServiceId,
         status: "pending",
         ...data,
+        notes: notesWithFiles,
         quantity: data.quantity ? parseInt(data.quantity) : null,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
       });
@@ -231,6 +255,20 @@ export default function ServiceRequestForm() {
                 />
               </div>
 
+              {requiresArtworkUpload(selectedService) && (
+                <div className="space-y-2">
+                  <Label>Artwork File Upload</Label>
+                  <p className="text-sm text-dark-gray mb-2">
+                    Upload your artwork file for processing. This service requires an artwork file to get started.
+                  </p>
+                  <FileUploader
+                    onUploadComplete={(url, name) => {
+                      setUploadedFiles((prev) => [...prev, { url, name }]);
+                    }}
+                  />
+                </div>
+              )}
+
               <div className="flex gap-4 pt-4">
                 <Button
                   type="submit"
@@ -245,6 +283,7 @@ export default function ServiceRequestForm() {
                   onClick={() => {
                     reset();
                     setSelectedServiceId("");
+                    setUploadedFiles([]);
                   }}
                 >
                   Clear Form

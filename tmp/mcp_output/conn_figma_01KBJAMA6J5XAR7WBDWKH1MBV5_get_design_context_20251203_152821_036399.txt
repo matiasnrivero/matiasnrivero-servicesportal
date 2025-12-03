@@ -1,0 +1,1120 @@
+<mcp_external_output>
+
+### Content Block 1 (Text)
+const imgGroup = "https://www.figma.com/api/mcp/asset/3ee26eff-4932-45aa-953d-7fdc37ced65a";
+const imgGroup4 = "https://www.figma.com/api/mcp/asset/4de2f9d9-017a-4bae-a99f-63bfd00b27cb";
+const imgGroup1 = "https://www.figma.com/api/mcp/asset/cec79742-ef71-4af9-81c0-0f5fc75dc64b";
+const imgGroup2 = "https://www.figma.com/api/mcp/asset/de0daf70-ea70-4964-8b4b-10934aed8d0f";
+const imgGroup3 = "https://www.figma.com/api/mcp/asset/ea4a37d3-9358-45b9-a043-d590bc13b543";
+const imgVector = "https://www.figma.com/api/mcp/asset/4a98dd91-715a-41c3-a99f-fb00c3d8217d";
+const imgLogo = "https://www.figma.com/api/mcp/asset/b66ee424-365a-4111-a815-e0165ca1e800";
+const img = "https://www.figma.com/api/mcp/asset/e68970a9-5ae4-4b2e-ba48-9c5db535be39";
+const img1 = "https://www.figma.com/api/mcp/asset/1632cb99-41ea-4573-acf3-0d2967fae70c";
+const imgVector1 = "https://www.figma.com/api/mcp/asset/ad91701b-aa10-4020-b93a-a74f2190318d";
+const imgVector2 = "https://www.figma.com/api/mcp/asset/e2c7a5a0-5a9d-4f20-83d9-b8be27b2b32b";
+const imgVector3 = "https://www.figma.com/api/mcp/asset/48e6e587-3b89-4dde-ad4d-58faa55f1e1a";
+const img2 = "https://www.figma.com/api/mcp/asset/25dd9465-3b94-4630-b138-a7e3bed18079";
+const img3 = "https://www.figma.com/api/mcp/asset/ba06ee3e-2e03-4bfe-94cc-5ca286eb6c22";
+const imgVector4 = "https://www.figma.com/api/mcp/asset/591ed4a8-c386-49fd-a475-83455c50e068";
+const img4 = "https://www.figma.com/api/mcp/asset/e387ce3d-da05-435e-874d-d74cfcc4fe25";
+const img5 = "https://www.figma.com/api/mcp/asset/68b3121e-2966-4703-9cd2-e691c23e02c6";
+const imgVector5 = "https://www.figma.com/api/mcp/asset/d39a6c6b-43a2-4bd9-9d43-b84cde9eee60";
+const img6 = "https://www.figma.com/api/mcp/asset/3921970b-4d15-43c8-8415-3758ef9f18e7";
+const img7 = "https://www.figma.com/api/mcp/asset/dea678c9-6b0f-469a-9745-c013b972d70f";
+
+function Footer({ className }: { className?: string }) {
+  return (
+    <div className={className} data-name="Footer" data-node-id="109:7590">
+      <div className="flex flex-col font-['IBM_Plex_Sans:Regular',sans-serif] justify-center leading-[0] not-italic relative shrink-0 text-[#263063] text-[14px] whitespace-nowrap" data-node-id="109:7570">
+        <p className="leading-[1.4]">Copyright © 2025 Tri-POD All rights reserved.</p>
+      </div>
+    </div>
+  );
+}
+type AdhocServiceProps = {
+  className?: string;
+  property1?: "Ad-hoc Service Card Default" | "Ad-hoc Service Card Hover";
+};
+
+function AdhocService({ className, property1 = "Ad-hoc Service Card Default" }: AdhocServiceProps) {
+  return (
+    <div className={className} data-name="Property 1=Ad-hoc Service Card Default" data-node-id="19588:47902">
+      <div className="content-stretch flex flex-[1_0_0] flex-col gap-[8px] items-start min-h-px min-w-px relative shrink-0" data-name="Info" data-node-id="19588:47885">
+        <div className="content-stretch flex gap-[24px] items-center relative shrink-0 w-full" data-name="Header" data-node-id="19588:47886">
+          <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[16px]" data-node-id="19588:47887">
+            <p className="leading-[1.4] whitespace-pre-wrap">Vectorization & Color Separation</p>
+          </div>
+          <div className="content-stretch flex gap-[10px] items-center relative shrink-0" data-node-id="19588:47888">
+            <div className="flex flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] not-italic relative shrink-0 text-[#03c3fb] text-[20px] whitespace-nowrap" data-node-id="19588:47889">
+              <p className="leading-[1.4]"> $ 10</p>
+            </div>
+          </div>
+        </div>
+        <div className="content-stretch flex gap-[8px] items-center relative shrink-0 w-full" data-name="Service Included" data-node-id="19588:47890">
+          <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:Regular',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="19588:47891">
+            <p className="leading-[1.4] whitespace-pre-wrap">Turn fuzzy images into sharp vectors, ready for screen printing.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IconNotification({ className }: { className?: string }) {
+  return (
+    <div className={className} data-name="Icon / Notification" data-node-id="116:6531">
+      <div className="absolute inset-[3.57%_7.14%_14.29%_17.86%]" data-name="Group" data-node-id="41:2399">
+        <div className="absolute bottom-[-3.26%] left-[-3.57%] right-0 top-0">
+          <img alt="" className="block max-w-none size-full" src={imgGroup} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IconFullWidth({ className }: { className?: string }) {
+  return (
+    <div className={className} data-name="Icon / Full Width" data-node-id="116:6532">
+      <div className="absolute inset-[17.86%]" data-node-id="41:2393">
+        <div className="absolute inset-[-4.17%]">
+          <img alt="" className="block max-w-none size-full" src={imgGroup4} />
+        </div>
+      </div>
+    </div>
+  );
+}
+type IconsProps = {
+  className?: string;
+  icons?: "Help" | "Log Out" | "My account" | "Arrow-left" | "Bell" | "Nav-arrow-down" | "Add" | "Nav-arrow-left" | "Nav-arrow-up" | "Pencil" | "User" | "Cancel" | "Search" | "check" | "message_square" | "Grid" | "clock" | "Nav-arrow-right" | "Workspace setting";
+};
+
+function Icons({ className, icons = "My account" }: IconsProps) {
+  if (icons === "Nav-arrow-down") {
+    return (
+      <div className={className} data-name="Icons=Nav-arrow-down" data-node-id="38:2569">
+        <div className="absolute bottom-[37.5%] left-1/4 right-1/4 top-[37.5%]" data-name="Group" data-node-id="38:2570">
+          <div className="absolute inset-[-12.5%_-6.25%]">
+            <img alt="" className="block max-w-none size-full" src={imgGroup1} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (icons === "Nav-arrow-left") {
+    return (
+      <div className={className} data-name="Icons=Nav-arrow-left" data-node-id="38:2572">
+        <div className="absolute bottom-1/4 left-[37.5%] right-[37.5%] top-1/4" data-name="Group" data-node-id="38:2573">
+          <div className="absolute inset-[-6.25%_-12.5%]">
+            <img alt="" className="block max-w-none size-full" src={imgGroup2} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (icons === "Nav-arrow-up") {
+    return (
+      <div className={className} data-name="Icons=Nav-arrow-up" data-node-id="38:2588">
+        <div className="absolute bottom-[37.5%] left-1/4 right-1/4 top-[37.5%]" data-name="Group" data-node-id="38:2589">
+          <div className="absolute inset-[-12.5%_-6.25%]">
+            <img alt="" className="block max-w-none size-full" src={imgGroup3} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className={className} data-name="Icons=My account" data-node-id="38:2435">
+      <div className="absolute inset-[5.21%]" data-name="vector" data-node-id="1472:40435">
+        <img alt="" className="block max-w-none size-full" src={imgVector} />
+      </div>
+    </div>
+  );
+}
+
+function LogosWorkspacesTriPod({ className }: { className?: string }) {
+  return (
+    <div className={className} data-name="Logos-Workspaces / Tri-POD" data-node-id="2378:50908">
+      <div className="h-[38px] relative shrink-0 w-full" data-name="Img" data-node-id="2378:50889">
+        <div className="absolute h-[30.113px] left-[calc(50%+-0.46px)] top-[calc(50%+0.06px)] translate-x-[-50%] translate-y-[-50%] w-[119.088px]" data-name="Logo" data-node-id="2378:50891">
+          <img alt="" className="block max-w-none size-full" src={imgLogo} />
+        </div>
+      </div>
+    </div>
+  );
+}
+type HeaderLogoProps = {
+  className?: string;
+  property1?: "Close" | "Open";
+};
+
+function HeaderLogo({ className, property1 = "Open" }: HeaderLogoProps) {
+  if (property1 === "Close") {
+    return (
+      <div className={className} data-name="Property 1=Close" data-node-id="959:31650">
+        <div className="bg-white border-b border-l-0 border-r border-solid border-t-0 border-white box-border content-stretch flex h-[64px] items-center justify-between px-[16px] py-[86px] relative shrink-0 w-full" data-name="Header - Logo" data-node-id="959:31591">
+          <LogosWorkspacesTriPod className="bg-white box-border content-stretch flex flex-col gap-[10px] h-[48px] items-center justify-center p-[5px] relative shrink-0 w-[144px]" />
+          <Icons className="block cursor-pointer overflow-clip relative shrink-0 size-[24px]" icons="Nav-arrow-down" />
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className={className} data-name="Property 1=Open" data-node-id="959:31651">
+      <div className="absolute bg-white h-[800px] left-0 opacity-70 top-[49px] w-[248px]" data-name="Overlay" data-node-id="967:60356" />
+      <div className="bg-white border-b border-l-0 border-r border-solid border-t-0 border-white box-border content-stretch flex h-[64px] items-center justify-between px-[16px] py-[86px] relative shrink-0 w-full" data-name="Header - Logo" data-node-id="959:31024">
+        <LogosWorkspacesTriPod className="bg-white box-border content-stretch flex flex-col gap-[10px] h-[48px] items-center justify-center p-[5px] relative shrink-0 w-[144px]" />
+        <Icons className="block cursor-pointer overflow-clip relative shrink-0 size-[24px]" icons="Nav-arrow-up" />
+      </div>
+      <div className="absolute bg-white box-border content-stretch flex flex-col h-[254px] items-start left-1/2 overflow-clip rounded-[4px] shadow-[0px_0px_16px_0px_rgba(26,26,26,0.1)] top-[68px] translate-x-[-50%] w-[240px]" data-name="Workspace" data-node-id="959:31064">
+        <div className="border-[#f0f0f5] border-b-[0.5px] border-l-0 border-r-0 border-solid border-t-0 box-border content-stretch flex flex-col gap-[10px] items-start p-[8px] relative shrink-0 w-full" data-name="Search Store" data-node-id="959:31065">
+          <div className="bg-white border border-[#d1d1d1] border-solid box-border content-stretch flex gap-[4px] h-[40px] items-center pl-[8px] pr-[20px] py-[6px] relative rounded-[4px] shrink-0 w-full" data-name="Search Bar" data-node-id="959:31066">
+            <div className="relative shrink-0 size-[18px]" data-name="Icons" data-node-id="959:31067">
+              <div className="absolute inset-[20.83%]" data-name="Group" data-node-id="I959:31067;38:2610">
+                <div className="absolute inset-[-7.14%]">
+                  <img alt="" className="block max-w-none size-full" src={img} />
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col font-['IBM_Plex_Sans:Regular',sans-serif] justify-center leading-[0] not-italic relative shrink-0 text-[#9e9e94] text-[12px] text-center whitespace-nowrap" data-node-id="959:31068">
+              <p className="leading-[1.4]">Search</p>
+            </div>
+          </div>
+        </div>
+        <div className="content-stretch flex gap-[4px] h-[220px] items-start justify-center overflow-x-clip overflow-y-auto relative shrink-0 w-full" data-name="Scroll" data-node-id="959:52857">
+          <div className="content-stretch flex flex-[1_0_0] flex-col items-start justify-center min-h-px min-w-px relative shrink-0" data-name="Store Options" data-node-id="959:31069">
+            <div className="bg-white border-[#f0f0f5] border-b border-l-0 border-r-0 border-solid border-t-0 box-border content-stretch flex gap-[8px] h-[38px] items-center px-[16px] py-[8px] relative shrink-0 w-full" data-name="Dropdown item" data-node-id="959:31070">
+              <div className="content-stretch flex flex-[1_0_0] gap-[8px] h-[24px] items-center min-h-px min-w-px relative shrink-0" data-name="Title" data-node-id="I959:31070;891:26630">
+                <p className="font-['IBM_Plex_Sans:Medium',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I959:31070;891:26631">
+                  Tri-POD
+                </p>
+              </div>
+              <div className="overflow-clip relative shrink-0 size-[24px]" data-name="Check" data-node-id="I959:31070;891:27480">
+                <div className="absolute inset-[29.17%_20.83%]" data-name="Group" data-node-id="I959:31070;891:27480;38:2668">
+                  <div className="absolute inset-[-7.5%_-5.36%]">
+                    <img alt="" className="block max-w-none size-full" src={img1} />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white border-[#f0f0f5] border-b border-l-0 border-r-0 border-solid border-t-0 box-border content-stretch flex gap-[8px] items-center px-[16px] py-[8px] relative shrink-0 w-full" data-name="Dropdown item" data-node-id="959:31071">
+              <div className="content-stretch flex flex-[1_0_0] gap-[8px] h-[24px] items-center min-h-px min-w-px relative shrink-0" data-name="Title" data-node-id="I959:31071;174:9565">
+                <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I959:31071;174:9566">
+                  Merchadise Tenant
+                </p>
+              </div>
+            </div>
+            <div className="bg-white border-[#f0f0f5] border-b border-l-0 border-r-0 border-solid border-t-0 box-border content-stretch flex gap-[8px] items-center px-[16px] py-[8px] relative shrink-0 w-full" data-name="Dropdown item" data-node-id="959:31072">
+              <div className="content-stretch flex flex-[1_0_0] gap-[8px] h-[24px] items-center min-h-px min-w-px relative shrink-0" data-name="Title" data-node-id="I959:31072;174:9565">
+                <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I959:31072;174:9566">
+                  Boundless
+                </p>
+              </div>
+            </div>
+            <div className="bg-white border-[#f0f0f5] border-b border-l-0 border-r-0 border-solid border-t-0 box-border content-stretch flex gap-[8px] items-center px-[16px] py-[8px] relative shrink-0 w-full" data-name="Dropdown item" data-node-id="959:31073">
+              <div className="content-stretch flex flex-[1_0_0] gap-[8px] h-[24px] items-center min-h-px min-w-px relative shrink-0" data-name="Title" data-node-id="I959:31073;174:9565">
+                <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I959:31073;174:9566">
+                  Touchstone
+                </p>
+              </div>
+            </div>
+            <div className="bg-white border-[#f0f0f5] border-b border-l-0 border-r-0 border-solid border-t-0 box-border content-stretch flex gap-[8px] items-center px-[16px] py-[8px] relative shrink-0 w-full" data-name="Dropdown item" data-node-id="959:31540">
+              <div className="content-stretch flex flex-[1_0_0] gap-[8px] h-[24px] items-center min-h-px min-w-px relative shrink-0" data-name="Title" data-node-id="I959:31540;174:9565">
+                <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I959:31540;174:9566">
+                  Friedrich
+                </p>
+              </div>
+            </div>
+            <div className="bg-white border-[#f0f0f5] border-b border-l-0 border-r-0 border-solid border-t-0 box-border content-stretch flex gap-[8px] items-center px-[16px] py-[8px] relative shrink-0 w-full" data-name="Dropdown item" data-node-id="959:31546">
+              <div className="content-stretch flex flex-[1_0_0] gap-[8px] h-[24px] items-center min-h-px min-w-px relative shrink-0" data-name="Title" data-node-id="I959:31546;174:9565">
+                <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I959:31546;174:9566">
+                  Blair Dorsey
+                </p>
+              </div>
+            </div>
+            <div className="bg-white box-border content-stretch flex gap-[8px] items-center px-[16px] py-[8px] relative shrink-0 w-full" data-name="Dropdown item" data-node-id="959:31552">
+              <div className="content-stretch flex flex-[1_0_0] gap-[8px] h-[24px] items-center min-h-px min-w-px relative shrink-0" data-name="Title" data-node-id="I959:31552;174:9565">
+                <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I959:31552;174:9566">
+                  Zigaprint
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white h-[220px] overflow-clip relative shrink-0 w-[12px]" data-name="Scroll Bar" data-node-id="959:59967">
+            <div className="absolute bg-[#d1d1d1] h-[54px] left-1/2 rounded-[4px] top-[4px] translate-x-[-50%] w-[8px]" data-node-id="959:59968" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+type HeaderProfileProps = {
+  className?: string;
+  property1?: "Close" | "Open" | "Icon" | "Distributor Admin" | "Variant5";
+};
+
+function HeaderProfile({ className, property1 = "Close" }: HeaderProfileProps) {
+  return (
+    <div className={className} data-name="Property 1=Close" data-node-id="1198:31139">
+      <div className="bg-white border-b border-l-0 border-r border-solid border-t-0 border-white box-border content-stretch flex h-[64px] items-center justify-between px-[16px] py-[86px] relative shrink-0 w-full" data-name="Header - Logo" data-node-id="1198:31140">
+        <div className="content-stretch flex flex-[1_0_0] gap-[8px] items-center min-h-px min-w-px relative shrink-0" data-name="Left" data-node-id="1198:31309">
+          <div className="bg-[#eae9f9] border border-[#263063] border-solid h-[40px] relative rounded-[1000px] shrink-0 w-[40.088px]" data-name="Profile" data-node-id="1198:31310">
+            <div className="absolute flex flex-col font-['Inter:Medium',sans-serif] font-medium justify-center leading-[0] left-[calc(50%+0.46px)] not-italic text-[#263063] text-[14px] text-center top-1/2 translate-x-[-50%] translate-y-[-50%] whitespace-nowrap" data-node-id="1198:31311">
+              <p className="leading-[24px]">JT</p>
+            </div>
+          </div>
+          <div className="content-stretch flex flex-[1_0_0] gap-[12px] h-[40px] items-center min-h-px min-w-px relative shrink-0" data-name="User-profile" data-node-id="1198:31312">
+            <div className="content-stretch flex flex-[1_0_0] flex-col h-full items-start justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#263063]" data-node-id="1198:31313">
+              <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:Medium',sans-serif] justify-center min-h-px min-w-px relative shrink-0 text-[16px] w-full" data-node-id="1198:31314">
+                <p className="leading-[1.4] whitespace-pre-wrap">Justin T.</p>
+              </div>
+              <div className="flex flex-col font-['IBM_Plex_Sans:Regular',sans-serif] h-[20px] justify-center relative shrink-0 text-[12px] w-full" data-node-id="1198:31315">
+                <p className="leading-[1.4] whitespace-pre-wrap">Tri-POD Admin</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <Icons className="block cursor-pointer overflow-clip relative shrink-0 size-[24px]" icons="Nav-arrow-down" />
+      </div>
+    </div>
+  );
+}
+
+function IconArrowDown({ className }: { className?: string }) {
+  return (
+    <div className={className} data-name="Icon / Arrow down" data-node-id="9671:18607">
+      <div className="absolute flex inset-[34.37%_21.87%_34.37%_21.88%] items-center justify-center">
+        <div className="flex-none h-[7.5px] rotate-[180deg] w-[13.5px]">
+          <div className="relative size-full" data-name="vector" data-node-id="9671:18606">
+            <img alt="" className="block max-w-none size-full" src={imgVector1} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IconSideBarAdmin({ className }: { className?: string }) {
+  return (
+    <div className={className} data-name="Icon / SideBar / Admin" data-node-id="18078:61036">
+      <div className="absolute inset-[4.17%_6.25%_6.25%_4.17%]" data-name="vector" data-node-id="18078:61035">
+        <img alt="" className="block max-w-none size-full" src={imgVector2} />
+      </div>
+    </div>
+  );
+}
+
+function IconArrowUp({ className }: { className?: string }) {
+  return (
+    <div className={className} data-name="Icon / Arrow up" data-node-id="9671:18602">
+      <div className="absolute inset-[34.38%_21.88%]" data-name="vector" data-node-id="9671:18601">
+        <img alt="" className="block max-w-none size-full" src={imgVector3} />
+      </div>
+    </div>
+  );
+}
+type AdminProps = {
+  className?: string;
+  property1?: boolean;
+};
+
+function Admin({ className, property1 = true }: AdminProps) {
+  const title = (
+    <div className="content-stretch flex gap-[8px] items-center relative shrink-0" data-name="Title">
+      <IconSideBarAdmin className="overflow-clip relative shrink-0 size-[24px]" />
+      <p className="font-['IBM_Plex_Sans:Medium',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]">Admin</p>
+    </div>
+  );
+  if (!property1) {
+    return (
+      <button className={className} data-name="Property 1=Closed" data-node-id="55:1607">
+        <div className="box-border content-stretch flex items-center justify-between px-[14px] py-[12px] relative rounded-[4px] shrink-0 w-full" data-name="Admin" data-node-id="55:1573">
+          {title}
+          <IconArrowDown className="overflow-clip relative shrink-0 size-[24px]" />
+        </div>
+      </button>
+    );
+  }
+  return (
+    <div className={className} data-name="Property 1=Open" data-node-id="55:1608">
+      <button className="box-border content-stretch cursor-pointer flex items-center justify-between px-[14px] py-[12px] relative rounded-[4px] shrink-0 w-full" data-name="Admin" data-node-id="54:2126">
+        {title}
+        <IconArrowUp className="overflow-clip relative shrink-0 size-[24px]" />
+      </button>
+      <div className="content-stretch flex flex-col items-start relative shrink-0 w-full" data-name="Sub sections" data-node-id="55:1570">
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-[248px]" data-name="SideBar / Items" data-node-id="1465:38389">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I1465:38389;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I1465:38389;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I1465:38389;39:1086">
+              Default Categories
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-[248px]" data-name="SideBar / Items" data-node-id="54:2421">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I54:2421;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I54:2421;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I54:2421;39:1086">
+              User Roles
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-[248px]" data-name="SideBar / Items" data-node-id="54:2426">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I54:2426;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I54:2426;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I54:2426;39:1086">
+              Fonts
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-[248px]" data-name="SideBar / Items" data-node-id="54:2431">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I54:2431;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I54:2431;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I54:2431;39:1086">
+              Global Settings
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-[248px]" data-name="SideBar / Items" data-node-id="7408:89373">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I7408:89373;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I7408:89373;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I7408:89373;39:1086">
+              Push Notification
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-[248px]" data-name="SideBar / Items" data-node-id="20504:58752">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I20504:58752;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img3} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I20504:58752;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I20504:58752;39:1086">
+              Workspace Requests
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IconSideBarReports({ className }: { className?: string }) {
+  return (
+    <div className={className} data-name="Icon / SideBar / Reports" data-node-id="18078:61046">
+      <div className="absolute inset-[8.33%_10.42%_8.14%_8.33%]" data-name="vector" data-node-id="18078:61031">
+        <img alt="" className="block max-w-none size-full" src={imgVector4} />
+      </div>
+    </div>
+  );
+}
+type ReportsProps = {
+  className?: string;
+  property1?: boolean;
+};
+
+function Reports({ className, property1 = true }: ReportsProps) {
+  const title = (
+    <div className="content-stretch flex gap-[8px] items-center relative shrink-0" data-name="Title">
+      <IconSideBarReports className="overflow-clip relative shrink-0 size-[24px]" />
+      <p className="font-['IBM_Plex_Sans:Medium',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]">Reports</p>
+    </div>
+  );
+  if (!property1) {
+    return (
+      <button className={className} data-name="Property 1=Closed" data-node-id="5435:53796">
+        <div className="box-border content-stretch flex items-center justify-between px-[14px] py-[12px] relative rounded-[4px] shrink-0 w-full" data-name="Admin" data-node-id="5435:53797">
+          {title}
+          <IconArrowDown className="overflow-clip relative shrink-0 size-[24px]" />
+        </div>
+      </button>
+    );
+  }
+  return (
+    <div className={className} data-name="Property 1=Open" data-node-id="5435:53787">
+      <div className="box-border content-stretch flex items-center justify-between px-[14px] py-[12px] relative rounded-[4px] shrink-0 w-full" data-name="Reports" data-node-id="5435:53890">
+        {title}
+        <IconArrowUp className="overflow-clip relative shrink-0 size-[24px]" />
+      </div>
+      <div className="content-stretch flex flex-col items-start relative shrink-0 w-full" data-name="Sub sections" data-node-id="5435:53789">
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-full" data-name="SideBar / Items" data-node-id="5435:53790">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I5435:53790;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I5435:53790;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I5435:53790;39:1086">
+              Profit Report by Store
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-full" data-name="SideBar / Items" data-node-id="5435:53791">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I5435:53791;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I5435:53791;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I5435:53791;39:1086">
+              Tripod Store Payout
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-full" data-name="SideBar / Items" data-node-id="5435:53792">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I5435:53792;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I5435:53792;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I5435:53792;39:1086">
+              Profit Report by Order
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-full" data-name="SideBar / Items" data-node-id="5435:53793">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I5435:53793;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I5435:53793;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I5435:53793;39:1086">
+              Orders List for Accounting
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-full" data-name="SideBar / Items" data-node-id="5435:53794">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I5435:53794;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I5435:53794;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I5435:53794;39:1086">
+              My Sales
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-full" data-name="SideBar / Items" data-node-id="5435:53795">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I5435:53795;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I5435:53795;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I5435:53795;39:1086">
+              Sales by Sales Rep
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-full" data-name="SideBar / Items" data-node-id="8706:44790">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I8706:44790;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I8706:44790;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I8706:44790;39:1086">
+              Distributor Royalty Report
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-full" data-name="SideBar / Items" data-node-id="13471:28612">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I13471:28612;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img4} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I13471:28612;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I13471:28612;39:1086">
+              Tri-POD Aggregated Profit
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-full" data-name="SideBar / Items" data-node-id="13848:82692">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I13848:82692;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img4} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I13848:82692;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I13848:82692;39:1086">
+              Stores Fee By Workspace
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-full" data-name="SideBar / Items" data-node-id="13848:83010">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I13848:83010;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img4} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px px-[8px] py-0 relative shrink-0" data-name="Title" data-node-id="I13848:83010;39:1084">
+            <p className="flex-[1_0_0] font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] min-h-px min-w-px not-italic overflow-ellipsis overflow-hidden relative shrink-0 text-[#0a0c36] text-[14px] whitespace-nowrap" data-node-id="I13848:83010;39:1086">
+              Stores Subscription
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-full" data-name="SideBar / Items" data-node-id="13902:45933">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I13902:45933;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img4} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px px-[8px] py-0 relative shrink-0" data-name="Title" data-node-id="I13902:45933;39:1084">
+            <p className="flex-[1_0_0] font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] min-h-px min-w-px not-italic overflow-ellipsis overflow-hidden relative shrink-0 text-[#0a0c36] text-[14px] whitespace-nowrap" data-node-id="I13902:45933;39:1086">
+              Stripe Billing History
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-full" data-name="SideBar / Items" data-node-id="19493:95067">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I19493:95067;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img3} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px px-[8px] py-0 relative shrink-0" data-name="Title" data-node-id="I19493:95067;39:1084">
+            <p className="flex-[1_0_0] font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] min-h-px min-w-px not-italic overflow-ellipsis overflow-hidden relative shrink-0 text-[#0a0c36] text-[14px] whitespace-nowrap" data-node-id="I19493:95067;39:1086">
+              Services Report Payment
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-full" data-name="SideBar / Items" data-node-id="19504:97593">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I19504:97593;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img3} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px px-[8px] py-0 relative shrink-0" data-name="Title" data-node-id="I19504:97593;39:1084">
+            <p className="flex-[1_0_0] font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] min-h-px min-w-px not-italic overflow-ellipsis overflow-hidden relative shrink-0 text-[#0a0c36] text-[14px] whitespace-nowrap" data-node-id="I19504:97593;39:1086">
+              Services Report
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-full" data-name="SideBar / Items" data-node-id="19988:28268">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I19988:28268;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img3} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px px-[8px] py-0 relative shrink-0" data-name="Title" data-node-id="I19988:28268;39:1084">
+            <p className="flex-[1_0_0] font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] min-h-px min-w-px not-italic overflow-ellipsis overflow-hidden relative shrink-0 text-[#0a0c36] text-[14px] whitespace-nowrap" data-node-id="I19988:28268;39:1086">
+              Shopify Orders
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-full" data-name="SideBar / Items" data-node-id="21529:49218">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I21529:49218;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img3} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px px-[8px] py-0 relative shrink-0" data-name="Title" data-node-id="I21529:49218;39:1084">
+            <p className="flex-[1_0_0] font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] min-h-px min-w-px not-italic overflow-ellipsis overflow-hidden relative shrink-0 text-[#0a0c36] text-[14px] whitespace-nowrap" data-node-id="I21529:49218;39:1086">
+              Product Sales Report
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+type SideBarItemsProps = {
+  className?: string;
+  showNumer?: boolean;
+  state?: "Default" | "Hover" | "Selected";
+  hierarchy?: "Sub Section" | "Section";
+};
+
+function SideBarItems({ className, showNumer = false, state = "Default", hierarchy = "Section" }: SideBarItemsProps) {
+  return (
+    <div className={className} data-name="State=Default, Hierarchy=Section" data-node-id="39:60">
+      <div className="content-stretch flex gap-[8px] items-center relative shrink-0" data-name="Title" data-node-id="39:33">
+        <div className="overflow-clip relative shrink-0 size-[24px]" data-name="Icon / SideBar / Dashboard" data-node-id="131:9289">
+          <div className="absolute inset-[12.5%_14.58%_14.58%_12.5%]" data-name="vector" data-node-id="I131:9289;18078:60974">
+            <div className="absolute inset-0" style={{ "--fill-0": "rgba(10, 12, 54, 1)" } as React.CSSProperties}>
+              <img alt="" className="block max-w-none size-full" src={img5} />
+            </div>
+          </div>
+        </div>
+        <p className="font-['IBM_Plex_Sans:Medium',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="39:21">
+          Section name
+        </p>
+        {showNumer && (
+          <div className="bg-[#263063] content-stretch flex gap-[4px] items-center justify-center relative rounded-[10px] shrink-0 size-[20px]" data-name="CTAs" data-node-id="7514:87975">
+            <div className="flex flex-col font-['IBM_Plex_Sans:Regular',sans-serif] justify-center leading-[0] not-italic relative shrink-0 text-[10px] text-center text-white whitespace-nowrap" data-node-id="I7514:87975;1209:12257">
+              <p className="leading-[1.2]">00</p>
+            </div>
+          </div>
+        )}
+      </div>
+      <Icons className="overflow-clip relative shrink-0 size-[24px]" icons="Nav-arrow-down" />
+    </div>
+  );
+}
+
+function IconSideBarVendors({ className }: { className?: string }) {
+  return (
+    <div className={className} data-name="Icon / SideBar / Vendors" data-node-id="18078:61038">
+      <div className="absolute inset-[16.67%_6.25%_13.54%_4.17%]" data-name="vector" data-node-id="18078:60994">
+        <img alt="" className="block max-w-none size-full" src={imgVector5} />
+      </div>
+    </div>
+  );
+}
+type VendorsProps = {
+  className?: string;
+  property1?: boolean;
+};
+
+function Vendors({ className, property1 = true }: VendorsProps) {
+  const title = (
+    <div className="content-stretch flex gap-[8px] items-center relative shrink-0" data-name="Title">
+      <IconSideBarVendors className="overflow-clip relative shrink-0 size-[24px]" />
+      <p className="font-['IBM_Plex_Sans:Medium',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]">Vendors</p>
+    </div>
+  );
+  if (!property1) {
+    return (
+      <button className={className} data-name="Property 1=Closed" data-node-id="698:1859">
+        <div className="box-border content-stretch flex items-center justify-between px-[14px] py-[12px] relative rounded-[4px] shrink-0 w-full" data-name="Admin" data-node-id="696:17645">
+          {title}
+          <IconArrowDown className="overflow-clip relative shrink-0 size-[24px]" />
+        </div>
+      </button>
+    );
+  }
+  return (
+    <button className={className} data-name="Property 1=Open" data-node-id="698:1844">
+      <div className="box-border content-stretch flex items-center justify-between px-[14px] py-[12px] relative rounded-[4px] shrink-0 w-full" data-name="Admin" data-node-id="696:17607">
+        {title}
+        <IconArrowUp className="overflow-clip relative shrink-0 size-[24px]" />
+      </div>
+      <div className="content-stretch flex flex-col items-start relative shrink-0 w-full" data-name="Sub sections" data-node-id="696:17608">
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-[248px]" data-name="SideBar / Items" data-node-id="696:17609">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I696:17609;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I696:17609;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I696:17609;39:1086">
+              All Vendors
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-[248px]" data-name="SideBar / Items" data-node-id="696:17610">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I696:17610;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I696:17610;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I696:17610;39:1086">
+              Orders
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-[248px]" data-name="SideBar / Items" data-node-id="696:17611">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I696:17611;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I696:17611;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I696:17611;39:1086">
+              Colors
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-[248px]" data-name="SideBar / Items" data-node-id="696:17612">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I696:17612;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I696:17612;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I696:17612;39:1086">
+              Sizes
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-[248px]" data-name="SideBar / Items" data-node-id="696:17613">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I696:17613;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I696:17613;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I696:17613;39:1086">
+              Brand Short Names
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-[248px]" data-name="SideBar / Items" data-node-id="698:1486">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I698:1486;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I698:1486;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I698:1486;39:1086">
+              Missing Size Charts
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-[248px]" data-name="SideBar / Items" data-node-id="749:17842">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I749:17842;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I749:17842;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I749:17842;39:1086">
+              Print Locations
+            </p>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[16px] h-[38px] items-center pl-[24px] pr-0 py-0 relative rounded-[4px] shrink-0 w-[248px]" data-name="SideBar / Items" data-node-id="698:1491">
+          <div className="h-full relative shrink-0 w-0" data-name="Line" data-node-id="I698:1491;1191:42286">
+            <div className="absolute inset-[-1.32%_-0.5px]">
+              <img alt="" className="block max-w-none size-full" src={img2} />
+            </div>
+          </div>
+          <div className="box-border content-stretch flex flex-[1_0_0] gap-[8px] h-full items-center min-h-px min-w-px pl-[8px] pr-0 py-0 relative shrink-0" data-name="Title" data-node-id="I698:1491;39:1084">
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I698:1491;39:1086">
+              Switch Products
+            </p>
+          </div>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+export default function ServicesRequestAdHocServices() {
+  return (
+    <div className="bg-[#f0f0f5] content-stretch flex items-start relative size-full" data-name="Services Request / Ad-hoc Services" data-node-id="19588:44431">
+      <div className="bg-white h-[700px] overflow-clip shrink-0 sticky top-0 w-[251px]" data-name="Side Bar" data-node-id="19588:44432">
+        <div className="absolute content-stretch flex gap-[10px] items-start justify-center left-0 overflow-x-clip overflow-y-auto top-[64px] w-[248px]" data-name="Scroll Section" data-node-id="I19588:44432;101:6916">
+          <div className="box-border content-stretch flex flex-[1_0_0] flex-col gap-[6px] items-start justify-center min-h-px min-w-px p-[8px] relative shrink-0" data-name="Sections" data-node-id="I19588:44432;101:6359">
+            <button className="box-border content-stretch cursor-pointer flex flex-col items-start p-0 relative shrink-0 w-full" data-name="Orders" data-node-id="I19588:44432;135:7865">
+              <div className="box-border content-stretch flex items-center justify-between px-[14px] py-[12px] relative rounded-[4px] shrink-0 w-full" data-name="SideBar / Items" data-node-id="I19588:44432;135:7865;40:1515">
+                <div className="content-stretch flex gap-[8px] items-center relative shrink-0" data-name="Title" data-node-id="I19588:44432;135:7865;40:1515;39:33">
+                  <div className="overflow-clip relative shrink-0 size-[24px]" data-name="Icon / SideBar / Orders" data-node-id="I19588:44432;135:7865;40:1515;131:9289">
+                    <div className="absolute inset-[11.46%_11.46%_13.54%_9.38%]" data-name="vector" data-node-id="I19588:44432;135:7865;40:1515;131:9289;18078:60980">
+                      <div className="absolute inset-0" style={{ "--fill-0": "rgba(10, 12, 54, 1)" } as React.CSSProperties}>
+                        <img alt="" className="block max-w-none size-full" src={img6} />
+                      </div>
+                    </div>
+                  </div>
+                  <p className="font-['IBM_Plex_Sans:Medium',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I19588:44432;135:7865;40:1515;39:21">
+                    Orders
+                  </p>
+                </div>
+                <IconArrowDown className="overflow-clip relative shrink-0 size-[24px]" />
+              </div>
+            </button>
+            <SideBarItems className="box-border content-stretch flex gap-[8px] items-center px-[14px] py-[12px] relative rounded-[4px] shrink-0 w-full" />
+            <SideBarItems className="box-border content-stretch flex gap-[8px] items-center px-[14px] py-[12px] relative rounded-[4px] shrink-0 w-full" />
+            <div className="content-stretch flex flex-col items-center relative shrink-0 w-full" data-name="Services Request" data-node-id="I19588:44432;18078:121291">
+              <div className="bg-[#263063] box-border content-stretch flex items-center justify-between px-[14px] py-[12px] relative rounded-[4px] shrink-0 w-full" data-name="Admin" data-node-id="I19588:44432;18078:121291;18078:34067">
+                <div className="content-stretch flex flex-[1_0_0] gap-[8px] items-center min-h-px min-w-px relative shrink-0" data-name="Title" data-node-id="I19588:44432;18078:121291;18078:34067;39:49">
+                  <div className="overflow-clip relative shrink-0 size-[24px]" data-name="Icon / SideBar / Service Request" data-node-id="I19588:44432;18078:121291;18078:34067;131:8095">
+                    <div className="absolute inset-[8.33%_10.42%_6.72%_8.33%]" data-name="vector" data-node-id="I19588:44432;18078:121291;18078:34067;131:8095;18078:191733">
+                      <div className="absolute inset-0" style={{ "--fill-0": "rgba(255, 255, 255, 1)" } as React.CSSProperties}>
+                        <img alt="" className="block max-w-none size-full" src={img7} />
+                      </div>
+                    </div>
+                  </div>
+                  <p className="font-['IBM_Plex_Sans:Medium',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[14px] text-white" data-node-id="I19588:44432;18078:121291;18078:34067;39:51">
+                    Services Request
+                  </p>
+                </div>
+              </div>
+            </div>
+            <Vendors className="box-border content-stretch cursor-pointer flex flex-col items-center p-0 relative shrink-0 w-full" property1={false} />
+            <SideBarItems className="box-border content-stretch flex gap-[8px] items-center px-[14px] py-[12px] relative rounded-[4px] shrink-0 w-full" />
+            <SideBarItems className="box-border content-stretch flex gap-[8px] items-center px-[14px] py-[12px] relative rounded-[4px] shrink-0 w-full" />
+            <SideBarItems className="box-border content-stretch flex gap-[8px] items-center px-[14px] py-[12px] relative rounded-[4px] shrink-0 w-full" />
+            <Reports className="box-border content-stretch cursor-pointer flex flex-col items-center p-0 relative shrink-0 w-[248px]" property1={false} />
+            <Admin className="content-stretch flex flex-col gap-[4px] items-center relative shrink-0 w-full" />
+            <Admin className="box-border content-stretch cursor-pointer flex flex-col items-center p-0 relative shrink-0 w-full" property1={false} />
+          </div>
+        </div>
+        <HeaderProfile className="absolute border-[#f0f0f5] border-b-0 border-l-0 border-r-0 border-solid border-t bottom-0 box-border content-stretch flex flex-col gap-[16px] items-start left-0 w-[248px]" />
+        <HeaderLogo className="absolute border-[#f0f0f5] border-b border-l-0 border-r-0 border-solid border-t-0 box-border content-stretch flex flex-col gap-[16px] items-start left-0 top-0 w-[248px]" property1="Close" />
+      </div>
+      <div className="content-stretch flex flex-[1_0_0] flex-col h-[700px] isolate items-center min-h-[700px] min-w-px relative shrink-0" data-name="Content" data-node-id="19588:44433">
+        <div className="bg-white box-border content-stretch flex gap-[48px] h-[64px] items-center justify-end px-[32px] py-0 shadow-[0px_10px_16px_2px_rgba(167,167,167,0.1)] shrink-0 sticky top-0 w-[1192px] z-[5]" data-name="Top Bar" data-node-id="19588:44434">
+          <div className="content-stretch flex flex-[1_0_0] gap-[4px] items-center min-h-px min-w-px relative shrink-0" data-name="Breadcrumbs" data-node-id="I19588:44434;116:6382">
+            <a className="box-border content-stretch cursor-pointer flex items-center p-0 relative shrink-0" data-name="Main Page" data-node-id="I19588:44434;479:18013">
+              <Icons className="overflow-clip relative shrink-0 size-[18px]" icons="Nav-arrow-left" />
+              <div className="border-0 border-[#9e9e94] border-solid box-border content-stretch flex gap-[4px] items-center px-[4px] py-0 relative shrink-0" data-name="Section 1" data-node-id="I19588:44434;320:9847">
+                <div className="flex flex-col font-['IBM_Plex_Sans:Regular',sans-serif] justify-center leading-[0] not-italic relative shrink-0 text-[#9e9e94] text-[14px] text-center whitespace-nowrap" data-node-id="I19588:44434;320:9847;320:9839">
+                  <p className="leading-[1.4]">Services Request</p>
+                </div>
+              </div>
+            </a>
+            <div className="flex flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] not-italic relative shrink-0 text-[#03c3fb] text-[14px] text-center whitespace-nowrap" data-node-id="I19588:44434;320:11596">
+              <p className="leading-[1.4]">/</p>
+            </div>
+            <div className="border-0 border-[#03c3fb] border-solid box-border content-stretch flex flex-[1_0_0] gap-[4px] items-center min-h-px min-w-px px-[4px] py-0 relative shrink-0" data-name="Current Section" data-node-id="I19588:44434;320:11597">
+              <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#03c3fb] text-[14px]" data-node-id="I19588:44434;320:11597;320:9841">
+                <p className="leading-[1.4] whitespace-pre-wrap">Bundle Services</p>
+              </div>
+            </div>
+          </div>
+          <div className="content-stretch flex gap-[40px] items-center justify-end relative shrink-0" data-name="Actions" data-node-id="I19588:44434;116:6367">
+            <div className="bg-white border-[#d1d1d1] border-[1.5px] border-solid box-border content-stretch flex items-center justify-between px-[16px] py-[8px] relative rounded-[4px] shrink-0 w-[300px]" data-name="Dropdown" data-node-id="I19588:44434;116:6411">
+              <div className="content-stretch flex gap-[8px] items-center relative shrink-0" data-name="Title" data-node-id="I19588:44434;116:6411;116:5142">
+                <p className="font-['IBM_Plex_Sans:Medium',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#9e9e94] text-[14px]" data-node-id="I19588:44434;116:6411;116:5143">
+                  Switch Store
+                </p>
+              </div>
+              <Icons className="overflow-clip relative shrink-0 size-[28px]" icons="Nav-arrow-down" />
+            </div>
+            <div className="content-stretch flex gap-[16px] items-center relative shrink-0" data-name="Actions" data-node-id="I19588:44434;116:6374">
+              <IconFullWidth className="overflow-clip relative shrink-0 size-[28px]" />
+              <IconNotification className="overflow-clip relative shrink-0 size-[28px]" />
+            </div>
+          </div>
+        </div>
+        <div className="box-border content-stretch flex gap-[1113px] items-start px-[32px] py-[24px] relative shrink-0 w-full z-[4]" data-name="Header Page" data-node-id="19588:44435">
+          <div className="content-stretch flex flex-col gap-[4px] items-start justify-center relative shrink-0" data-name="Tiitle+Sub" data-node-id="I19588:44435;248:15536">
+            <div className="content-stretch flex gap-[8px] items-center relative shrink-0" data-name="Title & Number" data-node-id="I19588:44435;248:15513">
+              <div className="content-stretch flex gap-[8px] items-center relative shrink-0" data-name="Section Name" data-node-id="I19588:44435;248:15514">
+                <p className="font-['IBM_Plex_Sans:SemiBold',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[24px]" data-node-id="I19588:44435;248:15515">
+                  Ad-hoc Services
+                </p>
+              </div>
+            </div>
+            <p className="font-['IBM_Plex_Sans:Regular',sans-serif] leading-[1.4] not-italic relative shrink-0 text-[#0a0c36] text-[16px]" data-node-id="I19588:44435;248:15535">
+              Pre-packaged services to replicate a store using existing Tri-POD replicators
+            </p>
+          </div>
+        </div>
+        <div className="content-start cursor-pointer flex flex-wrap gap-[24px] items-start max-w-[1128px] relative shrink-0 w-full z-[3]" data-name="Grid Product" data-node-id="19588:44436">
+          <AdhocService className="bg-white border border-[#f0f0f5] border-solid box-border content-stretch flex gap-[16px] items-start overflow-clip p-[24px] relative rounded-[16px] shrink-0 w-[360px]" />
+          <a className="bg-white border border-[#f0f0f5] border-solid box-border content-stretch flex gap-[16px] items-start overflow-clip p-[24px] relative rounded-[16px] shrink-0 w-[360px]" data-name="Adhoc Service" data-node-id="19588:47914">
+            <div className="content-stretch flex flex-[1_0_0] flex-col gap-[8px] items-start min-h-px min-w-px relative shrink-0" data-name="Info" data-node-id="I19588:47914;19588:47885">
+              <div className="content-stretch flex gap-[24px] items-center relative shrink-0 w-full" data-name="Header" data-node-id="I19588:47914;19588:47886">
+                <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[16px]" data-node-id="I19588:47914;19588:47887">
+                  <p className="leading-[1.4] whitespace-pre-wrap">Artwork Touch-Ups (DTF / DTG)</p>
+                </div>
+                <div className="content-stretch flex gap-[10px] items-center relative shrink-0" data-node-id="I19588:47914;19588:47888">
+                  <div className="flex flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] not-italic relative shrink-0 text-[#03c3fb] text-[20px] whitespace-nowrap" data-node-id="I19588:47914;19588:47889">
+                    <p className="leading-[1.4]">{` $ 10`}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="content-stretch flex gap-[8px] items-center relative shrink-0 w-full" data-name="Service Included" data-node-id="I19588:47914;19588:47890">
+                <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:Regular',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I19588:47914;19588:47891">
+                  <p className="leading-[1.4] whitespace-pre-wrap">Clean, refine, and prep your artwork for flawless digital prints.</p>
+                </div>
+              </div>
+            </div>
+          </a>
+          <a className="bg-white border border-[#f0f0f5] border-solid box-border content-stretch flex gap-[16px] items-start overflow-clip p-[24px] relative rounded-[16px] shrink-0 w-[360px]" data-name="Adhoc Service" data-node-id="19588:47923">
+            <div className="content-stretch flex flex-[1_0_0] flex-col gap-[8px] items-start min-h-px min-w-px relative shrink-0" data-name="Info" data-node-id="I19588:47923;19588:47885">
+              <div className="content-stretch flex gap-[24px] items-center relative shrink-0 w-full" data-name="Header" data-node-id="I19588:47923;19588:47886">
+                <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[16px]" data-node-id="I19588:47923;19588:47887">
+                  <p className="leading-[1.4] whitespace-pre-wrap">Artwork Composition</p>
+                </div>
+                <div className="content-stretch flex gap-[10px] items-center relative shrink-0" data-node-id="I19588:47923;19588:47888">
+                  <div className="flex flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] not-italic relative shrink-0 text-[#03c3fb] text-[20px] whitespace-nowrap" data-node-id="I19588:47923;19588:47889">
+                    <p className="leading-[1.4]">{` $ 10`}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="content-stretch flex gap-[8px] items-center relative shrink-0 w-full" data-name="Service Included" data-node-id="I19588:47923;19588:47890">
+                <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:Regular',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I19588:47923;19588:47891">
+                  <p className="leading-[1.4] whitespace-pre-wrap">Transform your logo into a polished new design or template.</p>
+                </div>
+              </div>
+            </div>
+          </a>
+          <a className="bg-white border border-[#f0f0f5] border-solid box-border content-stretch flex gap-[16px] items-start overflow-clip p-[24px] relative rounded-[16px] shrink-0 w-[360px]" data-name="Adhoc Service" data-node-id="19588:47933">
+            <div className="content-stretch flex flex-[1_0_0] flex-col gap-[8px] items-start min-h-px min-w-px relative shrink-0" data-name="Info" data-node-id="I19588:47933;19588:47885">
+              <div className="content-stretch flex gap-[24px] items-center relative shrink-0 w-full" data-name="Header" data-node-id="I19588:47933;19588:47886">
+                <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[16px]" data-node-id="I19588:47933;19588:47887">
+                  <p className="leading-[1.4] whitespace-pre-wrap">Creative Art</p>
+                </div>
+                <div className="content-stretch flex gap-[10px] items-center relative shrink-0" data-node-id="I19588:47933;19588:47888">
+                  <div className="flex flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] not-italic relative shrink-0 text-[#03c3fb] text-[20px] whitespace-nowrap" data-node-id="I19588:47933;19588:47889">
+                    <p className="leading-[1.4]">{` $ 20 - $ 60`}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="content-stretch flex gap-[8px] items-center relative shrink-0 w-full" data-name="Service Included" data-node-id="I19588:47933;19588:47890">
+                <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:Regular',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I19588:47933;19588:47891">
+                  <p className="leading-[1.4] whitespace-pre-wrap">Original artwork from just your idea, text, or inspiration.</p>
+                </div>
+              </div>
+            </div>
+          </a>
+          <a className="bg-white border border-[#f0f0f5] border-solid box-border content-stretch flex gap-[16px] items-start overflow-clip p-[24px] relative rounded-[16px] shrink-0 w-[360px]" data-name="Adhoc Service" data-node-id="19588:47942">
+            <div className="content-stretch flex flex-[1_0_0] flex-col gap-[8px] items-start min-h-px min-w-px relative shrink-0" data-name="Info" data-node-id="I19588:47942;19588:47885">
+              <div className="content-stretch flex gap-[24px] items-center relative shrink-0 w-full" data-name="Header" data-node-id="I19588:47942;19588:47886">
+                <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[16px]" data-node-id="I19588:47942;19588:47887">
+                  <p className="leading-[1.4] whitespace-pre-wrap">Embroidery Digitization</p>
+                </div>
+                <div className="content-stretch flex gap-[10px] items-center relative shrink-0" data-node-id="I19588:47942;19588:47888">
+                  <div className="flex flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] not-italic relative shrink-0 text-[#03c3fb] text-[20px] whitespace-nowrap" data-node-id="I19588:47942;19588:47889">
+                    <p className="leading-[1.4]">{` $ 15`}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="content-stretch flex gap-[8px] items-center relative shrink-0 w-full" data-name="Service Included" data-node-id="I19588:47942;19588:47890">
+                <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:Regular',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I19588:47942;19588:47891">
+                  <p className="leading-[1.4] whitespace-pre-wrap">Convert your artwork into stitch-perfect embroidery files.</p>
+                </div>
+              </div>
+            </div>
+          </a>
+          <a className="bg-white border border-[#f0f0f5] border-solid box-border content-stretch flex gap-[16px] items-start overflow-clip p-[24px] relative rounded-[16px] shrink-0 w-[360px]" data-name="Adhoc Service" data-node-id="19588:47951">
+            <div className="content-stretch flex flex-[1_0_0] flex-col gap-[8px] items-start min-h-px min-w-px relative shrink-0" data-name="Info" data-node-id="I19588:47951;19588:47885">
+              <div className="content-stretch flex gap-[24px] items-center relative shrink-0 w-full" data-name="Header" data-node-id="I19588:47951;19588:47886">
+                <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[16px]" data-node-id="I19588:47951;19588:47887">
+                  <p className="leading-[1.4] whitespace-pre-wrap">Dye-Sublimation Template</p>
+                </div>
+                <div className="content-stretch flex gap-[10px] items-center relative shrink-0" data-node-id="I19588:47951;19588:47888">
+                  <div className="flex flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] not-italic relative shrink-0 text-[#03c3fb] text-[20px] whitespace-nowrap" data-node-id="I19588:47951;19588:47889">
+                    <p className="leading-[1.4]">$ 60</p>
+                  </div>
+                </div>
+              </div>
+              <div className="content-stretch flex gap-[8px] items-center relative shrink-0 w-full" data-name="Service Included" data-node-id="I19588:47951;19588:47890">
+                <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:Regular',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I19588:47951;19588:47891">
+                  <p className="leading-[1.4] whitespace-pre-wrap">Full-coverage artwork templates tailored for all-over prints.</p>
+                </div>
+              </div>
+            </div>
+          </a>
+          <a className="bg-white border border-[#f0f0f5] border-solid box-border content-stretch flex gap-[16px] items-start overflow-clip p-[24px] relative rounded-[16px] shrink-0 w-[360px]" data-name="Adhoc Service" data-node-id="19588:47960">
+            <div className="content-stretch flex flex-[1_0_0] flex-col gap-[8px] items-start min-h-px min-w-px relative shrink-0" data-name="Info" data-node-id="I19588:47960;19588:47885">
+              <div className="content-stretch flex gap-[24px] items-center relative shrink-0 w-full" data-name="Header" data-node-id="I19588:47960;19588:47886">
+                <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[16px]" data-node-id="I19588:47960;19588:47887">
+                  <p className="leading-[1.4] whitespace-pre-wrap">Store Banner Design</p>
+                </div>
+                <div className="content-stretch flex gap-[10px] items-center relative shrink-0" data-node-id="I19588:47960;19588:47888">
+                  <div className="flex flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] not-italic relative shrink-0 text-[#03c3fb] text-[20px] whitespace-nowrap" data-node-id="I19588:47960;19588:47889">
+                    <p className="leading-[1.4]">$ 10</p>
+                  </div>
+                </div>
+              </div>
+              <div className="content-stretch flex gap-[8px] items-center relative shrink-0 w-full" data-name="Service Included" data-node-id="I19588:47960;19588:47890">
+                <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:Regular',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I19588:47960;19588:47891">
+                  <p className="leading-[1.4] whitespace-pre-wrap">Create digital banners for your Store to communicate better.</p>
+                </div>
+              </div>
+            </div>
+          </a>
+          <a className="bg-white border border-[#f0f0f5] border-solid box-border content-stretch flex gap-[16px] items-start overflow-clip p-[24px] relative rounded-[16px] shrink-0 w-[360px]" data-name="Adhoc Service" data-node-id="19588:47969">
+            <div className="content-stretch flex flex-[1_0_0] flex-col gap-[8px] items-start min-h-px min-w-px relative shrink-0" data-name="Info" data-node-id="I19588:47969;19588:47885">
+              <div className="content-stretch flex gap-[24px] items-center relative shrink-0 w-full" data-name="Header" data-node-id="I19588:47969;19588:47886">
+                <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[16px]" data-node-id="I19588:47969;19588:47887">
+                  <p className="leading-[1.4] whitespace-pre-wrap">Flyer Design</p>
+                </div>
+                <div className="content-stretch flex gap-[10px] items-center relative shrink-0" data-node-id="I19588:47969;19588:47888">
+                  <div className="flex flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] not-italic relative shrink-0 text-[#03c3fb] text-[20px] whitespace-nowrap" data-node-id="I19588:47969;19588:47889">
+                    <p className="leading-[1.4]">$ 10</p>
+                  </div>
+                </div>
+              </div>
+              <div className="content-stretch flex gap-[8px] items-center relative shrink-0 w-full" data-name="Service Included" data-node-id="I19588:47969;19588:47890">
+                <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:Regular',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I19588:47969;19588:47891">
+                  <p className="leading-[1.4] whitespace-pre-wrap">Marketing graphics designed for print-ready impact.</p>
+                </div>
+              </div>
+            </div>
+          </a>
+          <a className="bg-white border border-[#f0f0f5] border-solid box-border content-stretch flex gap-[16px] h-[124px] items-start overflow-clip p-[24px] relative rounded-[16px] shrink-0 w-[360px]" data-name="Adhoc Service" data-node-id="19588:47978">
+            <div className="content-stretch flex flex-[1_0_0] flex-col gap-[8px] items-start min-h-px min-w-px relative shrink-0" data-name="Info" data-node-id="I19588:47978;19588:47885">
+              <div className="content-stretch flex gap-[24px] items-center relative shrink-0 w-full" data-name="Header" data-node-id="I19588:47978;19588:47886">
+                <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[16px]" data-node-id="I19588:47978;19588:47887">
+                  <p className="leading-[1.4] whitespace-pre-wrap">Store Creation</p>
+                </div>
+                <div className="content-stretch flex gap-[10px] items-center relative shrink-0" data-node-id="I19588:47978;19588:47888">
+                  <div className="flex flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] not-italic relative shrink-0 text-[#03c3fb] text-[20px] whitespace-nowrap" data-node-id="I19588:47978;19588:47889">
+                    <p className="leading-[1.4]">$ 10</p>
+                  </div>
+                </div>
+              </div>
+              <div className="content-stretch flex gap-[8px] items-center relative shrink-0 w-full" data-name="Service Included" data-node-id="I19588:47978;19588:47890">
+                <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:Regular',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I19588:47978;19588:47891">
+                  <p className="leading-[1.4] whitespace-pre-wrap">Create an amazing custom store from scratch</p>
+                </div>
+              </div>
+            </div>
+          </a>
+          <a className="bg-white border border-[#f0f0f5] border-solid box-border content-stretch flex gap-[16px] items-start overflow-clip p-[24px] relative rounded-[16px] shrink-0 w-[360px]" data-name="Adhoc Service" data-node-id="19588:47987">
+            <div className="content-stretch flex flex-[1_0_0] flex-col gap-[8px] items-start min-h-px min-w-px relative shrink-0" data-name="Info" data-node-id="I19588:47987;19588:47885">
+              <div className="content-stretch flex gap-[24px] items-center relative shrink-0 w-full" data-name="Header" data-node-id="I19588:47987;19588:47886">
+                <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[16px]" data-node-id="I19588:47987;19588:47887">
+                  <p className="leading-[1.4] whitespace-pre-wrap">Blank Product - PSD</p>
+                </div>
+                <div className="content-stretch flex gap-[10px] items-center relative shrink-0" data-node-id="I19588:47987;19588:47888">
+                  <div className="flex flex-col font-['IBM_Plex_Sans:SemiBold',sans-serif] justify-center leading-[0] not-italic relative shrink-0 text-[#03c3fb] text-[20px] whitespace-nowrap" data-node-id="I19588:47987;19588:47889">
+                    <p className="leading-[1.4]">$ 30</p>
+                  </div>
+                </div>
+              </div>
+              <div className="content-stretch flex gap-[8px] items-center relative shrink-0 w-full" data-name="Service Included" data-node-id="I19588:47987;19588:47890">
+                <div className="flex flex-[1_0_0] flex-col font-['IBM_Plex_Sans:Regular',sans-serif] justify-center leading-[0] min-h-px min-w-px not-italic relative shrink-0 text-[#0a0c36] text-[14px]" data-node-id="I19588:47987;19588:47891">
+                  <p className="leading-[1.4] whitespace-pre-wrap">Request any Blank you would like to be added to your Catalog.</p>
+                </div>
+              </div>
+            </div>
+          </a>
+        </div>
+        <div className="flex-[1_0_0] max-w-[1128px] min-h-[48px] min-w-px shrink-0 w-full z-[2]" data-name="Space" data-node-id="19588:44501" />
+        <Footer className="border-[#eae9f9] border-b-0 border-l-0 border-r-0 border-solid border-t box-border content-stretch flex gap-[286px] items-center justify-center max-w-[1128px] px-[32px] py-[29px] relative shrink-0 w-full z-[1]" />
+      </div>
+    </div>
+  );
+}
+
+### Content Block 2 (Text)
+SUPER CRITICAL: The generated React+Tailwind code MUST be converted to match the target project's technology stack and styling system.
+1. Analyze the target codebase to identify: technology stack, styling approach, component patterns, and design tokens
+2. Convert React syntax to the target framework/library
+3. Transform all Tailwind classes to the target styling system while preserving exact visual design
+4. Follow the project's existing patterns and conventions
+DO NOT install any Tailwind as a dependency unless the user instructs you to do so.
+
+
+### Content Block 3 (Text)
+Node ids have been added to the code as data attributes, e.g. `data-node-id="1:2"`.
+
+### Content Block 4 (Text)
+These styles are contained in the design: Dark Blue Night: #0A0C36, Body 2/Med: Font(family: "IBM Plex Sans", style: Medium, size: 14, weight: 500, lineHeight: 1.399999976158142, letterSpacing: 0), White: #FFFFFF, Blue Space Cadet: #263063, Dashboard/Body 2 - Medium: Font(family: "Inter", style: Medium, size: 14, weight: 500, lineHeight: 24, letterSpacing: 0), Blue Lavender: #EAE9F9, Body 3/Reg: Font(family: "IBM Plex Sans", style: Regular, size: 12, weight: 400, lineHeight: 1.399999976158142, letterSpacing: 0), Light Grey: #F0F0F5, Dark Gray: #9E9E94, Body 2/Reg: Font(family: "IBM Plex Sans", style: Regular, size: 14, weight: 400, lineHeight: 1.399999976158142, letterSpacing: 0), Sky Blue - Accent: #03C3FB, Body 2/Semibold: Font(family: "IBM Plex Sans", style: SemiBold, size: 14, weight: 600, lineHeight: 1.399999976158142, letterSpacing: 0), Gray: #D1D1D1, Dark Blue: #02163A, Semantic/Error: #E82646, Shadow top Bar: Effect(type: DROP_SHADOW, color: #A7A7A71A, offset: (0, 10), radius: 16, spread: 2), Title/Semibold: Font(family: "IBM Plex Sans", style: SemiBold, size: 24, weight: 600, lineHeight: 1.399999976158142, letterSpacing: 0), Body/Reg: Font(family: "IBM Plex Sans", style: Regular, size: 16, weight: 400, lineHeight: 1.399999976158142, letterSpacing: 0), Body/Semibold: Font(family: "IBM Plex Sans", style: SemiBold, size: 16, weight: 600, lineHeight: 1.399999976158142, letterSpacing: 0), Subheading/Semibold: Font(family: "IBM Plex Sans", style: SemiBold, size: 20, weight: 600, lineHeight: 1.399999976158142, letterSpacing: 0).
+
+### Content Block 5 (Text)
+Images and SVGs will be stored as constants, e.g. const image = 'https://www.figma.com/api/mcp/asset/550e8400-e29b-41d4-a716-446655440000'. These constants will be used in the code as the source for the image, ex: <img src={image} />. Image assets are stored on a remote server for 7 days and can be fetched using the provided URLs until they expire.
+
+### Content Block 6 (Text)
+IMPORTANT: After you call this tool, you MUST call get_screenshot to get a screenshot of the node for context.
+
+</mcp_external_output>
