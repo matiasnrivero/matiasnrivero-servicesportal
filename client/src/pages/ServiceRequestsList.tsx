@@ -1,6 +1,6 @@
 import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { NavigationMenuSection } from "./sections/NavigationMenuSection";
+import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -94,8 +94,8 @@ export default function ServiceRequestsList() {
   };
 
   return (
-    <main className="flex w-full max-w-[1440px] min-w-[1440px] min-h-screen bg-light-grey">
-      <NavigationMenuSection />
+    <main className="flex flex-col w-full min-h-screen bg-light-grey">
+      <Header />
       <div className="flex-1 p-8">
         <Card>
           <CardHeader>

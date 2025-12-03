@@ -1,6 +1,7 @@
 import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import type { Service, InsertServiceRequest } from "@shared/schema";
-import { NavigationMenuSection } from "./sections/NavigationMenuSection";
+import { Header } from "@/components/Header";
 
 async function fetchServices(): Promise<Service[]> {
   const response = await fetch("/api/services");
@@ -40,13 +41,23 @@ async function createServiceRequest(data: InsertServiceRequest) {
 export default function ServiceRequestForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data: services = [] } = useQuery({
+  const [, navigate] = useLocation();
+  const { data: services = [], isLoading: servicesLoading } = useQuery({
     queryKey: ["services"],
     queryFn: fetchServices,
   });
 
-  const [selectedServiceId, setSelectedServiceId] = React.useState<string>("");
+  const urlParams = new URLSearchParams(window.location.search);
+  const preSelectedServiceId = urlParams.get("serviceId") || "";
+
+  const [selectedServiceId, setSelectedServiceId] = React.useState<string>(preSelectedServiceId);
   const { register, handleSubmit, reset, setValue } = useForm();
+
+  React.useEffect(() => {
+    if (preSelectedServiceId && services.length > 0) {
+      setSelectedServiceId(preSelectedServiceId);
+    }
+  }, [preSelectedServiceId, services]);
 
   const mutation = useMutation({
     mutationFn: createServiceRequest,
@@ -58,6 +69,7 @@ export default function ServiceRequestForm() {
       reset();
       setSelectedServiceId("");
       queryClient.invalidateQueries({ queryKey: ["service-requests"] });
+      navigate("/service-requests");
     },
     onError: () => {
       toast({
@@ -82,8 +94,8 @@ export default function ServiceRequestForm() {
   };
 
   return (
-    <main className="flex w-full max-w-[1440px] min-w-[1440px] min-h-screen bg-light-grey">
-      <NavigationMenuSection />
+    <main className="flex flex-col w-full min-h-screen bg-light-grey">
+      <Header />
       <div className="flex-1 p-8">
         <Card className="max-w-3xl mx-auto">
           <CardHeader>

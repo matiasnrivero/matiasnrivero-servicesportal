@@ -1,11 +1,11 @@
 import React from "react";
-import { NavigationMenuSection } from "./sections/NavigationMenuSection";
 import { ServicesListSection } from "./sections/ServicesListSection";
+import { Header } from "@/components/Header";
 
 export const ServicesRequestAd = (): JSX.Element => {
   return (
-    <main className="flex w-full max-w-[1440px] min-w-[1440px] min-h-[700px] bg-light-grey">
-      <NavigationMenuSection />
+    <main className="flex flex-col w-full min-h-screen bg-light-grey">
+      <Header />
       <ServicesListSection />
     </main>
   );
