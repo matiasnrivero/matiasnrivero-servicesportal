@@ -87,7 +87,7 @@ export default function JobDetailView() {
   const deliverableAttachments = attachments.filter(a => a.kind === "deliverable");
 
   const isDesigner = currentUser?.role === "designer";
-  const isClient = currentUser?.role === "client";
+  const isClient = currentUser?.role === "client" || currentUser?.role === "distributor";
 
   // Sync selectedDesignerId with current assignee when request loads
   useEffect(() => {

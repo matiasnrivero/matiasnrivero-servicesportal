@@ -82,8 +82,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Filter requests based on user's role
-      if (sessionUser.role === "client") {
-        // Clients can only see their own requests
+      // Note: "distributor" and "client" are treated the same - both can submit and view their own requests
+      if (sessionUser.role === "client" || sessionUser.role === "distributor") {
+        // Clients/Distributors can only see their own requests
         requests = await storage.getServiceRequestsByUser(sessionUserId);
       } else if (sessionUser.role === "designer") {
         // Designers can see all requests (to pick up pending jobs and their assigned jobs)
@@ -119,8 +120,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Service request not found" });
       }
 
-      // Clients can only view their own requests
-      if (sessionUser.role === "client" && request.userId !== sessionUserId) {
+      // Clients/Distributors can only view their own requests
+      if ((sessionUser.role === "client" || sessionUser.role === "distributor") && request.userId !== sessionUserId) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -383,8 +384,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Service request not found" });
       }
 
-      // Clients can only view attachments for their own requests
-      if (sessionUser.role === "client" && existingRequest.userId !== sessionUserId) {
+      // Clients/Distributors can only view attachments for their own requests
+      if ((sessionUser.role === "client" || sessionUser.role === "distributor") && existingRequest.userId !== sessionUserId) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -488,8 +489,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Service request not found" });
       }
 
-      // Clients can only view comments for their own requests
-      if (sessionUser.role === "client" && existingRequest.userId !== sessionUserId) {
+      // Clients/Distributors can only view comments for their own requests
+      if ((sessionUser.role === "client" || sessionUser.role === "distributor") && existingRequest.userId !== sessionUserId) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -536,8 +537,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Service request not found" });
       }
 
-      // Clients can only comment on their own requests
-      if (author.role === "client" && existingRequest.userId !== sessionUserId) {
+      // Clients/Distributors can only comment on their own requests
+      if ((author.role === "client" || author.role === "distributor") && existingRequest.userId !== sessionUserId) {
         return res.status(403).json({ error: "Access denied" });
       }
 
