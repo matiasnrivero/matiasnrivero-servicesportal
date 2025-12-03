@@ -4,6 +4,35 @@ import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Users routes
+  app.get("/api/users", async (req, res) => {
+    try {
+      const { role } = req.query;
+      let users;
+      if (role) {
+        users = await storage.getUsersByRole(role as string);
+      } else {
+        users = await storage.getAllUsers();
+      }
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.get("/api/users/:id", async (req, res) => {
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
   // Services routes
   app.get("/api/services", async (req, res) => {
     try {
@@ -39,11 +68,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Service requests routes
   app.get("/api/service-requests", async (req, res) => {
     try {
-      const { userId, status } = req.query;
+      const { userId, assigneeId, status } = req.query;
       let requests;
 
       if (userId) {
         requests = await storage.getServiceRequestsByUser(userId as string);
+      } else if (assigneeId) {
+        requests = await storage.getServiceRequestsByAssignee(assigneeId as string);
       } else if (status) {
         requests = await storage.getServiceRequestsByStatus(status as string);
       } else {
@@ -95,10 +126,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Assign designer to request
+  app.post("/api/service-requests/:id/assign", async (req, res) => {
+    try {
+      const { assigneeId } = req.body;
+      if (!assigneeId) {
+        return res.status(400).json({ error: "assigneeId is required" });
+      }
+
+      const existingRequest = await storage.getServiceRequest(req.params.id);
+      if (!existingRequest) {
+        return res.status(404).json({ error: "Service request not found" });
+      }
+
+      const request = await storage.assignDesigner(req.params.id, assigneeId);
+      res.json(request);
+    } catch (error) {
+      console.error("Error assigning designer:", error);
+      res.status(500).json({ error: "Failed to assign designer" });
+    }
+  });
+
+  // Mark request as delivered
+  app.post("/api/service-requests/:id/deliver", async (req, res) => {
+    try {
+      const { deliveredBy } = req.body;
+      if (!deliveredBy) {
+        return res.status(400).json({ error: "deliveredBy is required" });
+      }
+
+      const existingRequest = await storage.getServiceRequest(req.params.id);
+      if (!existingRequest) {
+        return res.status(404).json({ error: "Service request not found" });
+      }
+
+      if (existingRequest.status !== "in-progress" && existingRequest.status !== "change-request") {
+        return res.status(400).json({ error: "Request must be in-progress or change-request to deliver" });
+      }
+
+      const request = await storage.deliverRequest(req.params.id, deliveredBy);
+      res.json(request);
+    } catch (error) {
+      console.error("Error delivering request:", error);
+      res.status(500).json({ error: "Failed to deliver request" });
+    }
+  });
+
+  // Request changes
+  app.post("/api/service-requests/:id/change-request", async (req, res) => {
+    try {
+      const { changeNote } = req.body;
+      if (!changeNote || changeNote.trim() === "") {
+        return res.status(400).json({ error: "changeNote is required for change requests" });
+      }
+
+      const existingRequest = await storage.getServiceRequest(req.params.id);
+      if (!existingRequest) {
+        return res.status(404).json({ error: "Service request not found" });
+      }
+
+      if (existingRequest.status !== "delivered") {
+        return res.status(400).json({ error: "Request must be delivered to request changes" });
+      }
+
+      const request = await storage.requestChange(req.params.id, changeNote);
+      res.json(request);
+    } catch (error) {
+      console.error("Error requesting changes:", error);
+      res.status(500).json({ error: "Failed to request changes" });
+    }
+  });
+
+  // Resume work on request (after change request)
+  app.post("/api/service-requests/:id/resume", async (req, res) => {
+    try {
+      const existingRequest = await storage.getServiceRequest(req.params.id);
+      if (!existingRequest) {
+        return res.status(404).json({ error: "Service request not found" });
+      }
+
+      if (existingRequest.status !== "change-request") {
+        return res.status(400).json({ error: "Request must have change-request status to resume" });
+      }
+
+      const request = await storage.updateServiceRequest(req.params.id, { status: "in-progress" });
+      res.json(request);
+    } catch (error) {
+      console.error("Error resuming request:", error);
+      res.status(500).json({ error: "Failed to resume request" });
+    }
+  });
+
   // Attachments routes
   app.get("/api/service-requests/:requestId/attachments", async (req, res) => {
     try {
-      const attachments = await storage.getAttachmentsByRequest(req.params.requestId);
+      const { kind } = req.query;
+      let attachments;
+      if (kind) {
+        attachments = await storage.getAttachmentsByKind(req.params.requestId, kind as string);
+      } else {
+        attachments = await storage.getAttachmentsByRequest(req.params.requestId);
+      }
       res.json(attachments);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch attachments" });
@@ -117,6 +245,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Comments routes
+  app.get("/api/service-requests/:requestId/comments", async (req, res) => {
+    try {
+      const { visibility } = req.query;
+      const comments = await storage.getCommentsByRequest(
+        req.params.requestId, 
+        visibility as string | undefined
+      );
+      res.json(comments);
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+      res.status(500).json({ error: "Failed to fetch comments" });
+    }
+  });
+
+  app.post("/api/service-requests/:requestId/comments", async (req, res) => {
+    try {
+      const { authorId, body, visibility = "public", parentId } = req.body;
+      
+      if (!authorId || !body) {
+        return res.status(400).json({ error: "authorId and body are required" });
+      }
+
+      const comment = await storage.createComment({
+        requestId: req.params.requestId,
+        authorId,
+        body,
+        visibility,
+        parentId,
+      });
+      res.status(201).json(comment);
+    } catch (error) {
+      console.error("Error creating comment:", error);
+      res.status(500).json({ error: "Failed to create comment" });
+    }
+  });
+
   // Get or create default user
   app.get("/api/default-user", async (req, res) => {
     try {
@@ -126,13 +291,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username: "default-user",
           password: "not-used",
           email: "default@example.com",
-          role: "distributor",
+          role: "client",
         });
       }
-      res.json({ userId: user.id });
+      res.json({ userId: user.id, role: user.role, username: user.username });
     } catch (error) {
       console.error("Error getting default user:", error);
       res.status(500).json({ error: "Failed to get default user" });
+    }
+  });
+
+  // Switch user role (for demo purposes)
+  app.post("/api/switch-role", async (req, res) => {
+    try {
+      const { role } = req.body;
+      if (!role || (role !== "client" && role !== "designer")) {
+        return res.status(400).json({ error: "role must be 'client' or 'designer'" });
+      }
+
+      const username = role === "designer" ? "designer-user" : "default-user";
+      let user = await storage.getUserByUsername(username);
+      
+      if (!user) {
+        user = await storage.createUser({
+          username,
+          password: "not-used",
+          email: `${username}@example.com`,
+          role,
+        });
+      }
+      
+      res.json({ userId: user.id, role: user.role, username: user.username });
+    } catch (error) {
+      console.error("Error switching role:", error);
+      res.status(500).json({ error: "Failed to switch role" });
     }
   });
 
@@ -233,6 +425,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const serviceData of servicesData) {
         console.log("Creating service:", serviceData.title);
         await storage.createService(serviceData);
+      }
+
+      // Create designer user for demo
+      let designerUser = await storage.getUserByUsername("designer-user");
+      if (!designerUser) {
+        await storage.createUser({
+          username: "designer-user",
+          password: "not-used",
+          email: "designer@example.com",
+          role: "designer",
+        });
       }
 
       console.log("Services seeded successfully");
