@@ -1,0 +1,285 @@
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .all-\[unset\] {
+    all: unset;
+  }
+}
+
+:root {
+  --blue-lavender: rgba(234, 233, 249, 1);
+  --blue-space-cadet: rgba(38, 48, 99, 1);
+  --body-2-med-font-family: "IBM Plex Sans", Helvetica;
+  --body-2-med-font-size: 16px;
+  --body-2-med-font-style: normal;
+  --body-2-med-font-weight: 500;
+  --body-2-med-letter-spacing: 0px;
+  --body-2-med-line-height: 140%;
+  --body-2-reg-font-family: "IBM Plex Sans", Helvetica;
+  --body-2-reg-font-size: 14px;
+  --body-2-reg-font-style: normal;
+  --body-2-reg-font-weight: 400;
+  --body-2-reg-letter-spacing: 0px;
+  --body-2-reg-line-height: 140%;
+  --body-2-semibold-font-family: "IBM Plex Sans", Helvetica;
+  --body-2-semibold-font-size: 14px;
+  --body-2-semibold-font-style: normal;
+  --body-2-semibold-font-weight: 600;
+  --body-2-semibold-letter-spacing: 0px;
+  --body-2-semibold-line-height: 140%;
+  --body-3-reg-font-family: "IBM Plex Sans", Helvetica;
+  --body-3-reg-font-size: 12px;
+  --body-3-reg-font-style: normal;
+  --body-3-reg-font-weight: 400;
+  --body-3-reg-letter-spacing: 0px;
+  --body-3-reg-line-height: 140%;
+  --body-4-reg-font-family: "IBM Plex Sans", Helvetica;
+  --body-4-reg-font-size: 10px;
+  --body-4-reg-font-style: normal;
+  --body-4-reg-font-weight: 400;
+  --body-4-reg-letter-spacing: 0px;
+  --body-4-reg-line-height: 120.00000762939453%;
+  --body-4-semibold-font-family: "IBM Plex Sans", Helvetica;
+  --body-4-semibold-font-size: 10px;
+  --body-4-semibold-font-style: normal;
+  --body-4-semibold-font-weight: 600;
+  --body-4-semibold-letter-spacing: 0px;
+  --body-4-semibold-line-height: 120.00000762939453%;
+  --body-reg-font-family: "IBM Plex Sans", Helvetica;
+  --body-reg-font-size: 16px;
+  --body-reg-font-style: normal;
+  --body-reg-font-weight: 400;
+  --body-reg-letter-spacing: 0px;
+  --body-reg-line-height: 140%;
+  --body-semibold-font-family: "IBM Plex Sans", Helvetica;
+  --body-semibold-font-size: 16px;
+  --body-semibold-font-style: normal;
+  --body-semibold-font-weight: 600;
+  --body-semibold-letter-spacing: 0px;
+  --body-semibold-line-height: 140%;
+  --card-shadow: 0px 0px 16px 0px rgba(26, 26, 26, 0.1);
+  --dark-blue: rgba(2, 22, 58, 1);
+  --dark-blue-night: rgba(10, 12, 54, 1);
+  --dark-gray: rgba(158, 158, 148, 1);
+  --dashboard-body-2-medium-font-family: "Inter", Helvetica;
+  --dashboard-body-2-medium-font-size: 14px;
+  --dashboard-body-2-medium-font-style: normal;
+  --dashboard-body-2-medium-font-weight: 500;
+  --dashboard-body-2-medium-letter-spacing: 0px;
+  --dashboard-body-2-medium-line-height: 24px;
+  --gray: rgba(209, 209, 209, 1);
+  --light-grey: rgba(240, 240, 245, 1);
+  --semanticerror: rgba(232, 38, 70, 1);
+  --shadow-top-bar: 0px 10px 16px 2px rgba(167, 167, 167, 0.1);
+  --sky-blue-accent: rgba(3, 195, 251, 1);
+  --subheading-med-font-family: "IBM Plex Sans", Helvetica;
+  --subheading-med-font-size: 24px;
+  --subheading-med-font-style: normal;
+  --subheading-med-font-weight: 500;
+  --subheading-med-letter-spacing: 0px;
+  --subheading-med-line-height: 140%;
+  --subheading-semibold-font-family: "IBM Plex Sans", Helvetica;
+  --subheading-semibold-font-size: 20px;
+  --subheading-semibold-font-style: normal;
+  --subheading-semibold-font-weight: 600;
+  --subheading-semibold-letter-spacing: 0px;
+  --subheading-semibold-line-height: 140%;
+  --title-semibold-font-family: "IBM Plex Sans", Helvetica;
+  --title-semibold-font-size: 24px;
+  --title-semibold-font-style: normal;
+  --title-semibold-font-weight: 600;
+  --title-semibold-letter-spacing: 0px;
+  --title-semibold-line-height: 140%;
+  --white: rgba(255, 255, 255, 1);
+}
+
+:root {
+  --animate-spin: spin 1s linear infinite;
+}
+
+.animate-fade-in {
+  animation: fade-in 1s var(--animation-delay, 0s) ease forwards;
+}
+
+.animate-fade-up {
+  animation: fade-up 1s var(--animation-delay, 0s) ease forwards;
+}
+
+.animate-marquee {
+  animation: marquee var(--duration) infinite linear;
+}
+
+.animate-marquee-vertical {
+  animation: marquee-vertical var(--duration) linear infinite;
+}
+
+.animate-shimmer {
+  animation: shimmer 8s infinite;
+}
+
+.animate-spin {
+  animation: var(--animate-spin);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@keyframes image-glow {
+  0% {
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.74, 0.25, 0.76, 1);
+  }
+
+  10% {
+    opacity: 0.7;
+    animation-timing-function: cubic-bezier(0.12, 0.01, 0.08, 0.99);
+  }
+
+  to {
+    opacity: 0.4;
+  }
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes shimmer {
+  0%,
+  90%,
+  to {
+    background-position: calc(-100% - var(--shimmer-width)) 0;
+  }
+
+  30%,
+  60% {
+    background-position: calc(100% + var(--shimmer-width)) 0;
+  }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translate(0);
+  }
+
+  to {
+    transform: translateX(calc(-100% - var(--gap)));
+  }
+}
+
+@keyframes marquee-vertical {
+  0% {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(calc(-100% - var(--gap)));
+  }
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 47.4% 11.2%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+
+    --card: transparent;
+    --card-foreground: 222.2 47.4% 11.2%;
+
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 100% 50%;
+    --destructive-foreground: 210 40% 98%;
+
+    --ring: 215 20.2% 65.1%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 224 71% 4%;
+    --foreground: 213 31% 91%;
+
+    --muted: 223 47% 11%;
+    --muted-foreground: 215.4 16.3% 56.9%;
+
+    --accent: 216 34% 17%;
+    --accent-foreground: 210 40% 98%;
+
+    --popover: 224 71% 4%;
+    --popover-foreground: 215 20.2% 65.1%;
+
+    --border: 216 34% 17%;
+    --input: 216 34% 17%;
+
+    --card: transparent;
+    --card-foreground: 213 31% 91%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 1.2%;
+
+    --secondary: 222.2 47.4% 11.2%;
+    --secondary-foreground: 210 40% 98%;
+
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+
+    --ring: 216 34% 17%;
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
