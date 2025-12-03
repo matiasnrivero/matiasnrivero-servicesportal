@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { FileUploader } from "@/components/FileUploader";
 import { apiRequest } from "@/lib/queryClient";
@@ -21,7 +22,8 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  RefreshCw
+  RefreshCw,
+  Users
 } from "lucide-react";
 import type { ServiceRequest, Service, User as UserType, ServiceAttachment, Comment } from "@shared/schema";
 
@@ -48,6 +50,7 @@ export default function JobDetailView() {
   const [commentText, setCommentText] = useState("");
   const [commentTab, setCommentTab] = useState<"public" | "internal">("public");
   const [deliverableUrls, setDeliverableUrls] = useState<{ url: string; name: string }[]>([]);
+  const [selectedDesignerId, setSelectedDesignerId] = useState<string>("");
 
   const requestId = params?.id;
 
@@ -86,17 +89,28 @@ export default function JobDetailView() {
   const isDesigner = currentUser?.role === "designer";
   const isClient = currentUser?.role === "client";
 
+  // Sync selectedDesignerId with current assignee when request loads
+  useEffect(() => {
+    if (request?.assigneeId) {
+      setSelectedDesignerId(request.assigneeId);
+    }
+  }, [request?.assigneeId]);
+
 
   const assignMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", `/api/service-requests/${requestId}/assign`, {});
+    mutationFn: async (designerId?: string) => {
+      return apiRequest("POST", `/api/service-requests/${requestId}/assign`, { 
+        designerId: designerId || undefined 
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/service-requests", requestId] });
-      toast({ title: "Job assigned", description: "You have taken on this job." });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+      setSelectedDesignerId("");
+      toast({ title: "Job assigned", description: "The job has been assigned successfully." });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to take on job.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to assign job.", variant: "destructive" });
     },
   });
 
@@ -178,9 +192,12 @@ export default function JobDetailView() {
     await addAttachmentMutation.mutateAsync({ fileUrl, fileName, kind: "deliverable" });
   };
 
-  const handleTakeJob = () => {
-    assignMutation.mutate();
+  const handleTakeJob = (designerId?: string) => {
+    assignMutation.mutate(designerId);
   };
+
+  // Filter designers from all users
+  const designers = allUsers.filter(user => user.role === "designer");
 
   const handleDeliver = () => {
     deliverMutation.mutate();
@@ -572,13 +589,51 @@ export default function JobDetailView() {
               <CardContent className="space-y-3">
                 {isDesigner && request.status === "pending" && (
                   <Button
-                    onClick={handleTakeJob}
+                    onClick={() => handleTakeJob()}
                     disabled={assignMutation.isPending}
                     className="w-full bg-sky-blue-accent hover:bg-sky-blue-accent/90"
                     data-testid="button-take-job"
                   >
                     {assignMutation.isPending ? "Taking job..." : "Take This Job"}
                   </Button>
+                )}
+
+                {isDesigner && (request.status === "pending" || request.status === "in-progress") && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Assign to Designer</span>
+                    </div>
+                    <Select 
+                      value={selectedDesignerId} 
+                      onValueChange={setSelectedDesignerId}
+                    >
+                      <SelectTrigger data-testid="select-designer">
+                        <SelectValue placeholder="Select a designer..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {designers.map((designer) => (
+                          <SelectItem 
+                            key={designer.id} 
+                            value={designer.id}
+                            data-testid={`select-designer-${designer.id}`}
+                          >
+                            {designer.username}
+                            {designer.id === currentUser?.userId && " (You)"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      onClick={() => handleTakeJob(selectedDesignerId)}
+                      disabled={!selectedDesignerId || assignMutation.isPending}
+                      variant="outline"
+                      className="w-full"
+                      data-testid="button-assign-designer"
+                    >
+                      {assignMutation.isPending ? "Assigning..." : "Assign Selected Designer"}
+                    </Button>
+                  </div>
                 )}
 
                 {isDesigner && request.status === "change-request" && (

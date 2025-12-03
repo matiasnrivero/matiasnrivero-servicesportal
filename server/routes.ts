@@ -195,7 +195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Assign designer to request (designers can assign themselves)
+  // Assign designer to request (designers can assign themselves or other designers)
   app.post("/api/service-requests/:id/assign", async (req, res) => {
     try {
       // Use session user for authorization
@@ -210,7 +210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "User not found" });
       }
       if (sessionUser.role !== "designer") {
-        return res.status(403).json({ error: "Only designers can take on jobs" });
+        return res.status(403).json({ error: "Only designers can assign jobs" });
       }
 
       const existingRequest = await storage.getServiceRequest(req.params.id);
@@ -218,13 +218,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Service request not found" });
       }
 
-      // Only allow assignment if status is pending
-      if (existingRequest.status !== "pending") {
-        return res.status(400).json({ error: "Can only assign designers to pending requests" });
+      // Only allow assignment if status is pending or in-progress (reassignment)
+      if (existingRequest.status !== "pending" && existingRequest.status !== "in-progress") {
+        return res.status(400).json({ error: "Can only assign designers to pending or in-progress requests" });
       }
 
-      // Designer assigns themselves
-      const request = await storage.assignDesigner(req.params.id, sessionUserId);
+      // Get the target designer ID (from body or default to session user)
+      const targetDesignerId = req.body.designerId || sessionUserId;
+
+      // Verify target designer exists and is actually a designer
+      const targetDesigner = await storage.getUser(targetDesignerId);
+      if (!targetDesigner) {
+        return res.status(404).json({ error: "Target designer not found" });
+      }
+      if (targetDesigner.role !== "designer") {
+        return res.status(400).json({ error: "Can only assign to users with designer role" });
+      }
+
+      // Assign the target designer
+      const request = await storage.assignDesigner(req.params.id, targetDesignerId);
       res.json(request);
     } catch (error) {
       console.error("Error assigning designer:", error);
@@ -634,8 +646,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Checking for existing services...");
       const existingServices = await storage.getAllServices();
       console.log("Found", existingServices.length, "existing services");
+      
+      // Always ensure designer users exist
+      const designerUsers = [
+        { username: "designer-user", email: "designer@example.com" },
+        { username: "Sarah Martinez", email: "sarah.martinez@example.com" },
+        { username: "Mike Chen", email: "mike.chen@example.com" },
+        { username: "Emma Johnson", email: "emma.johnson@example.com" },
+      ];
+
+      for (const designer of designerUsers) {
+        const existing = await storage.getUserByUsername(designer.username);
+        if (!existing) {
+          await storage.createUser({
+            username: designer.username,
+            password: "not-used",
+            email: designer.email,
+            role: "designer",
+          });
+        }
+      }
+      
       if (existingServices.length > 0) {
-        return res.json({ message: "Services already seeded" });
+        return res.json({ message: "Services already seeded, designers checked" });
       }
 
       console.log("Seeding services...");
@@ -727,19 +760,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createService(serviceData);
       }
 
-      // Create designer user for demo
-      let designerUser = await storage.getUserByUsername("designer-user");
-      if (!designerUser) {
-        await storage.createUser({
-          username: "designer-user",
-          password: "not-used",
-          email: "designer@example.com",
-          role: "designer",
-        });
-      }
-
-      console.log("Services seeded successfully");
-      res.json({ message: "Services seeded successfully" });
+      console.log("Services and users seeded successfully");
+      res.json({ message: "Services and users seeded successfully" });
     } catch (error) {
       console.error("Error seeding services:", error);
       res.status(500).json({ error: "Failed to seed services", details: error instanceof Error ? error.message : String(error) });
