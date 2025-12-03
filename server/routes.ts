@@ -71,7 +71,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/service-requests", async (req, res) => {
     try {
       console.log("Creating service request with data:", req.body);
-      const request = await storage.createServiceRequest(req.body);
+      const requestData = {
+        ...req.body,
+        dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
+      };
+      const request = await storage.createServiceRequest(requestData);
       res.status(201).json(request);
     } catch (error) {
       console.error("Error creating service request:", error);
