@@ -8,6 +8,7 @@ import NotFound from "@/pages/not-found";
 import { ServicesRequestAd } from "@/pages/ServicesRequestAd";
 import ServiceRequestForm from "@/pages/ServiceRequestForm";
 import ServiceRequestsList from "@/pages/ServiceRequestsList";
+import JobDetailView from "@/pages/JobDetailView";
 
 function Router() {
   return (
@@ -16,6 +17,7 @@ function Router() {
       <Route path="/" component={ServicesRequestAd} />
       <Route path="/service-requests" component={ServiceRequestsList} />
       <Route path="/service-requests/new" component={ServiceRequestForm} />
+      <Route path="/jobs/:id" component={JobDetailView} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>

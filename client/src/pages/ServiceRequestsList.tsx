@@ -1,5 +1,7 @@
-import React from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "wouter";
+import { format } from "date-fns";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,77 +22,80 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import type { ServiceRequest, UpdateServiceRequest } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
+import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, UserCog } from "lucide-react";
+import type { ServiceRequest, Service, User } from "@shared/schema";
 
-async function fetchServiceRequests(): Promise<ServiceRequest[]> {
-  const response = await fetch("/api/service-requests");
-  if (!response.ok) {
-    throw new Error("Failed to fetch service requests");
-  }
-  return response.json();
+interface CurrentUser {
+  userId: string;
+  role: string;
+  username: string;
 }
 
-async function updateServiceRequestStatus(id: string, data: UpdateServiceRequest) {
-  const response = await fetch(`/api/service-requests/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) {
-    throw new Error("Failed to update service request");
-  }
-  return response.json();
-}
-
-const statusColors = {
-  pending: "bg-yellow-100 text-yellow-800",
-  "in-progress": "bg-blue-100 text-blue-800",
-  "awaiting-approval": "bg-purple-100 text-purple-800",
-  completed: "bg-green-100 text-green-800",
-  cancelled: "bg-red-100 text-red-800",
-};
-
-const statusLabels = {
-  pending: "Pending",
-  "in-progress": "In Progress",
-  "awaiting-approval": "Awaiting Approval",
-  completed: "Completed",
-  cancelled: "Cancelled",
+const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
+  "pending": { label: "Pending", color: "bg-yellow-100 text-yellow-800 border-yellow-200", icon: Clock },
+  "in-progress": { label: "In Progress", color: "bg-blue-100 text-blue-800 border-blue-200", icon: RefreshCw },
+  "delivered": { label: "Delivered", color: "bg-green-100 text-green-800 border-green-200", icon: CheckCircle2 },
+  "change-request": { label: "Change Request", color: "bg-orange-100 text-orange-800 border-orange-200", icon: AlertCircle },
 };
 
 export default function ServiceRequestsList() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data: requests = [], isLoading } = useQuery({
-    queryKey: ["service-requests"],
-    queryFn: fetchServiceRequests,
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const { data: currentUser, refetch: refetchUser } = useQuery<CurrentUser>({
+    queryKey: ["/api/default-user"],
   });
 
-  const mutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateServiceRequest }) =>
-      updateServiceRequestStatus(id, data),
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Request status updated successfully",
+  const { data: requests = [], isLoading: loadingRequests } = useQuery<ServiceRequest[]>({
+    queryKey: ["/api/service-requests"],
+  });
+
+  const { data: services = [] } = useQuery<Service[]>({
+    queryKey: ["/api/services"],
+  });
+
+  const { data: users = [] } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+  });
+
+  const switchRoleMutation = useMutation({
+    mutationFn: async (role: string) => {
+      return apiRequest("POST", "/api/switch-role", { role });
+    },
+    onSuccess: async () => {
+      await refetchUser();
+      queryClient.invalidateQueries({ queryKey: ["/api/default-user"] });
+      toast({ 
+        title: "Role switched", 
+        description: `You are now viewing as ${currentUser?.role === "designer" ? "Client" : "Designer"}` 
       });
-      queryClient.invalidateQueries({ queryKey: ["service-requests"] });
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update request status",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to switch role", variant: "destructive" });
     },
   });
 
-  const handleStatusChange = (id: string, newStatus: string) => {
-    const updateData: UpdateServiceRequest = {
-      status: newStatus,
-      completedAt: newStatus === "completed" ? new Date() : undefined,
-    };
-    mutation.mutate({ id, data: updateData });
+  const getServiceTitle = (serviceId: string) => {
+    const service = services.find(s => s.id === serviceId);
+    return service?.title || "Unknown Service";
+  };
+
+  const getAssigneeName = (assigneeId: string | null) => {
+    if (!assigneeId) return "Unassigned";
+    const user = users.find(u => u.id === assigneeId);
+    return user?.username || "Unknown";
+  };
+
+  const filteredRequests = requests.filter(r => {
+    if (statusFilter === "all") return true;
+    return r.status === statusFilter;
+  });
+
+  const handleSwitchRole = () => {
+    const newRole = currentUser?.role === "designer" ? "client" : "designer";
+    switchRoleMutation.mutate(newRole);
   };
 
   return (
@@ -99,16 +104,50 @@ export default function ServiceRequestsList() {
       <div className="flex-1 p-8">
         <Card>
           <CardHeader>
-            <CardTitle className="font-title-semibold text-dark-blue-night text-2xl">
-              Service Requests
-            </CardTitle>
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <CardTitle className="font-title-semibold text-dark-blue-night text-2xl">
+                Service Requests
+              </CardTitle>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 bg-blue-lavender/30 px-3 py-2 rounded-lg">
+                  <UserCog className="h-4 w-4 text-dark-gray" />
+                  <span className="text-sm text-dark-blue-night">
+                    Viewing as: <strong className="capitalize">{currentUser?.role || "client"}</strong>
+                  </span>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={handleSwitchRole}
+                    disabled={switchRoleMutation.isPending}
+                    data-testid="button-switch-role"
+                  >
+                    Switch to {currentUser?.role === "designer" ? "Client" : "Designer"}
+                  </Button>
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="in-progress">In Progress</SelectItem>
+                    <SelectItem value="delivered">Delivered</SelectItem>
+                    <SelectItem value="change-request">Change Request</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Link href="/service-requests/new">
+                  <Button data-testid="button-new-request">New Request</Button>
+                </Link>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {loadingRequests ? (
               <div className="text-center py-8">
                 <p className="font-body-reg text-dark-gray">Loading requests...</p>
               </div>
-            ) : requests.length === 0 ? (
+            ) : filteredRequests.length === 0 ? (
               <div className="text-center py-8">
                 <p className="font-body-reg text-dark-gray">No service requests found</p>
               </div>
@@ -116,69 +155,67 @@ export default function ServiceRequestsList() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Order #</TableHead>
-                    <TableHead>Customer</TableHead>
+                    <TableHead>Job ID</TableHead>
                     <TableHead>Service</TableHead>
-                    <TableHead>Method</TableHead>
-                    <TableHead>Quantity</TableHead>
+                    <TableHead>Customer</TableHead>
                     <TableHead>Due Date</TableHead>
+                    <TableHead>Assignee</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {requests.map((request) => (
-                    <TableRow key={request.id}>
-                      <TableCell className="font-medium">
-                        {request.orderNumber || "N/A"}
-                      </TableCell>
-                      <TableCell>{request.customerName || "N/A"}</TableCell>
-                      <TableCell className="max-w-[200px] truncate">
-                        Service ID: {request.serviceId.substring(0, 8)}...
-                      </TableCell>
-                      <TableCell>{request.decorationMethod || "N/A"}</TableCell>
-                      <TableCell>{request.quantity || "N/A"}</TableCell>
-                      <TableCell>
-                        {request.dueDate
-                          ? new Date(request.dueDate).toLocaleDateString()
-                          : "N/A"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          className={
-                            statusColors[request.status as keyof typeof statusColors] ||
-                            "bg-gray-100 text-gray-800"
-                          }
-                        >
-                          {statusLabels[request.status as keyof typeof statusLabels] ||
-                            request.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(request.createdAt).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={request.status}
-                          onValueChange={(value) => handleStatusChange(request.id, value)}
-                        >
-                          <SelectTrigger className="w-[180px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="in-progress">In Progress</SelectItem>
-                            <SelectItem value="awaiting-approval">
-                              Awaiting Approval
-                            </SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {filteredRequests.map((request) => {
+                    const StatusIcon = statusConfig[request.status]?.icon || Clock;
+                    return (
+                      <TableRow key={request.id} data-testid={`row-request-${request.id}`}>
+                        <TableCell className="font-medium">
+                          <span className="text-sky-blue-accent" data-testid={`text-job-id-${request.id}`}>
+                            A-{request.id.slice(0, 5).toUpperCase()}
+                          </span>
+                        </TableCell>
+                        <TableCell data-testid={`text-service-${request.id}`}>
+                          {getServiceTitle(request.serviceId)}
+                        </TableCell>
+                        <TableCell data-testid={`text-customer-${request.id}`}>
+                          {request.customerName || "N/A"}
+                        </TableCell>
+                        <TableCell data-testid={`text-due-date-${request.id}`}>
+                          {request.dueDate
+                            ? format(new Date(request.dueDate), "MM/dd/yyyy")
+                            : "Not set"}
+                        </TableCell>
+                        <TableCell data-testid={`text-assignee-${request.id}`}>
+                          {getAssigneeName(request.assigneeId)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            className={statusConfig[request.status]?.color || "bg-gray-100 text-gray-800"}
+                            data-testid={`badge-status-${request.id}`}
+                          >
+                            <StatusIcon className="h-3 w-3 mr-1" />
+                            {statusConfig[request.status]?.label || request.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell data-testid={`text-created-${request.id}`}>
+                          {format(new Date(request.createdAt), "MMM dd, yyyy")}
+                        </TableCell>
+                        <TableCell>
+                          <Link href={`/jobs/${request.id}`}>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              data-testid={`button-view-${request.id}`}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
