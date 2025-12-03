@@ -69,10 +69,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/service-requests", async (req, res) => {
     try {
+      console.log("Creating service request with data:", req.body);
       const request = await storage.createServiceRequest(req.body);
       res.status(201).json(request);
     } catch (error) {
-      res.status(500).json({ error: "Failed to create service request" });
+      console.error("Error creating service request:", error);
+      res.status(500).json({ error: "Failed to create service request", details: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -107,6 +109,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(attachment);
     } catch (error) {
       res.status(500).json({ error: "Failed to create attachment" });
+    }
+  });
+
+  // Get or create default user
+  app.get("/api/default-user", async (req, res) => {
+    try {
+      let user = await storage.getUserByUsername("default-user");
+      if (!user) {
+        user = await storage.createUser({
+          username: "default-user",
+          password: "not-used",
+          email: "default@example.com",
+          role: "distributor",
+        });
+      }
+      res.json({ userId: user.id });
+    } catch (error) {
+      console.error("Error getting default user:", error);
+      res.status(500).json({ error: "Failed to get default user" });
     }
   });
 

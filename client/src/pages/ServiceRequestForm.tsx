@@ -26,6 +26,15 @@ async function fetchServices(): Promise<Service[]> {
   return response.json();
 }
 
+async function getDefaultUserId(): Promise<string> {
+  const response = await fetch("/api/default-user");
+  if (!response.ok) {
+    throw new Error("Failed to get default user");
+  }
+  const data = await response.json();
+  return data.userId;
+}
+
 async function createServiceRequest(data: InsertServiceRequest) {
   const response = await fetch("/api/service-requests", {
     method: "POST",
@@ -82,15 +91,24 @@ export default function ServiceRequestForm() {
 
   const selectedService = services.find((s) => s.id === selectedServiceId);
 
-  const onSubmit = (data: any) => {
-    mutation.mutate({
-      userId: "default-user",
-      serviceId: selectedServiceId,
-      status: "pending",
-      ...data,
-      quantity: data.quantity ? parseInt(data.quantity) : null,
-      dueDate: data.dueDate ? new Date(data.dueDate) : null,
-    });
+  const onSubmit = async (data: any) => {
+    try {
+      const userId = await getDefaultUserId();
+      mutation.mutate({
+        userId,
+        serviceId: selectedServiceId,
+        status: "pending",
+        ...data,
+        quantity: data.quantity ? parseInt(data.quantity) : null,
+        dueDate: data.dueDate ? new Date(data.dueDate) : null,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to submit request",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
