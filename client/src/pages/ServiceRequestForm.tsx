@@ -1148,7 +1148,7 @@ export default function ServiceRequestForm() {
           <div className="space-y-2">
             <Label>Blank URL<span className="text-destructive">*</span></Label>
             <Input
-              placeholder="Placeholder text"
+              placeholder="Add the blank URL"
               onChange={(e) => handleFormDataChange("blankUrl", e.target.value)}
               data-testid="input-blank-url"
             />
