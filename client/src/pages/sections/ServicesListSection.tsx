@@ -86,11 +86,6 @@ export const ServicesListSection = (): JSX.Element => {
                     <p className="text-sm text-dark-blue-night">
                       {service.description}
                     </p>
-                    {service.decorationMethods && (
-                      <p className="text-xs text-dark-gray mt-2">
-                        Methods: {service.decorationMethods}
-                      </p>
-                    )}
                   </div>
                 </CardContent>
               </Card>
