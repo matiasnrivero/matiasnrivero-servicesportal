@@ -517,16 +517,16 @@ export default function ServiceRequestForm() {
               </Select>
             </div>
           </div>
+          <div className="space-y-2">
+            <Label>Number of Colors</Label>
+            <Input
+              type="number"
+              placeholder="0"
+              onChange={(e) => handleFormDataChange("numberOfColors", e.target.value)}
+              data-testid="input-number-of-colors"
+            />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Number of Colors</Label>
-              <Input
-                type="number"
-                placeholder="0"
-                onChange={(e) => handleFormDataChange("numberOfColors", e.target.value)}
-                data-testid="input-number-of-colors"
-              />
-            </div>
             <div className="space-y-2">
               <Label>Width in Inches</Label>
               <Input
@@ -536,15 +536,15 @@ export default function ServiceRequestForm() {
                 data-testid="input-width-inches"
               />
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Height in inches</Label>
-            <Input
-              type="number"
-              placeholder="0"
-              onChange={(e) => handleFormDataChange("heightInches", e.target.value)}
-              data-testid="input-height-inches"
-            />
+            <div className="space-y-2">
+              <Label>Height in inches</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                onChange={(e) => handleFormDataChange("heightInches", e.target.value)}
+                data-testid="input-height-inches"
+              />
+            </div>
           </div>
         </>
       );
