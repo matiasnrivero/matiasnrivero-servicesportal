@@ -95,8 +95,14 @@ export default function ServiceRequestsList() {
     return user?.username || "Unknown";
   };
 
-  const getServicePrice = (serviceId: string) => {
-    const service = services.find(s => s.id === serviceId);
+  const getServicePrice = (request: ServiceRequest) => {
+    // Check if the request has a calculated price in formData (for Store Creation)
+    const formData = request.formData as Record<string, any> | null;
+    if (formData?.calculatedPrice) {
+      return `$${formData.calculatedPrice}`;
+    }
+    // Otherwise use the service's price range
+    const service = services.find(s => s.id === request.serviceId);
     return service?.priceRange || "N/A";
   };
 
@@ -206,7 +212,7 @@ export default function ServiceRequestsList() {
                         </TableCell>
                         {isDistributor(currentUser?.role) ? (
                           <TableCell data-testid={`text-price-${request.id}`}>
-                            <span className="text-dark-blue-night font-medium">{getServicePrice(request.serviceId)}</span>
+                            <span className="text-dark-blue-night font-medium">{getServicePrice(request)}</span>
                           </TableCell>
                         ) : (
                           <TableCell data-testid={`text-assignee-${request.id}`}>

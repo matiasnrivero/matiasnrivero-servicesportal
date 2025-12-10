@@ -15,6 +15,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import type { Service, InsertServiceRequest } from "@shared/schema";
 import { Header } from "@/components/Header";
@@ -55,20 +62,113 @@ async function createServiceRequest(data: InsertServiceRequest) {
   return response.json();
 }
 
-const outputFormatOptions = ["AI", "EPS", "PDF", "PNG", "JPG", "SVG", "PSD", "TIFF"];
-const colorModeOptions = ["CMYK", "RGB", "Spot Colors", "Grayscale"];
-const complexityOptions = ["Simple", "Moderate", "Complex", "Very Complex"];
+const vectorizationOutputFormats = [
+  { value: "AI", label: "AI - Adobe Illustrator" },
+  { value: "EPS", label: "EPS - Encapsulated PostScript" },
+  { value: "PDF", label: "PDF - Portable Document Format" },
+  { value: "SVG", label: "SVG - Scalable Vector Graphics" },
+];
+
+const vectorizationColorModes = [
+  { value: "CMYK", label: "CMYK" },
+  { value: "Pantone", label: "Pantone" },
+  { value: "RGB", label: "RGB" },
+];
+
+const dtfDtgOutputFormats = [
+  { value: "PSD", label: "PSD - Photoshop Document" },
+  { value: "PNG", label: "PNG - Portable Network Graphic" },
+  { value: "TIF", label: "TIF - Tagged Image Format" },
+];
+
+const dtfDtgColorModes = [
+  { value: "CMYK", label: "CMYK" },
+  { value: "RGB", label: "RGB" },
+];
+
+const compositionOutputFormats = [
+  { value: "AI", label: "AI - Adobe Illustrator" },
+  { value: "PDF", label: "PDF - Portable Document Format" },
+  { value: "PNG", label: "PNG - Portable Network Graphic" },
+];
+
+const creativeArtOutputFormats = [
+  { value: "AI", label: "AI - Adobe Illustrator" },
+  { value: "PDF", label: "PDF - Portable Document Format" },
+  { value: "PNG", label: "PNG - Portable Network Graphic" },
+];
+
+const creativeArtComplexity = [
+  { value: "Basic", label: "Basic - $40", price: 40 },
+  { value: "Standard", label: "Standard - $60", price: 60 },
+  { value: "Advanced", label: "Advanced - $80", price: 80 },
+  { value: "Ultimate", label: "Ultimate - $100", price: 100 },
+];
+
+const embroideryOutputFormats = [
+  { value: "DST", label: "DST" },
+  { value: "EMB", label: "EMB" },
+  { value: "PES", label: "PES" },
+  { value: "JEF", label: "JEF" },
+  { value: "PDF", label: "PDF" },
+  { value: "Other", label: "Other (specify in notes)" },
+];
+
+const embroideryThreadColors = [
+  { value: "PMS", label: "PMS" },
+  { value: "ThreadChart", label: "Thread Chart #s" },
+];
+
+const dyeSubOutputFormats = [
+  { value: "PSD_Layered", label: "PSD Layered - Adobe Photoshop File with Layers" },
+  { value: "AI", label: "AI - Adobe Illustrator" },
+  { value: "PNG", label: "PNG - Portable Network Graphic" },
+];
+
+const dyeSubColorModes = [
+  { value: "CMYK", label: "CMYK" },
+  { value: "RGB", label: "RGB" },
+];
+
+const flyerOutputFormats = [
+  { value: "AI", label: "AI - Adobe Illustrator" },
+  { value: "PDF", label: "PDF - Portable Document Format" },
+];
+
+const flyerColorModes = [
+  { value: "CMYK", label: "CMYK" },
+  { value: "RGB", label: "RGB" },
+];
+
 const fabricTypeOptions = ["Cotton", "Polyester", "Blend", "Denim", "Leather", "Nylon"];
-const threadColorOptions = ["1 Color", "2 Colors", "3 Colors", "4+ Colors", "Full Color"];
 const garmentSizeOptions = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "Youth", "Custom"];
 const bleedMarginOptions = ["0.125 inches", "0.25 inches", "0.5 inches", "None"];
 const orientationOptions = ["Portrait", "Landscape", "Square"];
 const supplierOptions = ["SanMar", "S&S Activewear", "alphabroder", "Augusta Sportswear", "Other"];
 
+const storeCreationPricing = [
+  { minProducts: 1, maxProducts: 5, price: 50 },
+  { minProducts: 6, maxProducts: 10, price: 75 },
+  { minProducts: 11, maxProducts: 20, price: 100 },
+  { minProducts: 21, maxProducts: 30, price: 125 },
+  { minProducts: 31, maxProducts: 50, price: 150 },
+  { minProducts: 51, maxProducts: 100, price: 200 },
+  { minProducts: 101, maxProducts: 999999, price: 250 },
+];
+
+function calculateStoreCreationPrice(productCount: number): number {
+  if (!productCount || productCount <= 0) return 0;
+  const tier = storeCreationPricing.find(
+    (t) => productCount >= t.minProducts && productCount <= t.maxProducts
+  );
+  return tier ? tier.price : 0;
+}
+
 export default function ServiceRequestForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
+  const [pricingModalOpen, setPricingModalOpen] = useState(false);
   
   const { data: services = [], isLoading: servicesLoading } = useQuery({
     queryKey: ["services"],
@@ -86,6 +186,7 @@ export default function ServiceRequestForm() {
   const [selectedServiceId, setSelectedServiceId] = useState<string>(preSelectedServiceId);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, Array<{ url: string; name: string }>>>({});
+  const [calculatedPrice, setCalculatedPrice] = useState<number>(0);
   
   const { register, handleSubmit, reset, setValue, watch } = useForm();
 
@@ -101,6 +202,13 @@ export default function ServiceRequestForm() {
     }
   }, [currentUser, setValue]);
 
+  useEffect(() => {
+    if (formData.amountOfProducts) {
+      const price = calculateStoreCreationPrice(parseInt(formData.amountOfProducts));
+      setCalculatedPrice(price);
+    }
+  }, [formData.amountOfProducts]);
+
   const mutation = useMutation({
     mutationFn: createServiceRequest,
     onSuccess: () => {
@@ -112,6 +220,7 @@ export default function ServiceRequestForm() {
       setSelectedServiceId("");
       setFormData({});
       setUploadedFiles({});
+      setCalculatedPrice(0);
       queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
       navigate("/service-requests");
     },
@@ -125,10 +234,17 @@ export default function ServiceRequestForm() {
   });
 
   const selectedService = services.find((s) => s.id === selectedServiceId);
-  const serviceSlug = selectedService?.title.toLowerCase().replace(/[^a-z0-9]/g, '-') || "";
 
   const handleFormDataChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleEmbroideryFormatToggle = (format: string) => {
+    const current = formData.outputFormats || [];
+    const updated = current.includes(format)
+      ? current.filter((f: string) => f !== format)
+      : [...current, format];
+    handleFormDataChange("outputFormats", updated);
   };
 
   const handleFileUpload = (fieldName: string, url: string, name: string) => {
@@ -143,6 +259,7 @@ export default function ServiceRequestForm() {
       const allFormData = {
         ...formData,
         uploadedFiles,
+        calculatedPrice: calculatedPrice > 0 ? calculatedPrice : undefined,
       };
 
       mutation.mutate({
@@ -174,6 +291,7 @@ export default function ServiceRequestForm() {
     setSelectedServiceId("");
     setFormData({});
     setUploadedFiles({});
+    setCalculatedPrice(0);
     reset();
   };
 
@@ -222,6 +340,43 @@ export default function ServiceRequestForm() {
     </div>
   );
 
+  const renderPricingModal = () => (
+    <Dialog open={pricingModalOpen} onOpenChange={setPricingModalOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Store Creation Pricing</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <p className="text-sm text-dark-gray">
+            Pricing is based on the number of products in your store:
+          </p>
+          <div className="border rounded-md overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="px-4 py-2 text-left">Products</th>
+                  <th className="px-4 py-2 text-right">Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                {storeCreationPricing.map((tier, idx) => (
+                  <tr key={idx} className="border-t">
+                    <td className="px-4 py-2">
+                      {tier.maxProducts === 999999 
+                        ? `${tier.minProducts}+` 
+                        : `${tier.minProducts} - ${tier.maxProducts}`}
+                    </td>
+                    <td className="px-4 py-2 text-right font-semibold">${tier.price}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
   const renderDynamicFormFields = () => {
     if (!selectedService) return null;
 
@@ -244,8 +399,8 @@ export default function ServiceRequestForm() {
                   <SelectValue placeholder="Select an option" />
                 </SelectTrigger>
                 <SelectContent>
-                  {outputFormatOptions.map(opt => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  {vectorizationOutputFormats.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -259,8 +414,8 @@ export default function ServiceRequestForm() {
                   <SelectValue placeholder="Select an option" />
                 </SelectTrigger>
                 <SelectContent>
-                  {colorModeOptions.map(opt => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  {vectorizationColorModes.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -316,8 +471,8 @@ export default function ServiceRequestForm() {
                   <SelectValue placeholder="Select an option" />
                 </SelectTrigger>
                 <SelectContent>
-                  {outputFormatOptions.map(opt => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  {dtfDtgOutputFormats.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -331,8 +486,8 @@ export default function ServiceRequestForm() {
                   <SelectValue placeholder="Select an option" />
                 </SelectTrigger>
                 <SelectContent>
-                  {colorModeOptions.map(opt => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  {dtfDtgColorModes.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -385,8 +540,8 @@ export default function ServiceRequestForm() {
                   <SelectValue placeholder="Select an option" />
                 </SelectTrigger>
                 <SelectContent>
-                  {outputFormatOptions.map(opt => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  {compositionOutputFormats.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -449,8 +604,8 @@ export default function ServiceRequestForm() {
                   <SelectValue placeholder="Select an option" />
                 </SelectTrigger>
                 <SelectContent>
-                  {outputFormatOptions.map(opt => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  {creativeArtOutputFormats.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -462,14 +617,18 @@ export default function ServiceRequestForm() {
                   <SelectValue placeholder="Select an option" />
                 </SelectTrigger>
                 <SelectContent>
-                  {complexityOptions.map(opt => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  {creativeArtComplexity.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <a href="#" className="text-sky-blue-accent text-sm hover:underline">
+              <button 
+                type="button"
+                className="text-sky-blue-accent text-sm hover:underline"
+                onClick={() => {}}
+              >
                 Artwork Complexities Help
-              </a>
+              </button>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -532,17 +691,22 @@ export default function ServiceRequestForm() {
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-destructive">Desired Output Format*</Label>
-              <Select onValueChange={(v) => handleFormDataChange("outputFormat", v)}>
-                <SelectTrigger data-testid="select-output-format">
-                  <SelectValue placeholder="Select an option" />
-                </SelectTrigger>
-                <SelectContent>
-                  {outputFormatOptions.map(opt => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="text-destructive">Desired Output Format(s)*</Label>
+              <div className="border rounded-md p-3 space-y-2">
+                {embroideryOutputFormats.map(opt => (
+                  <div key={opt.value} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`format-${opt.value}`}
+                      checked={(formData.outputFormats || []).includes(opt.value)}
+                      onCheckedChange={() => handleEmbroideryFormatToggle(opt.value)}
+                      data-testid={`checkbox-format-${opt.value}`}
+                    />
+                    <Label htmlFor={`format-${opt.value}`} className="font-normal cursor-pointer">
+                      {opt.label}
+                    </Label>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -586,8 +750,8 @@ export default function ServiceRequestForm() {
                   <SelectValue placeholder="Select an option" />
                 </SelectTrigger>
                 <SelectContent>
-                  {threadColorOptions.map(opt => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  {embroideryThreadColors.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -653,8 +817,8 @@ export default function ServiceRequestForm() {
                   <SelectValue placeholder="Select an option" />
                 </SelectTrigger>
                 <SelectContent>
-                  {colorModeOptions.map(opt => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  {dyeSubColorModes.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -668,8 +832,8 @@ export default function ServiceRequestForm() {
                   <SelectValue placeholder="Select an option" />
                 </SelectTrigger>
                 <SelectContent>
-                  {outputFormatOptions.map(opt => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  {dyeSubOutputFormats.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -753,8 +917,8 @@ export default function ServiceRequestForm() {
                   <SelectValue placeholder="Select an option" />
                 </SelectTrigger>
                 <SelectContent>
-                  {outputFormatOptions.map(opt => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  {flyerOutputFormats.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -768,8 +932,8 @@ export default function ServiceRequestForm() {
                   <SelectValue placeholder="Select an option" />
                 </SelectTrigger>
                 <SelectContent>
-                  {colorModeOptions.map(opt => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  {flyerColorModes.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -831,6 +995,7 @@ export default function ServiceRequestForm() {
     if (title === "Store Creation") {
       return (
         <>
+          {renderPricingModal()}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-destructive">Store Name*</Label>
@@ -848,6 +1013,11 @@ export default function ServiceRequestForm() {
                 onChange={(e) => handleFormDataChange("amountOfProducts", e.target.value)}
                 data-testid="input-amount-products"
               />
+              {calculatedPrice > 0 && (
+                <p className="text-sm text-sky-blue-accent font-semibold">
+                  Calculated Price: ${calculatedPrice}
+                </p>
+              )}
             </div>
           </div>
           <div className="space-y-2">
@@ -865,9 +1035,14 @@ export default function ServiceRequestForm() {
               data-testid="input-product-assortment"
             />
           </div>
-          <a href="#" className="text-sky-blue-accent text-sm hover:underline">
+          <button
+            type="button"
+            className="text-sky-blue-accent text-sm hover:underline"
+            onClick={() => setPricingModalOpen(true)}
+            data-testid="button-pricing-table"
+          >
             Pricing table
-          </a>
+          </button>
         </>
       );
     }
@@ -921,7 +1096,7 @@ export default function ServiceRequestForm() {
             <h1 className="font-title-semibold text-dark-blue-night text-2xl flex items-center gap-3">
               {selectedService?.title}
               <span className="text-sky-blue-accent font-body-2-semibold">
-                {selectedService?.priceRange}
+                {calculatedPrice > 0 ? `$${calculatedPrice}` : selectedService?.priceRange}
               </span>
             </h1>
             <p className="font-body-reg text-dark-gray mt-1">
