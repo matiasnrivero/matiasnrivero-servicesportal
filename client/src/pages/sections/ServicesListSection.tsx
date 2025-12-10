@@ -5,6 +5,29 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Service } from "@shared/schema";
 
+const SERVICE_ORDER = [
+  "Vectorization & Color Separation",
+  "Artwork Touch-Ups (DTF / DTG)",
+  "Embroidery Digitization",
+  "Creative Art",
+  "Artwork Composition",
+  "Dye-Sublimation Template",
+  "Store Creation",
+  "Store Banner Design",
+  "Flyer Design",
+  "Blank Product - PSD",
+];
+
+function sortServices(services: Service[]): Service[] {
+  return [...services].sort((a, b) => {
+    const indexA = SERVICE_ORDER.indexOf(a.title);
+    const indexB = SERVICE_ORDER.indexOf(b.title);
+    const orderA = indexA === -1 ? 999 : indexA;
+    const orderB = indexB === -1 ? 999 : indexB;
+    return orderA - orderB;
+  });
+}
+
 async function fetchServices(): Promise<Service[]> {
   const response = await fetch("/api/services");
   if (!response.ok) {
@@ -47,7 +70,7 @@ export const ServicesListSection = (): JSX.Element => {
             <p className="text-dark-gray">No services available</p>
           </div>
         ) : (
-          services.map((service) => (
+          sortServices(services).map((service) => (
             <Link key={service.id} href={`/service-requests/new?serviceId=${service.id}`}>
               <Card className="border border-[#f0f0f5] rounded-2xl overflow-hidden bg-white cursor-pointer hover:shadow-lg transition-shadow h-full">
                 <CardContent className="p-6">

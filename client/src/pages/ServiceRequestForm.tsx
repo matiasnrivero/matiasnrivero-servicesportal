@@ -62,6 +62,29 @@ async function createServiceRequest(data: InsertServiceRequest) {
   return response.json();
 }
 
+const SERVICE_ORDER = [
+  "Vectorization & Color Separation",
+  "Artwork Touch-Ups (DTF / DTG)",
+  "Embroidery Digitization",
+  "Creative Art",
+  "Artwork Composition",
+  "Dye-Sublimation Template",
+  "Store Creation",
+  "Store Banner Design",
+  "Flyer Design",
+  "Blank Product - PSD",
+];
+
+function sortServices(services: Service[]): Service[] {
+  return [...services].sort((a, b) => {
+    const indexA = SERVICE_ORDER.indexOf(a.title);
+    const indexB = SERVICE_ORDER.indexOf(b.title);
+    const orderA = indexA === -1 ? 999 : indexA;
+    const orderB = indexB === -1 ? 999 : indexB;
+    return orderA - orderB;
+  });
+}
+
 const vectorizationOutputFormats = [
   { value: "AI", label: "AI - Adobe Illustrator" },
   { value: "EPS", label: "EPS - Encapsulated PostScript" },
@@ -305,7 +328,7 @@ export default function ServiceRequestForm() {
       </p>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-4xl">
-        {services.map((service) => (
+        {sortServices(services).map((service) => (
           <Card
             key={service.id}
             className={`cursor-pointer transition-all hover-elevate border-2 ${
