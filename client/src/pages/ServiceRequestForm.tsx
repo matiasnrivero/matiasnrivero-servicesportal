@@ -171,7 +171,7 @@ const flyerColorModes = [
 const fabricTypeOptions = ["Cotton", "Polyester", "Blend", "Denim", "Leather", "Nylon"];
 const garmentSizeOptions = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "Youth", "Custom"];
 const bleedMarginOptions = ["0.125 inches", "0.25 inches", "0.5 inches", "None"];
-const orientationOptions = ["Portrait", "Landscape", "Square"];
+const orientationOptions = ["Horizontal", "Vertical"];
 const supplierOptions = ["SanMar", "S&S Activewear", "alphabroder", "Augusta Sportswear", "Other"];
 
 const storeCreationPricing = [
@@ -662,7 +662,7 @@ export default function ServiceRequestForm() {
           <div className="space-y-2">
             <Label>Text Content to Include in Artwork</Label>
             <Input
-              placeholder="Placeholder text"
+              placeholder="Please enter the text to include in the Artwork"
               onChange={(e) => handleFormDataChange("textContent", e.target.value)}
               data-testid="input-text-content"
             />
@@ -745,7 +745,7 @@ export default function ServiceRequestForm() {
           <div className="space-y-2">
             <Label>Text Content to Include in Artwork</Label>
             <Input
-              placeholder="Placeholder text"
+              placeholder="Please enter the text to include in the Artwork"
               onChange={(e) => handleFormDataChange("textContent", e.target.value)}
               data-testid="input-text-content"
             />
@@ -759,7 +759,7 @@ export default function ServiceRequestForm() {
           <div className="space-y-2">
             <Label>Project Brief<span className="text-destructive">*</span></Label>
             <Textarea
-              placeholder="Please leave your comments here"
+              placeholder="Please tell us about your ideas for this project"
               onChange={(e) => handleFormDataChange("projectBrief", e.target.value)}
               rows={3}
               data-testid="textarea-project-brief"
@@ -934,7 +934,7 @@ export default function ServiceRequestForm() {
           <div className="space-y-2">
             <Label>Project Brief</Label>
             <Input
-              placeholder="Placeholder text"
+              placeholder="Please tell us about your ideas for this project"
               onChange={(e) => handleFormDataChange("projectBrief", e.target.value)}
               data-testid="input-project-brief"
             />
@@ -955,7 +955,7 @@ export default function ServiceRequestForm() {
           <div className="space-y-2">
             <Label>Text Content to Include in Artwork</Label>
             <Input
-              placeholder="Placeholder text"
+              placeholder="Please enter the text to include in the Artwork"
               onChange={(e) => handleFormDataChange("textContent", e.target.value)}
               data-testid="input-text-content"
             />
@@ -1021,20 +1021,20 @@ export default function ServiceRequestForm() {
               </Select>
             </div>
           </div>
+          <div className="space-y-2">
+            <Label>Flyer Orientation<span className="text-destructive">*</span></Label>
+            <Select onValueChange={(v) => handleFormDataChange("flyerOrientation", v)}>
+              <SelectTrigger data-testid="select-flyer-orientation">
+                <SelectValue placeholder="Select an option" />
+              </SelectTrigger>
+              <SelectContent>
+                {orientationOptions.map(opt => (
+                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Flyer Orientation<span className="text-destructive">*</span></Label>
-              <Select onValueChange={(v) => handleFormDataChange("flyerOrientation", v)}>
-                <SelectTrigger data-testid="select-flyer-orientation">
-                  <SelectValue placeholder="Select an option" />
-                </SelectTrigger>
-                <SelectContent>
-                  {orientationOptions.map(opt => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
             <div className="space-y-2">
               <Label>Width in Inches</Label>
               <Input
@@ -1044,20 +1044,20 @@ export default function ServiceRequestForm() {
                 data-testid="input-width-inches"
               />
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Height in Inches</Label>
-            <Input
-              type="number"
-              placeholder="0"
-              onChange={(e) => handleFormDataChange("heightInches", e.target.value)}
-              data-testid="input-height-inches"
-            />
+            <div className="space-y-2">
+              <Label>Height in Inches</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                onChange={(e) => handleFormDataChange("heightInches", e.target.value)}
+                data-testid="input-height-inches"
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <Label>Text Content to Include in Artwork</Label>
             <Input
-              placeholder="Placeholder text"
+              placeholder="Please enter the text to include in the Artwork"
               onChange={(e) => handleFormDataChange("textContent", e.target.value)}
               data-testid="input-text-content"
             />
@@ -1078,9 +1078,9 @@ export default function ServiceRequestForm() {
           {renderPricingModal()}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Store Name<span className="text-destructive">*</span></Label>
+              <Label>Store Name/Store URL<span className="text-destructive">*</span></Label>
               <Input
-                placeholder="Placeholder text"
+                placeholder="Add a Store Name or Store URL"
                 onChange={(e) => handleFormDataChange("storeName", e.target.value)}
                 data-testid="input-store-name"
               />
@@ -1110,7 +1110,7 @@ export default function ServiceRequestForm() {
           <div className="space-y-2">
             <Label>Product Assortment Description</Label>
             <Input
-              placeholder="Placeholder text"
+              placeholder="Please tell us about the brand or if you have a product assortment in mind"
               onChange={(e) => handleFormDataChange("productAssortment", e.target.value)}
               data-testid="input-product-assortment"
             />
@@ -1198,11 +1198,11 @@ export default function ServiceRequestForm() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="orderNumber">Order Reference</Label>
+                  <Label htmlFor="orderNumber">Order/Project Reference</Label>
                   <Input
                     id="orderNumber"
                     {...register("orderNumber")}
-                    placeholder="Placeholder text"
+                    placeholder="Add an order or project reference (optional)"
                     data-testid="input-order-reference"
                   />
                 </div>
@@ -1211,6 +1211,7 @@ export default function ServiceRequestForm() {
                   <Input
                     id="dueDate"
                     type="date"
+                    lang="en-US"
                     {...register("dueDate")}
                     data-testid="input-due-date"
                   />
