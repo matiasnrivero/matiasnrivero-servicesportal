@@ -1070,14 +1070,6 @@ export default function ServiceRequestForm() {
               data-testid="input-product-assortment"
             />
           </div>
-          <button
-            type="button"
-            className="text-sky-blue-accent text-sm hover:underline"
-            onClick={() => setPricingModalOpen(true)}
-            data-testid="button-pricing-table"
-          >
-            Pricing table
-          </button>
         </>
       );
     }
@@ -1134,7 +1126,7 @@ export default function ServiceRequestForm() {
                 <button
                   type="button"
                   onClick={() => setPricingModalOpen(true)}
-                  className="text-sky-blue-accent font-body-2-semibold underline hover:text-sky-blue-accent/80"
+                  className="text-sky-blue-accent text-sm underline hover:text-sky-blue-accent/80"
                   data-testid="link-pricing-breakdown"
                 >
                   Pricing Breakdown

@@ -96,7 +96,7 @@ export const ServicesListSection = (): JSX.Element => {
                       {service.title === "Store Creation" ? (
                         <button
                           onClick={handlePricingClick}
-                          className="font-semibold text-sky-blue-accent whitespace-nowrap underline hover:text-sky-blue-accent/80"
+                          className="text-sm text-sky-blue-accent whitespace-nowrap underline hover:text-sky-blue-accent/80"
                           data-testid="link-store-pricing"
                         >
                           Pricing Breakdown
