@@ -696,7 +696,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           basePrice: "10.00",
           priceRange: "$ 10",
           category: "creative",
-          decorationMethods: "All",
+          decorationMethods: "Digital Inkjet, DTF, DTG, Embroidery, Laser Etching, Puff Embroidery, Screen Printing, Sublimation, Sublimation Cut & Sew, UV DTF",
         },
         {
           title: "Creative Art",
@@ -704,7 +704,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           basePrice: "20.00",
           priceRange: "$ 20 - $ 60",
           category: "creative",
-          decorationMethods: "All",
+          decorationMethods: "Digital Inkjet, DTF, DTG, Embroidery, Laser Etching, Puff Embroidery, Screen Printing, Sublimation, Sublimation Cut & Sew, UV DTF",
         },
         {
           title: "Embroidery Digitization",

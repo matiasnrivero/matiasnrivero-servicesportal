@@ -32,6 +32,11 @@ interface CurrentUser {
   username: string;
 }
 
+// Check if user is a distributor/client (not designer)
+function isDistributor(role: string | undefined): boolean {
+  return role === "client" || role === "distributor";
+}
+
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   "pending": { label: "Pending", color: "bg-yellow-100 text-yellow-800 border-yellow-200", icon: Clock },
   "in-progress": { label: "In Progress", color: "bg-blue-100 text-blue-800 border-blue-200", icon: RefreshCw },
@@ -88,6 +93,11 @@ export default function ServiceRequestsList() {
     if (!assigneeId) return "Unassigned";
     const user = users.find(u => u.id === assigneeId);
     return user?.username || "Unknown";
+  };
+
+  const getServicePrice = (serviceId: string) => {
+    const service = services.find(s => s.id === serviceId);
+    return service?.priceRange || "N/A";
   };
 
   const filteredRequests = requests.filter(r => {
@@ -161,7 +171,11 @@ export default function ServiceRequestsList() {
                     <TableHead>Service</TableHead>
                     <TableHead>Customer</TableHead>
                     <TableHead>Due Date</TableHead>
-                    <TableHead>Assignee</TableHead>
+                    {isDistributor(currentUser?.role) ? (
+                      <TableHead>Price</TableHead>
+                    ) : (
+                      <TableHead>Assignee</TableHead>
+                    )}
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Actions</TableHead>
@@ -173,9 +187,11 @@ export default function ServiceRequestsList() {
                     return (
                       <TableRow key={request.id} data-testid={`row-request-${request.id}`}>
                         <TableCell className="font-medium">
-                          <span className="text-sky-blue-accent" data-testid={`text-job-id-${request.id}`}>
-                            A-{request.id.slice(0, 5).toUpperCase()}
-                          </span>
+                          <Link href={`/jobs/${request.id}`}>
+                            <span className="text-sky-blue-accent hover:underline cursor-pointer" data-testid={`link-job-id-${request.id}`}>
+                              A-{request.id.slice(0, 5).toUpperCase()}
+                            </span>
+                          </Link>
                         </TableCell>
                         <TableCell data-testid={`text-service-${request.id}`}>
                           {getServiceTitle(request.serviceId)}
@@ -188,9 +204,15 @@ export default function ServiceRequestsList() {
                             ? format(new Date(request.dueDate), "MM/dd/yyyy")
                             : "Not set"}
                         </TableCell>
-                        <TableCell data-testid={`text-assignee-${request.id}`}>
-                          {getAssigneeName(request.assigneeId)}
-                        </TableCell>
+                        {isDistributor(currentUser?.role) ? (
+                          <TableCell data-testid={`text-price-${request.id}`}>
+                            <span className="text-dark-blue-night font-medium">{getServicePrice(request.serviceId)}</span>
+                          </TableCell>
+                        ) : (
+                          <TableCell data-testid={`text-assignee-${request.id}`}>
+                            {getAssigneeName(request.assigneeId)}
+                          </TableCell>
+                        )}
                         <TableCell>
                           <Badge 
                             className={statusConfig[request.status]?.color || "bg-gray-100 text-gray-800"}

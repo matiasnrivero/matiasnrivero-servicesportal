@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, decimal, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, decimal, integer, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -41,6 +41,7 @@ export const serviceRequests = pgTable("service_requests", {
   deliveredBy: varchar("delivered_by").references(() => users.id),
   changeRequestNote: text("change_request_note"),
   completedAt: timestamp("completed_at"),
+  formData: jsonb("form_data"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

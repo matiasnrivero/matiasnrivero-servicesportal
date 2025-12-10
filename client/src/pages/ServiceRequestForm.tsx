@@ -1,12 +1,13 @@
-import React from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -18,6 +19,13 @@ import { useToast } from "@/hooks/use-toast";
 import type { Service, InsertServiceRequest } from "@shared/schema";
 import { Header } from "@/components/Header";
 import { FileUploader } from "@/components/FileUploader";
+import { ChevronRight, HelpCircle } from "lucide-react";
+
+interface CurrentUser {
+  userId: string;
+  role: string;
+  username: string;
+}
 
 async function fetchServices(): Promise<Service[]> {
   const response = await fetch("/api/services");
@@ -27,13 +35,12 @@ async function fetchServices(): Promise<Service[]> {
   return response.json();
 }
 
-async function getDefaultUserId(): Promise<string> {
+async function getDefaultUser(): Promise<CurrentUser> {
   const response = await fetch("/api/default-user");
   if (!response.ok) {
     throw new Error("Failed to get default user");
   }
-  const data = await response.json();
-  return data.userId;
+  return response.json();
 }
 
 async function createServiceRequest(data: InsertServiceRequest) {
@@ -48,42 +55,51 @@ async function createServiceRequest(data: InsertServiceRequest) {
   return response.json();
 }
 
+const outputFormatOptions = ["AI", "EPS", "PDF", "PNG", "JPG", "SVG", "PSD", "TIFF"];
+const colorModeOptions = ["CMYK", "RGB", "Spot Colors", "Grayscale"];
+const complexityOptions = ["Simple", "Moderate", "Complex", "Very Complex"];
+const fabricTypeOptions = ["Cotton", "Polyester", "Blend", "Denim", "Leather", "Nylon"];
+const threadColorOptions = ["1 Color", "2 Colors", "3 Colors", "4+ Colors", "Full Color"];
+const garmentSizeOptions = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "Youth", "Custom"];
+const bleedMarginOptions = ["0.125 inches", "0.25 inches", "0.5 inches", "None"];
+const orientationOptions = ["Portrait", "Landscape", "Square"];
+const supplierOptions = ["SanMar", "S&S Activewear", "alphabroder", "Augusta Sportswear", "Other"];
+
 export default function ServiceRequestForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
+  
   const { data: services = [], isLoading: servicesLoading } = useQuery({
     queryKey: ["services"],
     queryFn: fetchServices,
   });
 
+  const { data: currentUser } = useQuery({
+    queryKey: ["/api/default-user"],
+    queryFn: getDefaultUser,
+  });
+
   const urlParams = new URLSearchParams(window.location.search);
   const preSelectedServiceId = urlParams.get("serviceId") || "";
 
-  const [selectedServiceId, setSelectedServiceId] = React.useState<string>(preSelectedServiceId);
-  const [uploadedFiles, setUploadedFiles] = React.useState<Array<{ url: string; name: string }>>([]);
-  const { register, handleSubmit, reset, setValue } = useForm();
+  const [selectedServiceId, setSelectedServiceId] = useState<string>(preSelectedServiceId);
+  const [formData, setFormData] = useState<Record<string, any>>({});
+  const [uploadedFiles, setUploadedFiles] = useState<Record<string, Array<{ url: string; name: string }>>>({});
+  
+  const { register, handleSubmit, reset, setValue, watch } = useForm();
 
-  const servicesRequiringArtwork = [
-    "Vectorization",
-    "Artwork Touch-Ups",
-    "Embroidery Digitization",
-    "Artwork Composition",
-    "Creative Art",
-  ];
-
-  const requiresArtworkUpload = (service: Service | undefined): boolean => {
-    if (!service) return false;
-    return servicesRequiringArtwork.some(
-      (name) => service.title.toLowerCase().includes(name.toLowerCase())
-    );
-  };
-
-  React.useEffect(() => {
+  useEffect(() => {
     if (preSelectedServiceId && services.length > 0) {
       setSelectedServiceId(preSelectedServiceId);
     }
   }, [preSelectedServiceId, services]);
+
+  useEffect(() => {
+    if (currentUser?.username) {
+      setValue("customerName", currentUser.username);
+    }
+  }, [currentUser, setValue]);
 
   const mutation = useMutation({
     mutationFn: createServiceRequest,
@@ -94,7 +110,8 @@ export default function ServiceRequestForm() {
       });
       reset();
       setSelectedServiceId("");
-      setUploadedFiles([]);
+      setFormData({});
+      setUploadedFiles({});
       queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
       navigate("/service-requests");
     },
@@ -108,23 +125,37 @@ export default function ServiceRequestForm() {
   });
 
   const selectedService = services.find((s) => s.id === selectedServiceId);
+  const serviceSlug = selectedService?.title.toLowerCase().replace(/[^a-z0-9]/g, '-') || "";
+
+  const handleFormDataChange = (field: string, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleFileUpload = (fieldName: string, url: string, name: string) => {
+    setUploadedFiles(prev => ({
+      ...prev,
+      [fieldName]: [...(prev[fieldName] || []), { url, name }]
+    }));
+  };
 
   const onSubmit = async (data: any) => {
     try {
-      const userId = await getDefaultUserId();
-      
-      const notesWithFiles = uploadedFiles.length > 0
-        ? `${data.notes || ""}\n\nAttached Files:\n${uploadedFiles.map((f) => `- ${f.name}: ${f.url}`).join("\n")}`.trim()
-        : data.notes;
+      const allFormData = {
+        ...formData,
+        uploadedFiles,
+      };
 
       mutation.mutate({
-        userId,
+        userId: currentUser?.userId || "",
         serviceId: selectedServiceId,
         status: "pending",
-        ...data,
-        notes: notesWithFiles,
+        orderNumber: data.orderNumber || null,
+        customerName: currentUser?.username || data.customerName,
+        notes: data.jobNotes,
+        requirements: data.requirements,
         quantity: data.quantity ? parseInt(data.quantity) : null,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
+        formData: allFormData,
       });
     } catch (error) {
       toast({
@@ -135,164 +166,863 @@ export default function ServiceRequestForm() {
     }
   };
 
-  return (
-    <main className="flex flex-col w-full min-h-screen bg-light-grey">
-      <Header />
-      <div className="flex-1 p-8">
-        <Card className="max-w-3xl mx-auto">
-          <CardHeader>
-            <CardTitle className="font-title-semibold text-dark-blue-night text-2xl">
-              Create Service Request
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+  const handleCancel = () => {
+    navigate("/service-requests");
+  };
+
+  const handleBack = () => {
+    setSelectedServiceId("");
+    setFormData({});
+    setUploadedFiles({});
+    reset();
+  };
+
+  const renderServiceSelector = () => (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center p-8">
+      <h1 className="font-title-semibold text-dark-blue-night text-3xl mb-2">
+        Create Service Request
+      </h1>
+      <p className="text-dark-gray mb-8 text-center max-w-xl">
+        Select the type of service you need. Each service has specific requirements to help us deliver the best results.
+      </p>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-4xl">
+        {services.map((service) => (
+          <Card
+            key={service.id}
+            className={`cursor-pointer transition-all hover-elevate border-2 ${
+              selectedServiceId === service.id 
+                ? "border-sky-blue-accent bg-blue-lavender/30" 
+                : "border-transparent"
+            }`}
+            onClick={() => setSelectedServiceId(service.id)}
+            data-testid={`card-service-${service.id}`}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex-1">
+                  <h3 className="font-body-2-semibold text-dark-blue-night">
+                    {service.title}
+                  </h3>
+                  <p className="font-body-3-reg text-dark-gray mt-1 line-clamp-2">
+                    {service.description}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-sky-blue-accent font-body-2-semibold">
+                    {service.priceRange}
+                  </span>
+                  <ChevronRight className="h-5 w-5 text-dark-gray" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderDynamicFormFields = () => {
+    if (!selectedService) return null;
+
+    const title = selectedService.title;
+
+    if (title === "Vectorization & Color Separation") {
+      return (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-destructive">Upload Artwork File*</Label>
+              <FileUploader
+                onUploadComplete={(url, name) => handleFileUpload("artworkFile", url, name)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-destructive">Desired Output Format*</Label>
+              <Select onValueChange={(v) => handleFormDataChange("outputFormat", v)}>
+                <SelectTrigger data-testid="select-output-format">
+                  <SelectValue placeholder="Select an option" />
+                </SelectTrigger>
+                <SelectContent>
+                  {outputFormatOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-destructive">Color Mode*</Label>
+              <Select onValueChange={(v) => handleFormDataChange("colorMode", v)}>
+                <SelectTrigger data-testid="select-color-mode">
+                  <SelectValue placeholder="Select an option" />
+                </SelectTrigger>
+                <SelectContent>
+                  {colorModeOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Number of Colors</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                onChange={(e) => handleFormDataChange("numberOfColors", e.target.value)}
+                data-testid="input-number-of-colors"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Width in Inches</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                onChange={(e) => handleFormDataChange("widthInches", e.target.value)}
+                data-testid="input-width-inches"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Height in inches</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                onChange={(e) => handleFormDataChange("heightInches", e.target.value)}
+                data-testid="input-height-inches"
+              />
+            </div>
+          </div>
+        </>
+      );
+    }
+
+    if (title === "Artwork Touch-Ups (DTF / DTG)") {
+      return (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-destructive">Upload Artwork File*</Label>
+              <FileUploader
+                onUploadComplete={(url, name) => handleFileUpload("artworkFile", url, name)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-destructive">Desired Output Format*</Label>
+              <Select onValueChange={(v) => handleFormDataChange("outputFormat", v)}>
+                <SelectTrigger data-testid="select-output-format">
+                  <SelectValue placeholder="Select an option" />
+                </SelectTrigger>
+                <SelectContent>
+                  {outputFormatOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-destructive">Color Mode*</Label>
+              <Select onValueChange={(v) => handleFormDataChange("colorMode", v)}>
+                <SelectTrigger data-testid="select-color-mode">
+                  <SelectValue placeholder="Select an option" />
+                </SelectTrigger>
+                <SelectContent>
+                  {colorModeOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Width in inches</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                onChange={(e) => handleFormDataChange("widthInches", e.target.value)}
+                data-testid="input-width-inches"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Height in inches</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                onChange={(e) => handleFormDataChange("heightInches", e.target.value)}
+                data-testid="input-height-inches"
+              />
+            </div>
+          </div>
+        </>
+      );
+    }
+
+    if (title === "Artwork Composition") {
+      return (
+        <>
+          <div className="space-y-2">
+            <Label>Brand Guidelines</Label>
+            <FileUploader
+              onUploadComplete={(url, name) => handleFileUpload("brandGuidelines", url, name)}
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-destructive">Upload Assets*</Label>
+              <FileUploader
+                onUploadComplete={(url, name) => handleFileUpload("uploadAssets", url, name)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-destructive">Desired Output Format*</Label>
+              <Select onValueChange={(v) => handleFormDataChange("outputFormat", v)}>
+                <SelectTrigger data-testid="select-output-format">
+                  <SelectValue placeholder="Select an option" />
+                </SelectTrigger>
+                <SelectContent>
+                  {outputFormatOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Width in inches</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                onChange={(e) => handleFormDataChange("widthInches", e.target.value)}
+                data-testid="input-width-inches"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Height in inches</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                onChange={(e) => handleFormDataChange("heightInches", e.target.value)}
+                data-testid="input-height-inches"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Text Content to Include in Artwork</Label>
+              <Input
+                placeholder="Placeholder text"
+                onChange={(e) => handleFormDataChange("textContent", e.target.value)}
+                data-testid="input-text-content"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Example / Inspiration</Label>
+              <FileUploader
+                onUploadComplete={(url, name) => handleFileUpload("inspirationFile", url, name)}
+              />
+            </div>
+          </div>
+        </>
+      );
+    }
+
+    if (title === "Creative Art") {
+      return (
+        <>
+          <div className="space-y-2">
+            <Label>Brand Guidelines</Label>
+            <FileUploader
+              onUploadComplete={(url, name) => handleFileUpload("brandGuidelines", url, name)}
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-destructive">Desired Output Format*</Label>
+              <Select onValueChange={(v) => handleFormDataChange("outputFormat", v)}>
+                <SelectTrigger data-testid="select-output-format">
+                  <SelectValue placeholder="Select an option" />
+                </SelectTrigger>
+                <SelectContent>
+                  {outputFormatOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-destructive">Select Complexity*</Label>
+              <Select onValueChange={(v) => handleFormDataChange("complexity", v)}>
+                <SelectTrigger data-testid="select-complexity">
+                  <SelectValue placeholder="Select an option" />
+                </SelectTrigger>
+                <SelectContent>
+                  {complexityOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <a href="#" className="text-sky-blue-accent text-sm hover:underline">
+                Artwork Complexities Help
+              </a>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-destructive">Width in Pixels*</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                onChange={(e) => handleFormDataChange("widthPixels", e.target.value)}
+                data-testid="input-width-pixels"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Height in Pixels</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                onChange={(e) => handleFormDataChange("heightPixels", e.target.value)}
+                data-testid="input-height-pixels"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Text Content to Include in Artwork</Label>
+              <Input
+                placeholder="Placeholder text"
+                onChange={(e) => handleFormDataChange("textContent", e.target.value)}
+                data-testid="input-text-content"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Example / Inspiration</Label>
+              <FileUploader
+                onUploadComplete={(url, name) => handleFileUpload("inspirationFile", url, name)}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-destructive">Project Brief*</Label>
+            <Textarea
+              placeholder="Please leave your comments here"
+              onChange={(e) => handleFormDataChange("projectBrief", e.target.value)}
+              rows={3}
+              data-testid="textarea-project-brief"
+            />
+          </div>
+        </>
+      );
+    }
+
+    if (title === "Embroidery Digitization") {
+      return (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-destructive">Upload Artwork File*</Label>
+              <FileUploader
+                onUploadComplete={(url, name) => handleFileUpload("artworkFile", url, name)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-destructive">Desired Output Format*</Label>
+              <Select onValueChange={(v) => handleFormDataChange("outputFormat", v)}>
+                <SelectTrigger data-testid="select-output-format">
+                  <SelectValue placeholder="Select an option" />
+                </SelectTrigger>
+                <SelectContent>
+                  {outputFormatOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-destructive">Width in inches*</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                onChange={(e) => handleFormDataChange("widthInches", e.target.value)}
+                data-testid="input-width-inches"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-destructive">Height in inches*</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                onChange={(e) => handleFormDataChange("heightInches", e.target.value)}
+                data-testid="input-height-inches"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Fabric Type</Label>
+              <Select onValueChange={(v) => handleFormDataChange("fabricType", v)}>
+                <SelectTrigger data-testid="select-fabric-type">
+                  <SelectValue placeholder="Select an option" />
+                </SelectTrigger>
+                <SelectContent>
+                  {fabricTypeOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Thread Colors</Label>
+              <Select onValueChange={(v) => handleFormDataChange("threadColors", v)}>
+                <SelectTrigger data-testid="select-thread-colors">
+                  <SelectValue placeholder="Select an option" />
+                </SelectTrigger>
+                <SelectContent>
+                  {threadColorOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="vectorizationNeeded"
+              onCheckedChange={(checked) => handleFormDataChange("vectorizationNeeded", checked)}
+              data-testid="checkbox-vectorization-needed"
+            />
+            <Label htmlFor="vectorizationNeeded" className="flex items-center gap-1">
+              Vectorization Needed
+              <HelpCircle className="h-4 w-4 text-dark-gray" />
+            </Label>
+          </div>
+        </>
+      );
+    }
+
+    if (title === "Dye-Sublimation Template") {
+      return (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Upload Artwork File</Label>
+              <FileUploader
+                onUploadComplete={(url, name) => handleFileUpload("artworkFile", url, name)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-destructive">Garment or Product Template by Size*</Label>
+              <Select onValueChange={(v) => handleFormDataChange("garmentSize", v)}>
+                <SelectTrigger data-testid="select-garment-size">
+                  <SelectValue placeholder="Select an option" />
+                </SelectTrigger>
+                <SelectContent>
+                  {garmentSizeOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Bleed Margins</Label>
+              <Select onValueChange={(v) => handleFormDataChange("bleedMargins", v)}>
+                <SelectTrigger data-testid="select-bleed-margins">
+                  <SelectValue placeholder="Select an option" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bleedMarginOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-destructive">Color Mode*</Label>
+              <Select onValueChange={(v) => handleFormDataChange("colorMode", v)}>
+                <SelectTrigger data-testid="select-color-mode">
+                  <SelectValue placeholder="Select an option" />
+                </SelectTrigger>
+                <SelectContent>
+                  {colorModeOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-destructive">Output Format*</Label>
+              <Select onValueChange={(v) => handleFormDataChange("outputFormat", v)}>
+                <SelectTrigger data-testid="select-output-format">
+                  <SelectValue placeholder="Select an option" />
+                </SelectTrigger>
+                <SelectContent>
+                  {outputFormatOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Mockup / Wrap Sample</Label>
+              <FileUploader
+                onUploadComplete={(url, name) => handleFileUpload("mockupSample", url, name)}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Project Brief</Label>
+            <Input
+              placeholder="Placeholder text"
+              onChange={(e) => handleFormDataChange("projectBrief", e.target.value)}
+              data-testid="input-project-brief"
+            />
+          </div>
+        </>
+      );
+    }
+
+    if (title === "Store Banner Design") {
+      return (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-destructive">Upload Assets*</Label>
+              <FileUploader
+                onUploadComplete={(url, name) => handleFileUpload("uploadAssets", url, name)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Text Content to Include in Artwork</Label>
+              <Input
+                placeholder="Placeholder text"
+                onChange={(e) => handleFormDataChange("textContent", e.target.value)}
+                data-testid="input-text-content"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Width in inches</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                onChange={(e) => handleFormDataChange("widthInches", e.target.value)}
+                data-testid="input-width-inches"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Height in inches</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                onChange={(e) => handleFormDataChange("heightInches", e.target.value)}
+                data-testid="input-height-inches"
+              />
+            </div>
+          </div>
+        </>
+      );
+    }
+
+    if (title === "Flyer Design") {
+      return (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-destructive">Upload Assets*</Label>
+              <FileUploader
+                onUploadComplete={(url, name) => handleFileUpload("uploadAssets", url, name)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-destructive">Desired Output Format*</Label>
+              <Select onValueChange={(v) => handleFormDataChange("outputFormat", v)}>
+                <SelectTrigger data-testid="select-output-format">
+                  <SelectValue placeholder="Select an option" />
+                </SelectTrigger>
+                <SelectContent>
+                  {outputFormatOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-destructive">Color Mode*</Label>
+              <Select onValueChange={(v) => handleFormDataChange("colorMode", v)}>
+                <SelectTrigger data-testid="select-color-mode">
+                  <SelectValue placeholder="Select an option" />
+                </SelectTrigger>
+                <SelectContent>
+                  {colorModeOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-destructive">Flyer Orientation*</Label>
+              <Select onValueChange={(v) => handleFormDataChange("flyerOrientation", v)}>
+                <SelectTrigger data-testid="select-flyer-orientation">
+                  <SelectValue placeholder="Select an option" />
+                </SelectTrigger>
+                <SelectContent>
+                  {orientationOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Width in Inches</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                onChange={(e) => handleFormDataChange("widthInches", e.target.value)}
+                data-testid="input-width-inches"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Height in Inches</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                onChange={(e) => handleFormDataChange("heightInches", e.target.value)}
+                data-testid="input-height-inches"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Text Content to Include in Artwork</Label>
+              <Input
+                placeholder="Placeholder text"
+                onChange={(e) => handleFormDataChange("textContent", e.target.value)}
+                data-testid="input-text-content"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Upload QR Code</Label>
+              <FileUploader
+                onUploadComplete={(url, name) => handleFileUpload("qrCode", url, name)}
+              />
+            </div>
+          </div>
+        </>
+      );
+    }
+
+    if (title === "Store Creation") {
+      return (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-destructive">Store Name*</Label>
+              <Input
+                placeholder="Placeholder text"
+                onChange={(e) => handleFormDataChange("storeName", e.target.value)}
+                data-testid="input-store-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-destructive">Amount of Products*</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                onChange={(e) => handleFormDataChange("amountOfProducts", e.target.value)}
+                data-testid="input-amount-products"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-destructive">Upload Assets*</Label>
+            <p className="text-sm text-dark-gray">Logos, designs, etc.</p>
+            <FileUploader
+              onUploadComplete={(url, name) => handleFileUpload("uploadAssets", url, name)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Product Assortment Description</Label>
+            <Input
+              placeholder="Placeholder text"
+              onChange={(e) => handleFormDataChange("productAssortment", e.target.value)}
+              data-testid="input-product-assortment"
+            />
+          </div>
+          <a href="#" className="text-sky-blue-accent text-sm hover:underline">
+            Pricing table
+          </a>
+        </>
+      );
+    }
+
+    if (title === "Blank Product - PSD") {
+      return (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Blank Name</Label>
+              <Input
+                placeholder="Blank Name"
+                onChange={(e) => handleFormDataChange("blankName", e.target.value)}
+                data-testid="input-blank-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Supplier</Label>
+              <Select onValueChange={(v) => handleFormDataChange("supplier", v)}>
+                <SelectTrigger data-testid="select-supplier">
+                  <SelectValue placeholder="Supplier" />
+                </SelectTrigger>
+                <SelectContent>
+                  {supplierOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-destructive">Blank URL*</Label>
+            <Input
+              placeholder="Placeholder text"
+              onChange={(e) => handleFormDataChange("blankUrl", e.target.value)}
+              data-testid="input-blank-url"
+            />
+          </div>
+        </>
+      );
+    }
+
+    return null;
+  };
+
+  const renderServiceForm = () => (
+    <div className="p-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="font-title-semibold text-dark-blue-night text-2xl flex items-center gap-3">
+              {selectedService?.title}
+              <span className="text-sky-blue-accent font-body-2-semibold">
+                {selectedService?.priceRange}
+              </span>
+            </h1>
+            <p className="font-body-reg text-dark-gray mt-1">
+              {selectedService?.description}
+            </p>
+          </div>
+          <Button type="button" onClick={handleSubmit(onSubmit)} disabled={mutation.isPending}>
+            {mutation.isPending ? "Saving..." : "Save"}
+          </Button>
+        </div>
+
+        <Card>
+          <CardContent className="p-6">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="service">Service Type *</Label>
-                <Select
-                  value={selectedServiceId}
-                  onValueChange={(value) => {
-                    setSelectedServiceId(value);
-                    setValue("serviceId", value);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a service" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {services.map((service) => (
-                      <SelectItem key={service.id} value={service.id}>
-                        {service.title} - {service.priceRange}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {selectedService && (
-                <div className="p-4 bg-blue-lavender rounded-lg">
-                  <p className="font-body-2-reg text-dark-blue-night">
-                    {selectedService.description}
-                  </p>
-                  <p className="font-body-3-reg text-dark-gray mt-2">
-                    Decoration Methods: {selectedService.decorationMethods}
-                  </p>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="orderNumber">Order Number</Label>
-                <Input
-                  id="orderNumber"
-                  {...register("orderNumber")}
-                  placeholder="e.g., ORD-12345"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="customerName">Customer Name</Label>
-                <Input
-                  id="customerName"
-                  {...register("customerName")}
-                  placeholder="Customer or company name"
-                />
-              </div>
-
-              {selectedService?.decorationMethods && (
+              <h3 className="font-body-2-semibold text-dark-blue-night">General Info</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="decorationMethod">Decoration Method</Label>
-                  <Select onValueChange={(value) => setValue("decorationMethod", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select decoration method" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {selectedService.decorationMethods.split(",").map((method) => (
-                        <SelectItem key={method.trim()} value={method.trim()}>
-                          {method.trim()}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  {...register("quantity")}
-                  placeholder="Number of items"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="dueDate">Due Date</Label>
-                <Input
-                  id="dueDate"
-                  type="date"
-                  {...register("dueDate")}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="requirements">Requirements & Specifications</Label>
-                <Textarea
-                  id="requirements"
-                  {...register("requirements")}
-                  placeholder="Describe your specific requirements, colors, sizes, etc."
-                  rows={4}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="notes">Additional Notes</Label>
-                <Textarea
-                  id="notes"
-                  {...register("notes")}
-                  placeholder="Any additional information or special instructions"
-                  rows={3}
-                />
-              </div>
-
-              {requiresArtworkUpload(selectedService) && (
-                <div className="space-y-2">
-                  <Label>Artwork File Upload</Label>
-                  <p className="text-sm text-dark-gray mb-2">
-                    Upload your artwork file for processing. This service requires an artwork file to get started.
-                  </p>
-                  <FileUploader
-                    onUploadComplete={(url, name) => {
-                      setUploadedFiles((prev) => [...prev, { url, name }]);
-                    }}
+                  <Label htmlFor="orderNumber">Order Reference</Label>
+                  <Input
+                    id="orderNumber"
+                    {...register("orderNumber")}
+                    placeholder="Placeholder text"
+                    data-testid="input-order-reference"
                   />
                 </div>
-              )}
+                <div className="space-y-2">
+                  <Label htmlFor="dueDate">Due Date</Label>
+                  <Input
+                    id="dueDate"
+                    type="date"
+                    {...register("dueDate")}
+                    data-testid="input-due-date"
+                  />
+                </div>
+              </div>
 
-              <div className="flex gap-4 pt-4">
-                <Button
-                  type="submit"
-                  className="bg-sky-blue-accent hover:bg-sky-blue-accent/90 text-white"
-                  disabled={!selectedServiceId || mutation.isPending}
+              <h3 className="font-body-2-semibold text-dark-blue-night pt-4">Info Details</h3>
+              
+              {renderDynamicFormFields()}
+
+              <div className="space-y-2">
+                <Label htmlFor="jobNotes">Job Notes</Label>
+                <Textarea
+                  id="jobNotes"
+                  {...register("jobNotes")}
+                  placeholder="Please leave your comments here"
+                  rows={3}
+                  data-testid="textarea-job-notes"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t">
+                <Button 
+                  type="button" 
+                  variant="destructive"
+                  onClick={handleCancel}
+                  data-testid="button-cancel"
                 >
-                  {mutation.isPending ? "Submitting..." : "Submit Request"}
+                  Cancel
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    reset();
-                    setSelectedServiceId("");
-                    setUploadedFiles([]);
-                  }}
-                >
-                  Clear Form
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleBack}
+                    data-testid="button-back"
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={mutation.isPending}
+                    data-testid="button-save"
+                  >
+                    {mutation.isPending ? "Saving..." : "Save"}
+                  </Button>
+                </div>
               </div>
             </form>
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+
+  if (servicesLoading) {
+    return (
+      <main className="flex flex-col w-full min-h-screen bg-light-grey">
+        <Header />
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-dark-gray">Loading services...</p>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="flex flex-col w-full min-h-screen bg-light-grey">
+      <Header />
+      {selectedServiceId ? renderServiceForm() : renderServiceSelector()}
     </main>
   );
 }
