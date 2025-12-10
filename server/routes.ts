@@ -701,8 +701,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         {
           title: "Creative Art",
           description: "Original artwork from just your idea, text, or inspiration.",
-          basePrice: "20.00",
-          priceRange: "$ 20 - $ 60",
+          basePrice: "40.00",
+          priceRange: "$ 40 - $ 100",
           category: "creative",
           decorationMethods: "Digital Inkjet, DTF, DTG, Embroidery, Laser Etching, Puff Embroidery, Screen Printing, Sublimation, Sublimation Cut & Sew, UV DTF",
         },
@@ -741,8 +741,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         {
           title: "Store Creation",
           description: "Create an amazing custom store from scratch",
-          basePrice: "10.00",
-          priceRange: "$ 10",
+          basePrice: "1.50",
+          priceRange: "Pricing Breakdown",
           category: "other",
           decorationMethods: "N/A",
         },

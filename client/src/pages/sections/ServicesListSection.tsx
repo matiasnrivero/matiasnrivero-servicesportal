@@ -1,8 +1,14 @@
-import React from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { Service } from "@shared/schema";
 
 const SERVICE_ORDER = [
@@ -37,10 +43,18 @@ async function fetchServices(): Promise<Service[]> {
 }
 
 export const ServicesListSection = (): JSX.Element => {
+  const [pricingModalOpen, setPricingModalOpen] = useState(false);
+  
   const { data: services = [], isLoading } = useQuery({
     queryKey: ["services"],
     queryFn: fetchServices,
   });
+
+  const handlePricingClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setPricingModalOpen(true);
+  };
 
   return (
     <div className="flex flex-col items-center w-full flex-1 px-8 py-6">
@@ -79,9 +93,19 @@ export const ServicesListSection = (): JSX.Element => {
                       <h3 className="flex-1 font-semibold text-dark-blue-night">
                         {service.title}
                       </h3>
-                      <span className="font-semibold text-sky-blue-accent whitespace-nowrap">
-                        {service.priceRange}
-                      </span>
+                      {service.title === "Store Creation" ? (
+                        <button
+                          onClick={handlePricingClick}
+                          className="font-semibold text-sky-blue-accent whitespace-nowrap underline hover:text-sky-blue-accent/80"
+                          data-testid="link-store-pricing"
+                        >
+                          Pricing Breakdown
+                        </button>
+                      ) : (
+                        <span className="font-semibold text-sky-blue-accent whitespace-nowrap">
+                          {service.priceRange}
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-dark-blue-night">
                       {service.description}
@@ -93,6 +117,56 @@ export const ServicesListSection = (): JSX.Element => {
           ))
         )}
       </section>
+
+      <Dialog open={pricingModalOpen} onOpenChange={setPricingModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-dark-blue-night">
+              Pricing table
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-dark-blue-night mb-6">
+              Depending on the amount of products entered by the user the final pricing will vary as follows:
+            </p>
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-3 text-dark-gray font-normal">Quantity of products</th>
+                  <th className="text-left py-3 text-dark-gray font-normal">$ per item</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b">
+                  <td className="py-4 text-dark-blue-night">1-50</td>
+                  <td className="py-4 text-dark-blue-night">$ 1.50</td>
+                </tr>
+                <tr className="border-b">
+                  <td className="py-4 text-dark-blue-night">51-75</td>
+                  <td className="py-4 text-dark-blue-night">$ 1.30</td>
+                </tr>
+                <tr className="border-b">
+                  <td className="py-4 text-dark-blue-night">76-100</td>
+                  <td className="py-4 text-dark-blue-night">$ 1.10</td>
+                </tr>
+                <tr>
+                  <td className="py-4 text-dark-blue-night">&gt; 101</td>
+                  <td className="py-4 text-dark-blue-night">$ 1.00</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div className="flex justify-end">
+            <Button 
+              onClick={() => setPricingModalOpen(false)}
+              className="bg-sky-blue-accent hover:bg-sky-blue-accent/90 text-white"
+              data-testid="button-got-it"
+            >
+              Got It
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

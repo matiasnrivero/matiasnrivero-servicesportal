@@ -170,13 +170,10 @@ const orientationOptions = ["Portrait", "Landscape", "Square"];
 const supplierOptions = ["SanMar", "S&S Activewear", "alphabroder", "Augusta Sportswear", "Other"];
 
 const storeCreationPricing = [
-  { minProducts: 1, maxProducts: 5, price: 50 },
-  { minProducts: 6, maxProducts: 10, price: 75 },
-  { minProducts: 11, maxProducts: 20, price: 100 },
-  { minProducts: 21, maxProducts: 30, price: 125 },
-  { minProducts: 31, maxProducts: 50, price: 150 },
-  { minProducts: 51, maxProducts: 100, price: 200 },
-  { minProducts: 101, maxProducts: 999999, price: 250 },
+  { minProducts: 1, maxProducts: 50, pricePerItem: 1.50 },
+  { minProducts: 51, maxProducts: 75, pricePerItem: 1.30 },
+  { minProducts: 76, maxProducts: 100, pricePerItem: 1.10 },
+  { minProducts: 101, maxProducts: 999999, pricePerItem: 1.00 },
 ];
 
 function calculateStoreCreationPrice(productCount: number): number {
@@ -184,7 +181,7 @@ function calculateStoreCreationPrice(productCount: number): number {
   const tier = storeCreationPricing.find(
     (t) => productCount >= t.minProducts && productCount <= t.maxProducts
   );
-  return tier ? tier.price : 0;
+  return tier ? Number((productCount * tier.pricePerItem).toFixed(2)) : 0;
 }
 
 export default function ServiceRequestForm() {
@@ -367,34 +364,49 @@ export default function ServiceRequestForm() {
     <Dialog open={pricingModalOpen} onOpenChange={setPricingModalOpen}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Store Creation Pricing</DialogTitle>
+          <DialogTitle className="text-xl font-semibold text-dark-blue-night">
+            Pricing table
+          </DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          <p className="text-sm text-dark-gray">
-            Pricing is based on the number of products in your store:
+        <div className="py-4">
+          <p className="text-dark-blue-night mb-6">
+            Depending on the amount of products entered by the user the final pricing will vary as follows:
           </p>
-          <div className="border rounded-md overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted">
-                <tr>
-                  <th className="px-4 py-2 text-left">Products</th>
-                  <th className="px-4 py-2 text-right">Price</th>
-                </tr>
-              </thead>
-              <tbody>
-                {storeCreationPricing.map((tier, idx) => (
-                  <tr key={idx} className="border-t">
-                    <td className="px-4 py-2">
-                      {tier.maxProducts === 999999 
-                        ? `${tier.minProducts}+` 
-                        : `${tier.minProducts} - ${tier.maxProducts}`}
-                    </td>
-                    <td className="px-4 py-2 text-right font-semibold">${tier.price}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <table className="w-full">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-3 text-dark-gray font-normal">Quantity of products</th>
+                <th className="text-left py-3 text-dark-gray font-normal">$ per item</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b">
+                <td className="py-4 text-dark-blue-night">1-50</td>
+                <td className="py-4 text-dark-blue-night">$ 1.50</td>
+              </tr>
+              <tr className="border-b">
+                <td className="py-4 text-dark-blue-night">51-75</td>
+                <td className="py-4 text-dark-blue-night">$ 1.30</td>
+              </tr>
+              <tr className="border-b">
+                <td className="py-4 text-dark-blue-night">76-100</td>
+                <td className="py-4 text-dark-blue-night">$ 1.10</td>
+              </tr>
+              <tr>
+                <td className="py-4 text-dark-blue-night">&gt; 101</td>
+                <td className="py-4 text-dark-blue-night">$ 1.00</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div className="flex justify-end">
+          <Button 
+            onClick={() => setPricingModalOpen(false)}
+            className="bg-sky-blue-accent hover:bg-sky-blue-accent/90 text-white"
+            data-testid="button-got-it"
+          >
+            Got It
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -1118,9 +1130,20 @@ export default function ServiceRequestForm() {
           <div>
             <h1 className="font-title-semibold text-dark-blue-night text-2xl flex items-center gap-3">
               {selectedService?.title}
-              <span className="text-sky-blue-accent font-body-2-semibold">
-                {calculatedPrice > 0 ? `$${calculatedPrice}` : selectedService?.priceRange}
-              </span>
+              {selectedService?.title === "Store Creation" ? (
+                <button
+                  type="button"
+                  onClick={() => setPricingModalOpen(true)}
+                  className="text-sky-blue-accent font-body-2-semibold underline hover:text-sky-blue-accent/80"
+                  data-testid="link-pricing-breakdown"
+                >
+                  Pricing Breakdown
+                </button>
+              ) : (
+                <span className="text-sky-blue-accent font-body-2-semibold">
+                  {selectedService?.priceRange}
+                </span>
+              )}
             </h1>
             <p className="font-body-reg text-dark-gray mt-1">
               {selectedService?.description}
