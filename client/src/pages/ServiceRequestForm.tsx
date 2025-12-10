@@ -26,7 +26,12 @@ import { useToast } from "@/hooks/use-toast";
 import type { Service, InsertServiceRequest } from "@shared/schema";
 import { Header } from "@/components/Header";
 import { FileUploader } from "@/components/FileUploader";
-import { ChevronRight, HelpCircle } from "lucide-react";
+import { ChevronRight, HelpCircle, X } from "lucide-react";
+
+import complexityExample1 from "@assets/Imagen_de_WhatsApp_2025-09-04_a_las_11.08.18_29a99002_(1)_1765400666338.jpg";
+import complexityExample2 from "@assets/Imagen_de_WhatsApp_2025-09-04_a_las_11.08.18_be732b8a_(2)_1765400666337.jpg";
+import complexityExample3 from "@assets/Imagen_de_WhatsApp_2025-09-04_a_las_11.08.18_127a1c1b_(1)_1765400666337.jpg";
+import complexityExample4 from "@assets/Imagen_de_WhatsApp_2025-09-04_a_las_11.08.19_caa9df90_(1)_1765400666335.jpg";
 
 interface CurrentUser {
   userId: string;
@@ -189,6 +194,7 @@ export default function ServiceRequestForm() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
   const [pricingModalOpen, setPricingModalOpen] = useState(false);
+  const [complexityHelpModalOpen, setComplexityHelpModalOpen] = useState(false);
   
   const { data: services = [], isLoading: servicesLoading } = useQuery({
     queryKey: ["services"],
@@ -404,6 +410,63 @@ export default function ServiceRequestForm() {
             onClick={() => setPricingModalOpen(false)}
             className="bg-sky-blue-accent hover:bg-sky-blue-accent/90 text-white"
             data-testid="button-got-it"
+          >
+            Got It
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const complexityExamples = [
+    { image: complexityExample1, title: "Central Cheer" },
+    { image: complexityExample2, title: "United We Stand" },
+    { image: complexityExample3, title: "NFR Ranch" },
+    { image: complexityExample4, title: "I May Get Lost" },
+  ];
+
+  const complexityLabels = ["Basic", "Standard", "Advanced", "Ultimate"];
+
+  const renderComplexityHelpModal = () => (
+    <Dialog open={complexityHelpModalOpen} onOpenChange={setComplexityHelpModalOpen}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader className="flex flex-row items-center justify-between">
+          <DialogTitle className="text-xl font-semibold text-dark-blue-night">
+            Artwork Complexities Help
+          </DialogTitle>
+        </DialogHeader>
+        <div className="py-4">
+          <p className="text-dark-blue-night mb-6">
+            Here is an example so you can see the difference between our levels:
+          </p>
+          <div className="space-y-8">
+            {complexityExamples.map((example, index) => (
+              <div key={index} className="space-y-3">
+                <img 
+                  src={example.image} 
+                  alt={`${example.title} complexity examples`}
+                  className="w-full rounded-lg"
+                  data-testid={`img-complexity-example-${index}`}
+                />
+                <div className="grid grid-cols-4 gap-4">
+                  {complexityLabels.map((label, labelIndex) => (
+                    <span 
+                      key={labelIndex} 
+                      className="text-center text-dark-blue-night font-medium"
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="flex justify-end pt-4">
+          <Button 
+            onClick={() => setComplexityHelpModalOpen(false)}
+            className="bg-sky-blue-accent hover:bg-sky-blue-accent/90 text-white"
+            data-testid="button-complexity-got-it"
           >
             Got It
           </Button>
@@ -660,7 +723,8 @@ export default function ServiceRequestForm() {
               <button 
                 type="button"
                 className="text-sky-blue-accent text-sm hover:underline"
-                onClick={() => {}}
+                onClick={() => setComplexityHelpModalOpen(true)}
+                data-testid="button-complexity-help"
               >
                 Artwork Complexities Help
               </button>
@@ -711,6 +775,7 @@ export default function ServiceRequestForm() {
               data-testid="textarea-project-brief"
             />
           </div>
+          {renderComplexityHelpModal()}
         </>
       );
     }
