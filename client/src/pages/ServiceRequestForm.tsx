@@ -483,13 +483,13 @@ export default function ServiceRequestForm() {
     if (title === "Vectorization & Color Separation") {
       return (
         <>
+          <div className="space-y-2">
+            <Label>Upload Artwork File<span className="text-destructive">*</span></Label>
+            <FileUploader
+              onUploadComplete={(url, name) => handleFileUpload("artworkFile", url, name)}
+            />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Upload Artwork File<span className="text-destructive">*</span></Label>
-              <FileUploader
-                onUploadComplete={(url, name) => handleFileUpload("artworkFile", url, name)}
-              />
-            </div>
             <div className="space-y-2">
               <Label>Desired Output Format<span className="text-destructive">*</span></Label>
               <Select onValueChange={(v) => handleFormDataChange("outputFormat", v)}>
@@ -503,8 +503,6 @@ export default function ServiceRequestForm() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Color Mode<span className="text-destructive">*</span></Label>
               <Select onValueChange={(v) => handleFormDataChange("colorMode", v)}>
@@ -518,6 +516,8 @@ export default function ServiceRequestForm() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Number of Colors</Label>
               <Input
@@ -527,8 +527,6 @@ export default function ServiceRequestForm() {
                 data-testid="input-number-of-colors"
               />
             </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Width in Inches</Label>
               <Input
@@ -538,15 +536,15 @@ export default function ServiceRequestForm() {
                 data-testid="input-width-inches"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Height in inches</Label>
-              <Input
-                type="number"
-                placeholder="0"
-                onChange={(e) => handleFormDataChange("heightInches", e.target.value)}
-                data-testid="input-height-inches"
-              />
-            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Height in inches</Label>
+            <Input
+              type="number"
+              placeholder="0"
+              onChange={(e) => handleFormDataChange("heightInches", e.target.value)}
+              data-testid="input-height-inches"
+            />
           </div>
         </>
       );
@@ -555,13 +553,13 @@ export default function ServiceRequestForm() {
     if (title === "Artwork Touch-Ups (DTF / DTG)") {
       return (
         <>
+          <div className="space-y-2">
+            <Label>Upload Artwork File<span className="text-destructive">*</span></Label>
+            <FileUploader
+              onUploadComplete={(url, name) => handleFileUpload("artworkFile", url, name)}
+            />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Upload Artwork File<span className="text-destructive">*</span></Label>
-              <FileUploader
-                onUploadComplete={(url, name) => handleFileUpload("artworkFile", url, name)}
-              />
-            </div>
             <div className="space-y-2">
               <Label>Desired Output Format<span className="text-destructive">*</span></Label>
               <Select onValueChange={(v) => handleFormDataChange("outputFormat", v)}>
@@ -575,8 +573,6 @@ export default function ServiceRequestForm() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Color Mode<span className="text-destructive">*</span></Label>
               <Select onValueChange={(v) => handleFormDataChange("colorMode", v)}>
@@ -590,6 +586,8 @@ export default function ServiceRequestForm() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Width in inches</Label>
               <Input
@@ -599,8 +597,6 @@ export default function ServiceRequestForm() {
                 data-testid="input-width-inches"
               />
             </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Height in inches</Label>
               <Input
@@ -624,26 +620,24 @@ export default function ServiceRequestForm() {
               onUploadComplete={(url, name) => handleFileUpload("brandGuidelines", url, name)}
             />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Upload Assets<span className="text-destructive">*</span></Label>
-              <FileUploader
-                onUploadComplete={(url, name) => handleFileUpload("uploadAssets", url, name)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Desired Output Format<span className="text-destructive">*</span></Label>
-              <Select onValueChange={(v) => handleFormDataChange("outputFormat", v)}>
-                <SelectTrigger data-testid="select-output-format">
-                  <SelectValue placeholder="Select an option" />
-                </SelectTrigger>
-                <SelectContent>
-                  {compositionOutputFormats.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label>Upload Assets<span className="text-destructive">*</span></Label>
+            <FileUploader
+              onUploadComplete={(url, name) => handleFileUpload("uploadAssets", url, name)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Desired Output Format<span className="text-destructive">*</span></Label>
+            <Select onValueChange={(v) => handleFormDataChange("outputFormat", v)}>
+              <SelectTrigger data-testid="select-output-format">
+                <SelectValue placeholder="Select an option" />
+              </SelectTrigger>
+              <SelectContent>
+                {compositionOutputFormats.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -665,21 +659,19 @@ export default function ServiceRequestForm() {
               />
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Text Content to Include in Artwork</Label>
-              <Input
-                placeholder="Placeholder text"
-                onChange={(e) => handleFormDataChange("textContent", e.target.value)}
-                data-testid="input-text-content"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Example / Inspiration</Label>
-              <FileUploader
-                onUploadComplete={(url, name) => handleFileUpload("inspirationFile", url, name)}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label>Text Content to Include in Artwork</Label>
+            <Input
+              placeholder="Placeholder text"
+              onChange={(e) => handleFormDataChange("textContent", e.target.value)}
+              data-testid="input-text-content"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Example / Inspiration</Label>
+            <FileUploader
+              onUploadComplete={(url, name) => handleFileUpload("inspirationFile", url, name)}
+            />
           </div>
         </>
       );
@@ -750,21 +742,19 @@ export default function ServiceRequestForm() {
               />
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Text Content to Include in Artwork</Label>
-              <Input
-                placeholder="Placeholder text"
-                onChange={(e) => handleFormDataChange("textContent", e.target.value)}
-                data-testid="input-text-content"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Example / Inspiration</Label>
-              <FileUploader
-                onUploadComplete={(url, name) => handleFileUpload("inspirationFile", url, name)}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label>Text Content to Include in Artwork</Label>
+            <Input
+              placeholder="Placeholder text"
+              onChange={(e) => handleFormDataChange("textContent", e.target.value)}
+              data-testid="input-text-content"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Example / Inspiration</Label>
+            <FileUploader
+              onUploadComplete={(url, name) => handleFileUpload("inspirationFile", url, name)}
+            />
           </div>
           <div className="space-y-2">
             <Label>Project Brief<span className="text-destructive">*</span></Label>
@@ -783,30 +773,28 @@ export default function ServiceRequestForm() {
     if (title === "Embroidery Digitization") {
       return (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Upload Artwork File<span className="text-destructive">*</span></Label>
-              <FileUploader
-                onUploadComplete={(url, name) => handleFileUpload("artworkFile", url, name)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Desired Output Format(s)<span className="text-destructive">*</span></Label>
-              <div className="border rounded-md p-3 space-y-2">
-                {embroideryOutputFormats.map(opt => (
-                  <div key={opt.value} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`format-${opt.value}`}
-                      checked={(formData.outputFormats || []).includes(opt.value)}
-                      onCheckedChange={() => handleEmbroideryFormatToggle(opt.value)}
-                      data-testid={`checkbox-format-${opt.value}`}
-                    />
-                    <Label htmlFor={`format-${opt.value}`} className="font-normal cursor-pointer">
-                      {opt.label}
-                    </Label>
-                  </div>
-                ))}
-              </div>
+          <div className="space-y-2">
+            <Label>Upload Artwork File<span className="text-destructive">*</span></Label>
+            <FileUploader
+              onUploadComplete={(url, name) => handleFileUpload("artworkFile", url, name)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Desired Output Format(s)<span className="text-destructive">*</span></Label>
+            <div className="border rounded-md p-3 space-y-2 bg-white dark:bg-background">
+              {embroideryOutputFormats.map(opt => (
+                <div key={opt.value} className="flex items-center gap-2">
+                  <Checkbox
+                    id={`format-${opt.value}`}
+                    checked={(formData.outputFormats || []).includes(opt.value)}
+                    onCheckedChange={() => handleEmbroideryFormatToggle(opt.value)}
+                    data-testid={`checkbox-format-${opt.value}`}
+                  />
+                  <Label htmlFor={`format-${opt.value}`} className="font-normal cursor-pointer">
+                    {opt.label}
+                  </Label>
+                </div>
+              ))}
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -875,13 +863,13 @@ export default function ServiceRequestForm() {
     if (title === "Dye-Sublimation Template") {
       return (
         <>
+          <div className="space-y-2">
+            <Label>Upload Artwork File</Label>
+            <FileUploader
+              onUploadComplete={(url, name) => handleFileUpload("artworkFile", url, name)}
+            />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Upload Artwork File</Label>
-              <FileUploader
-                onUploadComplete={(url, name) => handleFileUpload("artworkFile", url, name)}
-              />
-            </div>
             <div className="space-y-2">
               <Label>Garment or Product Template by Size<span className="text-destructive">*</span></Label>
               <Select onValueChange={(v) => handleFormDataChange("garmentSize", v)}>
@@ -895,8 +883,6 @@ export default function ServiceRequestForm() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Bleed Margins</Label>
               <Select onValueChange={(v) => handleFormDataChange("bleedMargins", v)}>
@@ -910,6 +896,8 @@ export default function ServiceRequestForm() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Color Mode<span className="text-destructive">*</span></Label>
               <Select onValueChange={(v) => handleFormDataChange("colorMode", v)}>
@@ -923,8 +911,6 @@ export default function ServiceRequestForm() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Output Format<span className="text-destructive">*</span></Label>
               <Select onValueChange={(v) => handleFormDataChange("outputFormat", v)}>
@@ -938,12 +924,12 @@ export default function ServiceRequestForm() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Mockup / Wrap Sample</Label>
-              <FileUploader
-                onUploadComplete={(url, name) => handleFileUpload("mockupSample", url, name)}
-              />
-            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Mockup / Wrap Sample</Label>
+            <FileUploader
+              onUploadComplete={(url, name) => handleFileUpload("mockupSample", url, name)}
+            />
           </div>
           <div className="space-y-2">
             <Label>Project Brief</Label>
@@ -960,21 +946,19 @@ export default function ServiceRequestForm() {
     if (title === "Store Banner Design") {
       return (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Upload Assets<span className="text-destructive">*</span></Label>
-              <FileUploader
-                onUploadComplete={(url, name) => handleFileUpload("uploadAssets", url, name)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Text Content to Include in Artwork</Label>
-              <Input
-                placeholder="Placeholder text"
-                onChange={(e) => handleFormDataChange("textContent", e.target.value)}
-                data-testid="input-text-content"
-              />
-            </div>
+          <div className="space-y-2">
+            <Label>Upload Assets<span className="text-destructive">*</span></Label>
+            <FileUploader
+              onUploadComplete={(url, name) => handleFileUpload("uploadAssets", url, name)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Text Content to Include in Artwork</Label>
+            <Input
+              placeholder="Placeholder text"
+              onChange={(e) => handleFormDataChange("textContent", e.target.value)}
+              data-testid="input-text-content"
+            />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -1003,13 +987,13 @@ export default function ServiceRequestForm() {
     if (title === "Flyer Design") {
       return (
         <>
+          <div className="space-y-2">
+            <Label>Upload Assets<span className="text-destructive">*</span></Label>
+            <FileUploader
+              onUploadComplete={(url, name) => handleFileUpload("uploadAssets", url, name)}
+            />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Upload Assets<span className="text-destructive">*</span></Label>
-              <FileUploader
-                onUploadComplete={(url, name) => handleFileUpload("uploadAssets", url, name)}
-              />
-            </div>
             <div className="space-y-2">
               <Label>Desired Output Format<span className="text-destructive">*</span></Label>
               <Select onValueChange={(v) => handleFormDataChange("outputFormat", v)}>
@@ -1023,8 +1007,6 @@ export default function ServiceRequestForm() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Color Mode<span className="text-destructive">*</span></Label>
               <Select onValueChange={(v) => handleFormDataChange("colorMode", v)}>
@@ -1038,6 +1020,8 @@ export default function ServiceRequestForm() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Flyer Orientation<span className="text-destructive">*</span></Label>
               <Select onValueChange={(v) => handleFormDataChange("flyerOrientation", v)}>
@@ -1051,8 +1035,6 @@ export default function ServiceRequestForm() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Width in Inches</Label>
               <Input
@@ -1062,31 +1044,29 @@ export default function ServiceRequestForm() {
                 data-testid="input-width-inches"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Height in Inches</Label>
-              <Input
-                type="number"
-                placeholder="0"
-                onChange={(e) => handleFormDataChange("heightInches", e.target.value)}
-                data-testid="input-height-inches"
-              />
-            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Text Content to Include in Artwork</Label>
-              <Input
-                placeholder="Placeholder text"
-                onChange={(e) => handleFormDataChange("textContent", e.target.value)}
-                data-testid="input-text-content"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Upload QR Code</Label>
-              <FileUploader
-                onUploadComplete={(url, name) => handleFileUpload("qrCode", url, name)}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label>Height in Inches</Label>
+            <Input
+              type="number"
+              placeholder="0"
+              onChange={(e) => handleFormDataChange("heightInches", e.target.value)}
+              data-testid="input-height-inches"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Text Content to Include in Artwork</Label>
+            <Input
+              placeholder="Placeholder text"
+              onChange={(e) => handleFormDataChange("textContent", e.target.value)}
+              data-testid="input-text-content"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Upload QR Code</Label>
+            <FileUploader
+              onUploadComplete={(url, name) => handleFileUpload("qrCode", url, name)}
+            />
           </div>
         </>
       );
