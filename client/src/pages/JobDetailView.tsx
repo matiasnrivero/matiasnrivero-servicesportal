@@ -667,6 +667,7 @@ export default function JobDetailView() {
                   // Define field display names
                   const fieldLabels: Record<string, string> = {
                     outputFormats: "Output Formats",
+                    outputFormat: "Output Format",
                     widthInches: "Width (inches)",
                     heightInches: "Height (inches)",
                     widthPixels: "Width (pixels)",
@@ -706,40 +707,138 @@ export default function JobDetailView() {
                   };
                   
                   // Fields to skip (already shown elsewhere or internal)
-                  const skipFields = ['uploadedFiles', 'artworkFile'];
+                  const skipFields = ['uploadedFiles', 'artworkFile', 'notes'];
                   
-                  const entries = Object.entries(formData)
-                    .filter(([key]) => !skipFields.includes(key))
-                    .filter(([, value]) => value !== null && value !== undefined && value !== '');
+                  // Define preferred field order with paired fields (left, right) for side-by-side display
+                  // Fields not in this list will appear at the end
+                  const orderedPairs: [string, string | null][] = [
+                    ['colorMode', 'widthInches'],
+                    ['heightInches', 'outputFormat'],
+                    ['fabricType', 'widthInches'],
+                    ['heightInches', 'threadColors'],
+                    ['outputFormats', 'calculatedPrice'],
+                    ['vectorizationNeeded', null],
+                    ['numberOfColors', null],
+                    ['colorCount', null],
+                    ['needColorSeparation', null],
+                    ['printMethod', null],
+                    ['format', null],
+                    ['designStyle', 'complexity'],
+                    ['logoType', 'industry'],
+                    ['preferredStyle', 'colorPreference'],
+                    ['includeBrandName', 'brandName'],
+                    ['existingBrandColors', null],
+                    ['numberOfProducts', 'resolutionDPI'],
+                    ['mockupType', 'productType'],
+                    ['backgroundStyle', null],
+                    ['includesPackaging', 'includesLabeling'],
+                    ['pageCount', 'paperSize'],
+                    ['frontAndBack', 'foldType'],
+                    ['specialFinishes', 'quantity'],
+                    ['widthPixels', 'heightPixels'],
+                  ];
                   
-                  if (entries.length === 0) return null;
+                  // Build ordered fields from pairs
+                  const processedFields = new Set<string>();
+                  const renderField = (key: string) => {
+                    const value = formData[key];
+                    if (value === null || value === undefined || value === '') return null;
+                    
+                    let displayValue: string;
+                    if (typeof value === 'boolean') {
+                      displayValue = value ? 'Yes' : 'No';
+                    } else if (Array.isArray(value)) {
+                      displayValue = value.join(', ');
+                    } else if (key === 'calculatedPrice') {
+                      displayValue = `$${value}`;
+                    } else {
+                      displayValue = String(value);
+                    }
+                    
+                    return (
+                      <div key={key}>
+                        <p className="text-xs text-dark-gray mb-1">{fieldLabels[key] || key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</p>
+                        <p className="text-sm text-dark-blue-night font-medium" data-testid={`text-formdata-${key}`}>
+                          {displayValue}
+                        </p>
+                      </div>
+                    );
+                  };
                   
-                  return (
-                    <div className="grid grid-cols-2 gap-3">
-                      {entries.map(([key, value]) => {
-                        let displayValue: string;
-                        
-                        if (typeof value === 'boolean') {
-                          displayValue = value ? 'Yes' : 'No';
-                        } else if (Array.isArray(value)) {
-                          displayValue = value.join(', ');
-                        } else if (key === 'calculatedPrice') {
-                          displayValue = `$${value}`;
-                        } else {
-                          displayValue = String(value);
-                        }
-                        
-                        return (
-                          <div key={key} className="p-3 bg-blue-lavender/30 rounded-lg">
-                            <p className="text-xs text-dark-gray mb-1">{fieldLabels[key] || key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</p>
-                            <p className="text-sm text-dark-blue-night font-medium" data-testid={`text-formdata-${key}`}>
-                              {displayValue}
-                            </p>
+                  const rows: JSX.Element[] = [];
+                  
+                  // First, render ordered pairs
+                  for (const [leftKey, rightKey] of orderedPairs) {
+                    const leftExists = formData[leftKey] !== undefined && formData[leftKey] !== null && formData[leftKey] !== '' && !skipFields.includes(leftKey);
+                    const rightExists = rightKey && formData[rightKey] !== undefined && formData[rightKey] !== null && formData[rightKey] !== '' && !skipFields.includes(rightKey);
+                    
+                    if (leftExists || rightExists) {
+                      if (leftExists) processedFields.add(leftKey);
+                      if (rightKey && rightExists) processedFields.add(rightKey);
+                      
+                      if (leftExists && rightExists) {
+                        rows.push(
+                          <div key={`pair-${leftKey}-${rightKey}`} className="grid grid-cols-2 gap-4">
+                            {renderField(leftKey)}
+                            {rightKey && renderField(rightKey)}
                           </div>
                         );
-                      })}
-                    </div>
-                  );
+                      } else if (leftExists && !rightKey) {
+                        // Single field in its own row (full width)
+                        rows.push(
+                          <div key={`single-${leftKey}`}>
+                            {renderField(leftKey)}
+                          </div>
+                        );
+                      } else if (leftExists) {
+                        rows.push(
+                          <div key={`single-${leftKey}`} className="grid grid-cols-2 gap-4">
+                            {renderField(leftKey)}
+                            <div></div>
+                          </div>
+                        );
+                      } else if (rightExists && rightKey) {
+                        rows.push(
+                          <div key={`single-${rightKey}`} className="grid grid-cols-2 gap-4">
+                            <div></div>
+                            {renderField(rightKey)}
+                          </div>
+                        );
+                      }
+                    }
+                  }
+                  
+                  // Then, render any remaining fields not in the ordered list
+                  const remainingEntries = Object.entries(formData)
+                    .filter(([key]) => !skipFields.includes(key) && !processedFields.has(key))
+                    .filter(([, value]) => value !== null && value !== undefined && value !== '');
+                  
+                  if (remainingEntries.length > 0) {
+                    for (let i = 0; i < remainingEntries.length; i += 2) {
+                      const [key1] = remainingEntries[i];
+                      const second = remainingEntries[i + 1];
+                      
+                      if (second) {
+                        const [key2] = second;
+                        rows.push(
+                          <div key={`remaining-${key1}-${key2}`} className="grid grid-cols-2 gap-4">
+                            {renderField(key1)}
+                            {renderField(key2)}
+                          </div>
+                        );
+                      } else {
+                        rows.push(
+                          <div key={`remaining-${key1}`}>
+                            {renderField(key1)}
+                          </div>
+                        );
+                      }
+                    }
+                  }
+                  
+                  if (rows.length === 0) return null;
+                  
+                  return <div className="space-y-4">{rows}</div>;
                 })()}
 
                 {request.notes && (
