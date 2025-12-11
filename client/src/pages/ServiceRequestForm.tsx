@@ -798,7 +798,7 @@ export default function ServiceRequestForm() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Height in Pixels</Label>
+              <Label>Height in Pixels<span className="text-destructive">*</span></Label>
               <Input
                 type="number"
                 placeholder="0"
@@ -970,7 +970,7 @@ export default function ServiceRequestForm() {
       return (
         <>
           <div className="space-y-2">
-            <Label>Upload Artwork File</Label>
+            <Label>Upload Artwork File<span className="text-destructive">*</span></Label>
             <FileUploader
               onUploadComplete={(url, name) => handleFileUpload("artworkFile", url, name)}
               onFileRemove={(fileName) => handleFileRemove("artworkFile", fileName)}
@@ -1066,7 +1066,7 @@ export default function ServiceRequestForm() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Width in inches</Label>
+              <Label>Width in inches<span className="text-destructive">*</span></Label>
               <Input
                 type="number"
                 placeholder="0"
@@ -1075,7 +1075,7 @@ export default function ServiceRequestForm() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Height in inches</Label>
+              <Label>Height in inches<span className="text-destructive">*</span></Label>
               <Input
                 type="number"
                 placeholder="0"
@@ -1141,7 +1141,7 @@ export default function ServiceRequestForm() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Width in Inches</Label>
+              <Label>Width in Inches<span className="text-destructive">*</span></Label>
               <Input
                 type="number"
                 placeholder="0"
@@ -1150,7 +1150,7 @@ export default function ServiceRequestForm() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Height in Inches</Label>
+              <Label>Height in Inches<span className="text-destructive">*</span></Label>
               <Input
                 type="number"
                 placeholder="0"
