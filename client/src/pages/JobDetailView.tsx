@@ -833,8 +833,17 @@ export default function JobDetailView() {
                   };
                   
                   // Fields to skip (already shown elsewhere or internal)
-                  // Skip fields already rendered elsewhere or internal (including Artwork Composition fields)
-                  const skipFields = ['uploadedFiles', 'artworkFile', 'notes', 'brandGuidelines', 'uploadAssets', 'inspirationFile', 'textContent', 'outputFormat', 'widthInches', 'heightInches'];
+                  // Base skip fields for all form types
+                  const baseSkipFields = ['uploadedFiles', 'artworkFile', 'notes'];
+                  
+                  // Check if this is Artwork Composition form (has specific fields)
+                  const uploadedFiles = formData?.uploadedFiles as Record<string, unknown> | null;
+                  const isArtworkCompositionForm = formData?.textContent !== undefined || uploadedFiles?.brandGuidelines || uploadedFiles?.uploadAssets || uploadedFiles?.inspirationFile;
+                  
+                  // For Artwork Composition, also skip fields already rendered in the custom layout
+                  const skipFields = isArtworkCompositionForm 
+                    ? [...baseSkipFields, 'brandGuidelines', 'uploadAssets', 'inspirationFile', 'textContent', 'outputFormat', 'widthInches', 'heightInches']
+                    : baseSkipFields;
                   
                   // Define preferred field order with paired fields (left, right) for side-by-side display
                   // Fields not in this list will appear at the end
