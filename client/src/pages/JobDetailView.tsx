@@ -712,13 +712,15 @@ export default function JobDetailView() {
                   // Define preferred field order with paired fields (left, right) for side-by-side display
                   // Fields not in this list will appear at the end
                   const orderedPairs: [string, string | null][] = [
-                    ['colorMode', 'widthInches'],
-                    ['heightInches', 'outputFormat'],
-                    ['fabricType', 'widthInches'],
-                    ['heightInches', 'threadColors'],
+                    // Vectorization form order
+                    ['colorMode', 'outputFormat'],
+                    ['widthInches', 'heightInches'],
+                    ['numberOfColors', null],
+                    // Embroidery Digitizing form order
+                    ['fabricType', 'threadColors'],
                     ['outputFormats', 'calculatedPrice'],
                     ['vectorizationNeeded', null],
-                    ['numberOfColors', null],
+                    // Other forms
                     ['colorCount', null],
                     ['needColorSeparation', null],
                     ['printMethod', null],
