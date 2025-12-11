@@ -593,72 +593,197 @@ export default function JobDetailView() {
                 <CardTitle className="text-lg">Info Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <p className="text-xs text-dark-gray mb-2">Artwork Files</p>
-                  <div className="flex flex-col gap-2">
-                    {/* Show files from formData.uploadedFiles */}
-                    {(() => {
-                      const formData = request.formData as Record<string, unknown> | null;
-                      const uploadedFiles = formData?.uploadedFiles as Record<string, Array<{ url?: string; name?: string; fileName?: string; objectPath?: string }>> | null;
-                      const artworkFiles = uploadedFiles?.artworkFile || [];
-                      
-                      if (artworkFiles.length > 0) {
-                        return artworkFiles.map((file, index) => {
-                          // Handle both old format (url, name) and new format (objectPath, fileName)
-                          const fileName = file.name || file.fileName || 'Unknown file';
-                          const fileUrl = file.url || file.objectPath || '';
-                          
-                          if (!fileUrl) return null;
-                          
-                          return (
+                {/* Helper function to render file sections */}
+                {(() => {
+                  const formData = request.formData as Record<string, unknown> | null;
+                  const uploadedFiles = formData?.uploadedFiles as Record<string, Array<{ url?: string; name?: string; fileName?: string; objectPath?: string }>> | null;
+                  
+                  const renderFileSection = (label: string, fieldName: string, testIdPrefix: string) => {
+                    const files = uploadedFiles?.[fieldName] || [];
+                    
+                    if (files.length === 0) {
+                      return (
+                        <div key={fieldName}>
+                          <p className="text-xs text-dark-gray mb-2">{label}</p>
+                          <p className="text-sm text-dark-gray">No files uploaded</p>
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <div key={fieldName}>
+                        <p className="text-xs text-dark-gray mb-2">{label}</p>
+                        <div className="flex flex-col gap-2">
+                          {files.map((file, index) => {
+                            const fileName = file.name || file.fileName || 'Unknown file';
+                            let fileUrl = file.url || file.objectPath || '';
+                            
+                            // If objectPath doesn't start with http, prepend /objects prefix
+                            if (file.objectPath && !file.objectPath.startsWith('http')) {
+                              fileUrl = `/objects/${file.objectPath}`;
+                            }
+                            
+                            if (!fileUrl) return null;
+                            
+                            return (
+                              <div 
+                                key={`${fieldName}-${index}`}
+                                className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
+                              >
+                                <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
+                                <span className="text-sm text-dark-blue-night flex-1">{fileName}</span>
+                                <a 
+                                  href={fileUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                >
+                                  <Button size="sm" variant="default" data-testid={`button-download-${testIdPrefix}-${index}`}>
+                                    <Download className="h-3 w-3 mr-1" />
+                                    Download
+                                  </Button>
+                                </a>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  };
+                  
+                  // Check if this is Artwork Composition form (has specific fields)
+                  const isArtworkComposition = formData?.textContent !== undefined || uploadedFiles?.brandGuidelines || uploadedFiles?.uploadAssets || uploadedFiles?.inspirationFile;
+                  
+                  if (isArtworkComposition) {
+                    return (
+                      <>
+                        {/* 1. Brand Guidelines */}
+                        {renderFileSection("Brand Guidelines", "brandGuidelines", "brand-guidelines")}
+                        
+                        {/* 2. Artwork Files / Upload Assets */}
+                        {renderFileSection("Artwork Files", "uploadAssets", "artwork")}
+                        
+                        {/* 3. Width | Height */}
+                        {(formData?.widthInches || formData?.heightInches) && (
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-xs text-dark-gray mb-1">Width (inches)</p>
+                              <p className="text-sm text-dark-blue-night font-medium" data-testid="text-formdata-widthInches">
+                                {String(formData?.widthInches || "N/A")}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-dark-gray mb-1">Height (inches)</p>
+                              <p className="text-sm text-dark-blue-night font-medium" data-testid="text-formdata-heightInches">
+                                {String(formData?.heightInches || "N/A")}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* 4. Output Format | Text Content */}
+                        {(formData?.outputFormat || formData?.textContent) && (
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-xs text-dark-gray mb-1">Desired Output Format</p>
+                              <p className="text-sm text-dark-blue-night font-medium" data-testid="text-formdata-outputFormat">
+                                {String(formData?.outputFormat || "N/A")}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-dark-gray mb-1">Text Content</p>
+                              <p className="text-sm text-dark-blue-night font-medium" data-testid="text-formdata-textContent">
+                                {String(formData?.textContent || "N/A")}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* 5. Example / Inspiration */}
+                        {renderFileSection("Example / Inspiration", "inspirationFile", "inspiration")}
+                      </>
+                    );
+                  }
+                  
+                  // Default: show artworkFile for other form types
+                  const artworkFiles = uploadedFiles?.artworkFile || [];
+                  
+                  if (artworkFiles.length > 0) {
+                    return (
+                      <div>
+                        <p className="text-xs text-dark-gray mb-2">Artwork Files</p>
+                        <div className="flex flex-col gap-2">
+                          {artworkFiles.map((file, index) => {
+                            const fileName = file.name || file.fileName || 'Unknown file';
+                            let fileUrl = file.url || file.objectPath || '';
+                            
+                            if (file.objectPath && !file.objectPath.startsWith('http')) {
+                              fileUrl = `/objects/${file.objectPath}`;
+                            }
+                            
+                            if (!fileUrl) return null;
+                            
+                            return (
+                              <div 
+                                key={`artwork-${index}`}
+                                className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
+                              >
+                                <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
+                                <span className="text-sm text-dark-blue-night flex-1">{fileName}</span>
+                                <a 
+                                  href={fileUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                >
+                                  <Button size="sm" variant="default" data-testid={`button-download-artwork-${index}`}>
+                                    <Download className="h-3 w-3 mr-1" />
+                                    Download
+                                  </Button>
+                                </a>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  // Fallback to requestAttachments
+                  if (requestAttachments.length > 0) {
+                    return (
+                      <div>
+                        <p className="text-xs text-dark-gray mb-2">Artwork Files</p>
+                        <div className="flex flex-col gap-2">
+                          {requestAttachments.map((attachment) => (
                             <div 
-                              key={`artwork-${index}`}
+                              key={attachment.id}
                               className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
                             >
                               <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
-                              <span className="text-sm text-dark-blue-night flex-1">{fileName}</span>
+                              <span className="text-sm text-dark-blue-night flex-1">{attachment.fileName}</span>
                               <a 
-                                href={fileUrl} 
+                                href={attachment.fileUrl} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
                               >
-                                <Button size="sm" variant="default" data-testid={`button-download-artwork-${index}`}>
+                                <Button size="sm" variant="default" data-testid={`button-download-${attachment.id}`}>
                                   <Download className="h-3 w-3 mr-1" />
                                   Download
                                 </Button>
                               </a>
                             </div>
-                          );
-                        });
-                      }
-                      
-                      // Also check requestAttachments as fallback
-                      if (requestAttachments.length > 0) {
-                        return requestAttachments.map((attachment) => (
-                          <div 
-                            key={attachment.id}
-                            className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
-                          >
-                            <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
-                            <span className="text-sm text-dark-blue-night flex-1">{attachment.fileName}</span>
-                            <a 
-                              href={attachment.fileUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                            >
-                              <Button size="sm" variant="default" data-testid={`button-download-${attachment.id}`}>
-                                <Download className="h-3 w-3 mr-1" />
-                                Download
-                              </Button>
-                            </a>
-                          </div>
-                        ));
-                      }
-                      
-                      return <p className="text-sm text-dark-gray">No artwork files uploaded</p>;
-                    })()}
-                  </div>
-                </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  return (
+                    <div>
+                      <p className="text-xs text-dark-gray mb-2">Artwork Files</p>
+                      <p className="text-sm text-dark-gray">No artwork files uploaded</p>
+                    </div>
+                  );
+                })()}
 
                 {/* Display all form specifications */}
                 {(() => {
@@ -708,7 +833,8 @@ export default function JobDetailView() {
                   };
                   
                   // Fields to skip (already shown elsewhere or internal)
-                  const skipFields = ['uploadedFiles', 'artworkFile', 'notes'];
+                  // Skip fields already rendered elsewhere or internal (including Artwork Composition fields)
+                  const skipFields = ['uploadedFiles', 'artworkFile', 'notes', 'brandGuidelines', 'uploadAssets', 'inspirationFile', 'textContent'];
                   
                   // Define preferred field order with paired fields (left, right) for side-by-side display
                   // Fields not in this list will appear at the end
