@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { useLocation } from "wouter";
@@ -22,6 +22,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import type { Service, InsertServiceRequest } from "@shared/schema";
 import { Header } from "@/components/Header";
@@ -195,6 +200,8 @@ export default function ServiceRequestForm() {
   const [, navigate] = useLocation();
   const [pricingModalOpen, setPricingModalOpen] = useState(false);
   const [complexityHelpModalOpen, setComplexityHelpModalOpen] = useState(false);
+  const [threadColorInput, setThreadColorInput] = useState("");
+  const [threadColorChips, setThreadColorChips] = useState<string[]>([]);
   
   const { data: services = [], isLoading: servicesLoading } = useQuery({
     queryKey: ["services"],
@@ -228,12 +235,32 @@ export default function ServiceRequestForm() {
     }
   }, [currentUser, setValue]);
 
+  const prevServiceIdRef = useRef<string>("");
+  useEffect(() => {
+    if (prevServiceIdRef.current && prevServiceIdRef.current !== selectedServiceId) {
+      setThreadColorInput("");
+      setThreadColorChips([]);
+      setFormData(prev => ({ ...prev, threadColors: [] }));
+    }
+    prevServiceIdRef.current = selectedServiceId;
+  }, [selectedServiceId]);
+
   useEffect(() => {
     if (formData.amountOfProducts) {
       const price = calculateStoreCreationPrice(parseInt(formData.amountOfProducts));
       setCalculatedPrice(price);
     }
   }, [formData.amountOfProducts]);
+
+  const selectedService = services.find((s) => s.id === selectedServiceId);
+
+  useEffect(() => {
+    if (selectedService?.title === "Embroidery Digitization") {
+      const basePrice = parseFloat(selectedService.basePrice) || 15;
+      const vectorizationAddOn = formData.vectorizationNeeded ? 5 : 0;
+      setCalculatedPrice(basePrice + vectorizationAddOn);
+    }
+  }, [formData.vectorizationNeeded, selectedService]);
 
   const mutation = useMutation({
     mutationFn: createServiceRequest,
@@ -247,6 +274,8 @@ export default function ServiceRequestForm() {
       setFormData({});
       setUploadedFiles({});
       setCalculatedPrice(0);
+      setThreadColorInput("");
+      setThreadColorChips([]);
       queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
       navigate("/service-requests");
     },
@@ -258,8 +287,6 @@ export default function ServiceRequestForm() {
       });
     },
   });
-
-  const selectedService = services.find((s) => s.id === selectedServiceId);
 
   const handleFormDataChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -278,6 +305,29 @@ export default function ServiceRequestForm() {
       ...prev,
       [fieldName]: [...(prev[fieldName] || []), { url, name }]
     }));
+  };
+
+  const handleAddThreadColor = (color: string) => {
+    const trimmed = color.trim();
+    if (trimmed && !threadColorChips.includes(trimmed)) {
+      const newChips = [...threadColorChips, trimmed];
+      setThreadColorChips(newChips);
+      handleFormDataChange("threadColors", newChips);
+    }
+    setThreadColorInput("");
+  };
+
+  const handleRemoveThreadColor = (color: string) => {
+    const newChips = threadColorChips.filter(c => c !== color);
+    setThreadColorChips(newChips);
+    handleFormDataChange("threadColors", newChips);
+  };
+
+  const handleThreadColorKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleAddThreadColor(threadColorInput);
+    }
   };
 
   const onSubmit = async (data: any) => {
@@ -318,6 +368,8 @@ export default function ServiceRequestForm() {
     setFormData({});
     setUploadedFiles({});
     setCalculatedPrice(0);
+    setThreadColorInput("");
+    setThreadColorChips([]);
     reset();
   };
 
@@ -833,16 +885,36 @@ export default function ServiceRequestForm() {
             </div>
             <div className="space-y-2">
               <Label>Thread Colors</Label>
-              <Select onValueChange={(v) => handleFormDataChange("threadColors", v)}>
-                <SelectTrigger data-testid="select-thread-colors">
-                  <SelectValue placeholder="Select an option" />
-                </SelectTrigger>
-                <SelectContent>
-                  {embroideryThreadColors.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <Input
+                  placeholder="Type a color and press Enter or Space to add"
+                  value={threadColorInput}
+                  onChange={(e) => setThreadColorInput(e.target.value)}
+                  onKeyDown={handleThreadColorKeyDown}
+                  data-testid="input-thread-colors"
+                />
+                {threadColorChips.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {threadColorChips.map((color, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-blue-lavender text-dark-blue-night rounded-md text-sm"
+                        data-testid={`chip-thread-color-${index}`}
+                      >
+                        {color}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveThreadColor(color)}
+                          className="hover:text-destructive"
+                          data-testid={`button-remove-thread-color-${index}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -853,9 +925,28 @@ export default function ServiceRequestForm() {
             />
             <Label htmlFor="vectorizationNeeded" className="flex items-center gap-1">
               Vectorization Needed
-              <HelpCircle className="h-4 w-4 text-dark-gray" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="h-4 w-4 text-dark-gray cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="bg-dark-blue-night text-white max-w-[200px]">
+                  <p>By Requiring Vectorization $5 are gonna be added to the final price.</p>
+                </TooltipContent>
+              </Tooltip>
             </Label>
           </div>
+          {calculatedPrice > 0 && (
+            <div className="p-3 bg-blue-lavender/30 rounded-md">
+              <p className="text-sm font-semibold text-dark-blue-night">
+                Service Price: ${calculatedPrice}
+                {formData.vectorizationNeeded && (
+                  <span className="font-normal text-dark-gray ml-2">
+                    ($15 base + $5 vectorization)
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
         </>
       );
     }
@@ -869,20 +960,27 @@ export default function ServiceRequestForm() {
               onUploadComplete={(url, name) => handleFileUpload("artworkFile", url, name)}
             />
           </div>
+          <div className="space-y-2">
+            <Label>Garment or Product Template by Size<span className="text-destructive">*</span></Label>
+            <FileUploader
+              onUploadComplete={(url, name) => handleFileUpload("garmentTemplates", url, name)}
+              acceptedTypes="PDF, PSD, AI files"
+            />
+            {uploadedFiles.garmentTemplates && uploadedFiles.garmentTemplates.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {uploadedFiles.garmentTemplates.map((file, index) => (
+                  <span
+                    key={index}
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-blue-lavender text-dark-blue-night rounded-md text-sm"
+                    data-testid={`chip-garment-template-${index}`}
+                  >
+                    {file.name}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Garment or Product Template by Size<span className="text-destructive">*</span></Label>
-              <Select onValueChange={(v) => handleFormDataChange("garmentSize", v)}>
-                <SelectTrigger data-testid="select-garment-size">
-                  <SelectValue placeholder="Select an option" />
-                </SelectTrigger>
-                <SelectContent>
-                  {garmentSizeOptions.map(opt => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
             <div className="space-y-2">
               <Label>Bleed Margins</Label>
               <Select onValueChange={(v) => handleFormDataChange("bleedMargins", v)}>
