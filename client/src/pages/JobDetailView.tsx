@@ -396,11 +396,9 @@ export default function JobDetailView() {
         )}
 
         {isDesigner && (request.status === "in-progress" || request.status === "change-request") && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm font-medium text-dark-blue-night mb-2">Upload File*</p>
-              <FileUploader onUploadComplete={handleDeliverableUpload} />
-            </div>
+          <div>
+            <p className="text-sm font-medium text-dark-blue-night mb-2">Upload File*</p>
+            <FileUploader onUploadComplete={handleDeliverableUpload} />
           </div>
         )}
       </CardContent>
@@ -597,29 +595,61 @@ export default function JobDetailView() {
                 <div>
                   <p className="text-xs text-dark-gray mb-2">Upload Artwork File*</p>
                   <div className="flex flex-wrap gap-2">
-                    {requestAttachments.map((attachment) => (
-                      <div 
-                        key={attachment.id}
-                        className="flex items-center gap-2 p-2 bg-blue-lavender/30 rounded-lg"
-                      >
-                        <FileText className="h-4 w-4 text-dark-gray" />
-                        <span className="text-sm text-dark-blue-night">{attachment.fileName}</span>
-                        <a 
-                          href={attachment.fileUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="ml-2"
-                        >
-                          <Button size="sm" variant="default" data-testid={`button-download-${attachment.id}`}>
-                            <Download className="h-3 w-3 mr-1" />
-                            Download File
-                          </Button>
-                        </a>
-                      </div>
-                    ))}
-                    {requestAttachments.length === 0 && (
-                      <p className="text-sm text-dark-gray">No artwork files uploaded</p>
-                    )}
+                    {/* Show files from formData.uploadedFiles */}
+                    {(() => {
+                      const formData = request.formData as Record<string, unknown> | null;
+                      const uploadedFiles = formData?.uploadedFiles as Record<string, { fileName: string; objectPath: string }[]> | null;
+                      const artworkFiles = uploadedFiles?.artworkFile || [];
+                      
+                      if (artworkFiles.length > 0) {
+                        return artworkFiles.map((file, index) => (
+                          <div 
+                            key={`artwork-${index}`}
+                            className="flex items-center gap-2 p-2 bg-blue-lavender/30 rounded-lg"
+                          >
+                            <FileText className="h-4 w-4 text-dark-gray" />
+                            <span className="text-sm text-dark-blue-night">{file.fileName}</span>
+                            <a 
+                              href={file.objectPath} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="ml-2"
+                            >
+                              <Button size="sm" variant="default" data-testid={`button-download-artwork-${index}`}>
+                                <Download className="h-3 w-3 mr-1" />
+                                Download File
+                              </Button>
+                            </a>
+                          </div>
+                        ));
+                      }
+                      
+                      // Also check requestAttachments as fallback
+                      if (requestAttachments.length > 0) {
+                        return requestAttachments.map((attachment) => (
+                          <div 
+                            key={attachment.id}
+                            className="flex items-center gap-2 p-2 bg-blue-lavender/30 rounded-lg"
+                          >
+                            <FileText className="h-4 w-4 text-dark-gray" />
+                            <span className="text-sm text-dark-blue-night">{attachment.fileName}</span>
+                            <a 
+                              href={attachment.fileUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="ml-2"
+                            >
+                              <Button size="sm" variant="default" data-testid={`button-download-${attachment.id}`}>
+                                <Download className="h-3 w-3 mr-1" />
+                                Download File
+                              </Button>
+                            </a>
+                          </div>
+                        ));
+                      }
+                      
+                      return <p className="text-sm text-dark-gray">No artwork files uploaded</p>;
+                    })()}
                   </div>
                 </div>
 
