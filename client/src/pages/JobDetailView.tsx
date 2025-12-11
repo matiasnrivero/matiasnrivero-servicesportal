@@ -834,7 +834,7 @@ export default function JobDetailView() {
                   
                   // Fields to skip (already shown elsewhere or internal)
                   // Skip fields already rendered elsewhere or internal (including Artwork Composition fields)
-                  const skipFields = ['uploadedFiles', 'artworkFile', 'notes', 'brandGuidelines', 'uploadAssets', 'inspirationFile', 'textContent'];
+                  const skipFields = ['uploadedFiles', 'artworkFile', 'notes', 'brandGuidelines', 'uploadAssets', 'inspirationFile', 'textContent', 'outputFormat', 'widthInches', 'heightInches'];
                   
                   // Define preferred field order with paired fields (left, right) for side-by-side display
                   // Fields not in this list will appear at the end
