@@ -833,8 +833,8 @@ export default function JobDetailView() {
                   };
                   
                   // Fields to skip (already shown elsewhere or internal)
-                  // Base skip fields for all form types
-                  const baseSkipFields = ['uploadedFiles', 'artworkFile', 'notes'];
+                  // Base skip fields for all form types (calculatedPrice hidden from designers)
+                  const baseSkipFields = ['uploadedFiles', 'artworkFile', 'notes', 'calculatedPrice'];
                   
                   // Check if this is Artwork Composition form (has specific fields)
                   const uploadedFiles = formData?.uploadedFiles as Record<string, unknown> | null;
