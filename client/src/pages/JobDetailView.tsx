@@ -971,72 +971,74 @@ export default function JobDetailView() {
           </div>
 
           <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {isDesigner && request.status === "pending" && (
-                  <Button
-                    onClick={() => handleTakeJob()}
-                    disabled={assignMutation.isPending}
-                    className="w-full bg-sky-blue-accent hover:bg-sky-blue-accent/90"
-                    data-testid="button-take-job"
-                  >
-                    {assignMutation.isPending ? "Taking job..." : "Take This Job"}
-                  </Button>
-                )}
-
-                {isDesigner && (request.status === "pending" || request.status === "in-progress") && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Assign to Designer</span>
-                    </div>
-                    <Select 
-                      value={selectedDesignerId} 
-                      onValueChange={setSelectedDesignerId}
-                    >
-                      <SelectTrigger data-testid="select-designer">
-                        <SelectValue placeholder="Select a designer..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {designers.map((designer) => (
-                          <SelectItem 
-                            key={designer.id} 
-                            value={designer.id}
-                            data-testid={`select-designer-${designer.id}`}
-                          >
-                            {designer.username}
-                            {designer.id === currentUser?.userId && " (You)"}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+            {isDesigner && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {request.status === "pending" && (
                     <Button
-                      onClick={() => handleTakeJob(selectedDesignerId)}
-                      disabled={!selectedDesignerId || assignMutation.isPending}
-                      variant="outline"
-                      className="w-full"
-                      data-testid="button-assign-designer"
+                      onClick={() => handleTakeJob()}
+                      disabled={assignMutation.isPending}
+                      className="w-full bg-sky-blue-accent hover:bg-sky-blue-accent/90"
+                      data-testid="button-take-job"
                     >
-                      {assignMutation.isPending ? "Assigning..." : "Assign Selected Designer"}
+                      {assignMutation.isPending ? "Taking job..." : "Take This Job"}
                     </Button>
-                  </div>
-                )}
+                  )}
 
-                {isDesigner && request.status === "change-request" && (
-                  <Button
-                    onClick={handleResume}
-                    disabled={resumeMutation.isPending}
-                    className="w-full bg-blue-600 hover:bg-blue-700"
-                    data-testid="button-resume-work"
-                  >
-                    {resumeMutation.isPending ? "Resuming..." : "Resume Work"}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
+                  {(request.status === "pending" || request.status === "in-progress") && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Assign to Designer</span>
+                      </div>
+                      <Select 
+                        value={selectedDesignerId} 
+                        onValueChange={setSelectedDesignerId}
+                      >
+                        <SelectTrigger data-testid="select-designer">
+                          <SelectValue placeholder="Select a designer..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {designers.map((designer) => (
+                            <SelectItem 
+                              key={designer.id} 
+                              value={designer.id}
+                              data-testid={`select-designer-${designer.id}`}
+                            >
+                              {designer.username}
+                              {designer.id === currentUser?.userId && " (You)"}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        onClick={() => handleTakeJob(selectedDesignerId)}
+                        disabled={!selectedDesignerId || assignMutation.isPending}
+                        variant="outline"
+                        className="w-full"
+                        data-testid="button-assign-designer"
+                      >
+                        {assignMutation.isPending ? "Assigning..." : "Assign Selected Designer"}
+                      </Button>
+                    </div>
+                  )}
+
+                  {request.status === "change-request" && (
+                    <Button
+                      onClick={handleResume}
+                      disabled={resumeMutation.isPending}
+                      className="w-full bg-blue-600 hover:bg-blue-700"
+                      data-testid="button-resume-work"
+                    >
+                      {resumeMutation.isPending ? "Resuming..." : "Resume Work"}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>
