@@ -594,27 +594,30 @@ export default function JobDetailView() {
               <CardContent className="space-y-4">
                 <div>
                   <p className="text-xs text-dark-gray mb-2">Artwork Files</p>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-col gap-2">
                     {/* Show files from formData.uploadedFiles */}
                     {(() => {
                       const formData = request.formData as Record<string, unknown> | null;
-                      const uploadedFiles = formData?.uploadedFiles as Record<string, { fileName: string; objectPath: string }[]> | null;
+                      const uploadedFiles = formData?.uploadedFiles as Record<string, Array<{ url?: string; name?: string; fileName?: string; objectPath?: string }>> | null;
                       const artworkFiles = uploadedFiles?.artworkFile || [];
                       
                       if (artworkFiles.length > 0) {
-                        return artworkFiles.filter(file => file && file.fileName && file.objectPath).map((file, index) => {
-                          const downloadUrl = file.objectPath?.startsWith('/objects') 
-                            ? file.objectPath 
-                            : `/objects${file.objectPath}`;
+                        return artworkFiles.map((file, index) => {
+                          // Handle both old format (url, name) and new format (objectPath, fileName)
+                          const fileName = file.name || file.fileName || 'Unknown file';
+                          const fileUrl = file.url || file.objectPath || '';
+                          
+                          if (!fileUrl) return null;
+                          
                           return (
                             <div 
                               key={`artwork-${index}`}
                               className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
                             >
                               <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
-                              <span className="text-sm text-dark-blue-night flex-1">{file.fileName}</span>
+                              <span className="text-sm text-dark-blue-night flex-1">{fileName}</span>
                               <a 
-                                href={downloadUrl} 
+                                href={fileUrl} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
                               >
