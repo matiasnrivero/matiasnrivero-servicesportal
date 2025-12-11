@@ -602,25 +602,30 @@ export default function JobDetailView() {
                       const artworkFiles = uploadedFiles?.artworkFile || [];
                       
                       if (artworkFiles.length > 0) {
-                        return artworkFiles.map((file, index) => (
-                          <div 
-                            key={`artwork-${index}`}
-                            className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
-                          >
-                            <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
-                            <span className="text-sm text-dark-blue-night flex-1">{file.fileName}</span>
-                            <a 
-                              href={file.objectPath.startsWith('/objects') ? file.objectPath : `/objects${file.objectPath}`} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
+                        return artworkFiles.filter(file => file && file.fileName && file.objectPath).map((file, index) => {
+                          const downloadUrl = file.objectPath?.startsWith('/objects') 
+                            ? file.objectPath 
+                            : `/objects${file.objectPath}`;
+                          return (
+                            <div 
+                              key={`artwork-${index}`}
+                              className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
                             >
-                              <Button size="sm" variant="default" data-testid={`button-download-artwork-${index}`}>
-                                <Download className="h-3 w-3 mr-1" />
-                                Download
-                              </Button>
-                            </a>
-                          </div>
-                        ));
+                              <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
+                              <span className="text-sm text-dark-blue-night flex-1">{file.fileName}</span>
+                              <a 
+                                href={downloadUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                              >
+                                <Button size="sm" variant="default" data-testid={`button-download-artwork-${index}`}>
+                                  <Download className="h-3 w-3 mr-1" />
+                                  Download
+                                </Button>
+                              </a>
+                            </div>
+                          );
+                        });
                       }
                       
                       // Also check requestAttachments as fallback
