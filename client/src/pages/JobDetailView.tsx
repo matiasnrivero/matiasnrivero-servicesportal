@@ -665,10 +665,7 @@ export default function JobDetailView() {
                         {/* 1. Brand Guidelines */}
                         {renderFileSection("Brand Guidelines", "brandGuidelines", "brand-guidelines")}
                         
-                        {/* 2. Artwork Files / Upload Assets */}
-                        {renderFileSection("Artwork Files", "uploadAssets", "artwork")}
-                        
-                        {/* 3. Width | Height */}
+                        {/* 2. Width | Height */}
                         {(formData?.widthInches || formData?.heightInches) && (
                           <div className="grid grid-cols-2 gap-4">
                             <div>
