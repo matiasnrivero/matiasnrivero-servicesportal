@@ -555,9 +555,9 @@ export default function JobDetailView() {
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-blue-lavender/30 rounded-lg">
-                  <p className="text-xs text-dark-gray mb-1">Workspace</p>
-                  <p className="text-sm font-medium text-dark-blue-night" data-testid="text-workspace">
-                    {request.customerName || "Default Workspace"}
+                  <p className="text-xs text-dark-gray mb-1">Client</p>
+                  <p className="text-sm font-medium text-dark-blue-night" data-testid="text-client">
+                    {request.customerName || "N/A"}
                   </p>
                 </div>
 
@@ -593,7 +593,7 @@ export default function JobDetailView() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <p className="text-xs text-dark-gray mb-2">Upload Artwork File*</p>
+                  <p className="text-xs text-dark-gray mb-2">Artwork Files</p>
                   <div className="flex flex-wrap gap-2">
                     {/* Show files from formData.uploadedFiles */}
                     {(() => {
@@ -605,19 +605,18 @@ export default function JobDetailView() {
                         return artworkFiles.map((file, index) => (
                           <div 
                             key={`artwork-${index}`}
-                            className="flex items-center gap-2 p-2 bg-blue-lavender/30 rounded-lg"
+                            className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
                           >
-                            <FileText className="h-4 w-4 text-dark-gray" />
-                            <span className="text-sm text-dark-blue-night">{file.fileName}</span>
+                            <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
+                            <span className="text-sm text-dark-blue-night flex-1">{file.fileName}</span>
                             <a 
-                              href={file.objectPath} 
+                              href={file.objectPath.startsWith('/objects') ? file.objectPath : `/objects${file.objectPath}`} 
                               target="_blank" 
                               rel="noopener noreferrer"
-                              className="ml-2"
                             >
                               <Button size="sm" variant="default" data-testid={`button-download-artwork-${index}`}>
                                 <Download className="h-3 w-3 mr-1" />
-                                Download File
+                                Download
                               </Button>
                             </a>
                           </div>
@@ -629,19 +628,18 @@ export default function JobDetailView() {
                         return requestAttachments.map((attachment) => (
                           <div 
                             key={attachment.id}
-                            className="flex items-center gap-2 p-2 bg-blue-lavender/30 rounded-lg"
+                            className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
                           >
-                            <FileText className="h-4 w-4 text-dark-gray" />
-                            <span className="text-sm text-dark-blue-night">{attachment.fileName}</span>
+                            <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
+                            <span className="text-sm text-dark-blue-night flex-1">{attachment.fileName}</span>
                             <a 
                               href={attachment.fileUrl} 
                               target="_blank" 
                               rel="noopener noreferrer"
-                              className="ml-2"
                             >
                               <Button size="sm" variant="default" data-testid={`button-download-${attachment.id}`}>
                                 <Download className="h-3 w-3 mr-1" />
-                                Download File
+                                Download
                               </Button>
                             </a>
                           </div>
@@ -653,16 +651,88 @@ export default function JobDetailView() {
                   </div>
                 </div>
 
-                {request.requirements && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 bg-blue-lavender/30 rounded-lg">
-                      <p className="text-xs text-dark-gray mb-1">Desired Output Format</p>
-                      <p className="text-sm text-dark-blue-night" data-testid="text-output-format">
-                        {request.requirements}
-                      </p>
+                {/* Display all form specifications */}
+                {(() => {
+                  const formData = request.formData as Record<string, unknown> | null;
+                  if (!formData) return null;
+                  
+                  // Define field display names
+                  const fieldLabels: Record<string, string> = {
+                    outputFormats: "Output Formats",
+                    widthInches: "Width (inches)",
+                    heightInches: "Height (inches)",
+                    widthPixels: "Width (pixels)",
+                    heightPixels: "Height (pixels)",
+                    fabricType: "Fabric Type",
+                    threadColors: "Thread Colors",
+                    vectorizationNeeded: "Vectorization Needed",
+                    colorCount: "Color Count",
+                    needColorSeparation: "Color Separation Needed",
+                    printMethod: "Print Method",
+                    colorMode: "Color Mode",
+                    format: "Format",
+                    designStyle: "Design Style",
+                    complexity: "Complexity",
+                    numberOfColors: "Number of Colors",
+                    logoType: "Logo Type",
+                    industry: "Industry",
+                    preferredStyle: "Preferred Style",
+                    includeBrandName: "Include Brand Name",
+                    colorPreference: "Color Preference",
+                    existingBrandColors: "Existing Brand Colors",
+                    brandName: "Brand Name",
+                    calculatedPrice: "Estimated Price",
+                    numberOfProducts: "Number of Products",
+                    resolutionDPI: "Resolution (DPI)",
+                    mockupType: "Mockup Type",
+                    productType: "Product Type",
+                    backgroundStyle: "Background Style",
+                    includesPackaging: "Includes Packaging",
+                    includesLabeling: "Includes Labeling",
+                    pageCount: "Page Count",
+                    paperSize: "Paper Size",
+                    frontAndBack: "Front and Back",
+                    foldType: "Fold Type",
+                    specialFinishes: "Special Finishes",
+                    quantity: "Quantity",
+                  };
+                  
+                  // Fields to skip (already shown elsewhere or internal)
+                  const skipFields = ['uploadedFiles', 'artworkFile'];
+                  
+                  const entries = Object.entries(formData)
+                    .filter(([key]) => !skipFields.includes(key))
+                    .filter(([, value]) => value !== null && value !== undefined && value !== '');
+                  
+                  if (entries.length === 0) return null;
+                  
+                  return (
+                    <div className="grid grid-cols-2 gap-3">
+                      {entries.map(([key, value]) => {
+                        let displayValue: string;
+                        
+                        if (typeof value === 'boolean') {
+                          displayValue = value ? 'Yes' : 'No';
+                        } else if (Array.isArray(value)) {
+                          displayValue = value.join(', ');
+                        } else if (key === 'calculatedPrice') {
+                          displayValue = `$${value}`;
+                        } else {
+                          displayValue = String(value);
+                        }
+                        
+                        return (
+                          <div key={key} className="p-3 bg-blue-lavender/30 rounded-lg">
+                            <p className="text-xs text-dark-gray mb-1">{fieldLabels[key] || key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</p>
+                            <p className="text-sm text-dark-blue-night font-medium" data-testid={`text-formdata-${key}`}>
+                              {displayValue}
+                            </p>
+                          </div>
+                        );
+                      })}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {request.notes && (
                   <div className="p-3 bg-blue-lavender/30 rounded-lg">
