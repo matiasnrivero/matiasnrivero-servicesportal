@@ -854,8 +854,7 @@ export default function JobDetailView() {
                     ['numberOfColors', null],
                     // Embroidery Digitizing form order
                     ['fabricType', 'threadColors'],
-                    ['outputFormats', 'calculatedPrice'],
-                    ['vectorizationNeeded', null],
+                    ['outputFormats', 'vectorizationNeeded'],
                     // Other forms
                     ['colorCount', null],
                     ['needColorSeparation', null],
