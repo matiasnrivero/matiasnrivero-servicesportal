@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useRoute, Link } from "wouter";
 import { format } from "date-fns";
@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { FileUploader } from "@/components/FileUploader";
 import { apiRequest } from "@/lib/queryClient";
@@ -16,14 +17,15 @@ import {
   ArrowLeft, 
   Download, 
   Calendar, 
-  User, 
   FileText, 
   Send,
   AlertCircle,
   CheckCircle2,
   Clock,
   RefreshCw,
-  Users
+  Users,
+  Reply,
+  X
 } from "lucide-react";
 import type { ServiceRequest, Service, User as UserType, ServiceAttachment, Comment } from "@shared/schema";
 
@@ -51,6 +53,12 @@ export default function JobDetailView() {
   const [commentTab, setCommentTab] = useState<"public" | "internal">("public");
   const [deliverableUrls, setDeliverableUrls] = useState<{ url: string; name: string }[]>([]);
   const [selectedDesignerId, setSelectedDesignerId] = useState<string>("");
+  const [changeRequestModalOpen, setChangeRequestModalOpen] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionSearch, setMentionSearch] = useState("");
+  const [mentionCursorPosition, setMentionCursorPosition] = useState(0);
+  const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const requestId = params?.id;
 
@@ -89,7 +97,6 @@ export default function JobDetailView() {
   const isDesigner = currentUser?.role === "designer";
   const isClient = currentUser?.role === "client" || currentUser?.role === "distributor";
 
-  // Sync selectedDesignerId with current assignee when request loads
   useEffect(() => {
     if (request?.assigneeId) {
       setSelectedDesignerId(request.assigneeId);
@@ -120,6 +127,7 @@ export default function JobDetailView() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/service-requests", requestId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
       toast({ title: "Deliverables submitted", description: "The job has been marked as delivered." });
     },
     onError: () => {
@@ -135,7 +143,10 @@ export default function JobDetailView() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/service-requests", requestId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+      refetchComments();
       setChangeNote("");
+      setChangeRequestModalOpen(false);
       toast({ title: "Change requested", description: "The designer has been notified." });
     },
     onError: () => {
@@ -149,6 +160,7 @@ export default function JobDetailView() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/service-requests", requestId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
       toast({ title: "Work resumed", description: "The job is back in progress." });
     },
     onError: () => {
@@ -161,11 +173,13 @@ export default function JobDetailView() {
       return apiRequest("POST", `/api/service-requests/${requestId}/comments`, {
         body: commentText,
         visibility: commentTab,
+        parentId: replyingTo || undefined,
       });
     },
     onSuccess: () => {
       refetchComments();
       setCommentText("");
+      setReplyingTo(null);
       toast({ title: "Comment added" });
     },
     onError: () => {
@@ -196,7 +210,6 @@ export default function JobDetailView() {
     assignMutation.mutate(designerId);
   };
 
-  // Filter designers from all users
   const designers = allUsers.filter(user => user.role === "designer");
 
   const handleDeliver = () => {
@@ -216,6 +229,59 @@ export default function JobDetailView() {
   const getUserById = (id: string | null) => {
     if (!id) return null;
     return allUsers.find(u => u.id === id);
+  };
+
+  const handleCommentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    const cursorPos = e.target.selectionStart;
+    setCommentText(value);
+    setMentionCursorPosition(cursorPos);
+
+    const textBeforeCursor = value.substring(0, cursorPos);
+    const atIndex = textBeforeCursor.lastIndexOf("@");
+    
+    if (atIndex !== -1 && (atIndex === 0 || textBeforeCursor[atIndex - 1] === " ")) {
+      const searchText = textBeforeCursor.substring(atIndex + 1);
+      if (!searchText.includes(" ")) {
+        setMentionSearch(searchText.toLowerCase());
+        setShowMentionDropdown(true);
+        return;
+      }
+    }
+    setShowMentionDropdown(false);
+    setMentionSearch("");
+  };
+
+  const insertMention = (user: UserType) => {
+    const textBeforeCursor = commentText.substring(0, mentionCursorPosition);
+    const atIndex = textBeforeCursor.lastIndexOf("@");
+    const textBeforeAt = commentText.substring(0, atIndex);
+    const textAfterCursor = commentText.substring(mentionCursorPosition);
+    
+    const newText = `${textBeforeAt}@${user.username} ${textAfterCursor}`;
+    setCommentText(newText);
+    setShowMentionDropdown(false);
+    setMentionSearch("");
+    
+    setTimeout(() => {
+      commentTextareaRef.current?.focus();
+    }, 0);
+  };
+
+  const filteredMentionUsers = allUsers.filter(
+    user => user.username.toLowerCase().includes(mentionSearch)
+  );
+
+  const getTopLevelComments = (visibility: "public" | "internal") => {
+    return comments.filter(c => c.visibility === visibility && !c.parentId);
+  };
+
+  const getReplies = (parentId: string) => {
+    return comments.filter(c => c.parentId === parentId);
+  };
+
+  const isChangeRequestComment = (comment: Comment) => {
+    return comment.body.startsWith("[Change Request]");
   };
 
   if (loadingRequest) {
@@ -241,9 +307,142 @@ export default function JobDetailView() {
 
   const StatusIcon = statusConfig[request.status]?.icon || Clock;
   const assignedDesigner = getUserById(request.assigneeId);
+  const showDeliverablesAtTop = request.status === "delivered" || request.status === "change-request";
+
+  const renderCommentThread = (comment: Comment, isReply = false) => {
+    const author = getUserById(comment.authorId);
+    const replies = getReplies(comment.id);
+    const isChangeRequest = isChangeRequestComment(comment);
+    
+    return (
+      <div key={comment.id} className={`${isReply ? "ml-10 mt-3" : ""}`}>
+        <div className="flex gap-3">
+          <Avatar className="h-8 w-8 flex-shrink-0">
+            <AvatarFallback className={`${comment.visibility === "internal" ? "bg-purple-500" : "bg-sky-blue-accent"} text-white text-xs`}>
+              {author?.username?.slice(0, 2).toUpperCase() || "NS"}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-medium text-dark-blue-night">
+                {author?.username || "Unknown"}
+              </span>
+              <Badge variant="outline" className={`text-xs ${comment.visibility === "internal" ? "bg-purple-50" : ""}`}>
+                {author?.role === "designer" ? "Designer" : "Distributor"}
+              </Badge>
+              {isChangeRequest && (
+                <Badge className="bg-orange-100 text-orange-800 border-orange-200 text-xs">
+                  Change Request
+                </Badge>
+              )}
+              <span className="text-xs text-dark-gray">
+                {format(new Date(comment.createdAt), "MMM dd, yyyy")}
+              </span>
+            </div>
+            <p className="text-sm text-dark-gray mt-1" data-testid={`text-comment-${comment.id}`}>
+              {isChangeRequest ? comment.body.replace("[Change Request] ", "") : comment.body}
+            </p>
+            {!isReply && (
+              <button
+                onClick={() => setReplyingTo(comment.id)}
+                className="flex items-center gap-1 text-xs text-sky-blue-accent mt-2 hover:underline"
+                data-testid={`button-reply-${comment.id}`}
+              >
+                <Reply className="h-3 w-3" />
+                Reply
+              </button>
+            )}
+          </div>
+        </div>
+        {replies.map(reply => renderCommentThread(reply, true))}
+      </div>
+    );
+  };
+
+  const DeliverablesSection = () => (
+    <Card className={showDeliverablesAtTop ? "border-green-200 bg-green-50/30" : ""}>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          {showDeliverablesAtTop && <CheckCircle2 className="h-5 w-5 text-green-600" />}
+          Deliverables
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {deliverableAttachments.length > 0 && (
+          <div className="space-y-2">
+            {deliverableAttachments.map((attachment) => (
+              <div 
+                key={attachment.id}
+                className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
+              >
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <FileText className="h-4 w-4 text-dark-gray" />
+                  <span className="text-sm text-dark-blue-night">{attachment.fileName}</span>
+                </div>
+                <a href={attachment.fileUrl} target="_blank" rel="noopener noreferrer">
+                  <Button size="sm" variant="default" data-testid={`button-download-deliverable-${attachment.id}`}>
+                    <Download className="h-3 w-3 mr-1" />
+                    Download
+                  </Button>
+                </a>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {deliverableAttachments.length === 0 && !isDesigner && (
+          <p className="text-sm text-dark-gray">No deliverables uploaded yet</p>
+        )}
+
+        {isDesigner && (request.status === "in-progress" || request.status === "change-request") && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-medium text-dark-blue-night mb-2">Upload File*</p>
+              <FileUploader onUploadComplete={handleDeliverableUpload} />
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="min-h-screen bg-off-white-cream">
+      <Dialog open={changeRequestModalOpen} onOpenChange={setChangeRequestModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Request</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Textarea
+              placeholder="Please leave a comment explaining the reason for the rejection."
+              value={changeNote}
+              onChange={(e) => setChangeNote(e.target.value)}
+              className="min-h-[120px]"
+              data-testid="textarea-change-request-modal"
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setChangeRequestModalOpen(false)}
+              data-testid="button-cancel-change-request"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRequestChange}
+              disabled={!changeNote.trim() || changeRequestMutation.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              data-testid="button-submit-change-request"
+            >
+              {changeRequestMutation.isPending ? "Submitting..." : "Submit"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4 flex-wrap">
@@ -267,26 +466,91 @@ export default function JobDetailView() {
               </div>
               <p className="text-sm text-dark-gray mt-1" data-testid="text-created-date">
                 Created on {format(new Date(request.createdAt), "MMMM do, yyyy")}
+                {request.deliveredAt && (
+                  <span className="ml-2">
+                    • Delivered on {format(new Date(request.deliveredAt), "MMMM do, yyyy")}
+                  </span>
+                )}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {isClient && request.status === "delivered" && (
+            {request.status === "pending" && (
+              <>
+                <Button 
+                  variant="outline" 
+                  className="border-red-300 text-red-600"
+                  data-testid="button-cancel-request"
+                >
+                  Cancel Request
+                </Button>
+                <Button 
+                  className="bg-sky-blue-accent hover:bg-sky-blue-accent/90"
+                  data-testid="button-save"
+                >
+                  Save
+                </Button>
+              </>
+            )}
+
+            {request.status === "in-progress" && isDesigner && (
+              <>
+                <Button 
+                  variant="outline" 
+                  className="border-red-300 text-red-600"
+                  data-testid="button-cancel"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleDeliver}
+                  disabled={deliverMutation.isPending || (deliverableAttachments.length === 0 && deliverableUrls.length === 0)}
+                  className="bg-sky-blue-accent hover:bg-sky-blue-accent/90"
+                  data-testid="button-deliver"
+                >
+                  {deliverMutation.isPending ? "Delivering..." : "Deliver"}
+                </Button>
+              </>
+            )}
+
+            {request.status === "delivered" && isClient && (
               <Button 
                 variant="outline" 
-                className="border-orange-400 text-orange-600"
-                onClick={() => document.getElementById("change-request-section")?.scrollIntoView({ behavior: "smooth" })}
-                data-testid="button-request-changes"
+                className="border-red-300 text-red-600"
+                onClick={() => setChangeRequestModalOpen(true)}
+                data-testid="button-change-request"
               >
-                Request Changes
+                Change Request
               </Button>
+            )}
+
+            {request.status === "change-request" && isDesigner && (
+              <>
+                <Button 
+                  variant="outline" 
+                  className="border-red-300 text-red-600"
+                  data-testid="button-cancel"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleDeliver}
+                  disabled={deliverMutation.isPending || (deliverableAttachments.length === 0 && deliverableUrls.length === 0)}
+                  className="bg-sky-blue-accent hover:bg-sky-blue-accent/90"
+                  data-testid="button-deliver"
+                >
+                  {deliverMutation.isPending ? "Delivering..." : "Deliver"}
+                </Button>
+              </>
             )}
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
+            {showDeliverablesAtTop && <DeliverablesSection />}
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">General Info</CardTitle>
@@ -381,45 +645,8 @@ export default function JobDetailView() {
               </CardContent>
             </Card>
 
-            {(isDesigner || deliverableAttachments.length > 0) && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Deliverables</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {deliverableAttachments.length > 0 && (
-                    <div className="space-y-2">
-                      {deliverableAttachments.map((attachment) => (
-                        <div 
-                          key={attachment.id}
-                          className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
-                        >
-                          <div className="flex items-center gap-2">
-                            <CheckCircle2 className="h-5 w-5 text-green-600" />
-                            <FileText className="h-4 w-4 text-dark-gray" />
-                            <span className="text-sm text-dark-blue-night">{attachment.fileName}</span>
-                          </div>
-                          <a href={attachment.fileUrl} target="_blank" rel="noopener noreferrer">
-                            <Button size="sm" variant="outline" data-testid={`button-download-deliverable-${attachment.id}`}>
-                              <Download className="h-3 w-3 mr-1" />
-                              Download
-                            </Button>
-                          </a>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {isDesigner && (request.status === "in-progress" || request.status === "change-request") && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-dark-blue-night mb-2">Upload File*</p>
-                        <FileUploader onUploadComplete={handleDeliverableUpload} />
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+            {!showDeliverablesAtTop && (isDesigner || deliverableAttachments.length > 0) && (
+              <DeliverablesSection />
             )}
 
             {request.status === "change-request" && request.changeRequestNote && (
@@ -438,34 +665,6 @@ export default function JobDetailView() {
               </Card>
             )}
 
-            {isClient && request.status === "delivered" && (
-              <Card id="change-request-section">
-                <CardHeader>
-                  <CardTitle className="text-lg">Request Changes</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Textarea
-                    placeholder="Describe the changes you need..."
-                    value={changeNote}
-                    onChange={(e) => setChangeNote(e.target.value)}
-                    className="min-h-[100px]"
-                    data-testid="textarea-change-note"
-                  />
-                  <p className="text-xs text-dark-gray">
-                    Please provide detailed notes about the changes required. This is mandatory.
-                  </p>
-                  <Button
-                    onClick={handleRequestChange}
-                    disabled={!changeNote.trim() || changeRequestMutation.isPending}
-                    className="bg-orange-500 hover:bg-orange-600"
-                    data-testid="button-submit-change-request"
-                  >
-                    Submit Change Request
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Comments</CardTitle>
@@ -475,43 +674,14 @@ export default function JobDetailView() {
                   <TabsList>
                     <TabsTrigger value="public" data-testid="tab-comments-public">Comments</TabsTrigger>
                     {isDesigner && (
-                      <TabsTrigger value="internal" data-testid="tab-comments-internal">Internal Chat</TabsTrigger>
+                      <TabsTrigger value="internal" data-testid="tab-comments-internal">Internal Comments</TabsTrigger>
                     )}
                   </TabsList>
 
                   <TabsContent value="public" className="space-y-4">
                     <div className="space-y-4 max-h-96 overflow-y-auto">
-                      {comments
-                        .filter(c => c.visibility === "public")
-                        .map((comment) => {
-                          const author = getUserById(comment.authorId);
-                          return (
-                            <div key={comment.id} className="flex gap-3">
-                              <Avatar className="h-8 w-8">
-                                <AvatarFallback className="bg-sky-blue-accent text-white text-xs">
-                                  {author?.username?.slice(0, 2).toUpperCase() || "NS"}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-sm font-medium text-dark-blue-night">
-                                    {author?.username || "Unknown"}
-                                  </span>
-                                  <Badge variant="outline" className="text-xs">
-                                    {author?.role === "designer" ? "Designer" : "Client"}
-                                  </Badge>
-                                  <span className="text-xs text-dark-gray">
-                                    {format(new Date(comment.createdAt), "MMM dd, yyyy")}
-                                  </span>
-                                </div>
-                                <p className="text-sm text-dark-gray mt-1" data-testid={`text-comment-${comment.id}`}>
-                                  {comment.body}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      {comments.filter(c => c.visibility === "public").length === 0 && (
+                      {getTopLevelComments("public").map((comment) => renderCommentThread(comment))}
+                      {getTopLevelComments("public").length === 0 && (
                         <p className="text-sm text-dark-gray text-center py-4">No comments yet</p>
                       )}
                     </div>
@@ -520,38 +690,9 @@ export default function JobDetailView() {
                   {isDesigner && (
                     <TabsContent value="internal" className="space-y-4">
                       <div className="space-y-4 max-h-96 overflow-y-auto">
-                        {comments
-                          .filter(c => c.visibility === "internal")
-                          .map((comment) => {
-                            const author = getUserById(comment.authorId);
-                            return (
-                              <div key={comment.id} className="flex gap-3">
-                                <Avatar className="h-8 w-8">
-                                  <AvatarFallback className="bg-purple-500 text-white text-xs">
-                                    {author?.username?.slice(0, 2).toUpperCase() || "NS"}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-sm font-medium text-dark-blue-night">
-                                      {author?.username || "Unknown"}
-                                    </span>
-                                    <Badge variant="outline" className="text-xs bg-purple-50">
-                                      Designer
-                                    </Badge>
-                                    <span className="text-xs text-dark-gray">
-                                      {format(new Date(comment.createdAt), "MMM dd, yyyy")}
-                                    </span>
-                                  </div>
-                                  <p className="text-sm text-dark-gray mt-1" data-testid={`text-internal-comment-${comment.id}`}>
-                                    {comment.body}
-                                  </p>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        {comments.filter(c => c.visibility === "internal").length === 0 && (
-                          <p className="text-sm text-dark-gray text-center py-4">No internal chat messages yet</p>
+                        {getTopLevelComments("internal").map((comment) => renderCommentThread(comment))}
+                        {getTopLevelComments("internal").length === 0 && (
+                          <p className="text-sm text-dark-gray text-center py-4">No internal comments yet</p>
                         )}
                       </div>
                     </TabsContent>
@@ -559,13 +700,51 @@ export default function JobDetailView() {
                 </Tabs>
 
                 <div className="border-t pt-4">
-                  <Textarea
-                    placeholder={commentTab === "internal" ? "Write an internal message..." : "Write a comment..."}
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    className="mb-3"
-                    data-testid="textarea-comment"
-                  />
+                  {replyingTo && (
+                    <div className="flex items-center gap-2 mb-2 text-sm text-dark-gray bg-blue-lavender/30 p-2 rounded">
+                      <Reply className="h-4 w-4" />
+                      <span>Replying to comment</span>
+                      <button 
+                        onClick={() => setReplyingTo(null)} 
+                        className="ml-auto"
+                        data-testid="button-cancel-reply"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                  <div className="relative">
+                    <Textarea
+                      ref={commentTextareaRef}
+                      placeholder={commentTab === "internal" ? "Write an internal comment... Use @ to mention someone" : "Write a comment... Use @ to mention someone"}
+                      value={commentText}
+                      onChange={handleCommentChange}
+                      className="mb-3"
+                      data-testid="textarea-comment"
+                    />
+                    {showMentionDropdown && filteredMentionUsers.length > 0 && (
+                      <div className="absolute left-0 right-0 bottom-full mb-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto z-50">
+                        {filteredMentionUsers.map(user => (
+                          <button
+                            key={user.id}
+                            onClick={() => insertMention(user)}
+                            className="w-full text-left px-3 py-2 hover:bg-blue-lavender/30 flex items-center gap-2"
+                            data-testid={`mention-user-${user.id}`}
+                          >
+                            <Avatar className="h-6 w-6">
+                              <AvatarFallback className="bg-sky-blue-accent text-white text-xs">
+                                {user.username.slice(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-sm">{user.username}</span>
+                            <Badge variant="outline" className="text-xs ml-auto">
+                              {user.role}
+                            </Badge>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex justify-end">
                     <Button
                       onClick={() => addCommentMutation.mutate()}
@@ -646,25 +825,6 @@ export default function JobDetailView() {
                     {resumeMutation.isPending ? "Resuming..." : "Resume Work"}
                   </Button>
                 )}
-
-                {isDesigner && (request.status === "in-progress" || request.status === "change-request") && (
-                  <Button
-                    onClick={handleDeliver}
-                    disabled={deliverMutation.isPending || (deliverableAttachments.length === 0 && deliverableUrls.length === 0)}
-                    className="w-full bg-green-600 hover:bg-green-700"
-                    data-testid="button-save-deliver"
-                  >
-                    {deliverMutation.isPending ? "Saving..." : "Save & Deliver"}
-                  </Button>
-                )}
-
-                <Button
-                  variant="outline"
-                  className="w-full border-red-300 text-red-600"
-                  data-testid="button-cancel-job"
-                >
-                  Cancel Job
-                </Button>
               </CardContent>
             </Card>
 

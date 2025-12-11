@@ -315,6 +315,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const request = await storage.requestChange(req.params.id, changeNote);
+      
+      // Also add the change note as a comment with "[Change Request]" prefix
+      await storage.createComment({
+        requestId: req.params.id,
+        authorId: sessionUserId,
+        body: `[Change Request] ${changeNote}`,
+        visibility: "public",
+      });
+      
       res.json(request);
     } catch (error) {
       console.error("Error requesting changes:", error);
