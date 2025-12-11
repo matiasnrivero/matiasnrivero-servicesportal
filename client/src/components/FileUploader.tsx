@@ -7,6 +7,7 @@ interface FileUploaderProps {
   maxFileSize?: number;
   acceptedTypes?: string;
   onUploadComplete?: (fileUrl: string, fileName: string) => void;
+  onFileRemove?: (fileName: string) => void;
 }
 
 interface UploadedFile {
@@ -18,27 +19,21 @@ export function FileUploader({
   maxFileSize = 10485760,
   acceptedTypes = "image/*,.pdf,.ai,.eps,.svg,.psd",
   onUploadComplete,
+  onFileRemove,
 }: FileUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [currentFileIndex, setCurrentFileIndex] = useState(0);
+  const [totalFiles, setTotalFiles] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const file = files[0];
-    
+  const uploadSingleFile = async (file: File): Promise<UploadedFile | null> => {
     if (file.size > maxFileSize) {
-      setError(`File size exceeds ${Math.round(maxFileSize / 1024 / 1024)}MB limit`);
-      return;
+      setError(`File "${file.name}" exceeds ${Math.round(maxFileSize / 1024 / 1024)}MB limit`);
+      return null;
     }
-
-    setError(null);
-    setUploading(true);
-    setProgress(10);
 
     try {
       const response = await fetch("/api/objects/upload", {
@@ -51,7 +46,6 @@ export function FileUploader({
       }
 
       const { uploadURL } = await response.json();
-      setProgress(30);
 
       const uploadResponse = await fetch(uploadURL, {
         method: "PUT",
@@ -64,8 +58,6 @@ export function FileUploader({
       if (!uploadResponse.ok) {
         throw new Error("Failed to upload file");
       }
-
-      setProgress(80);
 
       const confirmResponse = await fetch("/api/artwork-files", {
         method: "PUT",
@@ -81,21 +73,46 @@ export function FileUploader({
       }
 
       const { objectPath, fileName } = await confirmResponse.json();
-      setProgress(100);
-
-      const newFile = { name: fileName || file.name, url: objectPath };
-      setUploadedFiles((prev) => [...prev, newFile]);
-      onUploadComplete?.(objectPath, fileName || file.name);
-
-      setTimeout(() => {
-        setUploading(false);
-        setProgress(0);
-      }, 500);
+      return { name: fileName || file.name, url: objectPath };
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      setError(err instanceof Error ? err.message : `Failed to upload ${file.name}`);
+      return null;
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setError(null);
+    setUploading(true);
+    setTotalFiles(files.length);
+    setCurrentFileIndex(0);
+    setProgress(0);
+
+    const newFiles: UploadedFile[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      setCurrentFileIndex(i + 1);
+      setProgress(Math.round(((i + 0.5) / files.length) * 100));
+      
+      const result = await uploadSingleFile(files[i]);
+      if (result) {
+        newFiles.push(result);
+        onUploadComplete?.(result.url, result.name);
+      }
+      
+      setProgress(Math.round(((i + 1) / files.length) * 100));
+    }
+
+    setUploadedFiles((prev) => [...prev, ...newFiles]);
+
+    setTimeout(() => {
       setUploading(false);
       setProgress(0);
-    }
+      setCurrentFileIndex(0);
+      setTotalFiles(0);
+    }, 500);
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -103,7 +120,11 @@ export function FileUploader({
   };
 
   const removeFile = (index: number) => {
+    const fileToRemove = uploadedFiles[index];
     setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
+    if (fileToRemove && onFileRemove) {
+      onFileRemove(fileToRemove.name);
+    }
   };
 
   return (
@@ -112,6 +133,7 @@ export function FileUploader({
         ref={fileInputRef}
         type="file"
         accept={acceptedTypes}
+        multiple
         onChange={handleFileSelect}
         className="hidden"
       />
@@ -129,7 +151,9 @@ export function FileUploader({
             <div className="flex justify-center">
               <Upload className="h-8 w-8 text-sky-blue-accent animate-pulse" />
             </div>
-            <p className="text-sm text-dark-gray">Uploading...</p>
+            <p className="text-sm text-dark-gray">
+              Uploading {currentFileIndex} of {totalFiles}...
+            </p>
             <Progress value={progress} className="h-2 w-full max-w-xs mx-auto" />
           </div>
         ) : (

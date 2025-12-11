@@ -307,6 +307,13 @@ export default function ServiceRequestForm() {
     }));
   };
 
+  const handleFileRemove = (fieldName: string, fileName: string) => {
+    setUploadedFiles(prev => ({
+      ...prev,
+      [fieldName]: (prev[fieldName] || []).filter((f: { name: string }) => f.name !== fileName)
+    }));
+  };
+
   const handleAddThreadColor = (color: string) => {
     const trimmed = color.trim();
     if (trimmed && !threadColorChips.includes(trimmed)) {
@@ -539,6 +546,7 @@ export default function ServiceRequestForm() {
             <Label>Upload Artwork File<span className="text-destructive">*</span></Label>
             <FileUploader
               onUploadComplete={(url, name) => handleFileUpload("artworkFile", url, name)}
+              onFileRemove={(fileName) => handleFileRemove("artworkFile", fileName)}
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -609,6 +617,7 @@ export default function ServiceRequestForm() {
             <Label>Upload Artwork File<span className="text-destructive">*</span></Label>
             <FileUploader
               onUploadComplete={(url, name) => handleFileUpload("artworkFile", url, name)}
+              onFileRemove={(fileName) => handleFileRemove("artworkFile", fileName)}
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -670,12 +679,14 @@ export default function ServiceRequestForm() {
             <Label>Brand Guidelines</Label>
             <FileUploader
               onUploadComplete={(url, name) => handleFileUpload("brandGuidelines", url, name)}
+              onFileRemove={(fileName) => handleFileRemove("brandGuidelines", fileName)}
             />
           </div>
           <div className="space-y-2">
             <Label>Upload Assets<span className="text-destructive">*</span></Label>
             <FileUploader
               onUploadComplete={(url, name) => handleFileUpload("uploadAssets", url, name)}
+              onFileRemove={(fileName) => handleFileRemove("uploadAssets", fileName)}
             />
           </div>
           <div className="space-y-2">
@@ -723,6 +734,7 @@ export default function ServiceRequestForm() {
             <Label>Example / Inspiration</Label>
             <FileUploader
               onUploadComplete={(url, name) => handleFileUpload("inspirationFile", url, name)}
+              onFileRemove={(fileName) => handleFileRemove("inspirationFile", fileName)}
             />
           </div>
         </>
@@ -736,6 +748,7 @@ export default function ServiceRequestForm() {
             <Label>Brand Guidelines</Label>
             <FileUploader
               onUploadComplete={(url, name) => handleFileUpload("brandGuidelines", url, name)}
+              onFileRemove={(fileName) => handleFileRemove("brandGuidelines", fileName)}
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -806,6 +819,7 @@ export default function ServiceRequestForm() {
             <Label>Example / Inspiration</Label>
             <FileUploader
               onUploadComplete={(url, name) => handleFileUpload("inspirationFile", url, name)}
+              onFileRemove={(fileName) => handleFileRemove("inspirationFile", fileName)}
             />
           </div>
           <div className="space-y-2">
@@ -829,6 +843,7 @@ export default function ServiceRequestForm() {
             <Label>Upload Artwork File<span className="text-destructive">*</span></Label>
             <FileUploader
               onUploadComplete={(url, name) => handleFileUpload("artworkFile", url, name)}
+              onFileRemove={(fileName) => handleFileRemove("artworkFile", fileName)}
             />
           </div>
           <div className="space-y-2">
@@ -958,27 +973,16 @@ export default function ServiceRequestForm() {
             <Label>Upload Artwork File</Label>
             <FileUploader
               onUploadComplete={(url, name) => handleFileUpload("artworkFile", url, name)}
+              onFileRemove={(fileName) => handleFileRemove("artworkFile", fileName)}
             />
           </div>
           <div className="space-y-2">
             <Label>Garment or Product Template by Size<span className="text-destructive">*</span></Label>
             <FileUploader
               onUploadComplete={(url, name) => handleFileUpload("garmentTemplates", url, name)}
-              acceptedTypes="PDF, PSD, AI files"
+              onFileRemove={(fileName) => handleFileRemove("garmentTemplates", fileName)}
+              acceptedTypes=".pdf,.psd,.ai"
             />
-            {uploadedFiles.garmentTemplates && uploadedFiles.garmentTemplates.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {uploadedFiles.garmentTemplates.map((file, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex items-center gap-1 px-2 py-1 bg-blue-lavender text-dark-blue-night rounded-md text-sm"
-                    data-testid={`chip-garment-template-${index}`}
-                  >
-                    {file.name}
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -1027,6 +1031,7 @@ export default function ServiceRequestForm() {
             <Label>Mockup / Wrap Sample</Label>
             <FileUploader
               onUploadComplete={(url, name) => handleFileUpload("mockupSample", url, name)}
+              onFileRemove={(fileName) => handleFileRemove("mockupSample", fileName)}
             />
           </div>
           <div className="space-y-2">
@@ -1048,6 +1053,7 @@ export default function ServiceRequestForm() {
             <Label>Upload Assets<span className="text-destructive">*</span></Label>
             <FileUploader
               onUploadComplete={(url, name) => handleFileUpload("uploadAssets", url, name)}
+              onFileRemove={(fileName) => handleFileRemove("uploadAssets", fileName)}
             />
           </div>
           <div className="space-y-2">
@@ -1089,6 +1095,7 @@ export default function ServiceRequestForm() {
             <Label>Upload Assets<span className="text-destructive">*</span></Label>
             <FileUploader
               onUploadComplete={(url, name) => handleFileUpload("uploadAssets", url, name)}
+              onFileRemove={(fileName) => handleFileRemove("uploadAssets", fileName)}
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1164,6 +1171,7 @@ export default function ServiceRequestForm() {
             <Label>Upload QR Code</Label>
             <FileUploader
               onUploadComplete={(url, name) => handleFileUpload("qrCode", url, name)}
+              onFileRemove={(fileName) => handleFileRemove("qrCode", fileName)}
             />
           </div>
         </>
@@ -1203,6 +1211,7 @@ export default function ServiceRequestForm() {
             <p className="text-sm text-dark-gray">Logos, designs, etc.</p>
             <FileUploader
               onUploadComplete={(url, name) => handleFileUpload("uploadAssets", url, name)}
+              onFileRemove={(fileName) => handleFileRemove("uploadAssets", fileName)}
             />
           </div>
           <div className="space-y-2">
