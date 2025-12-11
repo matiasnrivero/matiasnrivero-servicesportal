@@ -844,9 +844,9 @@ export default function JobDetailView() {
                 })()}
 
                 {request.notes && (
-                  <div className="p-3 bg-blue-lavender/30 rounded-lg">
+                  <div>
                     <p className="text-xs text-dark-gray mb-1">Job Notes</p>
-                    <p className="text-sm text-dark-blue-night" data-testid="text-job-notes">
+                    <p className="text-sm text-dark-blue-night font-medium" data-testid="text-job-notes">
                       {request.notes}
                     </p>
                   </div>
