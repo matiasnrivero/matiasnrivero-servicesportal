@@ -445,8 +445,9 @@ export default function JobDetailView() {
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4 flex-wrap">
             <Link href="/service-requests">
-              <Button variant="ghost" size="icon" data-testid="button-back">
-                <ArrowLeft className="h-5 w-5" />
+              <Button variant="outline" data-testid="button-back">
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back
               </Button>
             </Link>
             <div>
