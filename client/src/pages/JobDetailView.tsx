@@ -562,12 +562,14 @@ export default function JobDetailView() {
                   </p>
                 </div>
 
+{isDesigner && (
                 <div className="p-3 bg-blue-lavender/30 rounded-lg">
                   <p className="text-xs text-dark-gray mb-1">Assignee</p>
                   <p className="text-sm font-medium text-dark-blue-night" data-testid="text-assignee">
                     {assignedDesigner?.username || "Unassigned"}
                   </p>
                 </div>
+                )}
 
                 <div className="p-3 bg-blue-lavender/30 rounded-lg flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-dark-gray" />
@@ -599,7 +601,11 @@ export default function JobDetailView() {
                   const uploadedFiles = formData?.uploadedFiles as Record<string, Array<{ url?: string; name?: string; fileName?: string; objectPath?: string }>> | null;
                   
                   const renderFileSection = (label: string, fieldName: string, testIdPrefix: string) => {
-                    const files = uploadedFiles?.[fieldName] || [];
+                    // For artwork files, check both uploadAssets and artworkFile keys
+                    let files = uploadedFiles?.[fieldName] || [];
+                    if (fieldName === 'uploadAssets' && files.length === 0) {
+                      files = uploadedFiles?.['artworkFile'] || [];
+                    }
                     
                     if (files.length === 0) {
                       return (
@@ -680,8 +686,8 @@ export default function JobDetailView() {
                           </div>
                         )}
                         
-                        {/* 4. Output Format | Text Content */}
-                        {(formData?.outputFormat || formData?.textContent) && (
+                        {/* 4. Output Format | Complexity */}
+                        {(formData?.outputFormat || formData?.complexity) && (
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <p className="text-xs text-dark-gray mb-1">Desired Output Format</p>
@@ -690,11 +696,21 @@ export default function JobDetailView() {
                               </p>
                             </div>
                             <div>
-                              <p className="text-xs text-dark-gray mb-1">Text Content</p>
-                              <p className="text-sm text-dark-blue-night font-medium" data-testid="text-formdata-textContent">
-                                {String(formData?.textContent || "N/A")}
+                              <p className="text-xs text-dark-gray mb-1">Complexity</p>
+                              <p className="text-sm text-dark-blue-night font-medium" data-testid="text-formdata-complexity">
+                                {String(formData?.complexity || "N/A")}
                               </p>
                             </div>
+                          </div>
+                        )}
+                        
+                        {/* 5. Text Content (full width, left aligned) */}
+                        {formData?.textContent && (
+                          <div>
+                            <p className="text-xs text-dark-gray mb-1">Text Content</p>
+                            <p className="text-sm text-dark-blue-night font-medium" data-testid="text-formdata-textContent">
+                              {String(formData?.textContent)}
+                            </p>
                           </div>
                         )}
                         
@@ -842,7 +858,7 @@ export default function JobDetailView() {
                   
                   // For Artwork Composition, also skip fields already rendered in the custom layout
                   const skipFields = isArtworkCompositionForm 
-                    ? [...baseSkipFields, 'brandGuidelines', 'uploadAssets', 'inspirationFile', 'textContent', 'outputFormat', 'widthInches', 'heightInches']
+                    ? [...baseSkipFields, 'brandGuidelines', 'uploadAssets', 'artworkFile', 'inspirationFile', 'textContent', 'complexity', 'outputFormat', 'widthInches', 'heightInches']
                     : baseSkipFields;
                   
                   // Define preferred field order with paired fields (left, right) for side-by-side display
