@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Header } from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -183,15 +184,17 @@ export default function UserManagement() {
   const canInvite = isAdminOrInternal || isVendor;
 
   return (
-    <div className="p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <Users className="h-8 w-8 text-sky-blue-accent" />
-            <h1 className="font-title-semibold text-dark-blue-night text-2xl">
-              User Management
-            </h1>
-          </div>
+    <div className="min-h-screen bg-background">
+      <Header />
+      <div className="p-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <Users className="h-8 w-8 text-sky-blue-accent" />
+              <h1 className="font-title-semibold text-dark-blue-night text-2xl">
+                User Management
+              </h1>
+            </div>
           {canInvite && (
             <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
               <DialogTrigger asChild>
@@ -413,7 +416,8 @@ export default function UserManagement() {
               )}
             </div>
           </CardContent>
-        </Card>
+          </Card>
+        </div>
       </div>
     </div>
   );

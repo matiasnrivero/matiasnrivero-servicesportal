@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Header } from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -215,15 +216,18 @@ export default function VendorProfile() {
 
   if (!currentUser || currentUser.role !== "vendor") {
     return (
-      <div className="p-8">
-        <div className="max-w-4xl mx-auto text-center py-12">
-          <Building2 className="h-16 w-16 text-dark-gray mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-dark-blue-night mb-2">
-            Vendor Access Required
-          </h2>
-          <p className="text-dark-gray">
-            This page is only accessible to Vendor users.
-          </p>
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="p-8">
+          <div className="max-w-4xl mx-auto text-center py-12">
+            <Building2 className="h-16 w-16 text-dark-gray mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-dark-blue-night mb-2">
+              Vendor Access Required
+            </h2>
+            <p className="text-dark-gray">
+              This page is only accessible to Vendor users.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -231,21 +235,26 @@ export default function VendorProfile() {
 
   if (profileLoading || teamLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-blue-accent"></div>
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-blue-accent"></div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex items-center gap-3 mb-6">
-          <Building2 className="h-8 w-8 text-sky-blue-accent" />
-          <h1 className="font-title-semibold text-dark-blue-night text-2xl">
-            Vendor Profile
-          </h1>
-        </div>
+    <div className="min-h-screen bg-background">
+      <Header />
+      <div className="p-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center gap-3 mb-6">
+            <Building2 className="h-8 w-8 text-sky-blue-accent" />
+            <h1 className="font-title-semibold text-dark-blue-night text-2xl">
+              Vendor Profile
+            </h1>
+          </div>
 
         <Tabs defaultValue="profile" className="space-y-6">
           <TabsList>
@@ -701,7 +710,8 @@ export default function VendorProfile() {
               </CardContent>
             </Card>
           </TabsContent>
-        </Tabs>
+          </Tabs>
+        </div>
       </div>
     </div>
   );
