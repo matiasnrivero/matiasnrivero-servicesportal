@@ -69,9 +69,8 @@ export const ServicesListSection = (): JSX.Element => {
     queryFn: getDefaultUser,
   });
 
-  // Hide pricing until user role is confirmed (default to hiding for security)
-  const isDesigner = currentUser?.role === "designer";
-  const showPricing = currentUser && currentUser.role !== "designer";
+  // Pricing visible only for Clients and Admins
+  const showPricing = currentUser && (currentUser.role === "client" || currentUser.role === "admin");
 
   const handlePricingClick = (e: React.MouseEvent) => {
     e.preventDefault();

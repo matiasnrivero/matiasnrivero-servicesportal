@@ -9,6 +9,8 @@ import { ServicesRequestAd } from "@/pages/ServicesRequestAd";
 import ServiceRequestForm from "@/pages/ServiceRequestForm";
 import ServiceRequestsList from "@/pages/ServiceRequestsList";
 import JobDetailView from "@/pages/JobDetailView";
+import UserManagement from "@/pages/UserManagement";
+import VendorProfile from "@/pages/VendorProfile";
 
 function Router() {
   return (
@@ -18,6 +20,8 @@ function Router() {
       <Route path="/service-requests" component={ServiceRequestsList} />
       <Route path="/service-requests/new" component={ServiceRequestForm} />
       <Route path="/jobs/:id" component={JobDetailView} />
+      <Route path="/users" component={UserManagement} />
+      <Route path="/vendor-profile" component={VendorProfile} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>

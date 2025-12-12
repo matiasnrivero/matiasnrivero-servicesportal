@@ -13,11 +13,15 @@ import {
   type InsertAttachment,
   type Comment,
   type InsertComment,
+  type VendorProfile,
+  type InsertVendorProfile,
+  type UpdateVendorProfile,
   users,
   services,
   serviceRequests,
   serviceAttachments,
   comments,
+  vendorProfiles,
 } from "@shared/schema";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -29,7 +33,16 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
   getUsersByRole(role: string): Promise<User[]>;
+  getUsersByVendor(vendorId: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, data: Partial<InsertUser & { isActive: boolean }>): Promise<User | undefined>;
+
+  // Vendor Profile methods
+  getVendorProfile(userId: string): Promise<VendorProfile | undefined>;
+  getVendorProfileById(id: string): Promise<VendorProfile | undefined>;
+  getAllVendorProfiles(): Promise<VendorProfile[]>;
+  createVendorProfile(profile: InsertVendorProfile): Promise<VendorProfile>;
+  updateVendorProfile(id: string, profile: UpdateVendorProfile): Promise<VendorProfile | undefined>;
 
   // Service methods
   getAllServices(): Promise<Service[]>;
@@ -81,6 +94,43 @@ export class DbStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const result = await db.insert(users).values(insertUser).returning();
+    return result[0];
+  }
+
+  async updateUser(id: string, data: Partial<InsertUser & { isActive: boolean }>): Promise<User | undefined> {
+    const result = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    return result[0];
+  }
+
+  async getUsersByVendor(vendorId: string): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.vendorId, vendorId)).orderBy(users.username);
+  }
+
+  // Vendor Profile methods
+  async getVendorProfile(userId: string): Promise<VendorProfile | undefined> {
+    const result = await db.select().from(vendorProfiles).where(eq(vendorProfiles.userId, userId)).limit(1);
+    return result[0];
+  }
+
+  async getVendorProfileById(id: string): Promise<VendorProfile | undefined> {
+    const result = await db.select().from(vendorProfiles).where(eq(vendorProfiles.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAllVendorProfiles(): Promise<VendorProfile[]> {
+    return await db.select().from(vendorProfiles).orderBy(vendorProfiles.companyName);
+  }
+
+  async createVendorProfile(profile: InsertVendorProfile): Promise<VendorProfile> {
+    const result = await db.insert(vendorProfiles).values(profile).returning();
+    return result[0];
+  }
+
+  async updateVendorProfile(id: string, profile: UpdateVendorProfile): Promise<VendorProfile | undefined> {
+    const result = await db.update(vendorProfiles)
+      .set({ ...profile, updatedAt: new Date() })
+      .where(eq(vendorProfiles.id, id))
+      .returning();
     return result[0];
   }
 

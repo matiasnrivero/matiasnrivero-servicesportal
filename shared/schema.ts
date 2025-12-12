@@ -1,15 +1,44 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, decimal, integer, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, decimal, integer, jsonb, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// User roles hierarchy: admin > internal_designer > vendor > vendor_designer > client
+export const userRoles = ["admin", "internal_designer", "vendor", "vendor_designer", "client"] as const;
+export type UserRole = typeof userRoles[number];
+
+// Client payment methods
+export const paymentMethods = ["pay_as_you_go", "monthly_payment", "deduct_from_royalties"] as const;
+export type PaymentMethod = typeof paymentMethods[number];
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   email: text("email"),
+  phone: text("phone"),
   role: text("role").notNull().default("client"),
+  isActive: boolean("is_active").notNull().default(true),
+  // Vendor relationship - links vendor_designer to their parent vendor
+  vendorId: varchar("vendor_id"),
+  // Client payment configuration
+  paymentMethod: text("payment_method"),
+  invitedBy: varchar("invited_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Vendor profiles with pricing agreements and SLAs
+export const vendorProfiles = pgTable("vendor_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  companyName: text("company_name").notNull(),
+  website: text("website"),
+  // Pricing agreements per service type (JSON structure)
+  pricingAgreements: jsonb("pricing_agreements"),
+  // SLA configuration (JSON: { serviceType: { days: number, hours: number } })
+  slaConfig: jsonb("sla_config"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const services = pgTable("services", {
@@ -72,7 +101,22 @@ export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
   email: true,
+  phone: true,
   role: true,
+  vendorId: true,
+  paymentMethod: true,
+  invitedBy: true,
+});
+
+export const insertVendorProfileSchema = createInsertSchema(vendorProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateVendorProfileSchema = createInsertSchema(vendorProfiles).partial().omit({
+  id: true,
+  createdAt: true,
 });
 
 export const insertServiceSchema = createInsertSchema(services).omit({
@@ -107,6 +151,9 @@ export const insertCommentSchema = createInsertSchema(comments).omit({
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type VendorProfile = typeof vendorProfiles.$inferSelect;
+export type InsertVendorProfile = z.infer<typeof insertVendorProfileSchema>;
+export type UpdateVendorProfile = z.infer<typeof updateVendorProfileSchema>;
 export type Service = typeof services.$inferSelect;
 export type InsertService = z.infer<typeof insertServiceSchema>;
 export type ServiceRequest = typeof serviceRequests.$inferSelect;
@@ -116,3 +163,20 @@ export type ServiceAttachment = typeof serviceAttachments.$inferSelect;
 export type InsertAttachment = z.infer<typeof insertAttachmentSchema>;
 export type Comment = typeof comments.$inferSelect;
 export type InsertComment = z.infer<typeof insertCommentSchema>;
+
+// Helper type for pricing agreements structure
+export type PricingAgreement = {
+  serviceType: string;
+  basePrice: number;
+  complexity?: { basic?: number; standard?: number; advanced?: number; premium?: number };
+  variablePricing?: { perProduct?: number };
+  extras?: { vectorization?: number };
+};
+
+// Helper type for SLA configuration
+export type SLAConfig = {
+  [serviceType: string]: {
+    days: number;
+    hours?: number;
+  };
+};

@@ -70,7 +70,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const sessionUserId = req.session.userId;
       const { status } = req.query;
-      let requests;
+      let requests: any[] = [];
 
       if (!sessionUserId) {
         return res.status(401).json({ error: "Not authenticated" });
@@ -81,13 +81,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "User not found" });
       }
 
-      // Filter requests based on user's role
-      // Note: "distributor" and "client" are treated the same - both can submit and view their own requests
-      if (sessionUser.role === "client" || sessionUser.role === "distributor") {
-        // Clients/Distributors can only see their own requests
+      // Filter requests based on user's role hierarchy
+      // admin, internal_designer, vendor, vendor_designer can see all or assigned requests
+      // client can only see their own requests
+      if (sessionUser.role === "client") {
+        // Clients can only see their own requests
         requests = await storage.getServiceRequestsByUser(sessionUserId);
-      } else if (sessionUser.role === "designer") {
-        // Designers can see all requests (to pick up pending jobs and their assigned jobs)
+      } else if (["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(sessionUser.role)) {
+        // Admin, Internal Designers, Vendors, Vendor Designers can see all requests
         if (status) {
           requests = await storage.getServiceRequestsByStatus(status as string);
         } else {
@@ -120,12 +121,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Service request not found" });
       }
 
-      // Clients/Distributors can only view their own requests
-      if ((sessionUser.role === "client" || sessionUser.role === "distributor") && request.userId !== sessionUserId) {
+      // Clients can only view their own requests
+      if (sessionUser.role === "client" && request.userId !== sessionUserId) {
         return res.status(403).json({ error: "Access denied" });
       }
 
-      // Designers can view all requests
+      // Admin, Internal Designers, Vendors, Vendor Designers can view all requests
       res.json(request);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch service request" });
@@ -775,6 +776,211 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error seeding services:", error);
       res.status(500).json({ error: "Failed to seed services", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // ========== User Management Routes ==========
+  
+  // Create/Invite a new user
+  app.post("/api/users", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const { role: newUserRole, vendorId } = req.body;
+
+      // Role-based invitation permissions
+      // Admin can invite any role
+      // Internal Designer can invite internal_designer, vendor, vendor_designer
+      // Vendor can invite vendor, vendor_designer (under their structure)
+      const canInvite = () => {
+        if (sessionUser.role === "admin") return true;
+        if (sessionUser.role === "internal_designer") {
+          return ["internal_designer", "vendor", "vendor_designer"].includes(newUserRole);
+        }
+        if (sessionUser.role === "vendor") {
+          return ["vendor", "vendor_designer"].includes(newUserRole);
+        }
+        return false;
+      };
+
+      if (!canInvite()) {
+        return res.status(403).json({ error: "You don't have permission to invite this role" });
+      }
+
+      // For vendor users, ensure vendorId is set if created by vendor
+      let finalVendorId = vendorId;
+      if (sessionUser.role === "vendor" && ["vendor", "vendor_designer"].includes(newUserRole)) {
+        finalVendorId = sessionUser.vendorId || sessionUserId;
+      }
+
+      const newUser = await storage.createUser({
+        ...req.body,
+        vendorId: finalVendorId,
+        invitedBy: sessionUserId,
+      });
+
+      res.status(201).json(newUser);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ error: "Failed to create user" });
+    }
+  });
+
+  // Update user (including activate/deactivate)
+  app.patch("/api/users/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const targetUser = await storage.getUser(req.params.id);
+      if (!targetUser) {
+        return res.status(404).json({ error: "Target user not found" });
+      }
+
+      // Permission check for activating/deactivating users
+      const canModify = () => {
+        // Admin can modify anyone
+        if (sessionUser.role === "admin") return true;
+        // Vendor can modify vendors/vendor_designers under their structure
+        if (sessionUser.role === "vendor") {
+          const vendorStructureId = sessionUser.vendorId || sessionUserId;
+          return targetUser.vendorId === vendorStructureId && 
+                 ["vendor", "vendor_designer"].includes(targetUser.role);
+        }
+        return false;
+      };
+
+      if (!canModify()) {
+        return res.status(403).json({ error: "You don't have permission to modify this user" });
+      }
+
+      const updatedUser = await storage.updateUser(req.params.id, req.body);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  // Get users by vendor (for vendor team management)
+  app.get("/api/users/vendor/:vendorId", async (req, res) => {
+    try {
+      const users = await storage.getUsersByVendor(req.params.vendorId);
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching vendor users:", error);
+      res.status(500).json({ error: "Failed to fetch vendor users" });
+    }
+  });
+
+  // ========== Vendor Profile Routes ==========
+  
+  app.get("/api/vendor-profiles", async (req, res) => {
+    try {
+      const profiles = await storage.getAllVendorProfiles();
+      res.json(profiles);
+    } catch (error) {
+      console.error("Error fetching vendor profiles:", error);
+      res.status(500).json({ error: "Failed to fetch vendor profiles" });
+    }
+  });
+
+  app.get("/api/vendor-profiles/:id", async (req, res) => {
+    try {
+      const profile = await storage.getVendorProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Vendor profile not found" });
+      }
+      res.json(profile);
+    } catch (error) {
+      console.error("Error fetching vendor profile:", error);
+      res.status(500).json({ error: "Failed to fetch vendor profile" });
+    }
+  });
+
+  app.get("/api/vendor-profiles/user/:userId", async (req, res) => {
+    try {
+      const profile = await storage.getVendorProfile(req.params.userId);
+      if (!profile) {
+        return res.status(404).json({ error: "Vendor profile not found" });
+      }
+      res.json(profile);
+    } catch (error) {
+      console.error("Error fetching vendor profile:", error);
+      res.status(500).json({ error: "Failed to fetch vendor profile" });
+    }
+  });
+
+  app.post("/api/vendor-profiles", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      // Only admin can create vendor profiles
+      if (sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Only admins can create vendor profiles" });
+      }
+
+      const profile = await storage.createVendorProfile(req.body);
+      res.status(201).json(profile);
+    } catch (error) {
+      console.error("Error creating vendor profile:", error);
+      res.status(500).json({ error: "Failed to create vendor profile" });
+    }
+  });
+
+  app.patch("/api/vendor-profiles/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const profile = await storage.getVendorProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Vendor profile not found" });
+      }
+
+      // Admin can update any profile, Vendor can update their own
+      const canUpdate = sessionUser.role === "admin" || 
+                        (sessionUser.role === "vendor" && profile.userId === sessionUserId);
+
+      if (!canUpdate) {
+        return res.status(403).json({ error: "You don't have permission to update this profile" });
+      }
+
+      const updatedProfile = await storage.updateVendorProfile(req.params.id, req.body);
+      res.json(updatedProfile);
+    } catch (error) {
+      console.error("Error updating vendor profile:", error);
+      res.status(500).json({ error: "Failed to update vendor profile" });
     }
   });
 
