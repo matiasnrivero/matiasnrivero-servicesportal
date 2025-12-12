@@ -721,6 +721,76 @@ export default function JobDetailView() {
                   
                   // Default: show artworkFile for other form types
                   const artworkFiles = uploadedFiles?.artworkFile || [];
+                  const garmentTemplates = uploadedFiles?.garmentTemplates || [];
+                  
+                  // Check if this is Dye Sublimation Template form (has garmentTemplates)
+                  if (garmentTemplates.length > 0) {
+                    return (
+                      <>
+                        {/* Artwork Files */}
+                        {artworkFiles.length > 0 && (
+                          <div>
+                            <p className="text-xs text-dark-gray mb-2">Artwork Files</p>
+                            <div className="flex flex-col gap-2">
+                              {artworkFiles.map((file, index) => {
+                                const fileName = file.name || file.fileName || 'Unknown file';
+                                let fileUrl = file.url || file.objectPath || '';
+                                if (file.objectPath && !file.objectPath.startsWith('http')) {
+                                  fileUrl = `/objects/${file.objectPath}`;
+                                }
+                                if (!fileUrl) return null;
+                                return (
+                                  <div 
+                                    key={`artwork-${index}`}
+                                    className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
+                                  >
+                                    <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
+                                    <span className="text-sm text-dark-blue-night flex-1">{fileName}</span>
+                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer">
+                                      <Button size="sm" variant="default" data-testid={`button-download-artwork-${index}`}>
+                                        <Download className="h-3 w-3 mr-1" />
+                                        Download
+                                      </Button>
+                                    </a>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Garment or Product Template by Size */}
+                        <div>
+                          <p className="text-xs text-dark-gray mb-2">Garment or Product Template by Size</p>
+                          <div className="flex flex-col gap-2">
+                            {garmentTemplates.map((file, index) => {
+                              const fileName = file.name || file.fileName || 'Unknown file';
+                              let fileUrl = file.url || file.objectPath || '';
+                              if (file.objectPath && !file.objectPath.startsWith('http')) {
+                                fileUrl = `/objects/${file.objectPath}`;
+                              }
+                              if (!fileUrl) return null;
+                              return (
+                                <div 
+                                  key={`garment-${index}`}
+                                  className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
+                                >
+                                  <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
+                                  <span className="text-sm text-dark-blue-night flex-1">{fileName}</span>
+                                  <a href={fileUrl} target="_blank" rel="noopener noreferrer">
+                                    <Button size="sm" variant="default" data-testid={`button-download-garment-${index}`}>
+                                      <Download className="h-3 w-3 mr-1" />
+                                      Download
+                                    </Button>
+                                  </a>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </>
+                    );
+                  }
                   
                   if (artworkFiles.length > 0) {
                     return (
