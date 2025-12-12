@@ -705,12 +705,112 @@ export default function JobDetailView() {
                     );
                   }
                   
-                  // Check if this is Store Banner Design or Flyer Design form (has textContent + widthInches/heightInches but NO brandGuidelines/inspirationFile)
-                  const isStoreBannerOrFlyer = formData?.textContent !== undefined && 
+                  // Check if this is Flyer Design form (has colorMode or flyerOrientation)
+                  const isFlyerDesign = formData?.colorMode !== undefined || formData?.flyerOrientation !== undefined;
+                  
+                  if (isFlyerDesign) {
+                    const artworkFiles = uploadedFiles?.uploadAssets || uploadedFiles?.artworkFile || [];
+                    return (
+                      <>
+                        {/* Artwork */}
+                        {artworkFiles.length > 0 ? (
+                          <div>
+                            <p className="text-xs text-dark-gray mb-2">Artwork</p>
+                            <div className="flex flex-col gap-2">
+                              {artworkFiles.map((file, index) => {
+                                const fileName = file.name || file.fileName || 'Unknown file';
+                                let fileUrl = file.url || file.objectPath || '';
+                                if (file.objectPath && !file.objectPath.startsWith('http')) {
+                                  fileUrl = `/objects/${file.objectPath}`;
+                                }
+                                if (!fileUrl) return null;
+                                return (
+                                  <div 
+                                    key={`artwork-${index}`}
+                                    className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
+                                  >
+                                    <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
+                                    <span className="text-sm text-dark-blue-night flex-1">{fileName}</span>
+                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer">
+                                      <Button size="sm" variant="default" data-testid={`button-download-artwork-${index}`}>
+                                        <Download className="h-3 w-3 mr-1" />
+                                        Download
+                                      </Button>
+                                    </a>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="text-xs text-dark-gray mb-2">Artwork</p>
+                            <p className="text-sm text-dark-gray">No artwork files uploaded</p>
+                          </div>
+                        )}
+                        
+                        {/* Width | Height */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs text-dark-gray mb-1">Width (inches)</p>
+                            <p className="text-sm text-dark-blue-night font-medium" data-testid="text-formdata-widthInches">
+                              {String(formData?.widthInches || "N/A")}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-dark-gray mb-1">Height (inches)</p>
+                            <p className="text-sm text-dark-blue-night font-medium" data-testid="text-formdata-heightInches">
+                              {String(formData?.heightInches || "N/A")}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {/* Flyer Orientation (below Width) */}
+                        {formData?.flyerOrientation && (
+                          <div>
+                            <p className="text-xs text-dark-gray mb-1">Flyer Orientation</p>
+                            <p className="text-sm text-dark-blue-night font-medium" data-testid="text-formdata-flyerOrientation">
+                              {String(formData?.flyerOrientation)}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Output Format | Color Mode */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs text-dark-gray mb-1">Output Format</p>
+                            <p className="text-sm text-dark-blue-night font-medium" data-testid="text-formdata-outputFormat">
+                              {String(formData?.outputFormat || "N/A")}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-dark-gray mb-1">Color Mode</p>
+                            <p className="text-sm text-dark-blue-night font-medium" data-testid="text-formdata-colorMode">
+                              {String(formData?.colorMode || "N/A")}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {/* Text Content (just above Job Notes) */}
+                        {formData?.textContent && (
+                          <div>
+                            <p className="text-xs text-dark-gray mb-1">Text Content</p>
+                            <p className="text-sm text-dark-blue-night font-medium" data-testid="text-formdata-textContent">
+                              {String(formData?.textContent)}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    );
+                  }
+                  
+                  // Check if this is Store Banner Design form (has textContent + widthInches/heightInches but NO colorMode/flyerOrientation)
+                  const isStoreBanner = formData?.textContent !== undefined && 
                     (formData?.widthInches !== undefined || formData?.heightInches !== undefined) &&
+                    !formData?.colorMode && !formData?.flyerOrientation &&
                     !uploadedFiles?.brandGuidelines && !uploadedFiles?.inspirationFile;
                   
-                  if (isStoreBannerOrFlyer) {
+                  if (isStoreBanner) {
                     const artworkFiles = uploadedFiles?.uploadAssets || uploadedFiles?.artworkFile || [];
                     return (
                       <>
