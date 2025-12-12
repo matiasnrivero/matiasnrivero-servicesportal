@@ -1150,13 +1150,28 @@ export default function JobDetailView() {
                   
                   // Check if this is Artwork Composition form (has specific fields)
                   const uploadedFiles = formData?.uploadedFiles as Record<string, unknown> | null;
-                  const isArtworkCompositionForm = formData?.textContent !== undefined || uploadedFiles?.brandGuidelines || uploadedFiles?.inspirationFile;
+                  const isArtworkCompositionForm = uploadedFiles?.brandGuidelines || uploadedFiles?.inspirationFile;
+                  
+                  // Check if this is Flyer Design form (has colorMode or flyerOrientation)
+                  const isFlyerDesignForm = formData?.colorMode !== undefined || formData?.flyerOrientation !== undefined;
+                  
+                  // Check if this is Store Banner form
+                  const isStoreBannerForm = formData?.textContent !== undefined && 
+                    (formData?.widthInches !== undefined || formData?.heightInches !== undefined) &&
+                    !formData?.colorMode && !formData?.flyerOrientation &&
+                    !uploadedFiles?.brandGuidelines && !uploadedFiles?.inspirationFile;
                   
                   // Determine skip fields based on form type
                   let skipFields = baseSkipFields;
                   if (isStoreCreationForm) {
                     // Store Creation: skip uploadAssets (shown as "Artwork" in custom section)
                     skipFields = [...baseSkipFields, 'uploadAssets'];
+                  } else if (isFlyerDesignForm) {
+                    // Flyer Design: skip fields already rendered in custom layout
+                    skipFields = [...baseSkipFields, 'uploadAssets', 'artworkFile', 'widthInches', 'heightInches', 'flyerOrientation', 'outputFormat', 'colorMode', 'textContent'];
+                  } else if (isStoreBannerForm) {
+                    // Store Banner: skip fields already rendered in custom layout
+                    skipFields = [...baseSkipFields, 'uploadAssets', 'artworkFile', 'widthInches', 'heightInches', 'textContent'];
                   } else if (isArtworkCompositionForm) {
                     // Artwork Composition: skip fields already rendered in custom layout
                     skipFields = [...baseSkipFields, 'brandGuidelines', 'uploadAssets', 'artworkFile', 'inspirationFile', 'textContent', 'complexity', 'outputFormat', 'widthInches', 'heightInches'];
