@@ -116,6 +116,17 @@ export function Header() {
               </Button>
             </Link>
           )}
+          {isAdmin && (
+            <Link href="/settings">
+              <Button
+                variant={location === "/settings" ? "default" : "ghost"}
+                className={location === "/settings" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : "text-sky-blue-accent"}
+                data-testid="nav-settings"
+              >
+                Settings
+              </Button>
+            </Link>
+          )}
         </nav>
       </div>
       {currentUser && (

@@ -13,6 +13,7 @@ import UserManagement from "@/pages/UserManagement";
 import VendorProfile from "@/pages/VendorProfile";
 import VendorsList from "@/pages/VendorsList";
 import VendorDetail from "@/pages/VendorDetail";
+import Settings from "@/pages/Settings";
 
 function Router() {
   return (
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/vendor-profile" component={VendorProfile} />
       <Route path="/vendors" component={VendorsList} />
       <Route path="/vendors/:id" component={VendorDetail} />
+      <Route path="/settings" component={Settings} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>
