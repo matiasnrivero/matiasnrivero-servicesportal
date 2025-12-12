@@ -27,18 +27,18 @@ import { useToast } from "@/hooks/use-toast";
 import { Building2, Users, DollarSign, Clock, UserPlus, Save } from "lucide-react";
 import type { User, VendorProfile as VendorProfileType, Service } from "@shared/schema";
 
-const COST_SERVICES = [
-  { name: "Vectorization & Color Separation", hasComplexity: false },
-  { name: "Artwork Touch-Ups (DTF/DTG)", hasComplexity: false },
-  { name: "Embroidery Digitization", hasComplexity: false, subServices: ["Vectorization for Embroidery"] },
-  { name: "Creative Art", hasComplexity: true },
-  { name: "Artwork Composition", hasComplexity: false },
-  { name: "Dye-Sublimation Template", hasComplexity: false },
-  { name: "Store Creation", hasComplexity: false },
-  { name: "Store Banner Design", hasComplexity: false },
-  { name: "Flyer Design", hasComplexity: false },
-  { name: "Blank Product - PSD", hasComplexity: false },
+const BASE_COST_SERVICES = [
+  { name: "Vectorization & Color Separation" },
+  { name: "Artwork Touch-Ups (DTF/DTG)" },
+  { name: "Embroidery Digitization", subServices: ["Vectorization for Embroidery"] },
+  { name: "Artwork Composition" },
+  { name: "Dye-Sublimation Template" },
+  { name: "Store Banner Design" },
+  { name: "Flyer Design" },
+  { name: "Blank Product - PSD" },
 ];
+
+const STORE_QUANTITY_TIERS = ["1-50", "51-75", "76-100", ">101"];
 
 const SLA_SERVICES = [
   "Vectorization & Color Separation",
@@ -112,6 +112,7 @@ export default function VendorProfile() {
   const [pricingData, setPricingData] = useState<Record<string, {
     basePrice?: number;
     complexity?: { basic?: number; standard?: number; advanced?: number; ultimate?: number };
+    quantity?: Record<string, number>;
   }>>({});
 
   const [slaData, setSlaData] = useState<Record<string, { days: number; hours?: number }>>({});
@@ -208,6 +209,23 @@ export default function VendorProfile() {
         complexity: {
           ...(prev[serviceType]?.complexity || {}),
           [level]: value,
+        },
+      },
+    }));
+  };
+
+  const handleQuantityChange = (
+    serviceType: string,
+    tier: string,
+    value: number
+  ) => {
+    setPricingData((prev) => ({
+      ...prev,
+      [serviceType]: {
+        ...(prev[serviceType] || {}),
+        quantity: {
+          ...(prev[serviceType]?.quantity || {}),
+          [tier]: value,
         },
       },
     }));
@@ -527,26 +545,20 @@ export default function VendorProfile() {
                 <CardTitle>Cost Agreements</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-7 gap-2 pb-2 border-b font-semibold text-sm text-dark-gray">
-                    <div className="col-span-2">Service Type</div>
-                    <div>Base Cost</div>
-                    <div>Basic</div>
-                    <div>Standard</div>
-                    <div>Advance</div>
-                    <div>Ultimate</div>
-                  </div>
-                  {COST_SERVICES.map((service) => (
-                    <div key={service.name}>
-                      <div
-                        className="grid grid-cols-7 gap-2 items-center py-2"
-                        data-testid={`cost-row-${service.name.toLowerCase().replace(/\s+/g, "-")}`}
-                      >
-                        <div className="col-span-2 font-medium text-dark-blue-night">
-                          {service.name}
-                        </div>
-                        <div>
-                          {!service.hasComplexity && (
+                <div className="space-y-8">
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-dark-blue-night">Base Cost Services</h3>
+                    {BASE_COST_SERVICES.map((service) => (
+                      <div key={service.name}>
+                        <div
+                          className="flex items-center justify-between gap-4 p-4 border rounded-md"
+                          data-testid={`cost-row-${service.name.toLowerCase().replace(/\s+/g, "-")}`}
+                        >
+                          <div className="font-medium text-dark-blue-night min-w-[200px]">
+                            {service.name}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm text-dark-gray">Base Cost:</Label>
                             <Input
                               type="number"
                               value={pricingData[service.name]?.basePrice || ""}
@@ -558,114 +570,131 @@ export default function VendorProfile() {
                                 )
                               }
                               placeholder="0.00"
-                              className="w-20"
+                              className="w-24"
                             />
-                          )}
-                        </div>
-                        {service.hasComplexity ? (
-                          <>
-                            <div>
-                              <Input
-                                type="number"
-                                value={pricingData[service.name]?.complexity?.basic || ""}
-                                onChange={(e) =>
-                                  handleComplexityChange(
-                                    service.name,
-                                    "basic",
-                                    parseFloat(e.target.value) || 0
-                                  )
-                                }
-                                placeholder="0.00"
-                                className="w-20"
-                              />
-                            </div>
-                            <div>
-                              <Input
-                                type="number"
-                                value={pricingData[service.name]?.complexity?.standard || ""}
-                                onChange={(e) =>
-                                  handleComplexityChange(
-                                    service.name,
-                                    "standard",
-                                    parseFloat(e.target.value) || 0
-                                  )
-                                }
-                                placeholder="0.00"
-                                className="w-20"
-                              />
-                            </div>
-                            <div>
-                              <Input
-                                type="number"
-                                value={pricingData[service.name]?.complexity?.advanced || ""}
-                                onChange={(e) =>
-                                  handleComplexityChange(
-                                    service.name,
-                                    "advanced",
-                                    parseFloat(e.target.value) || 0
-                                  )
-                                }
-                                placeholder="0.00"
-                                className="w-20"
-                              />
-                            </div>
-                            <div>
-                              <Input
-                                type="number"
-                                value={pricingData[service.name]?.complexity?.ultimate || ""}
-                                onChange={(e) =>
-                                  handleComplexityChange(
-                                    service.name,
-                                    "ultimate",
-                                    parseFloat(e.target.value) || 0
-                                  )
-                                }
-                                placeholder="0.00"
-                                className="w-20"
-                              />
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div></div>
-                            <div></div>
-                            <div></div>
-                            <div></div>
-                          </>
-                        )}
-                      </div>
-                      {service.subServices?.map((subService) => (
-                        <div
-                          key={subService}
-                          className="grid grid-cols-7 gap-2 items-center py-2 pl-6"
-                          data-testid={`cost-row-${subService.toLowerCase().replace(/\s+/g, "-")}`}
-                        >
-                          <div className="col-span-2 text-dark-gray text-sm">
-                            {subService}
                           </div>
-                          <div>
+                        </div>
+                        {service.subServices?.map((subService) => (
+                          <div
+                            key={subService}
+                            className="flex items-center justify-between gap-4 p-4 border rounded-md ml-6 mt-2"
+                            data-testid={`cost-row-${subService.toLowerCase().replace(/\s+/g, "-")}`}
+                          >
+                            <div className="text-dark-gray text-sm min-w-[200px]">
+                              {subService}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Label className="text-sm text-dark-gray">Base Cost:</Label>
+                              <Input
+                                type="number"
+                                value={pricingData[subService]?.basePrice || ""}
+                                onChange={(e) =>
+                                  handlePricingChange(
+                                    subService,
+                                    "basePrice",
+                                    parseFloat(e.target.value) || 0
+                                  )
+                                }
+                                placeholder="0.00"
+                                className="w-24"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-dark-blue-night">Creative Art (Complexity-based)</h3>
+                    <div
+                      className="flex items-center justify-between gap-4 p-4 border rounded-md"
+                      data-testid="cost-row-creative-art"
+                    >
+                      <div className="font-medium text-dark-blue-night min-w-[200px]">
+                        Creative Art
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm text-dark-gray">Basic:</Label>
+                          <Input
+                            type="number"
+                            value={pricingData["Creative Art"]?.complexity?.basic || ""}
+                            onChange={(e) =>
+                              handleComplexityChange("Creative Art", "basic", parseFloat(e.target.value) || 0)
+                            }
+                            placeholder="0.00"
+                            className="w-24"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm text-dark-gray">Standard:</Label>
+                          <Input
+                            type="number"
+                            value={pricingData["Creative Art"]?.complexity?.standard || ""}
+                            onChange={(e) =>
+                              handleComplexityChange("Creative Art", "standard", parseFloat(e.target.value) || 0)
+                            }
+                            placeholder="0.00"
+                            className="w-24"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm text-dark-gray">Advance:</Label>
+                          <Input
+                            type="number"
+                            value={pricingData["Creative Art"]?.complexity?.advanced || ""}
+                            onChange={(e) =>
+                              handleComplexityChange("Creative Art", "advanced", parseFloat(e.target.value) || 0)
+                            }
+                            placeholder="0.00"
+                            className="w-24"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm text-dark-gray">Ultimate:</Label>
+                          <Input
+                            type="number"
+                            value={pricingData["Creative Art"]?.complexity?.ultimate || ""}
+                            onChange={(e) =>
+                              handleComplexityChange("Creative Art", "ultimate", parseFloat(e.target.value) || 0)
+                            }
+                            placeholder="0.00"
+                            className="w-24"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-dark-blue-night">Store Creation (Quantity-based)</h3>
+                    <div
+                      className="flex items-center justify-between gap-4 p-4 border rounded-md"
+                      data-testid="cost-row-store-creation"
+                    >
+                      <div className="font-medium text-dark-blue-night min-w-[200px]">
+                        Store Creation
+                      </div>
+                      <div className="flex items-center gap-4">
+                        {STORE_QUANTITY_TIERS.map((tier) => (
+                          <div key={tier} className="flex items-center gap-2">
+                            <Label className="text-sm text-dark-gray whitespace-nowrap">{tier}:</Label>
                             <Input
                               type="number"
-                              value={pricingData[subService]?.basePrice || ""}
+                              value={pricingData["Store Creation"]?.quantity?.[tier] || ""}
                               onChange={(e) =>
-                                handlePricingChange(
-                                  subService,
-                                  "basePrice",
-                                  parseFloat(e.target.value) || 0
-                                )
+                                handleQuantityChange("Store Creation", tier, parseFloat(e.target.value) || 0)
                               }
                               placeholder="0.00"
-                              className="w-20"
+                              className="w-24"
                             />
                           </div>
-                          <div></div>
-                          <div></div>
-                          <div></div>
-                          <div></div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  ))}
+                  </div>
+
                   <div className="flex justify-end pt-4">
                     <Button
                       onClick={handleSaveProfile}
