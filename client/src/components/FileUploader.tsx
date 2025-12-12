@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Upload, X, File, CheckCircle2 } from "lucide-react";
+import { Upload, X, CheckCircle2 } from "lucide-react";
+import { ImagePreviewTooltip } from "@/components/ImagePreviewTooltip";
 
 interface FileUploaderProps {
   maxFileSize?: number;
@@ -186,10 +187,14 @@ export function FileUploader({
               key={index}
               className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
             >
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                <File className="h-4 w-4 text-dark-gray" />
-                <span className="text-sm text-dark-blue-night">{file.name}</span>
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+                <ImagePreviewTooltip
+                  fileUrl={file.url}
+                  fileName={file.name}
+                  thumbnailSize="sm"
+                />
+                <span className="text-sm text-dark-blue-night truncate max-w-[200px]">{file.name}</span>
               </div>
               <Button
                 type="button"
@@ -197,6 +202,7 @@ export function FileUploader({
                 size="sm"
                 onClick={() => removeFile(index)}
                 className="h-8 w-8 p-0"
+                data-testid={`button-remove-file-${index}`}
               >
                 <X className="h-4 w-4" />
               </Button>

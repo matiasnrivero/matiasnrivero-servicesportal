@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { FileUploader } from "@/components/FileUploader";
+import { ImagePreviewTooltip } from "@/components/ImagePreviewTooltip";
 import { apiRequest } from "@/lib/queryClient";
 import { 
   ArrowLeft, 
@@ -375,10 +376,14 @@ export default function JobDetailView() {
                 key={attachment.id}
                 className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
               >
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  <FileText className="h-4 w-4 text-dark-gray" />
-                  <span className="text-sm text-dark-blue-night">{attachment.fileName}</span>
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+                  <ImagePreviewTooltip
+                    fileUrl={attachment.fileUrl}
+                    fileName={attachment.fileName}
+                    thumbnailSize="sm"
+                  />
+                  <span className="text-sm text-dark-blue-night flex-1 truncate">{attachment.fileName}</span>
                 </div>
                 <a href={attachment.fileUrl} target="_blank" rel="noopener noreferrer">
                   <Button size="sm" variant="default" data-testid={`button-download-deliverable-${attachment.id}`}>
@@ -1034,10 +1039,14 @@ export default function JobDetailView() {
                             return (
                               <div 
                                 key={`artwork-${index}`}
-                                className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
+                                className="flex items-center gap-3 p-3 bg-blue-lavender/30 rounded-lg w-full"
                               >
-                                <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
-                                <span className="text-sm text-dark-blue-night flex-1">{fileName}</span>
+                                <ImagePreviewTooltip
+                                  fileUrl={fileUrl}
+                                  fileName={fileName}
+                                  thumbnailSize="sm"
+                                />
+                                <span className="text-sm text-dark-blue-night flex-1 truncate">{fileName}</span>
                                 <a 
                                   href={fileUrl} 
                                   target="_blank" 
@@ -1065,10 +1074,14 @@ export default function JobDetailView() {
                           {requestAttachments.map((attachment) => (
                             <div 
                               key={attachment.id}
-                              className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
+                              className="flex items-center gap-3 p-3 bg-blue-lavender/30 rounded-lg w-full"
                             >
-                              <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
-                              <span className="text-sm text-dark-blue-night flex-1">{attachment.fileName}</span>
+                              <ImagePreviewTooltip
+                                fileUrl={attachment.fileUrl}
+                                fileName={attachment.fileName}
+                                thumbnailSize="sm"
+                              />
+                              <span className="text-sm text-dark-blue-night flex-1 truncate">{attachment.fileName}</span>
                               <a 
                                 href={attachment.fileUrl} 
                                 target="_blank" 
