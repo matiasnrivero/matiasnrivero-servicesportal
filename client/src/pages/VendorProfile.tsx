@@ -27,19 +27,30 @@ import { useToast } from "@/hooks/use-toast";
 import { Building2, Users, DollarSign, Clock, UserPlus, Save } from "lucide-react";
 import type { User, VendorProfile as VendorProfileType, Service } from "@shared/schema";
 
-const serviceTypes = [
-  "Custom Artwork",
+const COST_SERVICES = [
+  { name: "Vectorization & Color Separation", hasComplexity: false },
+  { name: "Artwork Touch-Ups (DTF/DTG)", hasComplexity: false },
+  { name: "Embroidery Digitization", hasComplexity: false, subServices: ["Vectorization for Embroidery"] },
+  { name: "Creative Art", hasComplexity: true },
+  { name: "Artwork Composition", hasComplexity: false },
+  { name: "Dye-Sublimation Template", hasComplexity: false },
+  { name: "Store Creation", hasComplexity: false },
+  { name: "Store Banner Design", hasComplexity: false },
+  { name: "Flyer Design", hasComplexity: false },
+  { name: "Blank Product - PSD", hasComplexity: false },
+];
+
+const SLA_SERVICES = [
+  "Vectorization & Color Separation",
+  "Artwork Touch-Ups (DTF/DTG)",
   "Embroidery Digitization",
-  "Vector Conversion",
-  "Name/Number Assignment",
-  "Dye Sublimation Template",
-  "Color Separation",
-  "Mock-up Creation",
-  "Size Chart Creation",
-  "Photo Editing",
-  "Store Creation",
   "Creative Art",
-  "Templates",
+  "Artwork Composition",
+  "Dye-Sublimation Template",
+  "Store Creation",
+  "Store Banner Design",
+  "Flyer Design",
+  "Blank Product - PSD",
 ];
 
 const roleLabels: Record<string, string> = {
@@ -99,10 +110,8 @@ export default function VendorProfile() {
   });
 
   const [pricingData, setPricingData] = useState<Record<string, {
-    basePrice: number;
-    complexity?: { basic?: number; standard?: number; advanced?: number; premium?: number };
-    variablePricing?: { perProduct?: number };
-    extras?: { vectorization?: number };
+    basePrice?: number;
+    complexity?: { basic?: number; standard?: number; advanced?: number; ultimate?: number };
   }>>({});
 
   const [slaData, setSlaData] = useState<Record<string, { days: number; hours?: number }>>({});
@@ -266,9 +275,9 @@ export default function VendorProfile() {
               <Users className="h-4 w-4 mr-2" />
               Team
             </TabsTrigger>
-            <TabsTrigger value="pricing" data-testid="tab-pricing">
+            <TabsTrigger value="cost" data-testid="tab-cost">
               <DollarSign className="h-4 w-4 mr-2" />
-              Pricing
+              Cost
             </TabsTrigger>
             <TabsTrigger value="sla" data-testid="tab-sla">
               <Clock className="h-4 w-4 mr-2" />
@@ -426,12 +435,39 @@ export default function VendorProfile() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {teamMembers.length === 0 ? (
+                  {currentUser && (
+                    <div
+                      className="flex items-center justify-between p-4 border rounded-md bg-muted/30"
+                      data-testid={`row-team-member-${currentUser.id}`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <p className="font-semibold text-dark-blue-night">
+                            {currentUser.username}
+                          </p>
+                          <p className="text-sm text-dark-gray">
+                            {currentUser.email || "No email"}
+                          </p>
+                        </div>
+                        <Badge variant="secondary">
+                          Vendor Admin
+                        </Badge>
+                        <Badge variant="outline" className="bg-sky-blue-accent/10 text-sky-blue-accent border-sky-blue-accent/20">
+                          Primary
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm text-dark-gray">Active</Label>
+                        <Switch checked={currentUser.isActive} disabled />
+                      </div>
+                    </div>
+                  )}
+                  {teamMembers.filter(m => m.id !== currentUser?.id).length === 0 ? (
                     <p className="text-dark-gray text-center py-8">
                       No team members yet. Add your first team member above.
                     </p>
                   ) : (
-                    teamMembers.map((member) => (
+                    teamMembers.filter(m => m.id !== currentUser?.id).map((member) => (
                       <div
                         key={member.id}
                         className="flex items-center justify-between p-4 border rounded-md"
@@ -458,27 +494,25 @@ export default function VendorProfile() {
                             </Badge>
                           )}
                         </div>
-                        {member.id !== currentUser.id && (
-                          <div className="flex items-center gap-2">
-                            <Label
-                              htmlFor={`toggle-team-${member.id}`}
-                              className="text-sm text-dark-gray"
-                            >
-                              Active
-                            </Label>
-                            <Switch
-                              id={`toggle-team-${member.id}`}
-                              checked={member.isActive}
-                              onCheckedChange={(checked) =>
-                                toggleUserActiveMutation.mutate({
-                                  userId: member.id,
-                                  isActive: checked,
-                                })
-                              }
-                              data-testid={`switch-team-active-${member.id}`}
-                            />
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <Label
+                            htmlFor={`toggle-team-${member.id}`}
+                            className="text-sm text-dark-gray"
+                          >
+                            Active
+                          </Label>
+                          <Switch
+                            id={`toggle-team-${member.id}`}
+                            checked={member.isActive}
+                            onCheckedChange={(checked) =>
+                              toggleUserActiveMutation.mutate({
+                                userId: member.id,
+                                isActive: checked,
+                              })
+                            }
+                            data-testid={`switch-team-active-${member.id}`}
+                          />
+                        </div>
                       </div>
                     ))
                   )}
@@ -487,162 +521,159 @@ export default function VendorProfile() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="pricing">
+          <TabsContent value="cost">
             <Card>
               <CardHeader>
-                <CardTitle>Pricing Agreements</CardTitle>
+                <CardTitle>Cost Agreements</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
-                  {serviceTypes.map((serviceType) => (
-                    <div
-                      key={serviceType}
-                      className="p-4 border rounded-md space-y-4"
-                      data-testid={`pricing-section-${serviceType.toLowerCase().replace(/\s+/g, "-")}`}
-                    >
-                      <h3 className="font-semibold text-dark-blue-night">{serviceType}</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label>Base Price ($)</Label>
-                          <Input
-                            type="number"
-                            value={pricingData[serviceType]?.basePrice || ""}
-                            onChange={(e) =>
-                              handlePricingChange(
-                                serviceType,
-                                "basePrice",
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                            placeholder="0.00"
-                            data-testid={`input-base-price-${serviceType.toLowerCase().replace(/\s+/g, "-")}`}
-                          />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-7 gap-2 pb-2 border-b font-semibold text-sm text-dark-gray">
+                    <div className="col-span-2">Service Type</div>
+                    <div>Base Cost</div>
+                    <div>Basic</div>
+                    <div>Standard</div>
+                    <div>Advance</div>
+                    <div>Ultimate</div>
+                  </div>
+                  {COST_SERVICES.map((service) => (
+                    <div key={service.name}>
+                      <div
+                        className="grid grid-cols-7 gap-2 items-center py-2"
+                        data-testid={`cost-row-${service.name.toLowerCase().replace(/\s+/g, "-")}`}
+                      >
+                        <div className="col-span-2 font-medium text-dark-blue-night">
+                          {service.name}
                         </div>
-                        {serviceType === "Creative Art" && (
+                        <div>
+                          {!service.hasComplexity && (
+                            <Input
+                              type="number"
+                              value={pricingData[service.name]?.basePrice || ""}
+                              onChange={(e) =>
+                                handlePricingChange(
+                                  service.name,
+                                  "basePrice",
+                                  parseFloat(e.target.value) || 0
+                                )
+                              }
+                              placeholder="0.00"
+                              className="w-20"
+                            />
+                          )}
+                        </div>
+                        {service.hasComplexity ? (
                           <>
-                            <div className="space-y-2">
-                              <Label>Basic ($)</Label>
+                            <div>
                               <Input
                                 type="number"
-                                value={pricingData[serviceType]?.complexity?.basic || ""}
+                                value={pricingData[service.name]?.complexity?.basic || ""}
                                 onChange={(e) =>
                                   handleComplexityChange(
-                                    serviceType,
+                                    service.name,
                                     "basic",
                                     parseFloat(e.target.value) || 0
                                   )
                                 }
                                 placeholder="0.00"
-                                data-testid="input-complexity-basic"
+                                className="w-20"
                               />
                             </div>
-                            <div className="space-y-2">
-                              <Label>Standard ($)</Label>
+                            <div>
                               <Input
                                 type="number"
-                                value={pricingData[serviceType]?.complexity?.standard || ""}
+                                value={pricingData[service.name]?.complexity?.standard || ""}
                                 onChange={(e) =>
                                   handleComplexityChange(
-                                    serviceType,
+                                    service.name,
                                     "standard",
                                     parseFloat(e.target.value) || 0
                                   )
                                 }
                                 placeholder="0.00"
-                                data-testid="input-complexity-standard"
+                                className="w-20"
                               />
                             </div>
-                            <div className="space-y-2">
-                              <Label>Advanced ($)</Label>
+                            <div>
                               <Input
                                 type="number"
-                                value={pricingData[serviceType]?.complexity?.advanced || ""}
+                                value={pricingData[service.name]?.complexity?.advanced || ""}
                                 onChange={(e) =>
                                   handleComplexityChange(
-                                    serviceType,
+                                    service.name,
                                     "advanced",
                                     parseFloat(e.target.value) || 0
                                   )
                                 }
                                 placeholder="0.00"
-                                data-testid="input-complexity-advanced"
+                                className="w-20"
                               />
                             </div>
-                            <div className="space-y-2">
-                              <Label>Premium ($)</Label>
+                            <div>
                               <Input
                                 type="number"
-                                value={pricingData[serviceType]?.complexity?.premium || ""}
+                                value={pricingData[service.name]?.complexity?.ultimate || ""}
                                 onChange={(e) =>
                                   handleComplexityChange(
-                                    serviceType,
-                                    "premium",
+                                    service.name,
+                                    "ultimate",
                                     parseFloat(e.target.value) || 0
                                   )
                                 }
                                 placeholder="0.00"
-                                data-testid="input-complexity-premium"
+                                className="w-20"
                               />
                             </div>
                           </>
-                        )}
-                        {serviceType === "Store Creation" && (
-                          <div className="space-y-2">
-                            <Label>Per Product ($)</Label>
-                            <Input
-                              type="number"
-                              value={
-                                pricingData[serviceType]?.variablePricing?.perProduct || ""
-                              }
-                              onChange={(e) =>
-                                setPricingData((prev) => ({
-                                  ...prev,
-                                  [serviceType]: {
-                                    ...(prev[serviceType] || {}),
-                                    variablePricing: {
-                                      perProduct: parseFloat(e.target.value) || 0,
-                                    },
-                                  },
-                                }))
-                              }
-                              placeholder="0.00"
-                              data-testid="input-per-product"
-                            />
-                          </div>
-                        )}
-                        {serviceType === "Embroidery Digitization" && (
-                          <div className="space-y-2">
-                            <Label>Extra Vectorization ($)</Label>
-                            <Input
-                              type="number"
-                              value={pricingData[serviceType]?.extras?.vectorization || ""}
-                              onChange={(e) =>
-                                setPricingData((prev) => ({
-                                  ...prev,
-                                  [serviceType]: {
-                                    ...(prev[serviceType] || {}),
-                                    extras: {
-                                      vectorization: parseFloat(e.target.value) || 0,
-                                    },
-                                  },
-                                }))
-                              }
-                              placeholder="0.00"
-                              data-testid="input-vectorization-extra"
-                            />
-                          </div>
+                        ) : (
+                          <>
+                            <div></div>
+                            <div></div>
+                            <div></div>
+                            <div></div>
+                          </>
                         )}
                       </div>
+                      {service.subServices?.map((subService) => (
+                        <div
+                          key={subService}
+                          className="grid grid-cols-7 gap-2 items-center py-2 pl-6"
+                          data-testid={`cost-row-${subService.toLowerCase().replace(/\s+/g, "-")}`}
+                        >
+                          <div className="col-span-2 text-dark-gray text-sm">
+                            {subService}
+                          </div>
+                          <div>
+                            <Input
+                              type="number"
+                              value={pricingData[subService]?.basePrice || ""}
+                              onChange={(e) =>
+                                handlePricingChange(
+                                  subService,
+                                  "basePrice",
+                                  parseFloat(e.target.value) || 0
+                                )
+                              }
+                              placeholder="0.00"
+                              className="w-20"
+                            />
+                          </div>
+                          <div></div>
+                          <div></div>
+                          <div></div>
+                          <div></div>
+                        </div>
+                      ))}
                     </div>
                   ))}
                   <div className="flex justify-end pt-4">
                     <Button
                       onClick={handleSaveProfile}
                       disabled={updateProfileMutation.isPending}
-                      data-testid="button-save-pricing"
+                      data-testid="button-save-cost"
                     >
                       <Save className="h-4 w-4 mr-2" />
-                      {updateProfileMutation.isPending ? "Saving..." : "Save Pricing"}
+                      {updateProfileMutation.isPending ? "Saving..." : "Save Cost"}
                     </Button>
                   </div>
                 </div>
@@ -657,7 +688,7 @@ export default function VendorProfile() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {serviceTypes.map((serviceType) => (
+                  {SLA_SERVICES.map((serviceType) => (
                     <div
                       key={serviceType}
                       className="flex items-center gap-4 p-4 border rounded-md"
