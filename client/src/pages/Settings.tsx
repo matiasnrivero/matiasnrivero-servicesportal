@@ -218,10 +218,10 @@ export default function Settings() {
                             {service.subServices?.map((subService) => (
                               <div
                                 key={subService}
-                                className="grid grid-cols-[minmax(220px,1fr)_repeat(4,minmax(0,1fr))] items-center gap-2 p-4 border rounded-md mt-2 ml-6"
+                                className="grid grid-cols-[minmax(220px,1fr)_repeat(4,minmax(0,1fr))] items-center gap-2 p-4 border rounded-md mt-2"
                                 data-testid={`pricing-row-${subService.toLowerCase().replace(/\s+/g, "-")}`}
                               >
-                                <div className="font-medium text-dark-blue-night text-sm">
+                                <div className="font-medium text-dark-blue-night text-sm pl-6">
                                   {subService}
                                 </div>
                                 <div className="flex items-center gap-2 col-span-4 justify-end">
