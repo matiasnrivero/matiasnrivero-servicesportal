@@ -641,10 +641,14 @@ export default function JobDetailView() {
                             return (
                               <div 
                                 key={`${fieldName}-${index}`}
-                                className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
+                                className="flex items-center gap-3 p-3 bg-blue-lavender/30 rounded-lg w-full"
                               >
-                                <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
-                                <span className="text-sm text-dark-blue-night flex-1">{fileName}</span>
+                                <ImagePreviewTooltip
+                                  fileUrl={fileUrl}
+                                  fileName={fileName}
+                                  thumbnailSize="sm"
+                                />
+                                <span className="text-sm text-dark-blue-night flex-1 truncate">{fileName}</span>
                                 <a 
                                   href={fileUrl} 
                                   target="_blank" 
@@ -685,10 +689,14 @@ export default function JobDetailView() {
                                 return (
                                   <div 
                                     key={`artwork-${index}`}
-                                    className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
+                                    className="flex items-center gap-3 p-3 bg-blue-lavender/30 rounded-lg w-full"
                                   >
-                                    <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
-                                    <span className="text-sm text-dark-blue-night flex-1">{fileName}</span>
+                                    <ImagePreviewTooltip
+                                      fileUrl={fileUrl}
+                                      fileName={fileName}
+                                      thumbnailSize="sm"
+                                    />
+                                    <span className="text-sm text-dark-blue-night flex-1 truncate">{fileName}</span>
                                     <a href={fileUrl} target="_blank" rel="noopener noreferrer">
                                       <Button size="sm" variant="default" data-testid={`button-download-artwork-${index}`}>
                                         <Download className="h-3 w-3 mr-1" />
@@ -732,10 +740,14 @@ export default function JobDetailView() {
                                 return (
                                   <div 
                                     key={`artwork-${index}`}
-                                    className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
+                                    className="flex items-center gap-3 p-3 bg-blue-lavender/30 rounded-lg w-full"
                                   >
-                                    <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
-                                    <span className="text-sm text-dark-blue-night flex-1">{fileName}</span>
+                                    <ImagePreviewTooltip
+                                      fileUrl={fileUrl}
+                                      fileName={fileName}
+                                      thumbnailSize="sm"
+                                    />
+                                    <span className="text-sm text-dark-blue-night flex-1 truncate">{fileName}</span>
                                     <a href={fileUrl} target="_blank" rel="noopener noreferrer">
                                       <Button size="sm" variant="default" data-testid={`button-download-artwork-${index}`}>
                                         <Download className="h-3 w-3 mr-1" />
@@ -834,10 +846,14 @@ export default function JobDetailView() {
                                 return (
                                   <div 
                                     key={`artwork-${index}`}
-                                    className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
+                                    className="flex items-center gap-3 p-3 bg-blue-lavender/30 rounded-lg w-full"
                                   >
-                                    <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
-                                    <span className="text-sm text-dark-blue-night flex-1">{fileName}</span>
+                                    <ImagePreviewTooltip
+                                      fileUrl={fileUrl}
+                                      fileName={fileName}
+                                      thumbnailSize="sm"
+                                    />
+                                    <span className="text-sm text-dark-blue-night flex-1 truncate">{fileName}</span>
                                     <a href={fileUrl} target="_blank" rel="noopener noreferrer">
                                       <Button size="sm" variant="default" data-testid={`button-download-artwork-${index}`}>
                                         <Download className="h-3 w-3 mr-1" />
@@ -971,10 +987,14 @@ export default function JobDetailView() {
                                 return (
                                   <div 
                                     key={`artwork-${index}`}
-                                    className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
+                                    className="flex items-center gap-3 p-3 bg-blue-lavender/30 rounded-lg w-full"
                                   >
-                                    <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
-                                    <span className="text-sm text-dark-blue-night flex-1">{fileName}</span>
+                                    <ImagePreviewTooltip
+                                      fileUrl={fileUrl}
+                                      fileName={fileName}
+                                      thumbnailSize="sm"
+                                    />
+                                    <span className="text-sm text-dark-blue-night flex-1 truncate">{fileName}</span>
                                     <a href={fileUrl} target="_blank" rel="noopener noreferrer">
                                       <Button size="sm" variant="default" data-testid={`button-download-artwork-${index}`}>
                                         <Download className="h-3 w-3 mr-1" />
@@ -1002,10 +1022,14 @@ export default function JobDetailView() {
                               return (
                                 <div 
                                   key={`garment-${index}`}
-                                  className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
+                                  className="flex items-center gap-3 p-3 bg-blue-lavender/30 rounded-lg w-full"
                                 >
-                                  <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
-                                  <span className="text-sm text-dark-blue-night flex-1">{fileName}</span>
+                                  <ImagePreviewTooltip
+                                    fileUrl={fileUrl}
+                                    fileName={fileName}
+                                    thumbnailSize="sm"
+                                  />
+                                  <span className="text-sm text-dark-blue-night flex-1 truncate">{fileName}</span>
                                   <a href={fileUrl} target="_blank" rel="noopener noreferrer">
                                     <Button size="sm" variant="default" data-testid={`button-download-garment-${index}`}>
                                       <Download className="h-3 w-3 mr-1" />
