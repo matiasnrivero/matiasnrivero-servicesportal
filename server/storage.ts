@@ -16,12 +16,14 @@ import {
   type VendorProfile,
   type InsertVendorProfile,
   type UpdateVendorProfile,
+  type SystemSetting,
   users,
   services,
   serviceRequests,
   serviceAttachments,
   comments,
   vendorProfiles,
+  systemSettings,
 } from "@shared/schema";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -70,6 +72,10 @@ export interface IStorage {
   // Comment methods
   getCommentsByRequest(requestId: string, visibility?: string): Promise<Comment[]>;
   createComment(comment: InsertComment): Promise<Comment>;
+
+  // System settings methods
+  getSystemSetting(key: string): Promise<SystemSetting | undefined>;
+  setSystemSetting(key: string, value: any): Promise<SystemSetting>;
 }
 
 export class DbStorage implements IStorage {
@@ -272,6 +278,28 @@ export class DbStorage implements IStorage {
   async createComment(comment: InsertComment): Promise<Comment> {
     const result = await db.insert(comments).values(comment).returning();
     return result[0];
+  }
+
+  // System settings methods
+  async getSystemSetting(key: string): Promise<SystemSetting | undefined> {
+    const result = await db.select().from(systemSettings).where(eq(systemSettings.settingKey, key)).limit(1);
+    return result[0];
+  }
+
+  async setSystemSetting(key: string, value: any): Promise<SystemSetting> {
+    const existing = await this.getSystemSetting(key);
+    if (existing) {
+      const result = await db.update(systemSettings)
+        .set({ settingValue: value, updatedAt: new Date() })
+        .where(eq(systemSettings.settingKey, key))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(systemSettings)
+        .values({ settingKey: key, settingValue: value })
+        .returning();
+      return result[0];
+    }
   }
 }
 

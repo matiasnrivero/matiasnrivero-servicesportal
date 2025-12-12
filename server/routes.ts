@@ -985,6 +985,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // System settings routes
+  app.get("/api/system-settings/pricing", async (req, res) => {
+    try {
+      const setting = await storage.getSystemSetting("pricing");
+      res.json(setting?.settingValue || {});
+    } catch (error) {
+      console.error("Error fetching pricing settings:", error);
+      res.status(500).json({ error: "Failed to fetch pricing settings" });
+    }
+  });
+
+  app.put("/api/system-settings/pricing", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Only admins can update pricing settings" });
+      }
+
+      const setting = await storage.setSystemSetting("pricing", req.body);
+      res.json(setting.settingValue);
+    } catch (error) {
+      console.error("Error updating pricing settings:", error);
+      res.status(500).json({ error: "Failed to update pricing settings" });
+    }
+  });
+
   // Object storage routes for file uploads (public file uploading)
   app.get("/objects/:objectPath(*)", async (req, res) => {
     const objectStorageService = new ObjectStorageService();
