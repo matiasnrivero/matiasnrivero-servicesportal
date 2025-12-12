@@ -705,8 +705,85 @@ export default function JobDetailView() {
                     );
                   }
                   
+                  // Check if this is Store Banner Design or Flyer Design form (has textContent + widthInches/heightInches but NO brandGuidelines/inspirationFile)
+                  const isStoreBannerOrFlyer = formData?.textContent !== undefined && 
+                    (formData?.widthInches !== undefined || formData?.heightInches !== undefined) &&
+                    !uploadedFiles?.brandGuidelines && !uploadedFiles?.inspirationFile;
+                  
+                  if (isStoreBannerOrFlyer) {
+                    const artworkFiles = uploadedFiles?.uploadAssets || uploadedFiles?.artworkFile || [];
+                    return (
+                      <>
+                        {/* Artwork */}
+                        {artworkFiles.length > 0 ? (
+                          <div>
+                            <p className="text-xs text-dark-gray mb-2">Artwork</p>
+                            <div className="flex flex-col gap-2">
+                              {artworkFiles.map((file, index) => {
+                                const fileName = file.name || file.fileName || 'Unknown file';
+                                let fileUrl = file.url || file.objectPath || '';
+                                if (file.objectPath && !file.objectPath.startsWith('http')) {
+                                  fileUrl = `/objects/${file.objectPath}`;
+                                }
+                                if (!fileUrl) return null;
+                                return (
+                                  <div 
+                                    key={`artwork-${index}`}
+                                    className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
+                                  >
+                                    <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
+                                    <span className="text-sm text-dark-blue-night flex-1">{fileName}</span>
+                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer">
+                                      <Button size="sm" variant="default" data-testid={`button-download-artwork-${index}`}>
+                                        <Download className="h-3 w-3 mr-1" />
+                                        Download
+                                      </Button>
+                                    </a>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="text-xs text-dark-gray mb-2">Artwork</p>
+                            <p className="text-sm text-dark-gray">No artwork files uploaded</p>
+                          </div>
+                        )}
+                        
+                        {/* Width | Height */}
+                        {(formData?.widthInches || formData?.heightInches) && (
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-xs text-dark-gray mb-1">Width (inches)</p>
+                              <p className="text-sm text-dark-blue-night font-medium" data-testid="text-formdata-widthInches">
+                                {String(formData?.widthInches || "N/A")}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-dark-gray mb-1">Height (inches)</p>
+                              <p className="text-sm text-dark-blue-night font-medium" data-testid="text-formdata-heightInches">
+                                {String(formData?.heightInches || "N/A")}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Text Content */}
+                        {formData?.textContent && (
+                          <div>
+                            <p className="text-xs text-dark-gray mb-1">Text Content</p>
+                            <p className="text-sm text-dark-blue-night font-medium" data-testid="text-formdata-textContent">
+                              {String(formData?.textContent)}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    );
+                  }
+                  
                   // Check if this is Artwork Composition form (has specific fields)
-                  const isArtworkComposition = formData?.textContent !== undefined || uploadedFiles?.brandGuidelines || uploadedFiles?.inspirationFile;
+                  const isArtworkComposition = uploadedFiles?.brandGuidelines || uploadedFiles?.inspirationFile;
                   
                   if (isArtworkComposition) {
                     return (
