@@ -89,11 +89,6 @@ export const ServicesListSection = (): JSX.Element => {
             Choose from our range of artwork services for promotional products
           </p>
         </div>
-        <Link href="/service-requests/new">
-          <Button className="bg-sky-blue-accent hover:bg-sky-blue-accent/90 text-white">
-            Create New Request
-          </Button>
-        </Link>
       </section>
 
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-6xl">

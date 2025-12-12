@@ -83,15 +83,6 @@ export function Header() {
               My Requests
             </Button>
           </Link>
-          <Link href="/service-requests/new">
-            <Button
-              variant={location === "/service-requests/new" ? "default" : "ghost"}
-              className={location === "/service-requests/new" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
-              data-testid="nav-new-request"
-            >
-              New Request
-            </Button>
-          </Link>
           {canManageUsers && (
             <Link href="/users">
               <Button
