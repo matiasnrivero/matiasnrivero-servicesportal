@@ -1086,6 +1086,12 @@ export default function JobDetailView() {
                     );
                   }
                   
+                  // Check if this is Blank Product - PSD form (has blankUrl or blankName) - don't show artwork section
+                  const isBlankProductForm = formData?.blankUrl !== undefined || formData?.blankName !== undefined;
+                  if (isBlankProductForm) {
+                    return null;
+                  }
+                  
                   return (
                     <div>
                       <p className="text-xs text-dark-gray mb-2">Artwork Files</p>
