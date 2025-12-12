@@ -658,8 +658,55 @@ export default function JobDetailView() {
                     );
                   };
                   
+                  // Check if this is Store Creation form (has storeName field)
+                  const isStoreCreation = formData?.storeName !== undefined;
+                  
+                  if (isStoreCreation) {
+                    const artworkFiles = uploadedFiles?.uploadAssets || [];
+                    return (
+                      <>
+                        {/* Artwork (Upload Assets) */}
+                        {artworkFiles.length > 0 ? (
+                          <div>
+                            <p className="text-xs text-dark-gray mb-2">Artwork</p>
+                            <div className="flex flex-col gap-2">
+                              {artworkFiles.map((file, index) => {
+                                const fileName = file.name || file.fileName || 'Unknown file';
+                                let fileUrl = file.url || file.objectPath || '';
+                                if (file.objectPath && !file.objectPath.startsWith('http')) {
+                                  fileUrl = `/objects/${file.objectPath}`;
+                                }
+                                if (!fileUrl) return null;
+                                return (
+                                  <div 
+                                    key={`artwork-${index}`}
+                                    className="flex items-center gap-2 p-3 bg-blue-lavender/30 rounded-lg w-full"
+                                  >
+                                    <FileText className="h-4 w-4 text-dark-gray flex-shrink-0" />
+                                    <span className="text-sm text-dark-blue-night flex-1">{fileName}</span>
+                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer">
+                                      <Button size="sm" variant="default" data-testid={`button-download-artwork-${index}`}>
+                                        <Download className="h-3 w-3 mr-1" />
+                                        Download
+                                      </Button>
+                                    </a>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="text-xs text-dark-gray mb-2">Artwork</p>
+                            <p className="text-sm text-dark-gray">No artwork files uploaded</p>
+                          </div>
+                        )}
+                      </>
+                    );
+                  }
+                  
                   // Check if this is Artwork Composition form (has specific fields)
-                  const isArtworkComposition = formData?.textContent !== undefined || uploadedFiles?.brandGuidelines || uploadedFiles?.uploadAssets || uploadedFiles?.inspirationFile;
+                  const isArtworkComposition = formData?.textContent !== undefined || uploadedFiles?.brandGuidelines || uploadedFiles?.inspirationFile;
                   
                   if (isArtworkComposition) {
                     return (
@@ -921,14 +968,22 @@ export default function JobDetailView() {
                   // Base skip fields for all form types (calculatedPrice hidden from designers)
                   const baseSkipFields = ['uploadedFiles', 'artworkFile', 'notes', 'calculatedPrice'];
                   
+                  // Check if this is Store Creation form (has storeName field)
+                  const isStoreCreationForm = formData?.storeName !== undefined;
+                  
                   // Check if this is Artwork Composition form (has specific fields)
                   const uploadedFiles = formData?.uploadedFiles as Record<string, unknown> | null;
-                  const isArtworkCompositionForm = formData?.textContent !== undefined || uploadedFiles?.brandGuidelines || uploadedFiles?.uploadAssets || uploadedFiles?.inspirationFile;
+                  const isArtworkCompositionForm = formData?.textContent !== undefined || uploadedFiles?.brandGuidelines || uploadedFiles?.inspirationFile;
                   
-                  // For Artwork Composition, also skip fields already rendered in the custom layout
-                  const skipFields = isArtworkCompositionForm 
-                    ? [...baseSkipFields, 'brandGuidelines', 'uploadAssets', 'artworkFile', 'inspirationFile', 'textContent', 'complexity', 'outputFormat', 'widthInches', 'heightInches']
-                    : baseSkipFields;
+                  // Determine skip fields based on form type
+                  let skipFields = baseSkipFields;
+                  if (isStoreCreationForm) {
+                    // Store Creation: skip uploadAssets (shown as "Artwork" in custom section)
+                    skipFields = [...baseSkipFields, 'uploadAssets'];
+                  } else if (isArtworkCompositionForm) {
+                    // Artwork Composition: skip fields already rendered in custom layout
+                    skipFields = [...baseSkipFields, 'brandGuidelines', 'uploadAssets', 'artworkFile', 'inspirationFile', 'textContent', 'complexity', 'outputFormat', 'widthInches', 'heightInches'];
+                  }
                   
                   // Define preferred field order with paired fields (left, right) for side-by-side display
                   // Fields not in this list will appear at the end
