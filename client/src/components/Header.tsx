@@ -1,9 +1,23 @@
 import { Link, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { User } from "@shared/schema";
 
-async function getDefaultUser(): Promise<User | null> {
+type UserSession = {
+  userId: string;
+  role: string;
+  username: string;
+};
+
+async function getDefaultUser(): Promise<UserSession | null> {
   const res = await fetch("/api/default-user");
   if (!res.ok) return null;
   return res.json();
@@ -12,9 +26,26 @@ async function getDefaultUser(): Promise<User | null> {
 export function Header() {
   const [location] = useLocation();
   
-  const { data: currentUser } = useQuery<User | null>({
+  const { data: currentUser } = useQuery<UserSession | null>({
     queryKey: ["/api/default-user"],
     queryFn: getDefaultUser,
+  });
+
+  const switchRoleMutation = useMutation({
+    mutationFn: async (role: string) => {
+      const res = await fetch("/api/switch-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      if (!res.ok) throw new Error("Failed to switch role");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/default-user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+    },
   });
 
   const isAdmin = currentUser?.role === "admin";
@@ -85,11 +116,25 @@ export function Header() {
         </nav>
       </div>
       {currentUser && (
-        <div className="flex items-center gap-2 text-sm text-dark-gray">
-          <span>{currentUser.username}</span>
-          <span className="text-xs px-2 py-1 bg-blue-lavender/30 rounded-md">
-            {currentUser.role.replace("_", " ")}
-          </span>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-sm text-dark-gray">
+            <span>{currentUser.username}</span>
+          </div>
+          <Select
+            value={currentUser.role}
+            onValueChange={(role) => switchRoleMutation.mutate(role)}
+          >
+            <SelectTrigger className="w-40" data-testid="select-role-switcher">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="internal_designer">Internal Designer</SelectItem>
+              <SelectItem value="vendor">Vendor</SelectItem>
+              <SelectItem value="vendor_designer">Vendor Designer</SelectItem>
+              <SelectItem value="client">Client</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       )}
     </header>

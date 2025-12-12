@@ -73,15 +73,61 @@ The API uses JSON for request/response bodies and includes error handling with a
 
 **Session-based Authentication**: Uses express-session middleware with in-memory storage. Sessions track `userId` and `userRole` properties.
 
-**Role-based Access Control**: Three roles supported (client, designer, admin) with different permissions:
-- Clients can create requests and view their own requests
-- Designers can be assigned requests and update their status
-- Admin role exists for future administrative features
+**Role-based Access Control**: Five-tier role hierarchy with specific permissions:
+
+1. **Admin**: Super user with full system access
+   - Can invite any user role
+   - Can activate/deactivate any user
+   - Can configure client payment methods
+   - Can see all service requests and pricing
+
+2. **Internal Designer**: Second-level internal team member
+   - Can invite Internal Designers, Vendors, and Vendor Designers
+   - Can assign/reassign jobs to any designer role
+   - Can see all service requests (no pricing visibility)
+
+3. **Vendor**: External vendor organization admin
+   - Can invite Vendors and Vendor Designers to their structure
+   - Can activate/deactivate team members under their vendor structure
+   - Has Vendor Profile with pricing agreements and SLAs
+   - Can see all service requests (no pricing visibility)
+
+4. **Vendor Designer**: Designer working for a specific vendor
+   - Linked to parent vendor via `vendorId` field
+   - Can assign to other Vendor Designers
+   - Can see all service requests (no pricing visibility)
+
+5. **Client**: Service requesters
+   - Auto-created on first service request submission
+   - Can only see their own requests
+   - Can see pricing information
+   - Three payment options: Pay-as-you-go, Monthly Payment, Deduct from Tri-POD Royalties
+
+**Pricing Visibility**: Only Clients and Admins can see pricing references.
 
 **Object-level ACL**: Custom access control system for files in Google Cloud Storage. Each object has an ACL policy stored in metadata defining:
 - Owner (user ID)
 - Visibility (public/private)
 - Group-based rules with read/write permissions
+
+## User Management
+
+**User Management Page** (`/users`): Available to Admin, Internal Designer, and Vendor users
+- Search and filter users by role
+- Invite new users with role-based invitation permissions
+- Activate/deactivate users (Admin can toggle any user, Vendor can toggle their team members)
+- Configure client payment methods (Admin only)
+
+**Vendor Profile Page** (`/vendor-profile`): Available to Vendor users only
+- Company information (name, website, email, phone)
+- Team management with activate/deactivate toggles
+- Pricing agreements table for all service types
+- SLA configuration (days/hours per service type)
+
+**Vendor Profiles Table**: Stores vendor-specific data
+- Company information
+- Pricing agreements per service type (JSON)
+- SLA configuration per service type (JSON)
 
 The ACL system is extensible to support different group types for fine-grained access control.
 

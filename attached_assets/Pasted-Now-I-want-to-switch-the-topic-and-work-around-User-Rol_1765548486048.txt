@@ -1,0 +1,22 @@
+Now I want to switch the topic and work around User Role, User Creation, User Profiles and User Permissions.
+A. User Management
+Create User Creation Module (Invite Users).a
+
+Admin can invite any User Role
+Internal Designers can invite other Internal Designers and Vendors and Vendor Designers.
+Vendor con Invite Vendor Designers.
+B. User Roles + Hierarchy:
+Admin: Global Admin, is the super user of the system, can do everything and see everything.
+Internal Designer: Is an Internal User, second level after admin, is part of the team of Tri-POD internal desingers, but they will be able to assing jobs to Vendors and Vendor Designers, and when I introduce the automations in the future, they are gonna be able to configure automations also. Internal Designer capabilities:
+Assign/Reassign to Vendors / Vendor Designers / Internal Designers
+Vendor: (Admin of a Vendor). Vendors has Vendor Designers that dependes of each vendor Structure. A vendor is a an outsource service supplier, that we will also add on the profile the Pricing List and SLAs. They can assign Jobs to Vendor Designers and other Vendors under the same Vendor Structure. So the Vendor Profile can have multiple Vendor (Admins).
+Vendor Designer: Each vendor designer depends from Vendor User Roles, part of their struture, these are outsources designers for a specific vendor. They can assign jobs to other Vendor Designer Users.
+Client. Client User are created automatically when they sign in for the first Service Request Submmition using Auth with Email and Google Login. They can also be created inside the Platfrom by an Admin User. Admin user will also be able to configure how they pay.
+Pay as you go (Credit Card)
+Montly Payment (Credit Card / ACH)
+Deduct from Tri-POD Royalties (in this case, is because the "Client" has a "Workspace in the Tri-POD main platfrom and we can deduct their Services Expensas from their Product Sales Profit from the main platfrom.
+Pricing References, the only users that can see Pricing References are "Clients" and "Admins".
+C. Vendor Profile
+Vendor Profile Information: Name, Email, Phone, Website
+Pricing Agreement Table: Add a table with the same princing inputs for each Service Type, with complexities in the case of Creative Art, Variable Pricing for Amount of Products on Store Creation and also Pricing for Extra Vectorization under the Embroidery Digitization Service.
+Add table for SLA (Deliver Services with possibility to cofiure days and even hours.

@@ -624,11 +624,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/switch-role", async (req, res) => {
     try {
       const { role } = req.body;
-      if (!role || (role !== "client" && role !== "designer")) {
-        return res.status(400).json({ error: "role must be 'client' or 'designer'" });
+      const validRoles = ["admin", "internal_designer", "vendor", "vendor_designer", "client", "designer"];
+      if (!role || !validRoles.includes(role)) {
+        return res.status(400).json({ error: `role must be one of: ${validRoles.join(", ")}` });
       }
 
-      const username = role === "designer" ? "designer-user" : "default-user";
+      const username = `${role}-user`;
       let user = await storage.getUserByUsername(username);
       
       if (!user) {
