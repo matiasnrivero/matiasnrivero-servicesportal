@@ -253,6 +253,9 @@ export default function ServiceRequestForm() {
   }, [formData.amountOfProducts]);
 
   const selectedService = services.find((s) => s.id === selectedServiceId);
+  // Hide pricing until user role is confirmed (default to hiding for security)
+  const isDesigner = currentUser?.role === "designer";
+  const showPricing = currentUser && currentUser.role !== "designer";
 
   useEffect(() => {
     if (selectedService?.title === "Embroidery Digitization") {
@@ -412,9 +415,11 @@ export default function ServiceRequestForm() {
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                  <span className="text-sky-blue-accent font-body-2-semibold">
-                    {service.priceRange}
-                  </span>
+                  {showPricing && (
+                    <span className="text-sky-blue-accent font-body-2-semibold">
+                      {service.priceRange}
+                    </span>
+                  )}
                   <ChevronRight className="h-5 w-5 text-dark-gray" />
                 </div>
               </div>
@@ -773,7 +778,9 @@ export default function ServiceRequestForm() {
                 </SelectTrigger>
                 <SelectContent>
                   {creativeArtComplexity.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {showPricing ? opt.label : opt.value}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -940,17 +947,19 @@ export default function ServiceRequestForm() {
             />
             <Label htmlFor="vectorizationNeeded" className="flex items-center gap-1">
               Vectorization Needed
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <HelpCircle className="h-4 w-4 text-dark-gray cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent className="bg-dark-blue-night text-white max-w-[200px]">
-                  <p>By Requiring Vectorization $5 are gonna be added to the final price.</p>
-                </TooltipContent>
-              </Tooltip>
+              {showPricing && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-4 w-4 text-dark-gray cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-dark-blue-night text-white max-w-[200px]">
+                    <p>By Requiring Vectorization $5 are gonna be added to the final price.</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </Label>
           </div>
-          {calculatedPrice > 0 && (
+          {showPricing && calculatedPrice > 0 && (
             <div className="p-3 bg-blue-lavender/30 rounded-md">
               <p className="text-sm font-semibold text-dark-blue-night">
                 Service Price: ${calculatedPrice}
@@ -1181,7 +1190,7 @@ export default function ServiceRequestForm() {
     if (title === "Store Creation") {
       return (
         <>
-          {renderPricingModal()}
+          {showPricing && renderPricingModal()}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Store Name/Store URL<span className="text-destructive">*</span></Label>
@@ -1199,7 +1208,7 @@ export default function ServiceRequestForm() {
                 onChange={(e) => handleFormDataChange("amountOfProducts", e.target.value)}
                 data-testid="input-amount-products"
               />
-              {calculatedPrice > 0 && (
+              {showPricing && calculatedPrice > 0 && (
                 <p className="text-sm text-sky-blue-accent font-semibold">
                   Calculated Price: ${calculatedPrice}
                 </p>
@@ -1274,19 +1283,21 @@ export default function ServiceRequestForm() {
           <div>
             <h1 className="font-title-semibold text-dark-blue-night text-2xl flex items-center gap-3">
               {selectedService?.title}
-              {selectedService?.title === "Store Creation" ? (
-                <button
-                  type="button"
-                  onClick={() => setPricingModalOpen(true)}
-                  className="text-sky-blue-accent text-sm underline hover:text-sky-blue-accent/80"
-                  data-testid="link-pricing-breakdown"
-                >
-                  Pricing Breakdown
-                </button>
-              ) : (
-                <span className="text-sky-blue-accent font-body-2-semibold">
-                  {selectedService?.priceRange}
-                </span>
+              {showPricing && (
+                selectedService?.title === "Store Creation" ? (
+                  <button
+                    type="button"
+                    onClick={() => setPricingModalOpen(true)}
+                    className="text-sky-blue-accent text-sm underline hover:text-sky-blue-accent/80"
+                    data-testid="link-pricing-breakdown"
+                  >
+                    Pricing Breakdown
+                  </button>
+                ) : (
+                  <span className="text-sky-blue-accent font-body-2-semibold">
+                    {selectedService?.priceRange}
+                  </span>
+                )
               )}
             </h1>
             <p className="font-body-reg text-dark-gray mt-1">

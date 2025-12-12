@@ -11,6 +11,20 @@ import {
 } from "@/components/ui/dialog";
 import type { Service } from "@shared/schema";
 
+interface CurrentUser {
+  userId: string;
+  role: string;
+  username: string;
+}
+
+async function getDefaultUser(): Promise<CurrentUser> {
+  const response = await fetch("/api/default-user");
+  if (!response.ok) {
+    throw new Error("Failed to get default user");
+  }
+  return response.json();
+}
+
 const SERVICE_ORDER = [
   "Vectorization & Color Separation",
   "Artwork Touch-Ups (DTF / DTG)",
@@ -49,6 +63,15 @@ export const ServicesListSection = (): JSX.Element => {
     queryKey: ["services"],
     queryFn: fetchServices,
   });
+
+  const { data: currentUser } = useQuery({
+    queryKey: ["/api/default-user"],
+    queryFn: getDefaultUser,
+  });
+
+  // Hide pricing until user role is confirmed (default to hiding for security)
+  const isDesigner = currentUser?.role === "designer";
+  const showPricing = currentUser && currentUser.role !== "designer";
 
   const handlePricingClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -93,18 +116,20 @@ export const ServicesListSection = (): JSX.Element => {
                       <h3 className="flex-1 font-semibold text-dark-blue-night">
                         {service.title}
                       </h3>
-                      {service.title === "Store Creation" ? (
-                        <button
-                          onClick={handlePricingClick}
-                          className="text-sm text-sky-blue-accent whitespace-nowrap underline hover:text-sky-blue-accent/80"
-                          data-testid="link-store-pricing"
-                        >
-                          Pricing Breakdown
-                        </button>
-                      ) : (
-                        <span className="font-semibold text-sky-blue-accent whitespace-nowrap">
-                          {service.priceRange}
-                        </span>
+                      {showPricing && (
+                        service.title === "Store Creation" ? (
+                          <button
+                            onClick={handlePricingClick}
+                            className="text-sm text-sky-blue-accent whitespace-nowrap underline hover:text-sky-blue-accent/80"
+                            data-testid="link-store-pricing"
+                          >
+                            Pricing Breakdown
+                          </button>
+                        ) : (
+                          <span className="font-semibold text-sky-blue-accent whitespace-nowrap">
+                            {service.priceRange}
+                          </span>
+                        )
                       )}
                     </div>
                     <p className="text-sm text-dark-blue-night">
