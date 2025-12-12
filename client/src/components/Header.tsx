@@ -121,7 +121,7 @@ export function Header() {
       {currentUser && (
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-sm text-dark-gray">
-            <span>{currentUser.username}</span>
+            <span>User Role</span>
           </div>
           <Select
             value={currentUser.role}

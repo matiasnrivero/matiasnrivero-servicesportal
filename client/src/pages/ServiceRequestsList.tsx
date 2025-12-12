@@ -127,21 +127,6 @@ export default function ServiceRequestsList() {
                 Service Requests
               </CardTitle>
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 bg-blue-lavender/30 px-3 py-2 rounded-lg">
-                  <UserCog className="h-4 w-4 text-dark-gray" />
-                  <span className="text-sm text-dark-blue-night">
-                    Viewing as: <strong className="capitalize">{currentUser?.role || "client"}</strong>
-                  </span>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={handleSwitchRole}
-                    disabled={switchRoleMutation.isPending}
-                    data-testid="button-switch-role"
-                  >
-                    Switch to {currentUser?.role === "designer" ? "Client" : "Designer"}
-                  </Button>
-                </div>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
                     <SelectValue placeholder="Filter by status" />
