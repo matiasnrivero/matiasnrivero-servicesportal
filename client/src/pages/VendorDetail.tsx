@@ -611,10 +611,10 @@ export default function VendorDetail() {
                           {service.subServices?.map((subService) => (
                             <div
                               key={subService}
-                              className="flex items-center justify-between gap-4 p-4 border rounded-md ml-6 mt-2"
+                              className="flex items-center justify-between gap-4 p-4 border rounded-md mt-2"
                               data-testid={`cost-row-${subService.toLowerCase().replace(/\s+/g, "-")}`}
                             >
-                              <div className="text-dark-gray text-sm min-w-[200px]">
+                              <div className="font-medium text-dark-blue-night min-w-[200px] pl-6">
                                 {subService}
                               </div>
                               <div className="flex items-center gap-2">
@@ -642,10 +642,10 @@ export default function VendorDetail() {
                     <div className="space-y-4">
                       <h3 className="font-semibold text-dark-blue-night">Creative Art (Complexity-based)</h3>
                       <div
-                        className="flex items-center justify-between gap-4 p-4 border rounded-md"
+                        className="grid grid-cols-[1fr_auto] items-center gap-4 p-4 border rounded-md"
                         data-testid="cost-row-creative-art"
                       >
-                        <div className="font-medium text-dark-blue-night min-w-[200px]">
+                        <div className="font-medium text-dark-blue-night">
                           Creative Art
                         </div>
                         <div className="flex items-center gap-4">
@@ -704,10 +704,10 @@ export default function VendorDetail() {
                     <div className="space-y-4">
                       <h3 className="font-semibold text-dark-blue-night">Store Creation (Quantity-based)</h3>
                       <div
-                        className="flex items-center justify-between gap-4 p-4 border rounded-md"
+                        className="grid grid-cols-[1fr_auto] items-center gap-4 p-4 border rounded-md"
                         data-testid="cost-row-store-creation"
                       >
-                        <div className="font-medium text-dark-blue-night min-w-[200px]">
+                        <div className="font-medium text-dark-blue-night">
                           Store Creation
                         </div>
                         <div className="flex items-center gap-4">
