@@ -861,8 +861,8 @@ export default function JobDetailView() {
                   // Define preferred field order with paired fields (left, right) for side-by-side display
                   // Fields not in this list will appear at the end
                   const orderedPairs: [string, string | null][] = [
-                    // Vectorization form order
-                    ['colorMode', 'outputFormat'],
+                    // Artwork Touch-ups and Vectorization form order
+                    ['outputFormat', 'colorMode'],
                     ['widthInches', 'heightInches'],
                     ['numberOfColors', null],
                     // Embroidery Digitizing form order
