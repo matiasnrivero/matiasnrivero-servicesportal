@@ -555,21 +555,13 @@ export default function JobDetailView() {
                 <CardTitle className="text-lg">General Info</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
+                {/* Row 1: Client (left) / Due Date (right) */}
                 <div className="p-3 bg-blue-lavender/30 rounded-lg">
                   <p className="text-xs text-dark-gray mb-1">Client</p>
                   <p className="text-sm font-medium text-dark-blue-night" data-testid="text-client">
                     {request.customerName || "N/A"}
                   </p>
                 </div>
-
-{isDesigner && (
-                <div className="p-3 bg-blue-lavender/30 rounded-lg">
-                  <p className="text-xs text-dark-gray mb-1">Assignee</p>
-                  <p className="text-sm font-medium text-dark-blue-night" data-testid="text-assignee">
-                    {assignedDesigner?.username || "Unassigned"}
-                  </p>
-                </div>
-                )}
 
                 <div className="p-3 bg-blue-lavender/30 rounded-lg flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-dark-gray" />
@@ -581,12 +573,22 @@ export default function JobDetailView() {
                   </div>
                 </div>
 
+                {/* Row 2: Order Reference (left) / Assignee (right - designer only) */}
                 <div className="p-3 bg-blue-lavender/30 rounded-lg">
                   <p className="text-xs text-dark-gray mb-1">Order Reference</p>
                   <p className="text-sm font-medium text-dark-blue-night" data-testid="text-order-ref">
                     {request.orderNumber || "N/A"}
                   </p>
                 </div>
+
+                {isDesigner && (
+                  <div className="p-3 bg-blue-lavender/30 rounded-lg">
+                    <p className="text-xs text-dark-gray mb-1">Assignee</p>
+                    <p className="text-sm font-medium text-dark-blue-night" data-testid="text-assignee">
+                      {assignedDesigner?.username || "Unassigned"}
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
