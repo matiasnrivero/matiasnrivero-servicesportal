@@ -254,75 +254,63 @@ export default function Settings() {
                     <div className="space-y-4">
                       <h3 className="font-semibold text-dark-blue-night">Creative Art (Complexity-based)</h3>
                       <div
-                        className="grid grid-cols-[minmax(220px,1fr)_repeat(4,minmax(0,1fr))] items-center gap-2 p-4 border rounded-md"
+                        className="grid grid-cols-[minmax(200px,1fr)_repeat(4,120px)] items-center gap-2 p-4 border rounded-md"
                         data-testid="pricing-row-creative-art"
                       >
                         <div className="font-medium text-dark-blue-night">
                           Creative Art
                         </div>
                         <div className="flex flex-col items-center">
-                          <Label className="text-sm text-dark-gray mb-1">Basic</Label>
-                          <div className="flex items-center gap-1">
-                            <span className="text-dark-gray text-sm">$</span>
-                            <Input
-                              type="number"
-                              value={pricingData["Creative Art"]?.complexity?.basic || ""}
-                              onChange={(e) =>
-                                handleComplexityChange("Creative Art", "basic", parseFloat(e.target.value) || 0)
-                              }
-                              placeholder="0.00"
-                              className="w-20"
-                              data-testid="input-pricing-creative-basic"
-                            />
-                          </div>
+                          <Label className="text-sm text-dark-gray mb-1">Basic:</Label>
+                          <Input
+                            type="number"
+                            value={pricingData["Creative Art"]?.complexity?.basic || ""}
+                            onChange={(e) =>
+                              handleComplexityChange("Creative Art", "basic", parseFloat(e.target.value) || 0)
+                            }
+                            placeholder="0.00"
+                            className="w-20"
+                            data-testid="input-pricing-creative-basic"
+                          />
                         </div>
                         <div className="flex flex-col items-center">
-                          <Label className="text-sm text-dark-gray mb-1">Standard</Label>
-                          <div className="flex items-center gap-1">
-                            <span className="text-dark-gray text-sm">$</span>
-                            <Input
-                              type="number"
-                              value={pricingData["Creative Art"]?.complexity?.standard || ""}
-                              onChange={(e) =>
-                                handleComplexityChange("Creative Art", "standard", parseFloat(e.target.value) || 0)
-                              }
-                              placeholder="0.00"
-                              className="w-20"
-                              data-testid="input-pricing-creative-standard"
-                            />
-                          </div>
+                          <Label className="text-sm text-dark-gray mb-1">Standard:</Label>
+                          <Input
+                            type="number"
+                            value={pricingData["Creative Art"]?.complexity?.standard || ""}
+                            onChange={(e) =>
+                              handleComplexityChange("Creative Art", "standard", parseFloat(e.target.value) || 0)
+                            }
+                            placeholder="0.00"
+                            className="w-20"
+                            data-testid="input-pricing-creative-standard"
+                          />
                         </div>
                         <div className="flex flex-col items-center">
-                          <Label className="text-sm text-dark-gray mb-1">Advance</Label>
-                          <div className="flex items-center gap-1">
-                            <span className="text-dark-gray text-sm">$</span>
-                            <Input
-                              type="number"
-                              value={pricingData["Creative Art"]?.complexity?.advanced || ""}
-                              onChange={(e) =>
-                                handleComplexityChange("Creative Art", "advanced", parseFloat(e.target.value) || 0)
-                              }
-                              placeholder="0.00"
-                              className="w-20"
-                              data-testid="input-pricing-creative-advance"
-                            />
-                          </div>
+                          <Label className="text-sm text-dark-gray mb-1">Advance:</Label>
+                          <Input
+                            type="number"
+                            value={pricingData["Creative Art"]?.complexity?.advanced || ""}
+                            onChange={(e) =>
+                              handleComplexityChange("Creative Art", "advanced", parseFloat(e.target.value) || 0)
+                            }
+                            placeholder="0.00"
+                            className="w-20"
+                            data-testid="input-pricing-creative-advance"
+                          />
                         </div>
                         <div className="flex flex-col items-center">
-                          <Label className="text-sm text-dark-gray mb-1">Ultimate</Label>
-                          <div className="flex items-center gap-1">
-                            <span className="text-dark-gray text-sm">$</span>
-                            <Input
-                              type="number"
-                              value={pricingData["Creative Art"]?.complexity?.ultimate || ""}
-                              onChange={(e) =>
-                                handleComplexityChange("Creative Art", "ultimate", parseFloat(e.target.value) || 0)
-                              }
-                              placeholder="0.00"
-                              className="w-20"
-                              data-testid="input-pricing-creative-ultimate"
-                            />
-                          </div>
+                          <Label className="text-sm text-dark-gray mb-1">Ultimate:</Label>
+                          <Input
+                            type="number"
+                            value={pricingData["Creative Art"]?.complexity?.ultimate || ""}
+                            onChange={(e) =>
+                              handleComplexityChange("Creative Art", "ultimate", parseFloat(e.target.value) || 0)
+                            }
+                            placeholder="0.00"
+                            className="w-20"
+                            data-testid="input-pricing-creative-ultimate"
+                          />
                         </div>
                       </div>
                     </div>
@@ -330,7 +318,7 @@ export default function Settings() {
                     <div className="space-y-4">
                       <h3 className="font-semibold text-dark-blue-night">Store Creation (Quantity-based)</h3>
                       <div
-                        className="grid grid-cols-[minmax(220px,1fr)_repeat(4,minmax(0,1fr))] items-center gap-2 p-4 border rounded-md"
+                        className="grid grid-cols-[minmax(200px,1fr)_repeat(4,120px)] items-center gap-2 p-4 border rounded-md"
                         data-testid="pricing-row-store-creation"
                       >
                         <div className="font-medium text-dark-blue-night">
@@ -338,21 +326,18 @@ export default function Settings() {
                         </div>
                         {STORE_QUANTITY_TIERS.map((tier) => (
                           <div key={tier} className="flex flex-col items-center">
-                            <Label className="text-sm text-dark-gray mb-1">{tier}</Label>
-                            <div className="flex items-center gap-1">
-                              <span className="text-dark-gray text-sm">$</span>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={pricingData["Store Creation"]?.quantity?.[tier] || ""}
-                                onChange={(e) =>
-                                  handleQuantityChange("Store Creation", tier, parseFloat(e.target.value) || 0)
-                                }
-                                placeholder="0.00"
-                                className="w-20"
-                                data-testid={`input-pricing-store-${tier.replace(/[^a-zA-Z0-9]/g, "")}`}
-                              />
-                            </div>
+                            <Label className="text-sm text-dark-gray mb-1">{tier}:</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={pricingData["Store Creation"]?.quantity?.[tier] || ""}
+                              onChange={(e) =>
+                                handleQuantityChange("Store Creation", tier, parseFloat(e.target.value) || 0)
+                              }
+                              placeholder="0.00"
+                              className="w-20"
+                              data-testid={`input-pricing-store-${tier.replace(/[^a-zA-Z0-9]/g, "")}`}
+                            />
                           </div>
                         ))}
                       </div>
