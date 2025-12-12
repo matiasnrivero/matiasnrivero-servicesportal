@@ -221,7 +221,7 @@ export default function Settings() {
                                 className="grid grid-cols-[minmax(220px,1fr)_repeat(4,minmax(0,1fr))] items-center gap-2 p-4 border rounded-md mt-2"
                                 data-testid={`pricing-row-${subService.toLowerCase().replace(/\s+/g, "-")}`}
                               >
-                                <div className="font-medium text-dark-blue-night text-sm pl-6">
+                                <div className="font-medium text-dark-blue-night">
                                   {subService}
                                 </div>
                                 <div className="flex items-center gap-2 col-span-4 justify-end">
