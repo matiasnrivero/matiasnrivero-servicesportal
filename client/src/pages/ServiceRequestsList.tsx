@@ -154,7 +154,7 @@ export default function ServiceRequestsList() {
                     <SelectItem value="change-request">Change Request</SelectItem>
                   </SelectContent>
                 </Select>
-                <Link href="/service-requests/new">
+                <Link href="/">
                   <Button data-testid="button-new-request">New Request</Button>
                 </Link>
               </div>
