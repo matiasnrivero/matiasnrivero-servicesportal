@@ -117,11 +117,8 @@ export const ServicesListSection = (): JSX.Element => {
 
     if (serviceName === "Embroidery Digitization") {
       const basePrice = pricing?.basePrice || 0;
-      const vecPrice = pricingSettings["Vectorization for Embroidery"]?.basePrice || 0;
       return {
         price: basePrice ? `$${basePrice}` : (service.priceRange || ""),
-        hasSubPrice: vecPrice > 0,
-        subPrice: vecPrice ? `+$${vecPrice}` : undefined,
       };
     }
 
