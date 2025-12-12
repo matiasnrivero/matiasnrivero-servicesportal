@@ -11,6 +11,8 @@ import ServiceRequestsList from "@/pages/ServiceRequestsList";
 import JobDetailView from "@/pages/JobDetailView";
 import UserManagement from "@/pages/UserManagement";
 import VendorProfile from "@/pages/VendorProfile";
+import VendorsList from "@/pages/VendorsList";
+import VendorDetail from "@/pages/VendorDetail";
 
 function Router() {
   return (
@@ -22,6 +24,8 @@ function Router() {
       <Route path="/jobs/:id" component={JobDetailView} />
       <Route path="/users" component={UserManagement} />
       <Route path="/vendor-profile" component={VendorProfile} />
+      <Route path="/vendors" component={VendorsList} />
+      <Route path="/vendors/:id" component={VendorDetail} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>

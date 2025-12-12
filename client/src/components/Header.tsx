@@ -54,6 +54,7 @@ export function Header() {
   const isVendorDesigner = currentUser?.role === "vendor_designer";
   const canManageUsers = isAdmin || isInternalDesigner || isVendor;
   const canViewVendorProfile = isVendor;
+  const canViewVendorsList = isAdmin;
 
   return (
     <header className="flex w-full items-center justify-between gap-12 px-8 py-4 bg-white shadow-shadow-top-bar">
@@ -110,6 +111,17 @@ export function Header() {
                 data-testid="nav-vendor-profile"
               >
                 Vendor Profile
+              </Button>
+            </Link>
+          )}
+          {canViewVendorsList && (
+            <Link href="/vendors">
+              <Button
+                variant={location.startsWith("/vendors") ? "default" : "ghost"}
+                className={location.startsWith("/vendors") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
+                data-testid="nav-vendors"
+              >
+                Vendors
               </Button>
             </Link>
           )}
