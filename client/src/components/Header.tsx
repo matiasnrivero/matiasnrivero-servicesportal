@@ -120,7 +120,7 @@ export function Header() {
             <Link href="/settings">
               <Button
                 variant={location === "/settings" ? "default" : "ghost"}
-                className={location === "/settings" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : "text-sky-blue-accent"}
+                className={location === "/settings" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-settings"
               >
                 Settings
