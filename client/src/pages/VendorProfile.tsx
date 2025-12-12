@@ -580,7 +580,7 @@ export default function VendorProfile() {
                             className="flex items-center justify-between gap-4 p-4 border rounded-md mt-2"
                             data-testid={`cost-row-${subService.toLowerCase().replace(/\s+/g, "-")}`}
                           >
-                            <div className="font-medium text-dark-blue-night min-w-[200px] pl-6">
+                            <div className="font-medium text-dark-blue-night min-w-[200px]">
                               {subService}
                             </div>
                             <div className="flex items-center gap-2">
@@ -608,61 +608,59 @@ export default function VendorProfile() {
                   <div className="space-y-4">
                     <h3 className="font-semibold text-dark-blue-night">Creative Art (Complexity-based)</h3>
                     <div
-                      className="grid grid-cols-[1fr_auto] items-center gap-4 p-4 border rounded-md"
+                      className="grid grid-cols-[minmax(200px,1fr)_repeat(4,120px)] items-center gap-2 p-4 border rounded-md"
                       data-testid="cost-row-creative-art"
                     >
                       <div className="font-medium text-dark-blue-night">
                         Creative Art
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm text-dark-gray">Basic:</Label>
-                          <Input
-                            type="number"
-                            value={pricingData["Creative Art"]?.complexity?.basic || ""}
-                            onChange={(e) =>
-                              handleComplexityChange("Creative Art", "basic", parseFloat(e.target.value) || 0)
-                            }
-                            placeholder="0.00"
-                            className="w-24"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm text-dark-gray">Standard:</Label>
-                          <Input
-                            type="number"
-                            value={pricingData["Creative Art"]?.complexity?.standard || ""}
-                            onChange={(e) =>
-                              handleComplexityChange("Creative Art", "standard", parseFloat(e.target.value) || 0)
-                            }
-                            placeholder="0.00"
-                            className="w-24"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm text-dark-gray">Advance:</Label>
-                          <Input
-                            type="number"
-                            value={pricingData["Creative Art"]?.complexity?.advanced || ""}
-                            onChange={(e) =>
-                              handleComplexityChange("Creative Art", "advanced", parseFloat(e.target.value) || 0)
-                            }
-                            placeholder="0.00"
-                            className="w-24"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm text-dark-gray">Ultimate:</Label>
-                          <Input
-                            type="number"
-                            value={pricingData["Creative Art"]?.complexity?.ultimate || ""}
-                            onChange={(e) =>
-                              handleComplexityChange("Creative Art", "ultimate", parseFloat(e.target.value) || 0)
-                            }
-                            placeholder="0.00"
-                            className="w-24"
-                          />
-                        </div>
+                      <div className="flex flex-col items-center">
+                        <Label className="text-sm text-dark-gray mb-1">Basic:</Label>
+                        <Input
+                          type="number"
+                          value={pricingData["Creative Art"]?.complexity?.basic || ""}
+                          onChange={(e) =>
+                            handleComplexityChange("Creative Art", "basic", parseFloat(e.target.value) || 0)
+                          }
+                          placeholder="0.00"
+                          className="w-20"
+                        />
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <Label className="text-sm text-dark-gray mb-1">Standard:</Label>
+                        <Input
+                          type="number"
+                          value={pricingData["Creative Art"]?.complexity?.standard || ""}
+                          onChange={(e) =>
+                            handleComplexityChange("Creative Art", "standard", parseFloat(e.target.value) || 0)
+                          }
+                          placeholder="0.00"
+                          className="w-20"
+                        />
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <Label className="text-sm text-dark-gray mb-1">Advance:</Label>
+                        <Input
+                          type="number"
+                          value={pricingData["Creative Art"]?.complexity?.advanced || ""}
+                          onChange={(e) =>
+                            handleComplexityChange("Creative Art", "advanced", parseFloat(e.target.value) || 0)
+                          }
+                          placeholder="0.00"
+                          className="w-20"
+                        />
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <Label className="text-sm text-dark-gray mb-1">Ultimate:</Label>
+                        <Input
+                          type="number"
+                          value={pricingData["Creative Art"]?.complexity?.ultimate || ""}
+                          onChange={(e) =>
+                            handleComplexityChange("Creative Art", "ultimate", parseFloat(e.target.value) || 0)
+                          }
+                          placeholder="0.00"
+                          className="w-20"
+                        />
                       </div>
                     </div>
                   </div>
@@ -670,27 +668,59 @@ export default function VendorProfile() {
                   <div className="space-y-4">
                     <h3 className="font-semibold text-dark-blue-night">Store Creation (Quantity-based)</h3>
                     <div
-                      className="grid grid-cols-[1fr_auto] items-center gap-4 p-4 border rounded-md"
+                      className="grid grid-cols-[minmax(200px,1fr)_repeat(4,120px)] items-center gap-2 p-4 border rounded-md"
                       data-testid="cost-row-store-creation"
                     >
                       <div className="font-medium text-dark-blue-night">
                         Store Creation
                       </div>
-                      <div className="flex items-center gap-4">
-                        {STORE_QUANTITY_TIERS.map((tier) => (
-                          <div key={tier} className="flex items-center gap-2">
-                            <Label className="text-sm text-dark-gray whitespace-nowrap">{tier}:</Label>
-                            <Input
-                              type="number"
-                              value={pricingData["Store Creation"]?.quantity?.[tier] || ""}
-                              onChange={(e) =>
-                                handleQuantityChange("Store Creation", tier, parseFloat(e.target.value) || 0)
-                              }
-                              placeholder="0.00"
-                              className="w-24"
-                            />
-                          </div>
-                        ))}
+                      <div className="flex flex-col items-center">
+                        <Label className="text-sm text-dark-gray mb-1">1-50:</Label>
+                        <Input
+                          type="number"
+                          value={pricingData["Store Creation"]?.quantity?.["1-50"] || ""}
+                          onChange={(e) =>
+                            handleQuantityChange("Store Creation", "1-50", parseFloat(e.target.value) || 0)
+                          }
+                          placeholder="0.00"
+                          className="w-20"
+                        />
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <Label className="text-sm text-dark-gray mb-1">51-75:</Label>
+                        <Input
+                          type="number"
+                          value={pricingData["Store Creation"]?.quantity?.["51-75"] || ""}
+                          onChange={(e) =>
+                            handleQuantityChange("Store Creation", "51-75", parseFloat(e.target.value) || 0)
+                          }
+                          placeholder="0.00"
+                          className="w-20"
+                        />
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <Label className="text-sm text-dark-gray mb-1">76-100:</Label>
+                        <Input
+                          type="number"
+                          value={pricingData["Store Creation"]?.quantity?.["76-100"] || ""}
+                          onChange={(e) =>
+                            handleQuantityChange("Store Creation", "76-100", parseFloat(e.target.value) || 0)
+                          }
+                          placeholder="0.00"
+                          className="w-20"
+                        />
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <Label className="text-sm text-dark-gray mb-1">&gt;101:</Label>
+                        <Input
+                          type="number"
+                          value={pricingData["Store Creation"]?.quantity?.[">101"] || ""}
+                          onChange={(e) =>
+                            handleQuantityChange("Store Creation", ">101", parseFloat(e.target.value) || 0)
+                          }
+                          placeholder="0.00"
+                          className="w-20"
+                        />
                       </div>
                     </div>
                   </div>
