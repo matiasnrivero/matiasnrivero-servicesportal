@@ -9,8 +9,15 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Search, Eye } from "lucide-react";
+import { Building2, Search, Eye, Plus } from "lucide-react";
 import type { User, VendorProfile } from "@shared/schema";
 
 type UserSession = {
@@ -29,6 +36,15 @@ export default function VendorsList() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [newVendor, setNewVendor] = useState({
+    username: "",
+    email: "",
+    phone: "",
+    password: "",
+    companyName: "",
+    website: "",
+  });
 
   const { data: currentUser } = useQuery<UserSession | null>({
     queryKey: ["/api/default-user"],
@@ -55,6 +71,44 @@ export default function VendorsList() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({ title: "Vendor status updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const createVendorMutation = useMutation({
+    mutationFn: async (vendorData: typeof newVendor) => {
+      const userRes = await apiRequest("POST", "/api/users", {
+        username: vendorData.username,
+        email: vendorData.email,
+        phone: vendorData.phone,
+        password: vendorData.password,
+        role: "vendor",
+      });
+      const user = await userRes.json();
+      
+      await apiRequest("POST", "/api/vendor-profiles", {
+        userId: user.id,
+        companyName: vendorData.companyName,
+        website: vendorData.website,
+      });
+      
+      return user;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor-profiles"] });
+      setAddDialogOpen(false);
+      setNewVendor({
+        username: "",
+        email: "",
+        phone: "",
+        password: "",
+        companyName: "",
+        website: "",
+      });
+      toast({ title: "Vendor created successfully" });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -112,11 +166,119 @@ export default function VendorsList() {
       <Header />
       <div className="p-8">
         <div className="max-w-6xl mx-auto">
-          <div className="flex items-center gap-3 mb-6">
-            <Building2 className="h-8 w-8 text-sky-blue-accent" />
-            <h1 className="font-title-semibold text-dark-blue-night text-2xl">
-              Vendors
-            </h1>
+          <div className="flex items-center justify-between gap-3 mb-6">
+            <div className="flex items-center gap-3">
+              <Building2 className="h-8 w-8 text-sky-blue-accent" />
+              <h1 className="font-title-semibold text-dark-blue-night text-2xl">
+                Vendors
+              </h1>
+            </div>
+            <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-add-vendor">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add New Vendor
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Add New Vendor</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 mt-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Company Name<span className="text-destructive">*</span></Label>
+                      <Input
+                        value={newVendor.companyName}
+                        onChange={(e) =>
+                          setNewVendor({ ...newVendor, companyName: e.target.value })
+                        }
+                        placeholder="Enter company name"
+                        data-testid="input-new-company-name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Website</Label>
+                      <Input
+                        value={newVendor.website}
+                        onChange={(e) =>
+                          setNewVendor({ ...newVendor, website: e.target.value })
+                        }
+                        placeholder="https://example.com"
+                        data-testid="input-new-website"
+                      />
+                    </div>
+                  </div>
+                  <div className="border-t pt-4">
+                    <p className="text-sm text-dark-gray mb-4">Primary Contact (Vendor Admin)</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Username<span className="text-destructive">*</span></Label>
+                        <Input
+                          value={newVendor.username}
+                          onChange={(e) =>
+                            setNewVendor({ ...newVendor, username: e.target.value })
+                          }
+                          placeholder="Enter username"
+                          data-testid="input-new-username"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Password<span className="text-destructive">*</span></Label>
+                        <Input
+                          type="password"
+                          value={newVendor.password}
+                          onChange={(e) =>
+                            setNewVendor({ ...newVendor, password: e.target.value })
+                          }
+                          placeholder="Enter password"
+                          data-testid="input-new-password"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Email</Label>
+                        <Input
+                          type="email"
+                          value={newVendor.email}
+                          onChange={(e) =>
+                            setNewVendor({ ...newVendor, email: e.target.value })
+                          }
+                          placeholder="contact@company.com"
+                          data-testid="input-new-email"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Phone</Label>
+                        <Input
+                          value={newVendor.phone}
+                          onChange={(e) =>
+                            setNewVendor({ ...newVendor, phone: e.target.value })
+                          }
+                          placeholder="(555) 123-4567"
+                          data-testid="input-new-phone"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => setAddDialogOpen(false)}
+                      data-testid="button-cancel-add-vendor"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => createVendorMutation.mutate(newVendor)}
+                      disabled={createVendorMutation.isPending || !newVendor.username || !newVendor.password || !newVendor.companyName}
+                      data-testid="button-confirm-add-vendor"
+                    >
+                      {createVendorMutation.isPending ? "Creating..." : "Create Vendor"}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
 
           <Card className="mb-6">
