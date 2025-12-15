@@ -17,6 +17,16 @@ import {
   type InsertVendorProfile,
   type UpdateVendorProfile,
   type SystemSetting,
+  type BundleLineItem,
+  type InsertBundleLineItem,
+  type Bundle,
+  type InsertBundle,
+  type BundleItem,
+  type InsertBundleItem,
+  type ServicePack,
+  type InsertServicePack,
+  type ServicePackItem,
+  type InsertServicePackItem,
   users,
   services,
   serviceRequests,
@@ -24,6 +34,11 @@ import {
   comments,
   vendorProfiles,
   systemSettings,
+  bundleLineItems,
+  bundles,
+  bundleItems,
+  servicePacks,
+  servicePackItems,
 } from "@shared/schema";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -76,6 +91,30 @@ export interface IStorage {
   // System settings methods
   getSystemSetting(key: string): Promise<SystemSetting | undefined>;
   setSystemSetting(key: string, value: any): Promise<SystemSetting>;
+
+  // Bundle Line Items methods
+  getAllBundleLineItems(): Promise<BundleLineItem[]>;
+  getBundleLineItem(id: string): Promise<BundleLineItem | undefined>;
+  createBundleLineItem(data: InsertBundleLineItem): Promise<BundleLineItem>;
+  updateBundleLineItem(id: string, data: Partial<InsertBundleLineItem>): Promise<BundleLineItem | undefined>;
+
+  // Bundle methods
+  getAllBundles(): Promise<Bundle[]>;
+  getBundle(id: string): Promise<Bundle | undefined>;
+  createBundle(data: InsertBundle): Promise<Bundle>;
+  updateBundle(id: string, data: Partial<InsertBundle>): Promise<Bundle | undefined>;
+  getBundleItems(bundleId: string): Promise<BundleItem[]>;
+  addBundleItem(data: InsertBundleItem): Promise<BundleItem>;
+  removeBundleItem(id: string): Promise<void>;
+
+  // Service Pack methods
+  getAllServicePacks(): Promise<ServicePack[]>;
+  getServicePack(id: string): Promise<ServicePack | undefined>;
+  createServicePack(data: InsertServicePack): Promise<ServicePack>;
+  updateServicePack(id: string, data: Partial<InsertServicePack>): Promise<ServicePack | undefined>;
+  getServicePackItems(packId: string): Promise<ServicePackItem[]>;
+  addServicePackItem(data: InsertServicePackItem): Promise<ServicePackItem>;
+  removeServicePackItem(id: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -300,6 +339,98 @@ export class DbStorage implements IStorage {
         .returning();
       return result[0];
     }
+  }
+
+  // Bundle Line Items methods
+  async getAllBundleLineItems(): Promise<BundleLineItem[]> {
+    return await db.select().from(bundleLineItems).orderBy(bundleLineItems.name);
+  }
+
+  async getBundleLineItem(id: string): Promise<BundleLineItem | undefined> {
+    const result = await db.select().from(bundleLineItems).where(eq(bundleLineItems.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createBundleLineItem(data: InsertBundleLineItem): Promise<BundleLineItem> {
+    const result = await db.insert(bundleLineItems).values(data).returning();
+    return result[0];
+  }
+
+  async updateBundleLineItem(id: string, data: Partial<InsertBundleLineItem>): Promise<BundleLineItem | undefined> {
+    const result = await db.update(bundleLineItems).set(data).where(eq(bundleLineItems.id, id)).returning();
+    return result[0];
+  }
+
+  // Bundle methods
+  async getAllBundles(): Promise<Bundle[]> {
+    return await db.select().from(bundles).orderBy(bundles.name);
+  }
+
+  async getBundle(id: string): Promise<Bundle | undefined> {
+    const result = await db.select().from(bundles).where(eq(bundles.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createBundle(data: InsertBundle): Promise<Bundle> {
+    const result = await db.insert(bundles).values(data).returning();
+    return result[0];
+  }
+
+  async updateBundle(id: string, data: Partial<InsertBundle>): Promise<Bundle | undefined> {
+    const result = await db.update(bundles)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(bundles.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getBundleItems(bundleId: string): Promise<BundleItem[]> {
+    return await db.select().from(bundleItems).where(eq(bundleItems.bundleId, bundleId));
+  }
+
+  async addBundleItem(data: InsertBundleItem): Promise<BundleItem> {
+    const result = await db.insert(bundleItems).values(data).returning();
+    return result[0];
+  }
+
+  async removeBundleItem(id: string): Promise<void> {
+    await db.delete(bundleItems).where(eq(bundleItems.id, id));
+  }
+
+  // Service Pack methods
+  async getAllServicePacks(): Promise<ServicePack[]> {
+    return await db.select().from(servicePacks).orderBy(servicePacks.name);
+  }
+
+  async getServicePack(id: string): Promise<ServicePack | undefined> {
+    const result = await db.select().from(servicePacks).where(eq(servicePacks.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createServicePack(data: InsertServicePack): Promise<ServicePack> {
+    const result = await db.insert(servicePacks).values(data).returning();
+    return result[0];
+  }
+
+  async updateServicePack(id: string, data: Partial<InsertServicePack>): Promise<ServicePack | undefined> {
+    const result = await db.update(servicePacks)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(servicePacks.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getServicePackItems(packId: string): Promise<ServicePackItem[]> {
+    return await db.select().from(servicePackItems).where(eq(servicePackItems.packId, packId));
+  }
+
+  async addServicePackItem(data: InsertServicePackItem): Promise<ServicePackItem> {
+    const result = await db.insert(servicePackItems).values(data).returning();
+    return result[0];
+  }
+
+  async removeServicePackItem(id: string): Promise<void> {
+    await db.delete(servicePackItems).where(eq(servicePackItems.id, id));
   }
 }
 

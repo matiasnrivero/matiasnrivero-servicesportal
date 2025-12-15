@@ -1098,6 +1098,330 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== BUNDLE LINE ITEMS ROUTES (Admin only) ====================
+  app.get("/api/bundle-line-items", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const items = await storage.getAllBundleLineItems();
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching bundle line items:", error);
+      res.status(500).json({ error: "Failed to fetch bundle line items" });
+    }
+  });
+
+  app.post("/api/bundle-line-items", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const item = await storage.createBundleLineItem(req.body);
+      res.status(201).json(item);
+    } catch (error) {
+      console.error("Error creating bundle line item:", error);
+      res.status(500).json({ error: "Failed to create bundle line item" });
+    }
+  });
+
+  app.patch("/api/bundle-line-items/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const item = await storage.updateBundleLineItem(req.params.id, req.body);
+      if (!item) {
+        return res.status(404).json({ error: "Bundle line item not found" });
+      }
+      res.json(item);
+    } catch (error) {
+      console.error("Error updating bundle line item:", error);
+      res.status(500).json({ error: "Failed to update bundle line item" });
+    }
+  });
+
+  // ==================== BUNDLES ROUTES (Admin only) ====================
+  app.get("/api/bundles", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const bundlesList = await storage.getAllBundles();
+      res.json(bundlesList);
+    } catch (error) {
+      console.error("Error fetching bundles:", error);
+      res.status(500).json({ error: "Failed to fetch bundles" });
+    }
+  });
+
+  app.get("/api/bundles/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const bundle = await storage.getBundle(req.params.id);
+      if (!bundle) {
+        return res.status(404).json({ error: "Bundle not found" });
+      }
+      res.json(bundle);
+    } catch (error) {
+      console.error("Error fetching bundle:", error);
+      res.status(500).json({ error: "Failed to fetch bundle" });
+    }
+  });
+
+  app.post("/api/bundles", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const bundle = await storage.createBundle(req.body);
+      res.status(201).json(bundle);
+    } catch (error) {
+      console.error("Error creating bundle:", error);
+      res.status(500).json({ error: "Failed to create bundle" });
+    }
+  });
+
+  app.patch("/api/bundles/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const bundle = await storage.updateBundle(req.params.id, req.body);
+      if (!bundle) {
+        return res.status(404).json({ error: "Bundle not found" });
+      }
+      res.json(bundle);
+    } catch (error) {
+      console.error("Error updating bundle:", error);
+      res.status(500).json({ error: "Failed to update bundle" });
+    }
+  });
+
+  app.get("/api/bundles/:id/items", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const items = await storage.getBundleItems(req.params.id);
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching bundle items:", error);
+      res.status(500).json({ error: "Failed to fetch bundle items" });
+    }
+  });
+
+  app.post("/api/bundles/:id/items", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const item = await storage.addBundleItem({ ...req.body, bundleId: req.params.id });
+      res.status(201).json(item);
+    } catch (error) {
+      console.error("Error adding bundle item:", error);
+      res.status(500).json({ error: "Failed to add bundle item" });
+    }
+  });
+
+  app.delete("/api/bundles/:id/items/:itemId", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      await storage.removeBundleItem(req.params.itemId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing bundle item:", error);
+      res.status(500).json({ error: "Failed to remove bundle item" });
+    }
+  });
+
+  // ==================== SERVICE PACKS ROUTES (Admin only) ====================
+  app.get("/api/service-packs", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const packs = await storage.getAllServicePacks();
+      res.json(packs);
+    } catch (error) {
+      console.error("Error fetching service packs:", error);
+      res.status(500).json({ error: "Failed to fetch service packs" });
+    }
+  });
+
+  app.get("/api/service-packs/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const pack = await storage.getServicePack(req.params.id);
+      if (!pack) {
+        return res.status(404).json({ error: "Service pack not found" });
+      }
+      res.json(pack);
+    } catch (error) {
+      console.error("Error fetching service pack:", error);
+      res.status(500).json({ error: "Failed to fetch service pack" });
+    }
+  });
+
+  app.post("/api/service-packs", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const pack = await storage.createServicePack(req.body);
+      res.status(201).json(pack);
+    } catch (error) {
+      console.error("Error creating service pack:", error);
+      res.status(500).json({ error: "Failed to create service pack" });
+    }
+  });
+
+  app.patch("/api/service-packs/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const pack = await storage.updateServicePack(req.params.id, req.body);
+      if (!pack) {
+        return res.status(404).json({ error: "Service pack not found" });
+      }
+      res.json(pack);
+    } catch (error) {
+      console.error("Error updating service pack:", error);
+      res.status(500).json({ error: "Failed to update service pack" });
+    }
+  });
+
+  app.get("/api/service-packs/:id/items", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const items = await storage.getServicePackItems(req.params.id);
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching service pack items:", error);
+      res.status(500).json({ error: "Failed to fetch service pack items" });
+    }
+  });
+
+  app.post("/api/service-packs/:id/items", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const item = await storage.addServicePackItem({ ...req.body, packId: req.params.id });
+      res.status(201).json(item);
+    } catch (error) {
+      console.error("Error adding service pack item:", error);
+      res.status(500).json({ error: "Failed to add service pack item" });
+    }
+  });
+
+  app.delete("/api/service-packs/:id/items/:itemId", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      await storage.removeServicePackItem(req.params.itemId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing service pack item:", error);
+      res.status(500).json({ error: "Failed to remove service pack item" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
