@@ -277,14 +277,26 @@ export const ServicesRequestAd = (): JSX.Element => {
         </section>
 
         <Tabs defaultValue="adhoc" className="w-full max-w-6xl">
-          <TabsList className="mb-6" data-testid="tabs-services">
-            <TabsTrigger value="adhoc" data-testid="tab-adhoc">
+          <TabsList className="mb-6 bg-transparent border-b border-border rounded-none h-auto p-0 gap-6" data-testid="tabs-services">
+            <TabsTrigger 
+              value="adhoc" 
+              data-testid="tab-adhoc"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-dark-blue-night data-[state=active]:bg-transparent data-[state=active]:shadow-none pb-3 px-1 text-base font-medium text-muted-foreground data-[state=active]:text-dark-blue-night"
+            >
               Ad-hoc Services
             </TabsTrigger>
-            <TabsTrigger value="bundles" data-testid="tab-bundles">
+            <TabsTrigger 
+              value="bundles" 
+              data-testid="tab-bundles"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-dark-blue-night data-[state=active]:bg-transparent data-[state=active]:shadow-none pb-3 px-1 text-base font-medium text-muted-foreground data-[state=active]:text-dark-blue-night"
+            >
               Bundle Services
             </TabsTrigger>
-            <TabsTrigger value="packs" data-testid="tab-packs">
+            <TabsTrigger 
+              value="packs" 
+              data-testid="tab-packs"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-dark-blue-night data-[state=active]:bg-transparent data-[state=active]:shadow-none pb-3 px-1 text-base font-medium text-muted-foreground data-[state=active]:text-dark-blue-night"
+            >
               Monthly Packs
             </TabsTrigger>
           </TabsList>
