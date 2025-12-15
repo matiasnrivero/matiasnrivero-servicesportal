@@ -1156,6 +1156,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== PUBLIC BUNDLES/PACKS ROUTES (For client catalog view) ====================
+  app.get("/api/public/bundles", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const allBundles = await storage.getAllBundles();
+      const activeBundles = allBundles.filter(b => b.isActive);
+      
+      const bundlesWithItems = await Promise.all(
+        activeBundles.map(async (bundle) => {
+          const items = await storage.getBundleItems(bundle.id);
+          const itemsWithDetails = await Promise.all(
+            items.map(async (item) => {
+              let service = null;
+              let lineItem = null;
+              if (item.serviceId) {
+                service = await storage.getService(item.serviceId);
+              }
+              if (item.lineItemId) {
+                lineItem = await storage.getBundleLineItem(item.lineItemId);
+              }
+              return { ...item, service, lineItem };
+            })
+          );
+          return { ...bundle, items: itemsWithDetails };
+        })
+      );
+      
+      res.json(bundlesWithItems);
+    } catch (error) {
+      console.error("Error fetching public bundles:", error);
+      res.status(500).json({ error: "Failed to fetch bundles" });
+    }
+  });
+
+  app.get("/api/public/service-packs", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const allPacks = await storage.getAllServicePacks();
+      const activePacks = allPacks.filter(p => p.isActive);
+      
+      const packsWithItems = await Promise.all(
+        activePacks.map(async (pack) => {
+          const items = await storage.getServicePackItems(pack.id);
+          const itemsWithServices = await Promise.all(
+            items.map(async (item) => {
+              const service = await storage.getService(item.serviceId);
+              return { ...item, service };
+            })
+          );
+          return { ...pack, items: itemsWithServices };
+        })
+      );
+      
+      res.json(packsWithItems);
+    } catch (error) {
+      console.error("Error fetching public service packs:", error);
+      res.status(500).json({ error: "Failed to fetch service packs" });
+    }
+  });
+
   // ==================== BUNDLES ROUTES (Admin only) ====================
   app.get("/api/bundles", async (req, res) => {
     try {

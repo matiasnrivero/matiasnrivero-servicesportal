@@ -76,7 +76,11 @@ async function fetchServices(): Promise<Service[]> {
   return response.json();
 }
 
-export const ServicesListSection = (): JSX.Element => {
+interface ServicesListSectionProps {
+  showHeader?: boolean;
+}
+
+export const ServicesListSection = ({ showHeader = true }: ServicesListSectionProps): JSX.Element => {
   const [pricingModalOpen, setPricingModalOpen] = useState(false);
   
   const { data: services = [], isLoading } = useQuery({
@@ -147,19 +151,21 @@ export const ServicesListSection = (): JSX.Element => {
   };
 
   return (
-    <div className="flex flex-col items-center w-full flex-1 px-8 py-6">
-      <section className="flex items-center justify-between w-full max-w-6xl mb-8">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold text-dark-blue-night">
-            Available Services
-          </h1>
-          <p className="text-dark-gray">
-            Choose from our range of artwork services for promotional products
-          </p>
-        </div>
-      </section>
+    <div className={showHeader ? "flex flex-col items-center w-full flex-1 px-8 py-6" : ""}>
+      {showHeader && (
+        <section className="flex items-center justify-between w-full max-w-6xl mb-8">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold text-dark-blue-night">
+              Available Services
+            </h1>
+            <p className="text-dark-gray">
+              Choose from our range of artwork services for promotional products
+            </p>
+          </div>
+        </section>
+      )}
 
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-6xl">
+      <section className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 ${showHeader ? "w-full max-w-6xl" : ""}`}>
         {isLoading ? (
           <div className="col-span-3 text-center py-8">
             <p className="text-dark-gray">Loading services...</p>
