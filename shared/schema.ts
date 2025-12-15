@@ -105,6 +105,72 @@ export const systemSettings = pgTable("system_settings", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// ==================== PHASE 2: BUNDLES & SERVICE PACKS ====================
+
+// Bundle line items - tasks only available within bundles (not standalone services)
+export const bundleLineItems = pgTable("bundle_line_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Bundles - combines services and line items with discounts
+export const bundles = pgTable("bundles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  discountPercent: decimal("discount_percent", { precision: 5, scale: 2 }).default("0"),
+  finalPrice: decimal("final_price", { precision: 10, scale: 2 }),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Bundle items - links bundles to services or line items with quantities
+export const bundleItems = pgTable("bundle_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bundleId: varchar("bundle_id").notNull().references(() => bundles.id, { onDelete: "cascade" }),
+  serviceId: varchar("service_id").references(() => services.id),
+  lineItemId: varchar("line_item_id").references(() => bundleLineItems.id),
+  quantity: integer("quantity").notNull().default(1),
+});
+
+// Service Packs - monthly subscription packs with service quantities
+export const servicePacks = pgTable("service_packs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Service pack items - links packs to services with monthly quantities
+export const servicePackItems = pgTable("service_pack_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  packId: varchar("pack_id").notNull().references(() => servicePacks.id, { onDelete: "cascade" }),
+  serviceId: varchar("service_id").notNull().references(() => services.id),
+  quantity: integer("quantity").notNull(),
+});
+
+// Client pack subscriptions - tracks client's active packs and consumption
+export const clientPackSubscriptions = pgTable("client_pack_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  packId: varchar("pack_id").notNull().references(() => servicePacks.id),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  consumedQuantities: jsonb("consumed_quantities"), // { serviceId: consumedCount }
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ==================== END PHASE 2 TABLES ====================
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -157,6 +223,37 @@ export const insertCommentSchema = createInsertSchema(comments).omit({
   updatedAt: true,
 });
 
+// Phase 2: Bundle & Pack schemas
+export const insertBundleLineItemSchema = createInsertSchema(bundleLineItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertBundleSchema = createInsertSchema(bundles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertBundleItemSchema = createInsertSchema(bundleItems).omit({
+  id: true,
+});
+
+export const insertServicePackSchema = createInsertSchema(servicePacks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertServicePackItemSchema = createInsertSchema(servicePackItems).omit({
+  id: true,
+});
+
+export const insertClientPackSubscriptionSchema = createInsertSchema(clientPackSubscriptions).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type VendorProfile = typeof vendorProfiles.$inferSelect;
@@ -172,6 +269,20 @@ export type InsertAttachment = z.infer<typeof insertAttachmentSchema>;
 export type Comment = typeof comments.$inferSelect;
 export type InsertComment = z.infer<typeof insertCommentSchema>;
 export type SystemSetting = typeof systemSettings.$inferSelect;
+
+// Phase 2: Bundle & Pack types
+export type BundleLineItem = typeof bundleLineItems.$inferSelect;
+export type InsertBundleLineItem = z.infer<typeof insertBundleLineItemSchema>;
+export type Bundle = typeof bundles.$inferSelect;
+export type InsertBundle = z.infer<typeof insertBundleSchema>;
+export type BundleItem = typeof bundleItems.$inferSelect;
+export type InsertBundleItem = z.infer<typeof insertBundleItemSchema>;
+export type ServicePack = typeof servicePacks.$inferSelect;
+export type InsertServicePack = z.infer<typeof insertServicePackSchema>;
+export type ServicePackItem = typeof servicePackItems.$inferSelect;
+export type InsertServicePackItem = z.infer<typeof insertServicePackItemSchema>;
+export type ClientPackSubscription = typeof clientPackSubscriptions.$inferSelect;
+export type InsertClientPackSubscription = z.infer<typeof insertClientPackSubscriptionSchema>;
 
 // Helper type for pricing agreements structure
 export type PricingAgreement = {
