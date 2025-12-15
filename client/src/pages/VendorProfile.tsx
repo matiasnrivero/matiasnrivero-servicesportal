@@ -80,10 +80,14 @@ export default function VendorProfile() {
   const { data: currentUser, isLoading: userLoading } = useQuery<User | null>({
     queryKey: ["/api/default-user"],
     queryFn: getDefaultUser,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
+  const vendorUserId = currentUser?.role === "vendor" ? currentUser.id : undefined;
+  
   const { data: vendorProfile, isLoading: profileLoading, refetch: refetchProfile } = useQuery<VendorProfileType | null>({
-    queryKey: ["/api/vendor-profiles/user", currentUser?.id],
+    queryKey: ["/api/vendor-profiles/user", vendorUserId],
     queryFn: async ({ queryKey }) => {
       const userId = queryKey[1] as string | undefined;
       if (!userId) return null;
@@ -91,8 +95,7 @@ export default function VendorProfile() {
       if (!res.ok) return null;
       return res.json();
     },
-    enabled: !!currentUser?.id && currentUser.role === "vendor",
-    refetchOnMount: true,
+    refetchOnMount: 'always',
     staleTime: 0,
   });
 

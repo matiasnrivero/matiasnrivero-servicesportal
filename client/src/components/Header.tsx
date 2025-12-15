@@ -46,6 +46,8 @@ export function Header() {
     onSuccess: async (data) => {
       // Invalidate all queries to trigger refetch with new role data
       await queryClient.invalidateQueries();
+      // Ensure the user query is fully refetched before navigation
+      await queryClient.refetchQueries({ queryKey: ["/api/default-user"], type: "active" });
       // Navigate to vendor profile when switching to vendor role
       if (data.role === "vendor") {
         setLocation("/vendor-profile");
