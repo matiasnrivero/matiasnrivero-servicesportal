@@ -257,13 +257,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
 
-      // Verify the user is a designer
+      // Verify the user can manage jobs
       const user = await storage.getUser(sessionUserId);
       if (!user) {
         return res.status(401).json({ error: "User not found" });
       }
-      if (user.role !== "designer") {
-        return res.status(403).json({ error: "Only designers can deliver requests" });
+      const canDeliver = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(user.role);
+      if (!canDeliver) {
+        return res.status(403).json({ error: "You don't have permission to deliver requests" });
       }
 
       const existingRequest = await storage.getServiceRequest(req.params.id);
@@ -343,13 +344,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
 
-      // Verify the user exists and is a designer
+      // Verify the user can manage jobs
       const user = await storage.getUser(sessionUserId);
       if (!user) {
         return res.status(401).json({ error: "User not found" });
       }
-      if (user.role !== "designer") {
-        return res.status(403).json({ error: "Only designers can resume work" });
+      const canResume = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(user.role);
+      if (!canResume) {
+        return res.status(403).json({ error: "You don't have permission to resume work" });
       }
       
       const existingRequest = await storage.getServiceRequest(req.params.id);

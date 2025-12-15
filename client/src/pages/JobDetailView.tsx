@@ -230,7 +230,8 @@ export default function JobDetailView() {
     assignMutation.mutate(designerId);
   };
 
-  const designers = allUsers.filter(user => user.role === "designer" || user.role === "vendor_designer");
+  const designers = allUsers.filter(user => ["admin", "internal_designer", "designer", "vendor_designer"].includes(user.role));
+  const isAssignee = currentUser?.userId === request?.assigneeId;
 
   const handleDeliver = () => {
     deliverMutation.mutate();
@@ -523,7 +524,7 @@ export default function JobDetailView() {
               </>
             )}
 
-            {request.status === "in-progress" && isDesigner && (
+            {request.status === "in-progress" && isAssignee && (
               <>
                 <Button 
                   variant="outline" 
@@ -554,7 +555,7 @@ export default function JobDetailView() {
               </Button>
             )}
 
-            {request.status === "change-request" && isDesigner && (
+            {request.status === "change-request" && isAssignee && (
               <>
                 <Button 
                   variant="outline" 
@@ -611,7 +612,7 @@ export default function JobDetailView() {
                   </p>
                 </div>
 
-                {isDesigner && (
+                {canManageJobs && (
                   <div className="p-3 bg-blue-lavender/30 rounded-lg">
                     <p className="text-xs text-dark-gray mb-1">Assignee</p>
                     <p className="text-sm font-medium text-dark-blue-night" data-testid="text-assignee">
