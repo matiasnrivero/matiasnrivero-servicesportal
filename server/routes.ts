@@ -640,7 +640,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const response: any = { 
             userId: existingUser.id, 
             role: existingUser.role, 
-            username: existingUser.username 
+            username: existingUser.username,
+            email: existingUser.email,
+            phone: existingUser.phone
           };
           // Include impersonation info if applicable
           if (req.session.impersonatorId) {
@@ -665,7 +667,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.userId = user.id;
       req.session.userRole = user.role;
       
-      res.json({ userId: user.id, role: user.role, username: user.username });
+      res.json({ userId: user.id, role: user.role, username: user.username, email: user.email, phone: user.phone });
     } catch (error) {
       console.error("Error getting default user:", error);
       res.status(500).json({ error: "Failed to get default user" });
@@ -708,7 +710,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Prevent caching
       res.set('Cache-Control', 'no-store');
-      res.json({ userId: user.id, role: user.role, username: user.username });
+      res.json({ userId: user.id, role: user.role, username: user.username, email: user.email, phone: user.phone });
     } catch (error) {
       console.error("Error switching role:", error);
       res.status(500).json({ error: "Failed to switch role" });
