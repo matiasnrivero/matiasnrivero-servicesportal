@@ -1594,13 +1594,54 @@ export default function JobDetailView() {
                       <span className="text-sm text-dark-blue-night">Assigned</span>
                     </div>
                   )}
-                  {request.deliveredAt && (
+                  {/* Show change request history from comments */}
+                  {comments.filter(c => c.body.startsWith("[Change Request]")).map((changeComment, index) => {
+                    const changeDate = new Date(changeComment.createdAt);
+                    return (
+                      <div key={`history-${changeComment.id}`}>
+                        {/* Delivery before change request */}
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="w-2 h-2 rounded-full bg-green-500" />
+                          <span className="text-sm text-dark-blue-night">Delivered</span>
+                          <span className="text-xs text-dark-gray ml-auto">
+                            {format(changeDate, "MMM dd")}
+                          </span>
+                        </div>
+                        {/* Change Request */}
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-orange-500" />
+                          <span className="text-sm text-dark-blue-night">Change Request</span>
+                          <span className="text-xs text-dark-gray ml-auto">
+                            {format(changeDate, "MMM dd")}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* Final delivered state */}
+                  {request.deliveredAt && request.status === "delivered" && (
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-green-500" />
                       <span className="text-sm text-dark-blue-night">Delivered</span>
                       <span className="text-xs text-dark-gray ml-auto">
                         {format(new Date(request.deliveredAt), "MMM dd")}
                       </span>
+                    </div>
+                  )}
+                  {/* Current change request status */}
+                  {request.status === "change-request" && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                      <span className="text-sm text-dark-blue-night">Change Requested</span>
+                      <Badge variant="outline" className="text-xs ml-auto">Current</Badge>
+                    </div>
+                  )}
+                  {/* In progress status */}
+                  {request.status === "in-progress" && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                      <span className="text-sm text-dark-blue-night">In Progress</span>
+                      <Badge variant="outline" className="text-xs ml-auto">Current</Badge>
                     </div>
                   )}
                 </div>
