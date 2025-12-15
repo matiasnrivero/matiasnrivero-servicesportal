@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -27,11 +28,17 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import type { Service, InsertServiceRequest } from "@shared/schema";
+import type { Service, InsertServiceRequest, Bundle, BundleItem, ServicePack, ServicePackItem } from "@shared/schema";
 import { Header } from "@/components/Header";
 import { FileUploader } from "@/components/FileUploader";
-import { ChevronRight, HelpCircle, X } from "lucide-react";
+import { ChevronRight, HelpCircle, X, Boxes, CalendarRange, Package } from "lucide-react";
 
 import complexityExample1 from "@assets/Imagen_de_WhatsApp_2025-09-04_a_las_11.08.18_29a99002_(1)_1765400666338.jpg";
 import complexityExample2 from "@assets/Imagen_de_WhatsApp_2025-09-04_a_las_11.08.18_be732b8a_(2)_1765400666337.jpg";
@@ -208,6 +215,14 @@ export default function ServiceRequestForm() {
     queryFn: fetchServices,
   });
 
+  const { data: bundles = [] } = useQuery<Bundle[]>({
+    queryKey: ["/api/bundles"],
+  });
+
+  const { data: servicePacks = [] } = useQuery<ServicePack[]>({
+    queryKey: ["/api/service-packs"],
+  });
+
   const { data: currentUser } = useQuery({
     queryKey: ["/api/default-user"],
     queryFn: getDefaultUser,
@@ -217,6 +232,9 @@ export default function ServiceRequestForm() {
   const preSelectedServiceId = urlParams.get("serviceId") || "";
 
   const [selectedServiceId, setSelectedServiceId] = useState<string>(preSelectedServiceId);
+  const [selectedBundleId, setSelectedBundleId] = useState<string>("");
+  const [selectedPackId, setSelectedPackId] = useState<string>("");
+  const [selectionMode, setSelectionMode] = useState<"adhoc" | "bundle" | "pack">("adhoc");
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, Array<{ url: string; name: string }>>>({});
   const [calculatedPrice, setCalculatedPrice] = useState<number>(0);
@@ -374,6 +392,8 @@ export default function ServiceRequestForm() {
 
   const handleBack = () => {
     setSelectedServiceId("");
+    setSelectedBundleId("");
+    setSelectedPackId("");
     setFormData({});
     setUploadedFiles({});
     setCalculatedPrice(0);
@@ -381,6 +401,9 @@ export default function ServiceRequestForm() {
     setThreadColorChips([]);
     reset();
   };
+
+  const activeBundles = bundles.filter((b: Bundle) => b.isActive);
+  const activePacks = servicePacks.filter((p: ServicePack) => p.isActive);
 
   const renderServiceSelector = () => (
     <div className="min-h-[60vh] flex flex-col items-center justify-center p-8">
@@ -391,40 +414,167 @@ export default function ServiceRequestForm() {
         Select the type of service you need. Each service has specific requirements to help us deliver the best results.
       </p>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-4xl">
-        {sortServices(services).map((service) => (
-          <Card
-            key={service.id}
-            className={`cursor-pointer transition-all hover-elevate border-2 ${
-              selectedServiceId === service.id 
-                ? "border-sky-blue-accent bg-blue-lavender/30" 
-                : "border-transparent"
-            }`}
-            onClick={() => setSelectedServiceId(service.id)}
-            data-testid={`card-service-${service.id}`}
-          >
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex-1">
-                  <h3 className="font-body-2-semibold text-dark-blue-night">
-                    {service.title}
-                  </h3>
-                  <p className="font-body-3-reg text-dark-gray mt-1 line-clamp-2">
-                    {service.description}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  {showPricing && (
-                    <span className="text-sky-blue-accent font-body-2-semibold">
-                      {service.priceRange}
-                    </span>
-                  )}
-                  <ChevronRight className="h-5 w-5 text-dark-gray" />
-                </div>
+      <div className="w-full max-w-4xl">
+        <Tabs defaultValue="adhoc" onValueChange={(v) => {
+          setSelectionMode(v as "adhoc" | "bundle" | "pack");
+          setSelectedServiceId("");
+          setSelectedBundleId("");
+          setSelectedPackId("");
+        }}>
+          <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsTrigger value="adhoc" data-testid="tab-adhoc" className="gap-2">
+              <Package className="h-4 w-4" />
+              Ad-hoc Services
+            </TabsTrigger>
+            <TabsTrigger value="bundle" data-testid="tab-bundles" className="gap-2">
+              <Boxes className="h-4 w-4" />
+              Bundles
+            </TabsTrigger>
+            <TabsTrigger value="pack" data-testid="tab-packs" className="gap-2">
+              <CalendarRange className="h-4 w-4" />
+              Monthly Packs
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="adhoc">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {sortServices(services).map((service) => (
+                <Card
+                  key={service.id}
+                  className={`cursor-pointer transition-all hover-elevate border-2 ${
+                    selectedServiceId === service.id 
+                      ? "border-sky-blue-accent bg-blue-lavender/30" 
+                      : "border-transparent"
+                  }`}
+                  onClick={() => setSelectedServiceId(service.id)}
+                  data-testid={`card-service-${service.id}`}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1">
+                        <h3 className="font-body-2-semibold text-dark-blue-night">
+                          {service.title}
+                        </h3>
+                        <p className="font-body-3-reg text-dark-gray mt-1 line-clamp-2">
+                          {service.description}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        {showPricing && (
+                          <span className="text-sky-blue-accent font-body-2-semibold">
+                            {service.priceRange}
+                          </span>
+                        )}
+                        <ChevronRight className="h-5 w-5 text-dark-gray" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="bundle">
+            {activeBundles.length === 0 ? (
+              <div className="text-center py-12 text-dark-gray">
+                <Boxes className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No bundles available at this time.</p>
               </div>
-            </CardContent>
-          </Card>
-        ))}
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {activeBundles.map((bundle: Bundle) => (
+                  <Card
+                    key={bundle.id}
+                    className={`cursor-pointer transition-all hover-elevate border-2 ${
+                      selectedBundleId === bundle.id 
+                        ? "border-sky-blue-accent bg-blue-lavender/30" 
+                        : "border-transparent"
+                    }`}
+                    onClick={() => setSelectedBundleId(bundle.id)}
+                    data-testid={`card-bundle-${bundle.id}`}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-body-2-semibold text-dark-blue-night">
+                              {bundle.name}
+                            </h3>
+                            {bundle.discountPercentage && parseFloat(bundle.discountPercentage) > 0 && (
+                              <Badge variant="secondary" className="text-xs">
+                                {bundle.discountPercentage}% off
+                              </Badge>
+                            )}
+                          </div>
+                          {bundle.description && (
+                            <p className="font-body-3-reg text-dark-gray mt-1 line-clamp-2">
+                              {bundle.description}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          {showPricing && bundle.finalPrice && (
+                            <span className="text-sky-blue-accent font-body-2-semibold">
+                              ${parseFloat(bundle.finalPrice).toFixed(2)}
+                            </span>
+                          )}
+                          <ChevronRight className="h-5 w-5 text-dark-gray" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="pack">
+            {activePacks.length === 0 ? (
+              <div className="text-center py-12 text-dark-gray">
+                <CalendarRange className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No monthly packs available at this time.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {activePacks.map((pack: ServicePack) => (
+                  <Card
+                    key={pack.id}
+                    className={`cursor-pointer transition-all hover-elevate border-2 ${
+                      selectedPackId === pack.id 
+                        ? "border-sky-blue-accent bg-blue-lavender/30" 
+                        : "border-transparent"
+                    }`}
+                    onClick={() => setSelectedPackId(pack.id)}
+                    data-testid={`card-pack-${pack.id}`}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <h3 className="font-body-2-semibold text-dark-blue-night">
+                            {pack.name}
+                          </h3>
+                          {pack.description && (
+                            <p className="font-body-3-reg text-dark-gray mt-1 line-clamp-2">
+                              {pack.description}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          {showPricing && pack.monthlyPrice && (
+                            <span className="text-sky-blue-accent font-body-2-semibold">
+                              ${parseFloat(pack.monthlyPrice).toFixed(2)}/mo
+                            </span>
+                          )}
+                          <ChevronRight className="h-5 w-5 text-dark-gray" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
@@ -1401,10 +1551,106 @@ export default function ServiceRequestForm() {
     );
   }
 
+  const renderBundleDetail = () => {
+    const bundle = bundles.find((b: Bundle) => b.id === selectedBundleId);
+    if (!bundle) return null;
+
+    return (
+      <div className="flex-1 p-4 md:p-8">
+        <div className="max-w-2xl mx-auto">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Boxes className="h-6 w-6 text-sky-blue-accent" />
+                  <h2 className="font-title-semibold text-dark-blue-night text-xl">{bundle.name}</h2>
+                  {bundle.discountPercentage && parseFloat(bundle.discountPercentage) > 0 && (
+                    <Badge variant="secondary">{bundle.discountPercentage}% off</Badge>
+                  )}
+                </div>
+                {showPricing && bundle.finalPrice && (
+                  <span className="text-sky-blue-accent font-title-semibold text-xl">
+                    ${parseFloat(bundle.finalPrice).toFixed(2)}
+                  </span>
+                )}
+              </div>
+              {bundle.description && (
+                <p className="text-dark-gray mb-6">{bundle.description}</p>
+              )}
+              <div className="border-t pt-4">
+                <p className="text-dark-gray text-sm mb-4">
+                  Bundle purchases are handled separately. Please contact our team to purchase this bundle.
+                </p>
+                <div className="flex gap-2 justify-end">
+                  <Button variant="outline" onClick={handleBack} data-testid="button-bundle-back">
+                    Back
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPackDetail = () => {
+    const pack = servicePacks.find((p: ServicePack) => p.id === selectedPackId);
+    if (!pack) return null;
+
+    return (
+      <div className="flex-1 p-4 md:p-8">
+        <div className="max-w-2xl mx-auto">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <CalendarRange className="h-6 w-6 text-sky-blue-accent" />
+                  <h2 className="font-title-semibold text-dark-blue-night text-xl">{pack.name}</h2>
+                </div>
+                {showPricing && pack.monthlyPrice && (
+                  <span className="text-sky-blue-accent font-title-semibold text-xl">
+                    ${parseFloat(pack.monthlyPrice).toFixed(2)}/mo
+                  </span>
+                )}
+              </div>
+              {pack.description && (
+                <p className="text-dark-gray mb-6">{pack.description}</p>
+              )}
+              <div className="border-t pt-4">
+                <p className="text-dark-gray text-sm mb-4">
+                  Monthly pack subscriptions are handled separately. Please contact our team to subscribe to this pack.
+                </p>
+                <div className="flex gap-2 justify-end">
+                  <Button variant="outline" onClick={handleBack} data-testid="button-pack-back">
+                    Back
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  };
+
+  const renderContent = () => {
+    if (selectedServiceId) {
+      return renderServiceForm();
+    }
+    if (selectedBundleId) {
+      return renderBundleDetail();
+    }
+    if (selectedPackId) {
+      return renderPackDetail();
+    }
+    return renderServiceSelector();
+  };
+
   return (
     <main className="flex flex-col w-full min-h-screen bg-light-grey">
       <Header />
-      {selectedServiceId ? renderServiceForm() : renderServiceSelector()}
+      {renderContent()}
     </main>
   );
 }
