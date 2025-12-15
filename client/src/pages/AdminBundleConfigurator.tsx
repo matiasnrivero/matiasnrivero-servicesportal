@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Header } from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,11 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -31,9 +34,26 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Boxes, Plus, Pencil, Trash2, DollarSign } from "lucide-react";
+import { insertBundleSchema } from "@shared/schema";
 import type { Bundle, BundleItem, BundleLineItem, Service, User } from "@shared/schema";
+
+const bundleFormSchema = insertBundleSchema.extend({
+  name: z.string().min(1, "Bundle name is required"),
+  description: z.string().nullable().optional(),
+  discountPercent: z.string().nullable().optional(),
+  finalPrice: z.string().nullable().optional(),
+  isActive: z.boolean().default(true),
+});
 
 async function getDefaultUser(): Promise<User | null> {
   const res = await fetch("/api/default-user");
@@ -45,25 +65,51 @@ type BundleWithItems = Bundle & {
   items?: (BundleItem & { service?: Service; lineItem?: BundleLineItem })[];
 };
 
+type BundleFormValues = z.infer<typeof bundleFormSchema>;
+
 export default function AdminBundleConfigurator() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [addItemDialogOpen, setAddItemDialogOpen] = useState(false);
   const [editingBundle, setEditingBundle] = useState<Bundle | null>(null);
   const [selectedBundle, setSelectedBundle] = useState<Bundle | null>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    discountPercent: "",
-    finalPrice: "",
-    isActive: true,
-  });
   const [newItemData, setNewItemData] = useState({
     itemType: "service" as "service" | "lineItem",
     serviceId: "",
     lineItemId: "",
     quantity: "1",
   });
+
+  const form = useForm<BundleFormValues>({
+    resolver: zodResolver(bundleFormSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      discountPercent: "",
+      finalPrice: "",
+      isActive: true,
+    },
+  });
+
+  useEffect(() => {
+    if (editingBundle) {
+      form.reset({
+        name: editingBundle.name,
+        description: editingBundle.description || "",
+        discountPercent: editingBundle.discountPercent || "",
+        finalPrice: editingBundle.finalPrice || "",
+        isActive: editingBundle.isActive,
+      });
+    } else {
+      form.reset({
+        name: "",
+        description: "",
+        discountPercent: "",
+        finalPrice: "",
+        isActive: true,
+      });
+    }
+  }, [editingBundle, form]);
 
   const { data: currentUser } = useQuery<User | null>({
     queryKey: ["/api/default-user"],
@@ -94,7 +140,7 @@ export default function AdminBundleConfigurator() {
   });
 
   const createBundleMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
+    mutationFn: async (data: BundleFormValues) => {
       return apiRequest("POST", "/api/bundles", {
         name: data.name,
         description: data.description || null,
@@ -114,7 +160,7 @@ export default function AdminBundleConfigurator() {
   });
 
   const updateBundleMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<typeof formData> }) => {
+    mutationFn: async ({ id, data }: { id: string; data: BundleFormValues }) => {
       return apiRequest("PATCH", `/api/bundles/${id}`, {
         name: data.name,
         description: data.description || null,
@@ -168,37 +214,25 @@ export default function AdminBundleConfigurator() {
   const closeDialog = () => {
     setDialogOpen(false);
     setEditingBundle(null);
-    setFormData({ name: "", description: "", discountPercent: "", finalPrice: "", isActive: true });
+    form.reset();
   };
 
   const openCreateDialog = () => {
     setEditingBundle(null);
-    setFormData({ name: "", description: "", discountPercent: "", finalPrice: "", isActive: true });
+    form.reset();
     setDialogOpen(true);
   };
 
   const openEditDialog = (bundle: Bundle) => {
     setEditingBundle(bundle);
-    setFormData({
-      name: bundle.name,
-      description: bundle.description || "",
-      discountPercent: bundle.discountPercent || "",
-      finalPrice: bundle.finalPrice || "",
-      isActive: bundle.isActive,
-    });
     setDialogOpen(true);
   };
 
-  const handleSubmit = () => {
-    if (!formData.name) {
-      toast({ title: "Please enter a bundle name", variant: "destructive" });
-      return;
-    }
-
+  const onSubmit = (values: BundleFormValues) => {
     if (editingBundle) {
-      updateBundleMutation.mutate({ id: editingBundle.id, data: formData });
+      updateBundleMutation.mutate({ id: editingBundle.id, data: values });
     } else {
-      createBundleMutation.mutate(formData);
+      createBundleMutation.mutate(values);
     }
   };
 
@@ -319,79 +353,128 @@ export default function AdminBundleConfigurator() {
                   <DialogTitle>
                     {editingBundle ? "Edit Bundle" : "Create Bundle"}
                   </DialogTitle>
+                  <DialogDescription>
+                    {editingBundle ? "Update bundle details" : "Create a new service bundle"}
+                  </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-4 mt-4">
-                  <div className="space-y-2">
-                    <Label>Name<span className="text-destructive">*</span></Label>
-                    <Input
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="Enter bundle name"
-                      data-testid="input-bundle-name"
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Name<span className="text-destructive">*</span></FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder="Enter bundle name"
+                              data-testid="input-bundle-name"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Description</Label>
-                    <Textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="Enter description (optional)"
-                      data-testid="input-bundle-description"
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              {...field}
+                              value={field.value || ""}
+                              placeholder="Enter description (optional)"
+                              data-testid="input-bundle-description"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Discount Percent</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      value={formData.discountPercent}
-                      onChange={(e) => setFormData({ ...formData, discountPercent: e.target.value })}
-                      placeholder="0"
-                      data-testid="input-bundle-discount"
+                    <FormField
+                      control={form.control}
+                      name="discountPercent"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Discount Percent</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max="100"
+                              {...field}
+                              value={field.value || ""}
+                              placeholder="0"
+                              data-testid="input-bundle-discount"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Final Price Override</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.finalPrice}
-                      onChange={(e) => setFormData({ ...formData, finalPrice: e.target.value })}
-                      placeholder="Leave empty to calculate from discount"
-                      data-testid="input-bundle-final-price"
+                    <FormField
+                      control={form.control}
+                      name="finalPrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Final Price Override</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              {...field}
+                              value={field.value || ""}
+                              placeholder="Leave empty to calculate from discount"
+                              data-testid="input-bundle-final-price"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      id="bundleActive"
-                      checked={formData.isActive}
-                      onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
-                      data-testid="switch-bundle-active"
+                    <FormField
+                      control={form.control}
+                      name="isActive"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center gap-2">
+                          <FormControl>
+                            <Switch
+                              id="bundleActive"
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              data-testid="switch-bundle-active"
+                            />
+                          </FormControl>
+                          <FormLabel htmlFor="bundleActive" className="!mt-0">Active</FormLabel>
+                        </FormItem>
+                      )}
                     />
-                    <Label htmlFor="bundleActive">Active</Label>
-                  </div>
-                  <div className="flex justify-end gap-2 pt-4">
-                    <Button
-                      variant="outline"
-                      onClick={closeDialog}
-                      data-testid="button-cancel-bundle"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleSubmit}
-                      disabled={createBundleMutation.isPending || updateBundleMutation.isPending}
-                      data-testid="button-save-bundle"
-                    >
-                      {(createBundleMutation.isPending || updateBundleMutation.isPending)
-                        ? "Saving..."
-                        : editingBundle ? "Update" : "Create"}
-                    </Button>
-                  </div>
-                </div>
+                    <div className="flex justify-end gap-2 pt-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={closeDialog}
+                        data-testid="button-cancel-bundle"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={createBundleMutation.isPending || updateBundleMutation.isPending}
+                        data-testid="button-save-bundle"
+                      >
+                        {(createBundleMutation.isPending || updateBundleMutation.isPending)
+                          ? "Saving..."
+                          : editingBundle ? "Update" : "Create"}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
               </DialogContent>
             </Dialog>
           </div>

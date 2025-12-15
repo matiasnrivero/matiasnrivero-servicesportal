@@ -117,15 +117,44 @@ export function Header() {
             </Link>
           )}
           {isAdmin && (
-            <Link href="/settings">
-              <Button
-                variant={location === "/settings" ? "default" : "ghost"}
-                className={location === "/settings" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
-                data-testid="nav-settings"
-              >
-                Settings
-              </Button>
-            </Link>
+            <>
+              <Link href="/admin/bundle-line-items">
+                <Button
+                  variant={location === "/admin/bundle-line-items" ? "default" : "ghost"}
+                  className={location === "/admin/bundle-line-items" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
+                  data-testid="nav-bundle-line-items"
+                >
+                  Line Items
+                </Button>
+              </Link>
+              <Link href="/admin/bundles">
+                <Button
+                  variant={location === "/admin/bundles" ? "default" : "ghost"}
+                  className={location === "/admin/bundles" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
+                  data-testid="nav-bundles"
+                >
+                  Bundles
+                </Button>
+              </Link>
+              <Link href="/admin/service-packs">
+                <Button
+                  variant={location === "/admin/service-packs" ? "default" : "ghost"}
+                  className={location === "/admin/service-packs" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
+                  data-testid="nav-service-packs"
+                >
+                  Packs
+                </Button>
+              </Link>
+              <Link href="/settings">
+                <Button
+                  variant={location === "/settings" ? "default" : "ghost"}
+                  className={location === "/settings" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
+                  data-testid="nav-settings"
+                >
+                  Settings
+                </Button>
+              </Link>
+            </>
           )}
         </nav>
       </div>

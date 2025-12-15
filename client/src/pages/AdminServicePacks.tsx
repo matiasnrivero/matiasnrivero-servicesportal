@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Header } from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,11 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -31,9 +34,28 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { CalendarRange, Plus, Pencil, Trash2 } from "lucide-react";
+import { insertServicePackSchema } from "@shared/schema";
 import type { ServicePack, ServicePackItem, Service, User } from "@shared/schema";
+
+const packFormSchema = insertServicePackSchema.extend({
+  name: z.string().min(1, "Pack name is required"),
+  description: z.string().nullable().optional(),
+  price: z.string().min(1, "Price is required").refine(
+    (val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0,
+    "Please enter a valid price"
+  ),
+  isActive: z.boolean().default(true),
+});
 
 async function getDefaultUser(): Promise<User | null> {
   const res = await fetch("/api/default-user");
@@ -41,22 +63,46 @@ async function getDefaultUser(): Promise<User | null> {
   return res.json();
 }
 
+type PackFormValues = z.infer<typeof packFormSchema>;
+
 export default function AdminServicePacks() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [addItemDialogOpen, setAddItemDialogOpen] = useState(false);
   const [editingPack, setEditingPack] = useState<ServicePack | null>(null);
   const [selectedPack, setSelectedPack] = useState<ServicePack | null>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    price: "",
-    isActive: true,
-  });
   const [newItemData, setNewItemData] = useState({
     serviceId: "",
     quantity: "1",
   });
+
+  const form = useForm<PackFormValues>({
+    resolver: zodResolver(packFormSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      price: "",
+      isActive: true,
+    },
+  });
+
+  useEffect(() => {
+    if (editingPack) {
+      form.reset({
+        name: editingPack.name,
+        description: editingPack.description || "",
+        price: editingPack.price,
+        isActive: editingPack.isActive,
+      });
+    } else {
+      form.reset({
+        name: "",
+        description: "",
+        price: "",
+        isActive: true,
+      });
+    }
+  }, [editingPack, form]);
 
   const { data: currentUser } = useQuery<User | null>({
     queryKey: ["/api/default-user"],
@@ -83,7 +129,7 @@ export default function AdminServicePacks() {
   });
 
   const createPackMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
+    mutationFn: async (data: PackFormValues) => {
       return apiRequest("POST", "/api/service-packs", {
         name: data.name,
         description: data.description || null,
@@ -102,7 +148,7 @@ export default function AdminServicePacks() {
   });
 
   const updatePackMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<typeof formData> }) => {
+    mutationFn: async ({ id, data }: { id: string; data: PackFormValues }) => {
       return apiRequest("PATCH", `/api/service-packs/${id}`, {
         name: data.name,
         description: data.description || null,
@@ -154,42 +200,25 @@ export default function AdminServicePacks() {
   const closeDialog = () => {
     setDialogOpen(false);
     setEditingPack(null);
-    setFormData({ name: "", description: "", price: "", isActive: true });
+    form.reset();
   };
 
   const openCreateDialog = () => {
     setEditingPack(null);
-    setFormData({ name: "", description: "", price: "", isActive: true });
+    form.reset();
     setDialogOpen(true);
   };
 
   const openEditDialog = (pack: ServicePack) => {
     setEditingPack(pack);
-    setFormData({
-      name: pack.name,
-      description: pack.description || "",
-      price: pack.price,
-      isActive: pack.isActive,
-    });
     setDialogOpen(true);
   };
 
-  const handleSubmit = () => {
-    if (!formData.name || !formData.price) {
-      toast({ title: "Please fill in required fields", variant: "destructive" });
-      return;
-    }
-
-    const priceNum = parseFloat(formData.price);
-    if (isNaN(priceNum) || priceNum < 0) {
-      toast({ title: "Please enter a valid price", variant: "destructive" });
-      return;
-    }
-
+  const onSubmit = (values: PackFormValues) => {
     if (editingPack) {
-      updatePackMutation.mutate({ id: editingPack.id, data: formData });
+      updatePackMutation.mutate({ id: editingPack.id, data: values });
     } else {
-      createPackMutation.mutate(formData);
+      createPackMutation.mutate(values);
     }
   };
 
@@ -275,66 +304,105 @@ export default function AdminServicePacks() {
                   <DialogTitle>
                     {editingPack ? "Edit Service Pack" : "Create Service Pack"}
                   </DialogTitle>
+                  <DialogDescription>
+                    {editingPack ? "Update service pack details" : "Create a new monthly service pack"}
+                  </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-4 mt-4">
-                  <div className="space-y-2">
-                    <Label>Name<span className="text-destructive">*</span></Label>
-                    <Input
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="Enter pack name"
-                      data-testid="input-pack-name"
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Name<span className="text-destructive">*</span></FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder="Enter pack name"
+                              data-testid="input-pack-name"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Description</Label>
-                    <Textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="Enter description (optional)"
-                      data-testid="input-pack-description"
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              {...field}
+                              value={field.value || ""}
+                              placeholder="Enter description (optional)"
+                              data-testid="input-pack-description"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Monthly Price<span className="text-destructive">*</span></Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.price}
-                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                      placeholder="0.00"
-                      data-testid="input-pack-price"
+                    <FormField
+                      control={form.control}
+                      name="price"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Monthly Price<span className="text-destructive">*</span></FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              {...field}
+                              placeholder="0.00"
+                              data-testid="input-pack-price"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      id="packActive"
-                      checked={formData.isActive}
-                      onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
-                      data-testid="switch-pack-active"
+                    <FormField
+                      control={form.control}
+                      name="isActive"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center gap-2">
+                          <FormControl>
+                            <Switch
+                              id="packActive"
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              data-testid="switch-pack-active"
+                            />
+                          </FormControl>
+                          <FormLabel htmlFor="packActive" className="!mt-0">Active</FormLabel>
+                        </FormItem>
+                      )}
                     />
-                    <Label htmlFor="packActive">Active</Label>
-                  </div>
-                  <div className="flex justify-end gap-2 pt-4">
-                    <Button
-                      variant="outline"
-                      onClick={closeDialog}
-                      data-testid="button-cancel-pack"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleSubmit}
-                      disabled={createPackMutation.isPending || updatePackMutation.isPending}
-                      data-testid="button-save-pack"
-                    >
-                      {(createPackMutation.isPending || updatePackMutation.isPending)
-                        ? "Saving..."
-                        : editingPack ? "Update" : "Create"}
-                    </Button>
-                  </div>
-                </div>
+                    <div className="flex justify-end gap-2 pt-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={closeDialog}
+                        data-testid="button-cancel-pack"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={createPackMutation.isPending || updatePackMutation.isPending}
+                        data-testid="button-save-pack"
+                      >
+                        {(createPackMutation.isPending || updatePackMutation.isPending)
+                          ? "Saving..."
+                          : editingPack ? "Update" : "Create"}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
               </DialogContent>
             </Dialog>
           </div>
