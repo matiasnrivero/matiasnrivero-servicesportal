@@ -48,7 +48,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2 } from "lucide-react";
 import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem } from "@shared/schema";
-import { insertBundleLineItemSchema, insertBundleSchema, insertServicePackSchema } from "@shared/schema";
+import { insertBundleLineItemSchema } from "@shared/schema";
 
 const BASE_PRICE_SERVICES = [
   { name: "Vectorization & Color Separation" },
@@ -655,40 +655,7 @@ function BundleTableRow({
 }
 
 function PacksTabContent() {
-  const { toast } = useToast();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [addItemDialogOpen, setAddItemDialogOpen] = useState(false);
-  const [editingPack, setEditingPack] = useState<ServicePack | null>(null);
-  const [selectedPack, setSelectedPack] = useState<ServicePack | null>(null);
-  const [newItemData, setNewItemData] = useState({ serviceId: "", quantity: "1" });
-
-  const packFormSchema = insertServicePackSchema.extend({
-    name: z.string().min(1, "Pack name is required"),
-    description: z.string().nullable().optional(),
-    price: z.string().min(1, "Price is required").refine(
-      (val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0,
-      "Please enter a valid price"
-    ),
-    isActive: z.boolean().default(true),
-  });
-
-  const form = useForm<z.infer<typeof packFormSchema>>({
-    resolver: zodResolver(packFormSchema),
-    defaultValues: { name: "", description: "", price: "", isActive: true },
-  });
-
-  useEffect(() => {
-    if (editingPack) {
-      form.reset({
-        name: editingPack.name,
-        description: editingPack.description || "",
-        price: editingPack.price,
-        isActive: editingPack.isActive,
-      });
-    } else {
-      form.reset({ name: "", description: "", price: "", isActive: true });
-    }
-  }, [editingPack, form]);
+  const [, navigate] = useLocation();
 
   const { data: servicePacks = [], isLoading } = useQuery<ServicePack[]>({
     queryKey: ["/api/service-packs"],
@@ -697,133 +664,6 @@ function PacksTabContent() {
   const { data: services = [] } = useQuery<Service[]>({
     queryKey: ["/api/services"],
   });
-
-  const { data: packItems = [] } = useQuery<ServicePackItem[]>({
-    queryKey: ["/api/service-packs", selectedPack?.id, "items"],
-    queryFn: async () => {
-      if (!selectedPack) return [];
-      const res = await fetch(`/api/service-packs/${selectedPack.id}/items`);
-      if (!res.ok) throw new Error("Failed to fetch pack items");
-      return res.json();
-    },
-    enabled: !!selectedPack,
-  });
-
-  const createPackMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof packFormSchema>) => {
-      return apiRequest("POST", "/api/service-packs", {
-        name: data.name,
-        description: data.description || null,
-        price: data.price,
-        isActive: data.isActive,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/service-packs"] });
-      closeDialog();
-      toast({ title: "Service pack created successfully" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const updatePackMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: z.infer<typeof packFormSchema> }) => {
-      return apiRequest("PATCH", `/api/service-packs/${id}`, {
-        name: data.name,
-        description: data.description || null,
-        price: data.price,
-        isActive: data.isActive,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/service-packs"] });
-      closeDialog();
-      toast({ title: "Service pack updated successfully" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const addItemMutation = useMutation({
-    mutationFn: async ({ packId, data }: { packId: string; data: typeof newItemData }) => {
-      return apiRequest("POST", `/api/service-packs/${packId}/items`, {
-        serviceId: data.serviceId,
-        quantity: parseInt(data.quantity) || 1,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/service-packs", selectedPack?.id, "items"] });
-      setAddItemDialogOpen(false);
-      setNewItemData({ serviceId: "", quantity: "1" });
-      toast({ title: "Service added to pack" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const removeItemMutation = useMutation({
-    mutationFn: async ({ packId, itemId }: { packId: string; itemId: string }) => {
-      return apiRequest("DELETE", `/api/service-packs/${packId}/items/${itemId}`, {});
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/service-packs", selectedPack?.id, "items"] });
-      toast({ title: "Service removed from pack" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const closeDialog = () => {
-    setDialogOpen(false);
-    setEditingPack(null);
-    form.reset();
-  };
-
-  const openCreateDialog = () => {
-    setEditingPack(null);
-    form.reset();
-    setDialogOpen(true);
-  };
-
-  const openEditDialog = (pack: ServicePack) => {
-    setEditingPack(pack);
-    setDialogOpen(true);
-  };
-
-  const onSubmit = (values: z.infer<typeof packFormSchema>) => {
-    if (editingPack) {
-      updatePackMutation.mutate({ id: editingPack.id, data: values });
-    } else {
-      createPackMutation.mutate(values);
-    }
-  };
-
-  const handleAddItem = () => {
-    if (!selectedPack) return;
-    if (!newItemData.serviceId) {
-      toast({ title: "Please select a service", variant: "destructive" });
-      return;
-    }
-    addItemMutation.mutate({ packId: selectedPack.id, data: newItemData });
-  };
-
-  const getServiceName = (serviceId: string): string => {
-    return services.find(s => s.id === serviceId)?.title || "Unknown Service";
-  };
-
-  const calculateTotalServiceValue = (): number => {
-    let total = 0;
-    for (const item of packItems) {
-      const service = services.find(s => s.id === item.serviceId);
-      if (service) total += parseFloat(service.basePrice) * item.quantity;
-    }
-    return total;
-  };
 
   if (isLoading) {
     return (
@@ -835,252 +675,91 @@ function PacksTabContent() {
     );
   }
 
-  const totalServiceValue = selectedPack ? calculateTotalServiceValue() : 0;
-  const packPrice = selectedPack ? parseFloat(selectedPack.price) : 0;
-  const savings = totalServiceValue > 0 ? totalServiceValue - packPrice : 0;
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-2">
+        <CardTitle className="flex items-center gap-2">
+          <CalendarRange className="h-5 w-5" />
+          Packs ({servicePacks.length})
+        </CardTitle>
+        <Button onClick={() => navigate("/settings/packs/new")} data-testid="button-create-pack">
+          <Plus className="h-4 w-4 mr-2" />
+          Create Pack
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {servicePacks.length === 0 ? (
+          <p className="text-muted-foreground text-center py-8">No packs yet. Create your first one above.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Pack Name</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-right">Full Price</TableHead>
+                <TableHead className="text-right">Pack Price</TableHead>
+                <TableHead className="text-right">Edit</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {servicePacks.map((pack) => (
+                <PackTableRow 
+                  key={pack.id} 
+                  pack={pack} 
+                  services={services}
+                  onEdit={() => navigate(`/settings/packs/${pack.id}/edit`)}
+                />
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PackTableRow({ 
+  pack, 
+  services, 
+  onEdit 
+}: { 
+  pack: ServicePack; 
+  services: Service[]; 
+  onEdit: () => void;
+}) {
+  const { data: packItems = [] } = useQuery<ServicePackItem[]>({
+    queryKey: ["/api/service-packs", pack.id, "items"],
+    queryFn: async () => {
+      const res = await fetch(`/api/service-packs/${pack.id}/items`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const fullPrice = packItems.reduce((total, item) => {
+    const service = services.find(s => s.id === item.serviceId);
+    if (service) return total + parseFloat(service.basePrice) * item.quantity;
+    return total;
+  }, 0);
+
+  const packPrice = pack.price ? parseFloat(pack.price) : fullPrice;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2">
-            <CalendarRange className="h-5 w-5" />
-            Service Packs ({servicePacks.length})
-          </CardTitle>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={openCreateDialog} data-testid="button-create-pack">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Pack
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>{editingPack ? "Edit Service Pack" : "Create Service Pack"}</DialogTitle>
-                <DialogDescription>
-                  {editingPack ? "Update service pack details" : "Create a new monthly service pack"}
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Name<span className="text-destructive">*</span></FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Enter pack name" data-testid="input-pack-name" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Textarea {...field} value={field.value || ""} placeholder="Enter description (optional)" data-testid="input-pack-description" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="price"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Monthly Price<span className="text-destructive">*</span></FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.01" min="0" {...field} placeholder="0.00" data-testid="input-pack-price" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="isActive"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center gap-2">
-                        <FormControl>
-                          <Switch id="packActive" checked={field.value} onCheckedChange={field.onChange} data-testid="switch-pack-active" />
-                        </FormControl>
-                        <FormLabel htmlFor="packActive" className="!mt-0">Active</FormLabel>
-                      </FormItem>
-                    )}
-                  />
-                  <div className="flex justify-end gap-2 pt-4">
-                    <Button type="button" variant="outline" onClick={closeDialog} data-testid="button-cancel-pack">Cancel</Button>
-                    <Button type="submit" disabled={createPackMutation.isPending || updatePackMutation.isPending} data-testid="button-save-pack">
-                      {(createPackMutation.isPending || updatePackMutation.isPending) ? "Saving..." : editingPack ? "Update" : "Create"}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </CardHeader>
-        <CardContent>
-          {servicePacks.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">No service packs yet. Create your first one above.</p>
-          ) : (
-            <div className="space-y-2">
-              {servicePacks.map((pack) => (
-                <div
-                  key={pack.id}
-                  className={`flex items-center justify-between p-3 border rounded-md cursor-pointer hover-elevate ${
-                    selectedPack?.id === pack.id ? "border-primary bg-muted/50" : ""
-                  }`}
-                  onClick={() => setSelectedPack(pack)}
-                  data-testid={`row-pack-${pack.id}`}
-                >
-                  <div>
-                    <p className="font-medium">{pack.name}</p>
-                    <p className="text-sm text-muted-foreground">${parseFloat(pack.price).toFixed(2)}/month</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={pack.isActive ? "default" : "secondary"}>{pack.isActive ? "Active" : "Inactive"}</Badge>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={(e) => { e.stopPropagation(); openEditDialog(pack); }}
-                      data-testid={`button-edit-pack-${pack.id}`}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">{selectedPack ? selectedPack.name : "Pack Details"}</CardTitle>
-          {selectedPack && <CardDescription>Configure monthly service allocations for this pack</CardDescription>}
-        </CardHeader>
-        <CardContent>
-          {!selectedPack ? (
-            <p className="text-muted-foreground text-center py-8">Select a pack from the list to configure services</p>
-          ) : (
-            <div className="space-y-6">
-              {packItems.length > 0 && (
-                <div className="p-4 bg-muted/50 rounded-md space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Individual Service Value:</span>
-                    <span>${totalServiceValue.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between font-semibold">
-                    <span>Pack Price:</span>
-                    <span>${packPrice.toFixed(2)}/month</span>
-                  </div>
-                  {savings > 0 && (
-                    <div className="text-sm text-green-600">
-                      Customer saves: ${savings.toFixed(2)} ({((savings / totalServiceValue) * 100).toFixed(1)}%)
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="flex items-center justify-between">
-                <span className="font-medium">Included Services</span>
-                <Dialog open={addItemDialogOpen} onOpenChange={setAddItemDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" data-testid="button-add-pack-item">
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Service
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Add Service to Pack</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 mt-4">
-                      <div className="space-y-2">
-                        <Label>Service</Label>
-                        <Select value={newItemData.serviceId} onValueChange={(v) => setNewItemData({ ...newItemData, serviceId: v })}>
-                          <SelectTrigger data-testid="select-pack-service">
-                            <SelectValue placeholder="Select a service" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {services.filter(s => s.isActive).map((service) => (
-                              <SelectItem key={service.id} value={service.id}>
-                                {service.title} - ${parseFloat(service.basePrice).toFixed(2)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Monthly Quantity</Label>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={newItemData.quantity}
-                          onChange={(e) => setNewItemData({ ...newItemData, quantity: e.target.value })}
-                          data-testid="input-pack-item-quantity"
-                        />
-                      </div>
-                      <div className="flex justify-end gap-2 pt-4">
-                        <Button variant="outline" onClick={() => setAddItemDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleAddItem} disabled={addItemMutation.isPending} data-testid="button-confirm-add-pack-item">
-                          {addItemMutation.isPending ? "Adding..." : "Add Service"}
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-
-              {packItems.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4 text-sm">No services in this pack yet</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Service</TableHead>
-                      <TableHead className="text-center">Monthly Qty</TableHead>
-                      <TableHead className="text-right">Value</TableHead>
-                      <TableHead className="w-10"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {packItems.map((item) => {
-                      const service = services.find(s => s.id === item.serviceId);
-                      const itemValue = service ? parseFloat(service.basePrice) * item.quantity : 0;
-                      return (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-medium">{getServiceName(item.serviceId)}</TableCell>
-                          <TableCell className="text-center">{item.quantity}</TableCell>
-                          <TableCell className="text-right">${itemValue.toFixed(2)}</TableCell>
-                          <TableCell>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => removeItemMutation.mutate({ packId: selectedPack.id, itemId: item.id })}
-                              data-testid={`button-remove-pack-item-${item.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+    <TableRow data-testid={`row-pack-${pack.id}`}>
+      <TableCell className="font-medium">{pack.name}</TableCell>
+      <TableCell className="text-center">
+        <Badge variant={pack.isActive ? "default" : "secondary"}>
+          {pack.isActive ? "Active" : "Inactive"}
+        </Badge>
+      </TableCell>
+      <TableCell className="text-right">${fullPrice.toFixed(2)}</TableCell>
+      <TableCell className="text-right">${packPrice.toFixed(2)}</TableCell>
+      <TableCell className="text-right">
+        <Button size="icon" variant="ghost" onClick={onEdit} data-testid={`button-edit-pack-${pack.id}`}>
+          <Pencil className="h-4 w-4" />
+        </Button>
+      </TableCell>
+    </TableRow>
   );
 }
 
