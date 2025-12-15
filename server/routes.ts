@@ -229,13 +229,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get the target designer ID (from body or default to session user)
       const targetDesignerId = req.body.designerId || sessionUserId;
 
-      // Verify target designer exists and is actually a designer
+      // Verify target designer exists and can be assigned work
       const targetDesigner = await storage.getUser(targetDesignerId);
       if (!targetDesigner) {
         return res.status(404).json({ error: "Target designer not found" });
       }
-      if (targetDesigner.role !== "designer") {
-        return res.status(400).json({ error: "Can only assign to users with designer role" });
+      const canBeAssigned = ["designer", "vendor_designer"].includes(targetDesigner.role);
+      if (!canBeAssigned) {
+        return res.status(400).json({ error: "Can only assign to designers or vendor designers" });
       }
 
       // Assign the target designer

@@ -100,6 +100,7 @@ export default function JobDetailView() {
   const isDesigner = currentUser?.role === "designer";
   const isClient = currentUser?.role === "client" || currentUser?.role === "distributor";
   const canManageJobs = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(currentUser?.role || "");
+  const canTakeJob = ["designer", "vendor_designer"].includes(currentUser?.role || "");
 
   useEffect(() => {
     if (request?.assigneeId) {
@@ -229,7 +230,7 @@ export default function JobDetailView() {
     assignMutation.mutate(designerId);
   };
 
-  const designers = allUsers.filter(user => user.role === "designer");
+  const designers = allUsers.filter(user => user.role === "designer" || user.role === "vendor_designer");
 
   const handleDeliver = () => {
     deliverMutation.mutate();
@@ -1510,7 +1511,7 @@ export default function JobDetailView() {
                   <CardTitle className="text-lg">Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {request.status === "pending" && (
+                  {request.status === "pending" && canTakeJob && (
                     <Button
                       onClick={() => handleTakeJob()}
                       disabled={assignMutation.isPending}
