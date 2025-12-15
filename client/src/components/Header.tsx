@@ -44,9 +44,8 @@ export function Header() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/default-user"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+      // Clear all queries to ensure fresh data for new role
+      queryClient.clear();
     },
   });
 
@@ -60,9 +59,8 @@ export function Header() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/default-user"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+      // Clear all queries to ensure fresh data
+      queryClient.clear();
     },
   });
 
