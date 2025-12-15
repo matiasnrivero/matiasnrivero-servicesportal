@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, UserCog } from "lucide-react";
+import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, UserCog, XCircle } from "lucide-react";
 import type { ServiceRequest, Service, User } from "@shared/schema";
 
 interface CurrentUser {
@@ -42,6 +42,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
   "in-progress": { label: "In Progress", color: "bg-blue-100 text-blue-800 border-blue-200", icon: RefreshCw },
   "delivered": { label: "Delivered", color: "bg-green-100 text-green-800 border-green-200", icon: CheckCircle2 },
   "change-request": { label: "Change Request", color: "bg-orange-100 text-orange-800 border-orange-200", icon: AlertCircle },
+  "canceled": { label: "Canceled", color: "bg-gray-100 text-gray-800 border-gray-200", icon: XCircle },
 };
 
 export default function ServiceRequestsList() {
@@ -137,6 +138,7 @@ export default function ServiceRequestsList() {
                     <SelectItem value="in-progress">In Progress</SelectItem>
                     <SelectItem value="delivered">Delivered</SelectItem>
                     <SelectItem value="change-request">Change Request</SelectItem>
+                    <SelectItem value="canceled">Canceled</SelectItem>
                   </SelectContent>
                 </Select>
                 <Link href="/">

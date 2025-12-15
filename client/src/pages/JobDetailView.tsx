@@ -26,7 +26,8 @@ import {
   RefreshCw,
   Users,
   Reply,
-  X
+  X,
+  XCircle
 } from "lucide-react";
 import type { ServiceRequest, Service, User as UserType, ServiceAttachment, Comment } from "@shared/schema";
 
@@ -41,6 +42,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
   "in-progress": { label: "In Progress", color: "bg-blue-100 text-blue-800 border-blue-200", icon: RefreshCw },
   "delivered": { label: "Delivered", color: "bg-green-100 text-green-800 border-green-200", icon: CheckCircle2 },
   "change-request": { label: "Change Request", color: "bg-orange-100 text-orange-800 border-orange-200", icon: AlertCircle },
+  "canceled": { label: "Canceled", color: "bg-gray-100 text-gray-800 border-gray-200", icon: XCircle },
 };
 
 export default function JobDetailView() {
@@ -169,6 +171,21 @@ export default function JobDetailView() {
     },
   });
 
+  const cancelMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", `/api/service-requests/${requestId}/cancel`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests", requestId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+      toast({ title: "Request canceled", description: "The service request has been canceled." });
+      navigate("/service-requests");
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to cancel request.", variant: "destructive" });
+    },
+  });
+
   const addCommentMutation = useMutation({
     mutationFn: async () => {
       return apiRequest("POST", `/api/service-requests/${requestId}/comments`, {
@@ -225,6 +242,10 @@ export default function JobDetailView() {
 
   const handleResume = () => {
     resumeMutation.mutate();
+  };
+
+  const handleCancel = () => {
+    cancelMutation.mutate();
   };
 
   const getUserById = (id: string | null) => {
@@ -485,9 +506,11 @@ export default function JobDetailView() {
                 <Button 
                   variant="outline" 
                   className="border-red-300 text-red-600"
+                  onClick={handleCancel}
+                  disabled={cancelMutation.isPending}
                   data-testid="button-cancel-request"
                 >
-                  Cancel Request
+                  {cancelMutation.isPending ? "Canceling..." : "Cancel Request"}
                 </Button>
                 <Button 
                   className="bg-sky-blue-accent hover:bg-sky-blue-accent/90"

@@ -376,6 +376,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cancel request (only when pending)
+  app.post("/api/service-requests/:id/cancel", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const existingRequest = await storage.getServiceRequest(req.params.id);
+      if (!existingRequest) {
+        return res.status(404).json({ error: "Service request not found" });
+      }
+
+      if (existingRequest.status !== "pending") {
+        return res.status(400).json({ error: "Only pending requests can be canceled" });
+      }
+
+      // Verify the session user is the original requester
+      if (existingRequest.userId !== sessionUserId) {
+        return res.status(403).json({ error: "Only the requester can cancel this request" });
+      }
+
+      const request = await storage.updateServiceRequest(req.params.id, { 
+        status: "canceled"
+      });
+      res.json(request);
+    } catch (error) {
+      console.error("Error canceling request:", error);
+      res.status(500).json({ error: "Failed to cancel request" });
+    }
+  });
+
   // Attachments routes - requires authentication and ownership/assignment check
   app.get("/api/service-requests/:requestId/attachments", async (req, res) => {
     try {
