@@ -61,7 +61,9 @@ const roleLabels: Record<string, string> = {
 async function getDefaultUser(): Promise<User | null> {
   const res = await fetch("/api/default-user");
   if (!res.ok) return null;
-  return res.json();
+  const data = await res.json();
+  // Map userId to id for consistency with User type
+  return { ...data, id: data.userId };
 }
 
 export default function VendorProfile() {
