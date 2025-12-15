@@ -1329,6 +1329,11 @@ export default function ServiceRequestForm() {
                     id="dueDate"
                     type="date"
                     lang="en-US"
+                    min={(() => {
+                      const tomorrow = new Date();
+                      tomorrow.setDate(tomorrow.getDate() + 1);
+                      return tomorrow.toLocaleDateString('en-CA');
+                    })()}
                     {...register("dueDate")}
                     data-testid="input-due-date"
                   />
