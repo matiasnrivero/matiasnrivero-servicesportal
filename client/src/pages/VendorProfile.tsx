@@ -150,7 +150,7 @@ export default function VendorProfile() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/vendor"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/vendor", vendorStructureId] });
       setInviteDialogOpen(false);
       setNewUser({
         username: "",
@@ -171,7 +171,7 @@ export default function VendorProfile() {
       return apiRequest("PATCH", `/api/users/${userId}`, { isActive });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/vendor"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users/vendor", vendorStructureId] });
       toast({ title: "User status updated" });
     },
     onError: (error: Error) => {
