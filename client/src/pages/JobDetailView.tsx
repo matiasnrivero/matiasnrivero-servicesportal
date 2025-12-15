@@ -419,11 +419,11 @@ export default function JobDetailView() {
           </div>
         )}
 
-        {deliverableAttachments.length === 0 && !isDesigner && (
+        {deliverableAttachments.length === 0 && !canManageJobs && (
           <p className="text-sm text-dark-gray">No deliverables uploaded yet</p>
         )}
 
-        {isDesigner && (request.status === "in-progress" || request.status === "change-request") && (
+        {canManageJobs && (request.status === "in-progress" || request.status === "change-request") && (
           <div>
             <p className="text-sm font-medium text-dark-blue-night mb-2">Upload File*</p>
             <FileUploader onUploadComplete={handleDeliverableUpload} />
@@ -1389,7 +1389,7 @@ export default function JobDetailView() {
               </CardContent>
             </Card>
 
-            {!showDeliverablesAtTop && (isDesigner || deliverableAttachments.length > 0) && (
+            {!showDeliverablesAtTop && (canManageJobs || deliverableAttachments.length > 0) && (
               <DeliverablesSection />
             )}
 
