@@ -118,7 +118,7 @@ export function Header() {
               className={location.startsWith("/service-requests") && location !== "/service-requests/new" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
               data-testid="nav-requests"
             >
-              My Requests
+              {currentUser?.role === "client" ? "My Requests" : "Requests"}
             </Button>
           </Link>
           {canManageUsers && (
