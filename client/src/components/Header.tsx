@@ -43,9 +43,9 @@ export function Header() {
       if (!res.ok) throw new Error("Failed to switch role");
       return res.json() as Promise<{ role: string }>;
     },
-    onSuccess: (data) => {
-      // Clear all queries to ensure fresh data for new role
-      queryClient.clear();
+    onSuccess: async (data) => {
+      // Invalidate all queries to trigger refetch with new role data
+      await queryClient.invalidateQueries();
       // Navigate to vendor profile when switching to vendor role
       if (data.role === "vendor") {
         setLocation("/vendor-profile");
@@ -62,9 +62,9 @@ export function Header() {
       if (!res.ok) throw new Error("Failed to exit impersonation");
       return res.json();
     },
-    onSuccess: () => {
-      // Clear all queries to ensure fresh data
-      queryClient.clear();
+    onSuccess: async () => {
+      // Invalidate all queries to trigger refetch
+      await queryClient.invalidateQueries();
     },
   });
 
