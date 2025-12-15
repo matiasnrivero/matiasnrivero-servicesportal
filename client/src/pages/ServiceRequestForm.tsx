@@ -38,7 +38,8 @@ import { useToast } from "@/hooks/use-toast";
 import type { Service, InsertServiceRequest, Bundle, BundleItem, ServicePack, ServicePackItem } from "@shared/schema";
 import { Header } from "@/components/Header";
 import { FileUploader } from "@/components/FileUploader";
-import { ChevronRight, HelpCircle, X, Boxes, CalendarRange, Package } from "lucide-react";
+import { ChevronRight, HelpCircle, X, Boxes, CalendarRange, Package, ArrowLeft } from "lucide-react";
+import { Link } from "wouter";
 
 import complexityExample1 from "@assets/Imagen_de_WhatsApp_2025-09-04_a_las_11.08.18_29a99002_(1)_1765400666338.jpg";
 import complexityExample2 from "@assets/Imagen_de_WhatsApp_2025-09-04_a_las_11.08.18_be732b8a_(2)_1765400666337.jpg";
@@ -1429,9 +1430,15 @@ export default function ServiceRequestForm() {
     <div className="p-8">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="font-title-semibold text-dark-blue-night text-2xl flex items-center gap-3">
-              {selectedService?.title}
+          <div className="flex items-start gap-4">
+            <Link href="/services">
+              <Button variant="ghost" size="icon" data-testid="button-back">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="font-title-semibold text-dark-blue-night text-2xl flex items-center gap-3">
+                {selectedService?.title}
               {showPricing && (
                 selectedService?.title === "Store Creation" ? (
                   <button
@@ -1449,9 +1456,10 @@ export default function ServiceRequestForm() {
                 )
               )}
             </h1>
-            <p className="font-body-reg text-dark-gray mt-1">
-              {selectedService?.description}
-            </p>
+              <p className="font-body-reg text-dark-gray mt-1">
+                {selectedService?.description}
+              </p>
+            </div>
           </div>
           <Button type="button" onClick={handleSubmit(onSubmit)} disabled={mutation.isPending}>
             {mutation.isPending ? "Saving..." : "Save"}
