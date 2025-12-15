@@ -628,6 +628,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get or create default user and set in session
   app.get("/api/default-user", async (req, res) => {
     try {
+      // Prevent browser caching - this endpoint depends on session state
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+      
       // If user already in session, return that user
       if (req.session.userId) {
         const existingUser = await storage.getUser(req.session.userId);
@@ -689,13 +694,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Clear impersonation when switching roles
+      req.session.impersonatorId = undefined;
+      
       // Update session with new user
       req.session.userId = user.id;
       req.session.userRole = user.role;
       
+      console.log(`[switch-role] Switched to ${role}: userId=${user.id}, username=${user.username}`);
+      
       // Update lastLoginAt
       await storage.updateUser(user.id, { lastLoginAt: new Date() });
       
+      // Prevent caching
+      res.set('Cache-Control', 'no-store');
       res.json({ userId: user.id, role: user.role, username: user.username });
     } catch (error) {
       console.error("Error switching role:", error);

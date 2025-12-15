@@ -84,9 +84,10 @@ export default function VendorProfile() {
 
   const { data: vendorProfile, isLoading: profileLoading, refetch: refetchProfile } = useQuery<VendorProfileType | null>({
     queryKey: ["/api/vendor-profiles/user", currentUser?.id],
-    queryFn: async () => {
-      if (!currentUser?.id || currentUser.role !== "vendor") return null;
-      const res = await fetch(`/api/vendor-profiles/user/${currentUser.id}`);
+    queryFn: async ({ queryKey }) => {
+      const userId = queryKey[1] as string | undefined;
+      if (!userId) return null;
+      const res = await fetch(`/api/vendor-profiles/user/${userId}`);
       if (!res.ok) return null;
       return res.json();
     },
