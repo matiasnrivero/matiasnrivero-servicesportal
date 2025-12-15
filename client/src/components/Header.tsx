@@ -70,7 +70,7 @@ export function Header() {
   const isInternalDesigner = currentUser?.role === "internal_designer";
   const isVendor = currentUser?.role === "vendor";
   const isVendorDesigner = currentUser?.role === "vendor_designer";
-  const canManageUsers = isAdmin || isInternalDesigner || isVendor;
+  const canManageUsers = isAdmin || isInternalDesigner;
   const canViewVendorProfile = isVendor;
   const canViewVendorsList = isAdmin;
 
