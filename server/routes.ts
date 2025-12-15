@@ -676,7 +676,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: `role must be one of: ${validRoles.join(", ")}` });
       }
 
-      const username = `${role}-user`;
+      // For vendor role, use Pixel's Hive vendor (Javier Rubiantes) for testing
+      const username = role === "vendor" ? "Javier Rubiantes" : `${role}-user`;
       let user = await storage.getUserByUsername(username);
       
       if (!user) {
