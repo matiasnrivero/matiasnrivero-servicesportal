@@ -266,6 +266,27 @@ export default function UserManagement() {
     return currentUser?.role === "admin";
   };
 
+  const canImpersonateUser = (targetUser: User): boolean => {
+    if (!currentUser) return false;
+    if (targetUser.id === currentUser.id) return false;
+    if (currentUser.role === "admin") return true;
+    if (currentUser.role === "vendor") {
+      const vendorStructureId = currentUser.vendorId || currentUser.id;
+      return (
+        targetUser.vendorId === vendorStructureId &&
+        ["vendor", "vendor_designer"].includes(targetUser.role)
+      );
+    }
+    return false;
+  };
+
+  const getAvailableRoleFilters = (): string[] => {
+    if (currentUser?.role === "vendor") {
+      return ["vendor", "vendor_designer"];
+    }
+    return userRoles as unknown as string[];
+  };
+
   const handleOpenEditDialog = (user: User) => {
     setEditingUser(user);
     setEditFormData({
@@ -572,9 +593,9 @@ export default function UserManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Roles</SelectItem>
-                    {userRoles.map((role) => (
+                    {getAvailableRoleFilters().map((role) => (
                       <SelectItem key={role} value={role}>
-                        {roleLabels[role]}
+                        {roleLabels[role as keyof typeof roleLabels]}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -683,7 +704,7 @@ export default function UserManagement() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {currentUser?.role === "admin" && user.id !== currentUser?.id && (
+                      {canImpersonateUser(user) && (
                         <Button
                           variant="ghost"
                           size="icon"
