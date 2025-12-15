@@ -907,7 +907,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "You don't have permission to modify this user" });
       }
 
-      const updatedUser = await storage.updateUser(req.params.id, req.body);
+      // Filter fields based on role permissions
+      // Admins can edit everything, vendors can only edit basic info
+      const { username, email, phone, role, paymentMethod, isActive } = req.body;
+      
+      let updateData: Record<string, any> = {};
+      
+      // Basic fields that any authorized user can edit
+      if (username !== undefined) updateData.username = username;
+      if (email !== undefined) updateData.email = email;
+      if (phone !== undefined) updateData.phone = phone;
+      if (isActive !== undefined) updateData.isActive = isActive;
+      
+      // Role and payment type can only be edited by admins
+      if (sessionUser.role === "admin") {
+        if (role !== undefined) {
+          updateData.role = role;
+          // Clear paymentMethod if role is changed to non-client
+          if (role !== "client") {
+            updateData.paymentMethod = null;
+          }
+        }
+        // Only allow paymentMethod for clients
+        if (paymentMethod !== undefined && (role === "client" || (!role && targetUser.role === "client"))) {
+          updateData.paymentMethod = paymentMethod;
+        }
+      }
+
+      const updatedUser = await storage.updateUser(req.params.id, updateData);
       res.json(updatedUser);
     } catch (error) {
       console.error("Error updating user:", error);

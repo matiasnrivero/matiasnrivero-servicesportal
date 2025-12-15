@@ -23,7 +23,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Users, UserPlus, Search, Filter } from "lucide-react";
+import { Users, UserPlus, Search, Filter, Pencil } from "lucide-react";
 import type { User } from "@shared/schema";
 import { userRoles, paymentMethods } from "@shared/schema";
 
@@ -62,6 +62,15 @@ export default function UserManagement() {
     role: "client" as string,
     paymentMethod: "" as string,
     vendorId: "" as string,
+  });
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    username: "",
+    email: "",
+    phone: "",
+    role: "",
+    paymentMethod: "",
   });
 
   const { data: currentUser } = useQuery<User | null>({
@@ -112,6 +121,21 @@ export default function UserManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({ title: "User status updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ userId, data }: { userId: string; data: Partial<typeof editFormData> }) => {
+      return apiRequest("PATCH", `/api/users/${userId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setEditDialogOpen(false);
+      setEditingUser(null);
+      toast({ title: "User updated successfully" });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -169,6 +193,60 @@ export default function UserManagement() {
       return;
     }
     createUserMutation.mutate(newUser);
+  };
+
+  const canEditUser = (targetUser: User): boolean => {
+    if (!currentUser) return false;
+    if (currentUser.role === "admin") return true;
+    if (currentUser.role === "vendor") {
+      const vendorStructureId = currentUser.vendorId || currentUser.id;
+      return (
+        targetUser.vendorId === vendorStructureId &&
+        ["vendor", "vendor_designer"].includes(targetUser.role)
+      );
+    }
+    return false;
+  };
+
+  const canEditRoleAndPayment = (): boolean => {
+    return currentUser?.role === "admin";
+  };
+
+  const handleOpenEditDialog = (user: User) => {
+    setEditingUser(user);
+    setEditFormData({
+      username: user.username,
+      email: user.email || "",
+      phone: user.phone || "",
+      role: user.role,
+      paymentMethod: user.paymentMethod || "",
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdateUser = () => {
+    if (!editingUser) return;
+    if (!editFormData.username) {
+      toast({ title: "Username is required", variant: "destructive" });
+      return;
+    }
+    
+    const updateData: Record<string, string> = {
+      username: editFormData.username,
+      email: editFormData.email,
+      phone: editFormData.phone,
+    };
+    
+    if (canEditRoleAndPayment()) {
+      updateData.role = editFormData.role;
+      if (editFormData.role === "client") {
+        updateData.paymentMethod = editFormData.paymentMethod;
+      } else {
+        updateData.paymentMethod = "";
+      }
+    }
+    
+    updateUserMutation.mutate({ userId: editingUser.id, data: updateData });
   };
 
   if (isLoading) {
@@ -287,13 +365,13 @@ export default function UserManagement() {
                   )}
                   {newUser.role === "client" && currentUser?.role === "admin" && (
                     <div className="space-y-2">
-                      <Label>Payment Method</Label>
+                      <Label>Payment Type</Label>
                       <Select
                         value={newUser.paymentMethod}
                         onValueChange={(v) => setNewUser({ ...newUser, paymentMethod: v })}
                       >
-                        <SelectTrigger data-testid="select-payment-method">
-                          <SelectValue placeholder="Select payment method" />
+                        <SelectTrigger data-testid="select-payment-type">
+                          <SelectValue placeholder="Select payment type" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="pay_as_you_go">Pay as you go (Credit Card)</SelectItem>
@@ -323,6 +401,100 @@ export default function UserManagement() {
               </DialogContent>
             </Dialog>
           )}
+
+          <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Edit User</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label>Username<span className="text-destructive">*</span></Label>
+                  <Input
+                    value={editFormData.username}
+                    onChange={(e) => setEditFormData({ ...editFormData, username: e.target.value })}
+                    placeholder="Enter username"
+                    data-testid="input-edit-username"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    value={editFormData.email}
+                    onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                    placeholder="Enter email"
+                    data-testid="input-edit-email"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Phone</Label>
+                  <Input
+                    value={editFormData.phone}
+                    onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                    placeholder="Enter phone"
+                    data-testid="input-edit-phone"
+                  />
+                </div>
+                {canEditRoleAndPayment() && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Role</Label>
+                      <Select
+                        value={editFormData.role}
+                        onValueChange={(v) => setEditFormData({ ...editFormData, role: v })}
+                      >
+                        <SelectTrigger data-testid="select-edit-role">
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {userRoles.map((role) => (
+                            <SelectItem key={role} value={role}>
+                              {roleLabels[role]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {editFormData.role === "client" && (
+                      <div className="space-y-2">
+                        <Label>Payment Type</Label>
+                        <Select
+                          value={editFormData.paymentMethod}
+                          onValueChange={(v) => setEditFormData({ ...editFormData, paymentMethod: v })}
+                        >
+                          <SelectTrigger data-testid="select-edit-payment-type">
+                            <SelectValue placeholder="Select payment type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pay_as_you_go">Pay as you go (Credit Card)</SelectItem>
+                            <SelectItem value="monthly_payment">Monthly Payment (Credit Card / ACH)</SelectItem>
+                            <SelectItem value="deduct_from_royalties">Deduct from Tri-POD Royalties</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </>
+                )}
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditDialogOpen(false)}
+                    data-testid="button-cancel-edit"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleUpdateUser}
+                    disabled={updateUserMutation.isPending}
+                    data-testid="button-confirm-edit"
+                  >
+                    {updateUserMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <Card className="mb-6">
@@ -392,6 +564,16 @@ export default function UserManagement() {
                       )}
                     </div>
                     <div className="flex items-center gap-4">
+                      {canEditUser(user) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenEditDialog(user)}
+                          data-testid={`button-edit-user-${user.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
                       {canToggleUserActive(user) && user.id !== currentUser?.id && (
                         <div className="flex items-center gap-2">
                           <Label htmlFor={`toggle-${user.id}`} className="text-sm text-dark-gray">
