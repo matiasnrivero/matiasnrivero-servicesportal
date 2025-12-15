@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { eq, desc, and, or } from "drizzle-orm";
+import { eq, desc, and, or, isNull } from "drizzle-orm";
 import {
   type User,
   type InsertUser,
@@ -60,6 +60,7 @@ export interface IStorage {
   getAllVendorProfiles(): Promise<VendorProfile[]>;
   createVendorProfile(profile: InsertVendorProfile): Promise<VendorProfile>;
   updateVendorProfile(id: string, profile: UpdateVendorProfile): Promise<VendorProfile | undefined>;
+  deleteVendor(profileId: string): Promise<void>;
 
   // Service methods
   getAllServices(): Promise<Service[]>;
@@ -163,7 +164,9 @@ export class DbStorage implements IStorage {
   }
 
   async getAllVendorProfiles(): Promise<VendorProfile[]> {
-    return await db.select().from(vendorProfiles).orderBy(vendorProfiles.companyName);
+    return await db.select().from(vendorProfiles)
+      .where(isNull(vendorProfiles.deletedAt))
+      .orderBy(vendorProfiles.companyName);
   }
 
   async createVendorProfile(profile: InsertVendorProfile): Promise<VendorProfile> {
@@ -177,6 +180,23 @@ export class DbStorage implements IStorage {
       .where(eq(vendorProfiles.id, id))
       .returning();
     return result[0];
+  }
+
+  async deleteVendor(profileId: string): Promise<void> {
+    const profile = await this.getVendorProfileById(profileId);
+    if (!profile) return;
+
+    await db.update(vendorProfiles)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(eq(vendorProfiles.id, profileId));
+
+    await db.update(users)
+      .set({ isActive: false })
+      .where(eq(users.id, profile.userId));
+
+    await db.update(users)
+      .set({ isActive: false })
+      .where(eq(users.vendorId, profile.userId));
   }
 
   // Service methods

@@ -16,8 +16,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Search, Eye, Plus } from "lucide-react";
+import { Building2, Search, Eye, Plus, Trash2 } from "lucide-react";
 import type { User, VendorProfile } from "@shared/schema";
 
 type UserSession = {
@@ -109,6 +120,20 @@ export default function VendorsList() {
         website: "",
       });
       toast({ title: "Vendor created successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteVendorMutation = useMutation({
+    mutationFn: async (profileId: string) => {
+      return apiRequest("DELETE", `/api/vendor-profiles/${profileId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor-profiles"] });
+      toast({ title: "Vendor deleted successfully" });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -368,6 +393,46 @@ export default function VendorsList() {
                             <Eye className="h-4 w-4 mr-2" />
                             View
                           </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-destructive border-destructive/50"
+                                data-testid={`button-delete-vendor-${vendor.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete{" "}
+                                  <strong>{profile?.companyName || vendor.username}</strong>?
+                                  This will deactivate the vendor account and all associated
+                                  team members. This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel data-testid="button-cancel-delete">
+                                  Cancel
+                                </AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => {
+                                    if (profile) {
+                                      deleteVendorMutation.mutate(profile.id);
+                                    }
+                                  }}
+                                  className="bg-destructive text-destructive-foreground"
+                                  data-testid="button-confirm-delete"
+                                >
+                                  {deleteVendorMutation.isPending ? "Deleting..." : "Delete Vendor"}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </div>
                     );

@@ -38,6 +38,8 @@ export const vendorProfiles = pgTable("vendor_profiles", {
   pricingAgreements: jsonb("pricing_agreements"),
   // SLA configuration (JSON: { serviceType: { days: number, hours: number } })
   slaConfig: jsonb("sla_config"),
+  // Soft delete timestamp - when set, vendor is considered deleted
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

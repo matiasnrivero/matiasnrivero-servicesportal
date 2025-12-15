@@ -1153,6 +1153,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/vendor-profiles/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      if (sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Only admins can delete vendors" });
+      }
+
+      const profile = await storage.getVendorProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Vendor profile not found" });
+      }
+
+      await storage.deleteVendor(req.params.id);
+      res.json({ success: true, message: "Vendor deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting vendor:", error);
+      res.status(500).json({ error: "Failed to delete vendor" });
+    }
+  });
+
   // System settings routes
   app.get("/api/system-settings/pricing", async (req, res) => {
     try {
