@@ -22,10 +22,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { Users, UserPlus, Search, Filter, Pencil } from "lucide-react";
+import { Users, UserPlus, Search, Filter, Pencil, CalendarIcon, X } from "lucide-react";
 import type { User } from "@shared/schema";
 import { userRoles, paymentMethods } from "@shared/schema";
+import { format } from "date-fns";
 
 const roleLabels: Record<string, string> = {
   admin: "Admin",
@@ -62,6 +69,8 @@ export default function UserManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [newUser, setNewUser] = useState({
     username: "",
@@ -159,7 +168,24 @@ export default function UserManagement() {
     const matchesStatus = statusFilter === "all" || 
       (statusFilter === "active" && user.isActive) || 
       (statusFilter === "inactive" && !user.isActive);
-    return matchesSearch && matchesRole && matchesStatus;
+    
+    // Date range filtering
+    let matchesDateRange = true;
+    if (user.createdAt) {
+      const userDate = new Date(user.createdAt);
+      if (dateFrom) {
+        const fromStart = new Date(dateFrom);
+        fromStart.setHours(0, 0, 0, 0);
+        matchesDateRange = matchesDateRange && userDate >= fromStart;
+      }
+      if (dateTo) {
+        const toEnd = new Date(dateTo);
+        toEnd.setHours(23, 59, 59, 999);
+        matchesDateRange = matchesDateRange && userDate <= toEnd;
+      }
+    }
+    
+    return matchesSearch && matchesRole && matchesStatus && matchesDateRange;
   });
 
   const canInviteRole = (targetRole: string): boolean => {
@@ -550,6 +576,50 @@ export default function UserManagement() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-32 justify-start text-left font-normal" data-testid="button-date-from">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateFrom ? format(dateFrom, "MM/dd/yy") : "From"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateFrom}
+                      onSelect={setDateFrom}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-32 justify-start text-left font-normal" data-testid="button-date-to">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateTo ? format(dateTo, "MM/dd/yy") : "To"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateTo}
+                      onSelect={setDateTo}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                {(dateFrom || dateTo) && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => { setDateFrom(undefined); setDateTo(undefined); }}
+                    data-testid="button-clear-dates"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -572,7 +642,7 @@ export default function UserManagement() {
                     data-testid={`row-user-${user.id}`}
                   >
                     <div className="flex items-center gap-4">
-                      <div>
+                      <div className="min-w-[180px]">
                         <p className="font-semibold text-dark-blue-night">
                           {user.username}
                         </p>
@@ -589,6 +659,9 @@ export default function UserManagement() {
                           Inactive
                         </Badge>
                       )}
+                      <div className="text-sm text-dark-gray">
+                        {user.createdAt ? format(new Date(user.createdAt), "MMM d, yyyy") : "-"}
+                      </div>
                     </div>
                     <div className="flex items-center gap-4">
                       {canEditUser(user) && (
