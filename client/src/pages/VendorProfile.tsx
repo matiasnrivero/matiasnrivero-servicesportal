@@ -148,13 +148,14 @@ export default function VendorProfile() {
       setProfileForm({
         companyName: vendorProfile.companyName || "",
         website: vendorProfile.website || "",
-        email: vendorProfile.email || "",
-        phone: vendorProfile.phone || "",
+        // Use vendor profile email/phone if available, otherwise fall back to user email/phone
+        email: vendorProfile.email || currentUser?.email || "",
+        phone: vendorProfile.phone || currentUser?.phone || "",
       });
       setPricingData((vendorProfile.pricingAgreements as any) || {});
       setSlaData((vendorProfile.slaConfig as any) || {});
     }
-  }, [vendorProfile]);
+  }, [vendorProfile, currentUser?.email, currentUser?.phone]);
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: any) => {
