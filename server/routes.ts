@@ -632,7 +632,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.session.userId) {
         const existingUser = await storage.getUser(req.session.userId);
         if (existingUser) {
-          return res.json({ userId: existingUser.id, role: existingUser.role, username: existingUser.username });
+          const response: any = { 
+            userId: existingUser.id, 
+            role: existingUser.role, 
+            username: existingUser.username 
+          };
+          // Include impersonation info if applicable
+          if (req.session.impersonatorId) {
+            response.impersonating = true;
+            response.impersonatorId = req.session.impersonatorId;
+          }
+          return res.json(response);
         }
       }
 
@@ -682,10 +692,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.userId = user.id;
       req.session.userRole = user.role;
       
+      // Update lastLoginAt
+      await storage.updateUser(user.id, { lastLoginAt: new Date() });
+      
       res.json({ userId: user.id, role: user.role, username: user.username });
     } catch (error) {
       console.error("Error switching role:", error);
       res.status(500).json({ error: "Failed to switch role" });
+    }
+  });
+
+  // Admin impersonation - login as another user
+  app.post("/api/users/:id/impersonate", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      // Check if already impersonating - don't allow nested impersonation
+      if (req.session.impersonatorId) {
+        return res.status(400).json({ error: "Already impersonating a user. Exit impersonation first." });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Only admins can impersonate users" });
+      }
+
+      const targetUser = await storage.getUser(req.params.id);
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Store the original admin user ID and switch to target user
+      req.session.impersonatorId = sessionUserId;
+      req.session.userId = targetUser.id;
+      req.session.userRole = targetUser.role;
+
+      res.json({ 
+        userId: targetUser.id, 
+        role: targetUser.role, 
+        username: targetUser.username,
+        impersonating: true,
+        impersonatorId: sessionUserId 
+      });
+    } catch (error) {
+      console.error("Error impersonating user:", error);
+      res.status(500).json({ error: "Failed to impersonate user" });
+    }
+  });
+
+  // Exit impersonation - return to original admin user
+  app.post("/api/impersonation/exit", async (req, res) => {
+    try {
+      const impersonatorId = req.session.impersonatorId;
+      if (!impersonatorId) {
+        return res.status(400).json({ error: "Not currently impersonating any user" });
+      }
+
+      const adminUser = await storage.getUser(impersonatorId);
+      if (!adminUser) {
+        return res.status(404).json({ error: "Original admin user not found" });
+      }
+
+      // Restore the original admin session
+      req.session.userId = adminUser.id;
+      req.session.userRole = adminUser.role;
+      delete req.session.impersonatorId;
+
+      res.json({ 
+        userId: adminUser.id, 
+        role: adminUser.role, 
+        username: adminUser.username,
+        impersonating: false 
+      });
+    } catch (error) {
+      console.error("Error exiting impersonation:", error);
+      res.status(500).json({ error: "Failed to exit impersonation" });
     }
   });
 

@@ -25,6 +25,7 @@ export const users = pgTable("users", {
   paymentMethod: text("payment_method"),
   invitedBy: varchar("invited_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastLoginAt: timestamp("last_login_at"),
 });
 
 // Vendor profiles with pricing agreements and SLAs

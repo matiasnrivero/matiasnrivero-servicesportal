@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { Users, UserPlus, Search, Filter, Pencil, CalendarIcon, X } from "lucide-react";
+import { Users, UserPlus, Search, Filter, Pencil, CalendarIcon, X, LogIn } from "lucide-react";
 import type { User } from "@shared/schema";
 import { userRoles, paymentMethods } from "@shared/schema";
 import { format } from "date-fns";
@@ -154,6 +154,22 @@ export default function UserManagement() {
       setEditDialogOpen(false);
       setEditingUser(null);
       toast({ title: "User updated successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const impersonateMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return apiRequest("POST", `/api/users/${userId}/impersonate`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/default-user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+      toast({ title: "Now viewing as selected user" });
+      window.location.href = "/";
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -659,11 +675,26 @@ export default function UserManagement() {
                           Inactive
                         </Badge>
                       )}
-                      <div className="text-sm text-dark-gray">
+                      <div className="text-sm text-dark-gray min-w-[90px]">
                         {user.createdAt ? format(new Date(user.createdAt), "MMM d, yyyy") : "-"}
                       </div>
+                      <div className="text-sm text-dark-gray min-w-[90px]">
+                        {user.lastLoginAt ? format(new Date(user.lastLoginAt), "MMM d, yyyy") : "Never"}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      {currentUser?.role === "admin" && user.id !== currentUser?.id && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => impersonateMutation.mutate(user.id)}
+                          disabled={impersonateMutation.isPending}
+                          title="Login as this user"
+                          data-testid={`button-login-as-${user.id}`}
+                        >
+                          <LogIn className="h-4 w-4" />
+                        </Button>
+                      )}
                       {canEditUser(user) && (
                         <Button
                           variant="ghost"

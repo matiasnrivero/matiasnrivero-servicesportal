@@ -15,6 +15,8 @@ type UserSession = {
   userId: string;
   role: string;
   username: string;
+  impersonating?: boolean;
+  impersonatorId?: string;
 };
 
 async function getDefaultUser(): Promise<UserSession | null> {
@@ -48,6 +50,22 @@ export function Header() {
     },
   });
 
+  const exitImpersonationMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/impersonation/exit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) throw new Error("Failed to exit impersonation");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/default-user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+    },
+  });
+
   const isAdmin = currentUser?.role === "admin";
   const isInternalDesigner = currentUser?.role === "internal_designer";
   const isVendor = currentUser?.role === "vendor";
@@ -57,6 +75,24 @@ export function Header() {
   const canViewVendorsList = isAdmin;
 
   return (
+    <>
+      {currentUser?.impersonating && (
+        <div className="w-full bg-amber-500 text-white px-4 py-2 flex items-center justify-center gap-4">
+          <span className="text-sm font-medium">
+            You are viewing as: <strong>{currentUser.username}</strong> ({currentUser.role})
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="bg-white text-amber-700 hover:bg-amber-50 border-amber-300"
+            onClick={() => exitImpersonationMutation.mutate()}
+            disabled={exitImpersonationMutation.isPending}
+            data-testid="button-exit-impersonation"
+          >
+            {exitImpersonationMutation.isPending ? "Exiting..." : "Exit Impersonation"}
+          </Button>
+        </div>
+      )}
     <header className="flex w-full items-center justify-between gap-12 px-8 py-4 bg-white shadow-shadow-top-bar">
       <div className="flex items-center gap-8">
         <Link href="/">
@@ -129,7 +165,7 @@ export function Header() {
           )}
         </nav>
       </div>
-      {currentUser && (
+      {currentUser && !currentUser.impersonating && (
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-sm text-dark-gray">
             <span>User Role</span>
@@ -152,5 +188,6 @@ export function Header() {
         </div>
       )}
     </header>
+    </>
   );
 }
