@@ -1432,8 +1432,9 @@ export default function ServiceRequestForm() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-start gap-4">
             <Link href="/">
-              <Button variant="ghost" size="icon" data-testid="button-back">
-                <ArrowLeft className="h-5 w-5" />
+              <Button variant="outline" data-testid="button-back">
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back
               </Button>
             </Link>
             <div>
