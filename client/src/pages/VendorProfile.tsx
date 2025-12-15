@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Header } from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +25,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Users, DollarSign, Clock, UserPlus, Save } from "lucide-react";
+import { Building2, Users, DollarSign, Clock, UserPlus, Save, LogIn, Pencil } from "lucide-react";
 import type { User, VendorProfile as VendorProfileType, Service } from "@shared/schema";
 
 const BASE_COST_SERVICES = [
@@ -143,6 +144,17 @@ export default function VendorProfile() {
 
   const [slaData, setSlaData] = useState<Record<string, { days: number; hours?: number }>>({});
 
+  // Edit team member state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<User | null>(null);
+  const [editForm, setEditForm] = useState({
+    username: "",
+    email: "",
+    phone: "",
+  });
+
+  const [, setLocation] = useLocation();
+
   useEffect(() => {
     if (vendorProfile) {
       setProfileForm({
@@ -207,6 +219,56 @@ export default function VendorProfile() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  // Impersonate team member mutation
+  const impersonateMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return apiRequest("POST", `/api/users/${userId}/impersonate`, {});
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/default-user"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/default-user"] });
+      toast({ title: "Logged in as team member" });
+      setLocation("/requests");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Edit team member mutation
+  const editTeamMemberMutation = useMutation({
+    mutationFn: async ({ userId, data }: { userId: string; data: typeof editForm }) => {
+      return apiRequest("PATCH", `/api/vendor/users/${userId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/vendor", vendorStructureId] });
+      setEditDialogOpen(false);
+      setEditingMember(null);
+      toast({ title: "Team member updated successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleEditMember = (member: User) => {
+    setEditingMember(member);
+    setEditForm({
+      username: member.username,
+      email: member.email || "",
+      phone: member.phone || "",
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEditMember = () => {
+    if (!editingMember) return;
+    editTeamMemberMutation.mutate({
+      userId: editingMember.id,
+      data: editForm,
+    });
+  };
 
   const handleSaveProfile = () => {
     updateProfileMutation.mutate({
@@ -557,24 +619,45 @@ export default function VendorProfile() {
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Label
-                            htmlFor={`toggle-team-${member.id}`}
-                            className="text-sm text-dark-gray"
+                        <div className="flex items-center gap-4">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEditMember(member)}
+                            data-testid={`button-edit-member-${member.id}`}
                           >
-                            Active
-                          </Label>
-                          <Switch
-                            id={`toggle-team-${member.id}`}
-                            checked={member.isActive}
-                            onCheckedChange={(checked) =>
-                              toggleUserActiveMutation.mutate({
-                                userId: member.id,
-                                isActive: checked,
-                              })
-                            }
-                            data-testid={`switch-team-active-${member.id}`}
-                          />
+                            <Pencil className="h-4 w-4 mr-1" />
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => impersonateMutation.mutate(member.id)}
+                            disabled={!member.isActive || impersonateMutation.isPending}
+                            data-testid={`button-login-as-${member.id}`}
+                          >
+                            <LogIn className="h-4 w-4 mr-1" />
+                            Login as
+                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Label
+                              htmlFor={`toggle-team-${member.id}`}
+                              className="text-sm text-dark-gray"
+                            >
+                              Active
+                            </Label>
+                            <Switch
+                              id={`toggle-team-${member.id}`}
+                              checked={member.isActive}
+                              onCheckedChange={(checked) =>
+                                toggleUserActiveMutation.mutate({
+                                  userId: member.id,
+                                  isActive: checked,
+                                })
+                              }
+                              data-testid={`switch-team-active-${member.id}`}
+                            />
+                          </div>
                         </div>
                       </div>
                     ))
@@ -582,6 +665,67 @@ export default function VendorProfile() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Edit Team Member Dialog */}
+            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit Team Member</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <Label>Username<span className="text-destructive">*</span></Label>
+                    <Input
+                      value={editForm.username}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, username: e.target.value })
+                      }
+                      placeholder="Enter username"
+                      data-testid="input-edit-username"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      value={editForm.email}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, email: e.target.value })
+                      }
+                      placeholder="Enter email"
+                      data-testid="input-edit-email"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Phone</Label>
+                    <Input
+                      value={editForm.phone}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, phone: e.target.value })
+                      }
+                      placeholder="Enter phone"
+                      data-testid="input-edit-phone"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => setEditDialogOpen(false)}
+                      data-testid="button-cancel-edit-member"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleSaveEditMember}
+                      disabled={editTeamMemberMutation.isPending || !editForm.username.trim()}
+                      data-testid="button-save-edit-member"
+                    >
+                      {editTeamMemberMutation.isPending ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="cost">

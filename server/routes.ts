@@ -804,6 +804,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Vendor edit team member - allows vendor to update team member details
+  app.patch("/api/vendor/users/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(403).json({ error: "User not found" });
+      }
+
+      // Only vendors can use this endpoint
+      if (sessionUser.role !== "vendor") {
+        return res.status(403).json({ error: "Only vendors can edit team members" });
+      }
+
+      const targetUser = await storage.getUser(req.params.id);
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Verify target user belongs to vendor's team
+      const vendorStructureId = sessionUser.vendorId || sessionUser.id;
+      const isTeamMember = 
+        (targetUser.vendorId === vendorStructureId || targetUser.id === vendorStructureId) &&
+        ["vendor", "vendor_designer"].includes(targetUser.role);
+
+      if (!isTeamMember) {
+        return res.status(403).json({ error: "User is not part of your vendor team" });
+      }
+
+      // Only allow editing safe fields (username, email, phone)
+      const { username, email, phone } = req.body;
+      const updateData: Partial<{ username: string; email: string; phone: string }> = {};
+      
+      if (username !== undefined) updateData.username = username;
+      if (email !== undefined) updateData.email = email;
+      if (phone !== undefined) updateData.phone = phone;
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ error: "No valid fields to update" });
+      }
+
+      const updatedUser = await storage.updateUser(req.params.id, updateData);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating team member:", error);
+      res.status(500).json({ error: "Failed to update team member" });
+    }
+  });
+
   // Seed initial services data
   app.post("/api/seed", async (req, res) => {
     try {
