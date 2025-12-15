@@ -1,4 +1,4 @@
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useRoute } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ async function getDefaultUser(): Promise<UserSession | null> {
 }
 
 export function Header() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   
   const { data: currentUser } = useQuery<UserSession | null>({
     queryKey: ["/api/default-user"],
@@ -41,11 +41,15 @@ export function Header() {
         body: JSON.stringify({ role }),
       });
       if (!res.ok) throw new Error("Failed to switch role");
-      return res.json();
+      return res.json() as Promise<{ role: string }>;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       // Clear all queries to ensure fresh data for new role
       queryClient.clear();
+      // Navigate to vendor profile when switching to vendor role
+      if (data.role === "vendor") {
+        setLocation("/vendor-profile");
+      }
     },
   });
 

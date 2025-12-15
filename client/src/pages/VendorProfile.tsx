@@ -77,7 +77,7 @@ export default function VendorProfile() {
     role: "vendor_designer" as string,
   });
 
-  const { data: currentUser } = useQuery<User | null>({
+  const { data: currentUser, isLoading: userLoading } = useQuery<User | null>({
     queryKey: ["/api/default-user"],
     queryFn: getDefaultUser,
   });
@@ -242,6 +242,18 @@ export default function VendorProfile() {
       },
     }));
   };
+
+  // Show loading state while user data is being fetched
+  if (userLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-blue-accent"></div>
+        </div>
+      </div>
+    );
+  }
 
   if (!currentUser || currentUser.role !== "vendor") {
     return (
