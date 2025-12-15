@@ -248,6 +248,13 @@ export default function ServiceRequestForm() {
     }
   }, [preSelectedServiceId, services]);
 
+  // Redirect to home if no serviceId is provided - user must select from Available Services page
+  useEffect(() => {
+    if (!preSelectedServiceId) {
+      navigate("/");
+    }
+  }, [preSelectedServiceId, navigate]);
+
   useEffect(() => {
     if (currentUser?.username) {
       setValue("customerName", currentUser.username);
@@ -392,15 +399,8 @@ export default function ServiceRequestForm() {
   };
 
   const handleBack = () => {
-    setSelectedServiceId("");
-    setSelectedBundleId("");
-    setSelectedPackId("");
-    setFormData({});
-    setUploadedFiles({});
-    setCalculatedPrice(0);
-    setThreadColorInput("");
-    setThreadColorChips([]);
-    reset();
+    // Navigate back to Available Services page instead of showing local selector
+    navigate("/");
   };
 
   const activeBundles = bundles.filter((b: Bundle) => b.isActive);
@@ -1646,6 +1646,10 @@ export default function ServiceRequestForm() {
   };
 
   const renderContent = () => {
+    // If no serviceId in URL, redirect is happening - show nothing
+    if (!preSelectedServiceId) {
+      return null;
+    }
     if (selectedServiceId) {
       return renderServiceForm();
     }
@@ -1655,7 +1659,12 @@ export default function ServiceRequestForm() {
     if (selectedPackId) {
       return renderPackDetail();
     }
-    return renderServiceSelector();
+    // Fallback - show loading while service loads
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <p className="text-dark-gray">Loading...</p>
+      </div>
+    );
   };
 
   return (
