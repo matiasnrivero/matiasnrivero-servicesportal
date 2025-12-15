@@ -486,13 +486,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // For deliverable attachments: only the assigned designer can upload
+      // For deliverable attachments: only assigned job managers can upload
       if (attachmentKind === "deliverable") {
-        if (sessionUser.role !== "designer") {
-          return res.status(403).json({ error: "Only designers can upload deliverables" });
+        const canUploadDeliverables = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(sessionUser.role);
+        if (!canUploadDeliverables) {
+          return res.status(403).json({ error: "You don't have permission to upload deliverables" });
         }
         if (existingRequest.assigneeId !== sessionUserId) {
-          return res.status(403).json({ error: "Only the assigned designer can upload deliverables" });
+          return res.status(403).json({ error: "Only the assigned user can upload deliverables" });
         }
         // Deliverables can only be uploaded when job is in-progress or change-request
         if (existingRequest.status !== "in-progress" && existingRequest.status !== "change-request") {
