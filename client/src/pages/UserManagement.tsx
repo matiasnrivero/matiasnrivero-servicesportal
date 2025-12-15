@@ -40,7 +40,15 @@ const roleBadgeVariants: Record<string, "default" | "secondary" | "outline"> = {
   internal_designer: "default",
   vendor: "secondary",
   vendor_designer: "secondary",
-  client: "outline",
+  client: "default",
+};
+
+const roleBadgeColors: Record<string, string> = {
+  admin: "",
+  internal_designer: "",
+  vendor: "",
+  vendor_designer: "",
+  client: "bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700",
 };
 
 async function getDefaultUser(): Promise<User | null> {
@@ -53,6 +61,7 @@ export default function UserManagement() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [newUser, setNewUser] = useState({
     username: "",
@@ -147,7 +156,10 @@ export default function UserManagement() {
       user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
     const matchesRole = roleFilter === "all" || user.role === roleFilter;
-    return matchesSearch && matchesRole;
+    const matchesStatus = statusFilter === "all" || 
+      (statusFilter === "active" && user.isActive) || 
+      (statusFilter === "inactive" && !user.isActive);
+    return matchesSearch && matchesRole && matchesStatus;
   });
 
   const canInviteRole = (targetRole: string): boolean => {
@@ -526,6 +538,18 @@ export default function UserManagement() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="flex items-center gap-2">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-36" data-testid="select-status-filter">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -554,7 +578,10 @@ export default function UserManagement() {
                         </p>
                         <p className="text-sm text-dark-gray">{user.email || "No email"}</p>
                       </div>
-                      <Badge variant={roleBadgeVariants[user.role] || "outline"}>
+                      <Badge 
+                        variant={roleBadgeVariants[user.role] || "outline"}
+                        className={roleBadgeColors[user.role] || ""}
+                      >
                         {roleLabels[user.role] || user.role}
                       </Badge>
                       {!user.isActive && (
