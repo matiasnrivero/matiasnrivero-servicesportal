@@ -234,9 +234,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!targetDesigner) {
         return res.status(404).json({ error: "Target designer not found" });
       }
-      const canBeAssigned = ["designer", "vendor_designer"].includes(targetDesigner.role);
+      const canBeAssigned = ["admin", "internal_designer", "designer", "vendor_designer"].includes(targetDesigner.role);
       if (!canBeAssigned) {
-        return res.status(400).json({ error: "Can only assign to designers or vendor designers" });
+        return res.status(400).json({ error: "Can only assign to admin, internal designers, designers, or vendor designers" });
       }
 
       // Assign the target designer

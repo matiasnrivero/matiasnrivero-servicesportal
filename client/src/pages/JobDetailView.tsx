@@ -100,7 +100,7 @@ export default function JobDetailView() {
   const isDesigner = currentUser?.role === "designer";
   const isClient = currentUser?.role === "client" || currentUser?.role === "distributor";
   const canManageJobs = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(currentUser?.role || "");
-  const canTakeJob = ["designer", "vendor_designer"].includes(currentUser?.role || "");
+  const canTakeJob = ["admin", "internal_designer", "designer", "vendor_designer"].includes(currentUser?.role || "");
 
   useEffect(() => {
     if (request?.assigneeId) {
