@@ -966,8 +966,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.status(201).json(newUser);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating user:", error);
+      if (error.code === "23505" && error.constraint === "users_username_unique") {
+        return res.status(400).json({ error: "Username already exists. Please choose a different username." });
+      }
       res.status(500).json({ error: "Failed to create user" });
     }
   });
