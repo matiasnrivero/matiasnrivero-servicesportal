@@ -1427,19 +1427,25 @@ export default function ServiceRequestForm() {
   };
 
   const renderServiceForm = () => (
-    <div className="p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-start gap-4">
-            <Link href="/">
-              <Button variant="outline" data-testid="button-back">
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back
-              </Button>
-            </Link>
-            <div>
-              <h1 className="font-title-semibold text-dark-blue-night text-2xl flex items-center gap-3">
-                {selectedService?.title}
+    <div>
+      <div className="bg-gradient-to-r from-dark-blue-night to-space-cadet px-8 py-4">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <Link href="/">
+            <Button variant="outline" className="bg-white hover:bg-gray-100" data-testid="button-back">
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back
+            </Button>
+          </Link>
+          <Button type="button" onClick={handleSubmit(onSubmit)} disabled={mutation.isPending}>
+            {mutation.isPending ? "Saving..." : "Save"}
+          </Button>
+        </div>
+      </div>
+      <div className="p-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-6">
+            <h1 className="font-title-semibold text-dark-blue-night text-2xl flex items-center gap-3">
+              {selectedService?.title}
               {showPricing && (
                 selectedService?.title === "Store Creation" ? (
                   <button
@@ -1457,15 +1463,10 @@ export default function ServiceRequestForm() {
                 )
               )}
             </h1>
-              <p className="font-body-reg text-dark-gray mt-1">
-                {selectedService?.description}
-              </p>
-            </div>
+            <p className="font-body-reg text-dark-gray mt-1">
+              {selectedService?.description}
+            </p>
           </div>
-          <Button type="button" onClick={handleSubmit(onSubmit)} disabled={mutation.isPending}>
-            {mutation.isPending ? "Saving..." : "Save"}
-          </Button>
-        </div>
 
         <Card>
           <CardContent className="p-6">
@@ -1545,6 +1546,7 @@ export default function ServiceRequestForm() {
             </form>
           </CardContent>
         </Card>
+        </div>
       </div>
     </div>
   );
