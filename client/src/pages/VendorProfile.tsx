@@ -131,6 +131,8 @@ export default function VendorProfile() {
   const [profileForm, setProfileForm] = useState({
     companyName: "",
     website: "",
+    email: "",
+    phone: "",
   });
 
   const [pricingData, setPricingData] = useState<Record<string, {
@@ -146,6 +148,8 @@ export default function VendorProfile() {
       setProfileForm({
         companyName: vendorProfile.companyName || "",
         website: vendorProfile.website || "",
+        email: vendorProfile.email || "",
+        phone: vendorProfile.phone || "",
       });
       setPricingData((vendorProfile.pricingAgreements as any) || {});
       setSlaData((vendorProfile.slaConfig as any) || {});
@@ -371,18 +375,22 @@ export default function VendorProfile() {
                   <div className="space-y-2">
                     <Label>Email</Label>
                     <Input
-                      value={currentUser.email || ""}
-                      disabled
-                      className="bg-muted"
+                      value={profileForm.email}
+                      onChange={(e) =>
+                        setProfileForm({ ...profileForm, email: e.target.value })
+                      }
+                      placeholder="Enter email"
                       data-testid="input-email"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>Phone</Label>
                     <Input
-                      value={currentUser.phone || ""}
-                      disabled
-                      className="bg-muted"
+                      value={profileForm.phone}
+                      onChange={(e) =>
+                        setProfileForm({ ...profileForm, phone: e.target.value })
+                      }
+                      placeholder="Enter phone"
                       data-testid="input-phone"
                     />
                   </div>

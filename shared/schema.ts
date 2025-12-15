@@ -34,6 +34,8 @@ export const vendorProfiles = pgTable("vendor_profiles", {
   userId: varchar("user_id").notNull().references(() => users.id),
   companyName: text("company_name").notNull(),
   website: text("website"),
+  email: text("email"),
+  phone: text("phone"),
   // Pricing agreements per service type (JSON structure)
   pricingAgreements: jsonb("pricing_agreements"),
   // SLA configuration (JSON: { serviceType: { days: number, hours: number } })
