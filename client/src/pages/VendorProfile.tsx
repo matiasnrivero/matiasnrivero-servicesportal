@@ -82,20 +82,29 @@ export default function VendorProfile() {
     queryFn: getDefaultUser,
   });
 
-  const { data: vendorProfile, isLoading: profileLoading } = useQuery<VendorProfileType | null>({
+  const { data: vendorProfile, isLoading: profileLoading, refetch: refetchProfile } = useQuery<VendorProfileType | null>({
     queryKey: ["/api/vendor-profiles/user", currentUser?.id],
     queryFn: async () => {
-      if (!currentUser?.id) return null;
+      if (!currentUser?.id || currentUser.role !== "vendor") return null;
       const res = await fetch(`/api/vendor-profiles/user/${currentUser.id}`);
       if (!res.ok) return null;
       return res.json();
     },
     enabled: !!currentUser?.id && currentUser.role === "vendor",
+    refetchOnMount: true,
+    staleTime: 0,
   });
+
+  // Force refetch when currentUser changes to vendor role
+  useEffect(() => {
+    if (currentUser?.id && currentUser.role === "vendor") {
+      refetchProfile();
+    }
+  }, [currentUser?.id, currentUser?.role, refetchProfile]);
 
   const vendorStructureId = currentUser?.vendorId || currentUser?.id;
 
-  const { data: teamMembers = [], isLoading: teamLoading } = useQuery<User[]>({
+  const { data: teamMembers = [], isLoading: teamLoading, refetch: refetchTeam } = useQuery<User[]>({
     queryKey: ["/api/users/vendor", vendorStructureId],
     queryFn: async () => {
       if (!vendorStructureId) return [];
@@ -104,7 +113,16 @@ export default function VendorProfile() {
       return res.json();
     },
     enabled: !!vendorStructureId,
+    refetchOnMount: true,
+    staleTime: 0,
   });
+
+  // Force refetch team when vendorStructureId changes
+  useEffect(() => {
+    if (vendorStructureId) {
+      refetchTeam();
+    }
+  }, [vendorStructureId, refetchTeam]);
 
   const [profileForm, setProfileForm] = useState({
     companyName: "",
