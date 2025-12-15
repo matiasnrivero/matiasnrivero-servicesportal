@@ -14,9 +14,7 @@ import VendorProfile from "@/pages/VendorProfile";
 import VendorsList from "@/pages/VendorsList";
 import VendorDetail from "@/pages/VendorDetail";
 import Settings from "@/pages/Settings";
-import AdminBundleLineItems from "@/pages/AdminBundleLineItems";
-import AdminBundleConfigurator from "@/pages/AdminBundleConfigurator";
-import AdminServicePacks from "@/pages/AdminServicePacks";
+import BundleEditor from "@/pages/BundleEditor";
 
 function Router() {
   return (
@@ -31,9 +29,8 @@ function Router() {
       <Route path="/vendors" component={VendorsList} />
       <Route path="/vendors/:id" component={VendorDetail} />
       <Route path="/settings" component={Settings} />
-      <Route path="/admin/bundle-line-items" component={AdminBundleLineItems} />
-      <Route path="/admin/bundles" component={AdminBundleConfigurator} />
-      <Route path="/admin/service-packs" component={AdminServicePacks} />
+      <Route path="/settings/bundles/new" component={BundleEditor} />
+      <Route path="/settings/bundles/:id/edit" component={BundleEditor} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>
