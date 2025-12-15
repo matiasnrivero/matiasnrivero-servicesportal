@@ -99,6 +99,7 @@ export default function JobDetailView() {
 
   const isDesigner = currentUser?.role === "designer";
   const isClient = currentUser?.role === "client" || currentUser?.role === "distributor";
+  const canManageJobs = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(currentUser?.role || "");
 
   useEffect(() => {
     if (request?.assigneeId) {
@@ -1503,7 +1504,7 @@ export default function JobDetailView() {
           </div>
 
           <div className="space-y-4">
-            {isDesigner && (
+            {canManageJobs && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Actions</CardTitle>
