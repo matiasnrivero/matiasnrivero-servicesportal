@@ -197,7 +197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Assign designer to request (designers can assign themselves or other designers)
+  // Assign designer to request (admins, internal designers, vendors, vendor designers can assign)
   app.post("/api/service-requests/:id/assign", async (req, res) => {
     try {
       // Use session user for authorization
@@ -206,13 +206,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
 
-      // Verify the session user is a designer
+      // Verify the session user can manage jobs
       const sessionUser = await storage.getUser(sessionUserId);
       if (!sessionUser) {
         return res.status(401).json({ error: "User not found" });
       }
-      if (sessionUser.role !== "designer") {
-        return res.status(403).json({ error: "Only designers can assign jobs" });
+      const canManageJobs = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(sessionUser.role);
+      if (!canManageJobs) {
+        return res.status(403).json({ error: "You don't have permission to assign jobs" });
       }
 
       const existingRequest = await storage.getServiceRequest(req.params.id);
