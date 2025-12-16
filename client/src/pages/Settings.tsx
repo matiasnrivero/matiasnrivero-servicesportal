@@ -47,7 +47,7 @@ import {
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2 } from "lucide-react";
-import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem, InputField, ServiceField } from "@shared/schema";
+import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem, InputField, ServiceField, BundleFieldDefault } from "@shared/schema";
 import { insertBundleLineItemSchema, inputFieldTypes, valueModes } from "@shared/schema";
 
 const BASE_PRICE_SERVICES = [
@@ -1443,6 +1443,848 @@ function InputFieldsTabContent() {
   );
 }
 
+// Service Fields Manager - Configure per-service field options and defaults
+function ServiceFieldsManager() {
+  const { toast } = useToast();
+  const [selectedServiceId, setSelectedServiceId] = useState<string>("");
+  const [isAddFieldDialogOpen, setIsAddFieldDialogOpen] = useState(false);
+  const [editingServiceField, setEditingServiceField] = useState<ServiceField | null>(null);
+
+  const { data: allServices = [] } = useQuery<Service[]>({
+    queryKey: ["/api/services"],
+  });
+
+  const { data: inputFieldsList = [] } = useQuery<InputField[]>({
+    queryKey: ["/api/input-fields"],
+  });
+
+  const { data: serviceFieldsList = [], isLoading: loadingServiceFields } = useQuery<ServiceField[]>({
+    queryKey: ["/api/services", selectedServiceId, "fields"],
+    queryFn: async () => {
+      if (!selectedServiceId) return [];
+      const res = await fetch(`/api/services/${selectedServiceId}/fields`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedServiceId,
+  });
+
+  const addFieldMutation = useMutation({
+    mutationFn: async (data: { inputFieldId: string; optionsJson?: string[]; defaultValue?: string; isRequired?: boolean; sortOrder?: number }) => {
+      return apiRequest("POST", `/api/services/${selectedServiceId}/fields`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/services", selectedServiceId, "fields"] });
+      setIsAddFieldDialogOpen(false);
+      toast({ title: "Field added to service" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to add field", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateServiceFieldMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<ServiceField> }) => {
+      return apiRequest("PATCH", `/api/service-fields/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/services", selectedServiceId, "fields"] });
+      setEditingServiceField(null);
+      toast({ title: "Service field updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteServiceFieldMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/service-fields/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/services", selectedServiceId, "fields"] });
+      toast({ title: "Field removed from service" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to remove", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const addFieldForm = useForm({
+    defaultValues: {
+      inputFieldId: "",
+      optionsJson: "",
+      defaultValue: "",
+      isRequired: false,
+      sortOrder: 0,
+    },
+  });
+
+  const editFieldForm = useForm({
+    defaultValues: {
+      optionsJson: "",
+      defaultValue: "",
+      isRequired: false,
+      sortOrder: 0,
+    },
+  });
+
+  useEffect(() => {
+    if (editingServiceField) {
+      editFieldForm.reset({
+        optionsJson: editingServiceField.optionsJson ? JSON.stringify(editingServiceField.optionsJson) : "",
+        defaultValue: editingServiceField.defaultValue || "",
+        isRequired: editingServiceField.isRequired ?? false,
+        sortOrder: editingServiceField.sortOrder ?? 0,
+      });
+    }
+  }, [editingServiceField, editFieldForm]);
+
+  const handleAddField = (data: { inputFieldId: string; optionsJson: string; defaultValue: string; isRequired: boolean; sortOrder: number }) => {
+    addFieldMutation.mutate({
+      inputFieldId: data.inputFieldId,
+      optionsJson: data.optionsJson ? JSON.parse(data.optionsJson) : undefined,
+      defaultValue: data.defaultValue || undefined,
+      isRequired: data.isRequired,
+      sortOrder: data.sortOrder,
+    });
+  };
+
+  const handleUpdateField = (data: { optionsJson: string; defaultValue: string; isRequired: boolean; sortOrder: number }) => {
+    if (!editingServiceField) return;
+    updateServiceFieldMutation.mutate({
+      id: editingServiceField.id,
+      data: {
+        optionsJson: data.optionsJson ? JSON.parse(data.optionsJson) : null,
+        defaultValue: data.defaultValue || null,
+        isRequired: data.isRequired,
+        sortOrder: data.sortOrder,
+      },
+    });
+  };
+
+  const getInputFieldName = (inputFieldId: string) => {
+    const field = inputFieldsList.find(f => f.id === inputFieldId);
+    return field?.displayName || field?.name || "Unknown Field";
+  };
+
+  const getInputFieldType = (inputFieldId: string) => {
+    const field = inputFieldsList.find(f => f.id === inputFieldId);
+    return field?.inputType || "text";
+  };
+
+  const availableFieldsToAdd = inputFieldsList.filter(
+    f => !serviceFieldsList.some(sf => sf.inputFieldId === f.id)
+  );
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Package className="h-5 w-5" />
+          Service Field Assignments
+        </CardTitle>
+        <CardDescription>
+          Configure which input fields appear on each service, with per-service dropdown options and default values.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center gap-4">
+          <Label>Select Service:</Label>
+          <Select value={selectedServiceId} onValueChange={setSelectedServiceId}>
+            <SelectTrigger className="w-[300px]" data-testid="select-service-for-fields">
+              <SelectValue placeholder="Choose a service..." />
+            </SelectTrigger>
+            <SelectContent>
+              {allServices.map((service) => (
+                <SelectItem key={service.id} value={service.id}>
+                  {service.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {selectedServiceId && (
+          <>
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-medium">Fields assigned to this service:</h4>
+              <Dialog open={isAddFieldDialogOpen} onOpenChange={setIsAddFieldDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" disabled={availableFieldsToAdd.length === 0} data-testid="button-add-field-to-service">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Field
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Field to Service</DialogTitle>
+                    <DialogDescription>
+                      Select an input field and configure its options for this service.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Form {...addFieldForm}>
+                    <form onSubmit={addFieldForm.handleSubmit(handleAddField)} className="space-y-4">
+                      <FormField
+                        control={addFieldForm.control}
+                        name="inputFieldId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Input Field</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-add-input-field">
+                                  <SelectValue placeholder="Choose a field..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {availableFieldsToAdd.map((f) => (
+                                  <SelectItem key={f.id} value={f.id}>
+                                    {f.displayName || f.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={addFieldForm.control}
+                        name="optionsJson"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Service-Specific Options (JSON array)</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                placeholder='["Option A", "Option B"]'
+                                {...field}
+                                data-testid="input-add-service-options"
+                                className="font-mono text-sm"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={addFieldForm.control}
+                        name="defaultValue"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Service Default Value</FormLabel>
+                            <FormControl>
+                              <Input {...field} data-testid="input-add-service-default" placeholder="Leave empty to use global default" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={addFieldForm.control}
+                          name="sortOrder"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Sort Order</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  {...field}
+                                  onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                  data-testid="input-add-service-sort"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={addFieldForm.control}
+                          name="isRequired"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                              <FormLabel>Required</FormLabel>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  data-testid="switch-add-service-required"
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button type="button" variant="outline" onClick={() => setIsAddFieldDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" disabled={addFieldMutation.isPending} data-testid="button-submit-add-field">
+                          {addFieldMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                          Add Field
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {loadingServiceFields ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : serviceFieldsList.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground border rounded-md">
+                No fields assigned to this service yet. Click "Add Field" to get started.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Field Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Service Options</TableHead>
+                    <TableHead>Default Value</TableHead>
+                    <TableHead>Required</TableHead>
+                    <TableHead>Order</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {serviceFieldsList.map((sf) => (
+                    <TableRow key={sf.id} data-testid={`row-service-field-${sf.id}`}>
+                      <TableCell className="font-medium">{getInputFieldName(sf.inputFieldId)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{getInputFieldType(sf.inputFieldId)}</Badge>
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate">
+                        {sf.optionsJson ? JSON.stringify(sf.optionsJson) : "-"}
+                      </TableCell>
+                      <TableCell>{sf.defaultValue || "-"}</TableCell>
+                      <TableCell>{sf.isRequired ? "Yes" : "No"}</TableCell>
+                      <TableCell>{sf.sortOrder}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setEditingServiceField(sf)}
+                            data-testid={`button-edit-service-field-${sf.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => deleteServiceFieldMutation.mutate(sf.id)}
+                            data-testid={`button-delete-service-field-${sf.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </>
+        )}
+      </CardContent>
+
+      {/* Edit Service Field Dialog */}
+      <Dialog open={!!editingServiceField} onOpenChange={(open) => !open && setEditingServiceField(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Service Field</DialogTitle>
+            <DialogDescription>
+              Update the service-specific options and default value for this field.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editFieldForm}>
+            <form onSubmit={editFieldForm.handleSubmit(handleUpdateField)} className="space-y-4">
+              <FormField
+                control={editFieldForm.control}
+                name="optionsJson"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Service-Specific Options (JSON array)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        data-testid="input-edit-service-options"
+                        className="font-mono text-sm"
+                        placeholder='["Option A", "Option B"]'
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editFieldForm.control}
+                name="defaultValue"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Service Default Value</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-edit-service-default" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editFieldForm.control}
+                  name="sortOrder"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Sort Order</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          {...field}
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                          data-testid="input-edit-service-sort"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editFieldForm.control}
+                  name="isRequired"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                      <FormLabel>Required</FormLabel>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-edit-service-required"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setEditingServiceField(null)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateServiceFieldMutation.isPending} data-testid="button-submit-edit-service-field">
+                  {updateServiceFieldMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Update
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
+// Bundle Field Defaults Manager - Override default values for bundle submissions
+function BundleFieldDefaultsManager() {
+  const { toast } = useToast();
+  const [selectedBundleId, setSelectedBundleId] = useState<string>("");
+  const [selectedServiceId, setSelectedServiceId] = useState<string>("");
+  const [isAddDefaultDialogOpen, setIsAddDefaultDialogOpen] = useState(false);
+  const [editingDefault, setEditingDefault] = useState<BundleFieldDefault | null>(null);
+
+  const { data: allBundles = [] } = useQuery<Bundle[]>({
+    queryKey: ["/api/bundles"],
+  });
+
+  const { data: allServices = [] } = useQuery<Service[]>({
+    queryKey: ["/api/services"],
+  });
+
+  const { data: inputFieldsList = [] } = useQuery<InputField[]>({
+    queryKey: ["/api/input-fields"],
+  });
+
+  const { data: serviceFieldsList = [] } = useQuery<ServiceField[]>({
+    queryKey: ["/api/services", selectedServiceId, "fields"],
+    queryFn: async () => {
+      if (!selectedServiceId) return [];
+      const res = await fetch(`/api/services/${selectedServiceId}/fields`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedServiceId,
+  });
+
+  const { data: bundleDefaults = [], isLoading: loadingDefaults } = useQuery<BundleFieldDefault[]>({
+    queryKey: ["/api/bundles", selectedBundleId, "field-defaults", selectedServiceId],
+    queryFn: async () => {
+      if (!selectedBundleId) return [];
+      let url = `/api/bundles/${selectedBundleId}/field-defaults`;
+      if (selectedServiceId) {
+        url += `?serviceId=${selectedServiceId}`;
+      }
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedBundleId,
+  });
+
+  const createDefaultMutation = useMutation({
+    mutationFn: async (data: { serviceId: string; inputFieldId: string; defaultValue: any }) => {
+      return apiRequest("POST", `/api/bundles/${selectedBundleId}/field-defaults`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bundles", selectedBundleId, "field-defaults"] });
+      setIsAddDefaultDialogOpen(false);
+      toast({ title: "Bundle default created" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create default", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateDefaultMutation = useMutation({
+    mutationFn: async ({ id, defaultValue }: { id: string; defaultValue: any }) => {
+      return apiRequest("PATCH", `/api/bundle-field-defaults/${id}`, { defaultValue });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bundles", selectedBundleId, "field-defaults"] });
+      setEditingDefault(null);
+      toast({ title: "Bundle default updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteDefaultMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/bundle-field-defaults/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bundles", selectedBundleId, "field-defaults"] });
+      toast({ title: "Bundle default removed" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to remove", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const addDefaultForm = useForm({
+    defaultValues: {
+      serviceId: "",
+      inputFieldId: "",
+      defaultValue: "",
+    },
+  });
+
+  const editDefaultForm = useForm({
+    defaultValues: {
+      defaultValue: "",
+    },
+  });
+
+  useEffect(() => {
+    if (editingDefault) {
+      editDefaultForm.reset({
+        defaultValue: typeof editingDefault.defaultValue === 'string' 
+          ? editingDefault.defaultValue 
+          : JSON.stringify(editingDefault.defaultValue),
+      });
+    }
+  }, [editingDefault, editDefaultForm]);
+
+  const handleAddDefault = (data: { serviceId: string; inputFieldId: string; defaultValue: string }) => {
+    let parsedValue: any = data.defaultValue;
+    try {
+      parsedValue = JSON.parse(data.defaultValue);
+    } catch {
+      // Keep as string if not valid JSON
+    }
+    createDefaultMutation.mutate({
+      serviceId: data.serviceId,
+      inputFieldId: data.inputFieldId,
+      defaultValue: parsedValue,
+    });
+  };
+
+  const handleUpdateDefault = (data: { defaultValue: string }) => {
+    if (!editingDefault) return;
+    let parsedValue: any = data.defaultValue;
+    try {
+      parsedValue = JSON.parse(data.defaultValue);
+    } catch {
+      // Keep as string if not valid JSON
+    }
+    updateDefaultMutation.mutate({
+      id: editingDefault.id,
+      defaultValue: parsedValue,
+    });
+  };
+
+  const getInputFieldName = (inputFieldId: string) => {
+    const field = inputFieldsList.find(f => f.id === inputFieldId);
+    return field?.displayName || field?.name || "Unknown Field";
+  };
+
+  const getServiceName = (serviceId: string) => {
+    const service = allServices.find(s => s.id === serviceId);
+    return service?.name || "Unknown Service";
+  };
+
+  // Get available fields for the selected service (only fields assigned to that service)
+  const availableFieldsToAdd = selectedServiceId 
+    ? serviceFieldsList.filter(sf => !bundleDefaults.some(bd => bd.inputFieldId === sf.inputFieldId && bd.serviceId === selectedServiceId))
+    : [];
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Boxes className="h-5 w-5" />
+          Bundle Field Defaults
+        </CardTitle>
+        <CardDescription>
+          Pre-fill default values for bundle submissions. When a client selects a bundle, these values are automatically applied.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Label>Bundle:</Label>
+            <Select value={selectedBundleId} onValueChange={setSelectedBundleId}>
+              <SelectTrigger className="w-[250px]" data-testid="select-bundle-for-defaults">
+                <SelectValue placeholder="Choose a bundle..." />
+              </SelectTrigger>
+              <SelectContent>
+                {allBundles.map((bundle) => (
+                  <SelectItem key={bundle.id} value={bundle.id}>
+                    {bundle.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {selectedBundleId && (
+            <div className="flex items-center gap-2">
+              <Label>Filter by Service:</Label>
+              <Select value={selectedServiceId} onValueChange={setSelectedServiceId}>
+                <SelectTrigger className="w-[250px]" data-testid="select-service-filter">
+                  <SelectValue placeholder="All services" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Services</SelectItem>
+                  {allServices.map((service) => (
+                    <SelectItem key={service.id} value={service.id}>
+                      {service.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+
+        {selectedBundleId && (
+          <>
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-medium">Default values for this bundle:</h4>
+              <Dialog open={isAddDefaultDialogOpen} onOpenChange={setIsAddDefaultDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" disabled={!selectedServiceId || availableFieldsToAdd.length === 0} data-testid="button-add-bundle-default">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Default
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Bundle Default Value</DialogTitle>
+                    <DialogDescription>
+                      Set a default value for a field when this bundle is selected.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Form {...addDefaultForm}>
+                    <form onSubmit={addDefaultForm.handleSubmit(handleAddDefault)} className="space-y-4">
+                      <FormField
+                        control={addDefaultForm.control}
+                        name="serviceId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Service</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || selectedServiceId}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-default-service">
+                                  <SelectValue placeholder="Choose service..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {allServices.map((s) => (
+                                  <SelectItem key={s.id} value={s.id}>
+                                    {s.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={addDefaultForm.control}
+                        name="inputFieldId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Field</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-default-field">
+                                  <SelectValue placeholder="Choose field..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {availableFieldsToAdd.map((sf) => (
+                                  <SelectItem key={sf.inputFieldId} value={sf.inputFieldId}>
+                                    {getInputFieldName(sf.inputFieldId)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={addDefaultForm.control}
+                        name="defaultValue"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Default Value</FormLabel>
+                            <FormControl>
+                              <Input {...field} data-testid="input-default-value" placeholder="Enter default value" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button type="button" variant="outline" onClick={() => setIsAddDefaultDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" disabled={createDefaultMutation.isPending} data-testid="button-submit-add-default">
+                          {createDefaultMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                          Add Default
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {loadingDefaults ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : bundleDefaults.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground border rounded-md">
+                {selectedServiceId 
+                  ? "No bundle defaults configured for this service. Click \"Add Default\" to create one."
+                  : "No bundle defaults configured. Select a service filter and click \"Add Default\" to create one."}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Service</TableHead>
+                    <TableHead>Field</TableHead>
+                    <TableHead>Default Value</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {bundleDefaults.map((bd) => (
+                    <TableRow key={bd.id} data-testid={`row-bundle-default-${bd.id}`}>
+                      <TableCell>{getServiceName(bd.serviceId)}</TableCell>
+                      <TableCell className="font-medium">{getInputFieldName(bd.inputFieldId)}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">
+                        {typeof bd.defaultValue === 'string' ? bd.defaultValue : JSON.stringify(bd.defaultValue)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setEditingDefault(bd)}
+                            data-testid={`button-edit-bundle-default-${bd.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => deleteDefaultMutation.mutate(bd.id)}
+                            data-testid={`button-delete-bundle-default-${bd.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </>
+        )}
+      </CardContent>
+
+      {/* Edit Bundle Default Dialog */}
+      <Dialog open={!!editingDefault} onOpenChange={(open) => !open && setEditingDefault(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Bundle Default</DialogTitle>
+            <DialogDescription>
+              Update the default value for this field when this bundle is selected.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editDefaultForm}>
+            <form onSubmit={editDefaultForm.handleSubmit(handleUpdateDefault)} className="space-y-4">
+              <FormField
+                control={editDefaultForm.control}
+                name="defaultValue"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Default Value</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-edit-default-value" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setEditingDefault(null)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateDefaultMutation.isPending} data-testid="button-submit-edit-default">
+                  {updateDefaultMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Update
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 export default function Settings() {
   const { toast } = useToast();
 
@@ -1572,6 +2414,8 @@ export default function Settings() {
 
             <TabsContent value="input-fields">
               <InputFieldsTabContent />
+              <ServiceFieldsManager />
+              <BundleFieldDefaultsManager />
             </TabsContent>
           </Tabs>
         </div>
