@@ -1533,8 +1533,8 @@ function ServiceFieldsManager() {
     if (editingServiceField) {
       editFieldForm.reset({
         optionsJson: editingServiceField.optionsJson ? JSON.stringify(editingServiceField.optionsJson) : "",
-        defaultValue: editingServiceField.defaultValue || "",
-        isRequired: editingServiceField.isRequired ?? false,
+        defaultValue: (editingServiceField.defaultValue as string) || "",
+        isRequired: editingServiceField.required ?? false,
         sortOrder: editingServiceField.sortOrder ?? 0,
       });
     }
@@ -1557,7 +1557,7 @@ function ServiceFieldsManager() {
       data: {
         optionsJson: data.optionsJson ? JSON.parse(data.optionsJson) : null,
         defaultValue: data.defaultValue || null,
-        isRequired: data.isRequired,
+        required: data.isRequired,
         sortOrder: data.sortOrder,
       },
     });
@@ -1565,7 +1565,7 @@ function ServiceFieldsManager() {
 
   const getInputFieldName = (inputFieldId: string) => {
     const field = inputFieldsList.find(f => f.id === inputFieldId);
-    return field?.displayName || field?.name || "Unknown Field";
+    return field?.label || "Unknown Field";
   };
 
   const getInputFieldType = (inputFieldId: string) => {
@@ -1598,7 +1598,7 @@ function ServiceFieldsManager() {
             <SelectContent>
               {allServices.map((service) => (
                 <SelectItem key={service.id} value={service.id}>
-                  {service.name}
+                  {service.title}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -1640,7 +1640,7 @@ function ServiceFieldsManager() {
                               <SelectContent>
                                 {availableFieldsToAdd.map((f) => (
                                   <SelectItem key={f.id} value={f.id}>
-                                    {f.displayName || f.name}
+                                    {f.label}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -1762,8 +1762,8 @@ function ServiceFieldsManager() {
                       <TableCell className="max-w-[200px] truncate">
                         {sf.optionsJson ? JSON.stringify(sf.optionsJson) : "-"}
                       </TableCell>
-                      <TableCell>{sf.defaultValue || "-"}</TableCell>
-                      <TableCell>{sf.isRequired ? "Yes" : "No"}</TableCell>
+                      <TableCell>{(sf.defaultValue as string) || "-"}</TableCell>
+                      <TableCell>{sf.required ? "Yes" : "No"}</TableCell>
                       <TableCell>{sf.sortOrder}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
@@ -2030,12 +2030,12 @@ function BundleFieldDefaultsManager() {
 
   const getInputFieldName = (inputFieldId: string) => {
     const field = inputFieldsList.find(f => f.id === inputFieldId);
-    return field?.displayName || field?.name || "Unknown Field";
+    return field?.label || "Unknown Field";
   };
 
   const getServiceName = (serviceId: string) => {
     const service = allServices.find(s => s.id === serviceId);
-    return service?.name || "Unknown Service";
+    return service?.title || "Unknown Service";
   };
 
   // Get available fields for the selected service (only fields assigned to that service)
@@ -2082,7 +2082,7 @@ function BundleFieldDefaultsManager() {
                   <SelectItem value="">All Services</SelectItem>
                   {allServices.map((service) => (
                     <SelectItem key={service.id} value={service.id}>
-                      {service.name}
+                      {service.title}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -2126,7 +2126,7 @@ function BundleFieldDefaultsManager() {
                               <SelectContent>
                                 {allServices.map((s) => (
                                   <SelectItem key={s.id} value={s.id}>
-                                    {s.name}
+                                    {s.title}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
