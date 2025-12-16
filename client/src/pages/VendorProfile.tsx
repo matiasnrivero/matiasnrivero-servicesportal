@@ -73,7 +73,7 @@ const TIMEZONES = [
   { value: "America/Chicago", label: "Central Time (CT)", offset: -6 },
   { value: "America/New_York", label: "Eastern Time (ET)", offset: -5 },
   { value: "America/Argentina/Buenos_Aires", label: "Argentina (ART)", offset: -3 },
-  { value: "UTC", label: "UTC", offset: 0 },
+  { value: "UTC", label: "UTC (Coordinated Universal Time)", offset: 0 },
   { value: "Europe/London", label: "London (GMT)", offset: 0 },
   { value: "Europe/Paris", label: "Central European (CET)", offset: 1 },
   { value: "Asia/Karachi", label: "Pakistan (PKT)", offset: 5 },
@@ -112,7 +112,7 @@ function convertTimeToUSZones(time: string, fromTimezone: string): { pst: string
   };
 }
 
-type Holiday = { date: string; title: string };
+type Holiday = { date: string; title: string; workMode: string };
 type WorkingHours = { timezone: string; startHour: string; endHour: string };
 
 async function getDefaultUser(): Promise<User | null> {
@@ -207,9 +207,10 @@ export default function VendorProfile() {
     startHour: "09:00",
     endHour: "17:00",
   });
-  const [newHoliday, setNewHoliday] = useState<{ date: Date | undefined; title: string }>({
+  const [newHoliday, setNewHoliday] = useState<{ date: Date | undefined; title: string; workMode: string }>({
     date: undefined,
     title: "",
+    workMode: "Totally Off",
   });
 
   // Edit team member state
@@ -415,8 +416,8 @@ export default function VendorProfile() {
       toast({ title: "This date is already added", variant: "destructive" });
       return;
     }
-    setHolidays([...holidays, { date: dateStr, title: newHoliday.title.trim() }]);
-    setNewHoliday({ date: undefined, title: "" });
+    setHolidays([...holidays, { date: dateStr, title: newHoliday.title.trim(), workMode: newHoliday.workMode }]);
+    setNewHoliday({ date: undefined, title: "", workMode: "Totally Off" });
   };
 
   const handleRemoveHoliday = (dateStr: string) => {
@@ -1179,8 +1180,8 @@ export default function VendorProfile() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Add Holiday Form */}
-                  <div className="flex items-end gap-4 p-4 border rounded-md bg-muted/30">
-                    <div className="flex-1 space-y-2">
+                  <div className="flex items-end gap-4 p-4 border rounded-md bg-muted/30 flex-wrap">
+                    <div className="flex-1 min-w-[200px] space-y-2">
                       <Label>Holiday Title</Label>
                       <Input
                         value={newHoliday.title}
@@ -1207,6 +1208,22 @@ export default function VendorProfile() {
                         </PopoverContent>
                       </Popover>
                     </div>
+                    <div className="space-y-2">
+                      <Label>Work Mode</Label>
+                      <Select
+                        value={newHoliday.workMode}
+                        onValueChange={(value) => setNewHoliday({ ...newHoliday, workMode: value })}
+                      >
+                        <SelectTrigger className="w-[140px]" data-testid="select-work-mode">
+                          <SelectValue placeholder="Select mode" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Full-Time">Full-Time</SelectItem>
+                          <SelectItem value="Part-Time">Part-Time</SelectItem>
+                          <SelectItem value="Totally Off">Totally Off</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <Button onClick={handleAddHoliday} data-testid="button-add-holiday">
                       <Plus className="h-4 w-4 mr-2" />
                       Add
@@ -1228,11 +1245,14 @@ export default function VendorProfile() {
                             className="flex items-center justify-between p-3 border rounded-md"
                             data-testid={`row-holiday-${holiday.date}`}
                           >
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-4 flex-wrap">
                               <Badge variant="outline">
                                 {format(new Date(holiday.date + "T00:00:00"), "MMM d, yyyy")}
                               </Badge>
                               <span className="font-medium">{holiday.title}</span>
+                              <Badge variant={holiday.workMode === "Totally Off" ? "destructive" : holiday.workMode === "Part-Time" ? "secondary" : "default"}>
+                                {holiday.workMode || "Totally Off"}
+                              </Badge>
                             </div>
                             <Button
                               size="icon"
