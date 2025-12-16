@@ -185,6 +185,11 @@ export default function UserManagement() {
       (statusFilter === "active" && user.isActive) || 
       (statusFilter === "inactive" && !user.isActive);
     
+    // Internal designers cannot see clients
+    if (currentUser?.role === "internal_designer" && user.role === "client") {
+      return false;
+    }
+    
     // Date range filtering
     let matchesDateRange = true;
     if (user.createdAt) {
@@ -289,6 +294,9 @@ export default function UserManagement() {
   const getAvailableRoleFilters = (): string[] => {
     if (currentUser?.role === "vendor") {
       return ["vendor", "vendor_designer"];
+    }
+    if (currentUser?.role === "internal_designer") {
+      return ["admin", "internal_designer", "vendor", "vendor_designer"];
     }
     return userRoles as unknown as string[];
   };
