@@ -1394,6 +1394,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/bundle-line-items/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      await storage.deleteBundleLineItem(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting bundle line item:", error);
+      res.status(500).json({ error: "Failed to delete bundle line item" });
+    }
+  });
+
   // ==================== PUBLIC BUNDLES/PACKS ROUTES (For client catalog view) ====================
   app.get("/api/public/bundles", async (req, res) => {
     try {
@@ -1539,6 +1557,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/bundles/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      await storage.deleteBundle(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting bundle:", error);
+      res.status(500).json({ error: "Failed to delete bundle" });
+    }
+  });
+
   app.get("/api/bundles/:id/items", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -1669,6 +1705,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating service pack:", error);
       res.status(500).json({ error: "Failed to update service pack" });
+    }
+  });
+
+  app.delete("/api/service-packs/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      await storage.deleteServicePack(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting service pack:", error);
+      res.status(500).json({ error: "Failed to delete service pack" });
     }
   });
 

@@ -98,12 +98,14 @@ export interface IStorage {
   getBundleLineItem(id: string): Promise<BundleLineItem | undefined>;
   createBundleLineItem(data: InsertBundleLineItem): Promise<BundleLineItem>;
   updateBundleLineItem(id: string, data: Partial<InsertBundleLineItem>): Promise<BundleLineItem | undefined>;
+  deleteBundleLineItem(id: string): Promise<void>;
 
   // Bundle methods
   getAllBundles(): Promise<Bundle[]>;
   getBundle(id: string): Promise<Bundle | undefined>;
   createBundle(data: InsertBundle): Promise<Bundle>;
   updateBundle(id: string, data: Partial<InsertBundle>): Promise<Bundle | undefined>;
+  deleteBundle(id: string): Promise<void>;
   getBundleItems(bundleId: string): Promise<BundleItem[]>;
   addBundleItem(data: InsertBundleItem): Promise<BundleItem>;
   removeBundleItem(id: string): Promise<void>;
@@ -113,6 +115,7 @@ export interface IStorage {
   getServicePack(id: string): Promise<ServicePack | undefined>;
   createServicePack(data: InsertServicePack): Promise<ServicePack>;
   updateServicePack(id: string, data: Partial<InsertServicePack>): Promise<ServicePack | undefined>;
+  deleteServicePack(id: string): Promise<void>;
   getServicePackItems(packId: string): Promise<ServicePackItem[]>;
   addServicePackItem(data: InsertServicePackItem): Promise<ServicePackItem>;
   removeServicePackItem(id: string): Promise<void>;
@@ -381,6 +384,10 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async deleteBundleLineItem(id: string): Promise<void> {
+    await db.delete(bundleLineItems).where(eq(bundleLineItems.id, id));
+  }
+
   // Bundle methods
   async getAllBundles(): Promise<Bundle[]> {
     return await db.select().from(bundles).orderBy(bundles.name);
@@ -402,6 +409,11 @@ export class DbStorage implements IStorage {
       .where(eq(bundles.id, id))
       .returning();
     return result[0];
+  }
+
+  async deleteBundle(id: string): Promise<void> {
+    await db.delete(bundleItems).where(eq(bundleItems.bundleId, id));
+    await db.delete(bundles).where(eq(bundles.id, id));
   }
 
   async getBundleItems(bundleId: string): Promise<BundleItem[]> {
@@ -438,6 +450,11 @@ export class DbStorage implements IStorage {
       .where(eq(servicePacks.id, id))
       .returning();
     return result[0];
+  }
+
+  async deleteServicePack(id: string): Promise<void> {
+    await db.delete(servicePackItems).where(eq(servicePackItems.packId, id));
+    await db.delete(servicePacks).where(eq(servicePacks.id, id));
   }
 
   async getServicePackItems(packId: string): Promise<ServicePackItem[]> {
