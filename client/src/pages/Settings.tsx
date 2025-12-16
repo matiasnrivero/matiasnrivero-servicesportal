@@ -745,6 +745,7 @@ function PackTableRow({
 
   const packPrice = pack.price ? parseFloat(pack.price) : fullPrice;
   const savings = fullPrice - packPrice;
+  const savingsPercent = fullPrice > 0 ? (savings / fullPrice) * 100 : 0;
 
   return (
     <TableRow data-testid={`row-pack-${pack.id}`}>
@@ -757,7 +758,7 @@ function PackTableRow({
       <TableCell className="text-right">${fullPrice.toFixed(2)}</TableCell>
       <TableCell className="text-right">${packPrice.toFixed(2)}</TableCell>
       <TableCell className="text-right text-emerald-600 dark:text-emerald-400 font-medium">
-        ${savings.toFixed(2)}
+        ${savings.toFixed(2)} ({savingsPercent.toFixed(1)}%)
       </TableCell>
       <TableCell className="text-right">
         <Button size="icon" variant="ghost" onClick={onEdit} data-testid={`button-edit-pack-${pack.id}`}>
