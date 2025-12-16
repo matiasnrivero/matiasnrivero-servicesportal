@@ -345,6 +345,19 @@ function LineItemsTabContent() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/bundle-line-items/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bundle-line-items"] });
+      toast({ title: "Line item deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const closeDialog = () => {
     setDialogOpen(false);
     setEditingItem(null);
@@ -502,9 +515,23 @@ function LineItemsTabContent() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button size="icon" variant="ghost" onClick={() => openEditDialog(item)} data-testid={`button-edit-${item.id}`}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => openEditDialog(item)} data-testid={`button-edit-${item.id}`}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        onClick={() => {
+                          if (confirm("Are you sure you want to delete this line item?")) {
+                            deleteMutation.mutate(item.id);
+                          }
+                        }} 
+                        data-testid={`button-delete-${item.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -612,12 +639,39 @@ function BundleTableRow({
   lineItems: BundleLineItem[]; 
   onEdit: () => void;
 }) {
+  const { toast } = useToast();
   const { data: bundleItems = [] } = useQuery<BundleItem[]>({
     queryKey: ["/api/bundles", bundle.id, "items"],
     queryFn: async () => {
       const res = await fetch(`/api/bundles/${bundle.id}/items`);
       if (!res.ok) return [];
       return res.json();
+    },
+  });
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      return apiRequest("PATCH", `/api/bundles/${id}`, { isActive });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bundles"] });
+      toast({ title: "Bundle updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/bundles/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bundles"] });
+      toast({ title: "Bundle deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -639,16 +693,37 @@ function BundleTableRow({
     <TableRow data-testid={`row-bundle-${bundle.id}`}>
       <TableCell className="font-medium">{bundle.name}</TableCell>
       <TableCell className="text-center">
-        <Badge variant={bundle.isActive ? "default" : "secondary"}>
-          {bundle.isActive ? "Active" : "Inactive"}
-        </Badge>
+        <div className="flex items-center justify-center gap-2">
+          <Switch
+            checked={bundle.isActive}
+            onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: bundle.id, isActive: checked })}
+            data-testid={`switch-bundle-active-${bundle.id}`}
+          />
+          <Badge variant={bundle.isActive ? "default" : "secondary"}>
+            {bundle.isActive ? "Active" : "Inactive"}
+          </Badge>
+        </div>
       </TableCell>
       <TableCell className="text-right">${fullPrice.toFixed(2)}</TableCell>
       <TableCell className="text-right">${bundlePrice.toFixed(2)}</TableCell>
       <TableCell className="text-right">
-        <Button size="icon" variant="ghost" onClick={onEdit} data-testid={`button-edit-bundle-${bundle.id}`}>
-          <Pencil className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center justify-end gap-1">
+          <Button size="icon" variant="ghost" onClick={onEdit} data-testid={`button-edit-bundle-${bundle.id}`}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button 
+            size="icon" 
+            variant="ghost" 
+            onClick={() => {
+              if (confirm("Are you sure you want to delete this bundle?")) {
+                deleteMutation.mutate(bundle.id);
+              }
+            }} 
+            data-testid={`button-delete-bundle-${bundle.id}`}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
       </TableCell>
     </TableRow>
   );
@@ -728,12 +803,39 @@ function PackTableRow({
   services: Service[]; 
   onEdit: () => void;
 }) {
+  const { toast } = useToast();
   const { data: packItems = [] } = useQuery<ServicePackItem[]>({
     queryKey: ["/api/service-packs", pack.id, "items"],
     queryFn: async () => {
       const res = await fetch(`/api/service-packs/${pack.id}/items`);
       if (!res.ok) return [];
       return res.json();
+    },
+  });
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      return apiRequest("PATCH", `/api/service-packs/${id}`, { isActive });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-packs"] });
+      toast({ title: "Pack updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/service-packs/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-packs"] });
+      toast({ title: "Pack deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -751,9 +853,16 @@ function PackTableRow({
     <TableRow data-testid={`row-pack-${pack.id}`}>
       <TableCell className="font-medium">{pack.name}</TableCell>
       <TableCell className="text-center">
-        <Badge variant={pack.isActive ? "default" : "secondary"}>
-          {pack.isActive ? "Active" : "Inactive"}
-        </Badge>
+        <div className="flex items-center justify-center gap-2">
+          <Switch
+            checked={pack.isActive}
+            onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: pack.id, isActive: checked })}
+            data-testid={`switch-pack-active-${pack.id}`}
+          />
+          <Badge variant={pack.isActive ? "default" : "secondary"}>
+            {pack.isActive ? "Active" : "Inactive"}
+          </Badge>
+        </div>
       </TableCell>
       <TableCell className="text-right">${fullPrice.toFixed(2)}</TableCell>
       <TableCell className="text-right">${packPrice.toFixed(2)}</TableCell>
@@ -761,9 +870,23 @@ function PackTableRow({
         ${savings.toFixed(2)} ({savingsPercent.toFixed(1)}%)
       </TableCell>
       <TableCell className="text-right">
-        <Button size="icon" variant="ghost" onClick={onEdit} data-testid={`button-edit-pack-${pack.id}`}>
-          <Pencil className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center justify-end gap-1">
+          <Button size="icon" variant="ghost" onClick={onEdit} data-testid={`button-edit-pack-${pack.id}`}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button 
+            size="icon" 
+            variant="ghost" 
+            onClick={() => {
+              if (confirm("Are you sure you want to delete this pack?")) {
+                deleteMutation.mutate(pack.id);
+              }
+            }} 
+            data-testid={`button-delete-pack-${pack.id}`}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
       </TableCell>
     </TableRow>
   );
