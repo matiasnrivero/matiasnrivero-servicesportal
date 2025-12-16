@@ -1470,7 +1470,7 @@ function ServiceFieldsManager() {
   });
 
   const addFieldMutation = useMutation({
-    mutationFn: async (data: { inputFieldId: string; optionsJson?: string[]; defaultValue?: string; isRequired?: boolean; sortOrder?: number; uiGroup?: string }) => {
+    mutationFn: async (data: { inputFieldId: string; optionsJson?: string[]; defaultValue?: string; required?: boolean; sortOrder?: number; uiGroup?: string }) => {
       return apiRequest("POST", `/api/services/${selectedServiceId}/fields`, data);
     },
     onSuccess: () => {
@@ -1564,7 +1564,7 @@ function ServiceFieldsManager() {
       inputFieldId: data.inputFieldId,
       optionsJson: parseOptionsInput(data.optionsJson) || undefined,
       defaultValue: data.defaultValue || undefined,
-      isRequired: data.isRequired,
+      required: data.isRequired,  // Map isRequired to 'required' for backend schema
       sortOrder: data.sortOrder,
       uiGroup: data.uiGroup,
     });
