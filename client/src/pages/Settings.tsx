@@ -698,6 +698,7 @@ function PacksTabContent() {
                 <TableHead className="text-center">Status</TableHead>
                 <TableHead className="text-right">Full Price</TableHead>
                 <TableHead className="text-right">Pack Price</TableHead>
+                <TableHead className="text-right">Savings</TableHead>
                 <TableHead className="text-right">Edit</TableHead>
               </TableRow>
             </TableHeader>
@@ -743,6 +744,7 @@ function PackTableRow({
   }, 0);
 
   const packPrice = pack.price ? parseFloat(pack.price) : fullPrice;
+  const savings = fullPrice - packPrice;
 
   return (
     <TableRow data-testid={`row-pack-${pack.id}`}>
@@ -754,6 +756,9 @@ function PackTableRow({
       </TableCell>
       <TableCell className="text-right">${fullPrice.toFixed(2)}</TableCell>
       <TableCell className="text-right">${packPrice.toFixed(2)}</TableCell>
+      <TableCell className="text-right text-emerald-600 dark:text-emerald-400 font-medium">
+        ${savings.toFixed(2)}
+      </TableCell>
       <TableCell className="text-right">
         <Button size="icon" variant="ghost" onClick={onEdit} data-testid={`button-edit-pack-${pack.id}`}>
           <Pencil className="h-4 w-4" />
