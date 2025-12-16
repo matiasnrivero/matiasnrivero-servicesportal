@@ -25,7 +25,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Users, DollarSign, Clock, UserPlus, Save, LogIn, Pencil } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Building2, Users, DollarSign, Clock, UserPlus, Save, LogIn, Pencil, CalendarDays, Plus, Trash2, Globe } from "lucide-react";
+import { format } from "date-fns";
 import type { User, VendorProfile as VendorProfileType, Service } from "@shared/schema";
 
 const BASE_COST_SERVICES = [
@@ -58,6 +65,52 @@ const roleLabels: Record<string, string> = {
   vendor: "Vendor Admin",
   vendor_designer: "Vendor Designer",
 };
+
+// Common timezones for vendor availability
+const TIMEZONES = [
+  { value: "America/Los_Angeles", label: "Pacific Time (PT)", offset: -8 },
+  { value: "America/Denver", label: "Mountain Time (MT)", offset: -7 },
+  { value: "America/Chicago", label: "Central Time (CT)", offset: -6 },
+  { value: "America/New_York", label: "Eastern Time (ET)", offset: -5 },
+  { value: "Europe/London", label: "London (GMT)", offset: 0 },
+  { value: "Europe/Paris", label: "Central European (CET)", offset: 1 },
+  { value: "Asia/Kolkata", label: "India (IST)", offset: 5.5 },
+  { value: "Asia/Manila", label: "Philippines (PHT)", offset: 8 },
+  { value: "Asia/Tokyo", label: "Japan (JST)", offset: 9 },
+];
+
+// Helper to convert time from one timezone to US timezones
+function convertTimeToUSZones(time: string, fromTimezone: string): { pst: string; cst: string; est: string } {
+  if (!time) return { pst: "--:--", cst: "--:--", est: "--:--" };
+  
+  const fromTz = TIMEZONES.find(tz => tz.value === fromTimezone);
+  if (!fromTz) return { pst: "--:--", cst: "--:--", est: "--:--" };
+  
+  const [hours, minutes] = time.split(":").map(Number);
+  const totalMinutes = hours * 60 + minutes;
+  
+  // Convert from source timezone to UTC, then to US timezones
+  const utcMinutes = totalMinutes - (fromTz.offset * 60);
+  
+  const pstMinutes = (utcMinutes + (-8 * 60) + 1440) % 1440;
+  const cstMinutes = (utcMinutes + (-6 * 60) + 1440) % 1440;
+  const estMinutes = (utcMinutes + (-5 * 60) + 1440) % 1440;
+  
+  const formatTime = (mins: number) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+  };
+  
+  return {
+    pst: formatTime(pstMinutes),
+    cst: formatTime(cstMinutes),
+    est: formatTime(estMinutes),
+  };
+}
+
+type Holiday = { date: string; title: string };
+type WorkingHours = { timezone: string; startHour: string; endHour: string };
 
 async function getDefaultUser(): Promise<User | null> {
   const res = await fetch("/api/default-user");
@@ -144,6 +197,18 @@ export default function VendorProfile() {
 
   const [slaData, setSlaData] = useState<Record<string, { days: number; hours?: number }>>({});
 
+  // Availability state
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [workingHours, setWorkingHours] = useState<WorkingHours>({
+    timezone: "America/Los_Angeles",
+    startHour: "09:00",
+    endHour: "17:00",
+  });
+  const [newHoliday, setNewHoliday] = useState<{ date: Date | undefined; title: string }>({
+    date: undefined,
+    title: "",
+  });
+
   // Edit team member state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<User | null>(null);
@@ -166,6 +231,11 @@ export default function VendorProfile() {
       });
       setPricingData((vendorProfile.pricingAgreements as any) || {});
       setSlaData((vendorProfile.slaConfig as any) || {});
+      setHolidays((vendorProfile.holidays as Holiday[]) || []);
+      const wh = vendorProfile.workingHours as WorkingHours | null;
+      if (wh) {
+        setWorkingHours(wh);
+      }
     }
   }, [vendorProfile, currentUser?.email, currentUser?.phone]);
 
@@ -332,6 +402,31 @@ export default function VendorProfile() {
     }));
   };
 
+  const handleAddHoliday = () => {
+    if (!newHoliday.date || !newHoliday.title.trim()) {
+      toast({ title: "Please enter both date and title", variant: "destructive" });
+      return;
+    }
+    const dateStr = format(newHoliday.date, "yyyy-MM-dd");
+    if (holidays.some(h => h.date === dateStr)) {
+      toast({ title: "This date is already added", variant: "destructive" });
+      return;
+    }
+    setHolidays([...holidays, { date: dateStr, title: newHoliday.title.trim() }]);
+    setNewHoliday({ date: undefined, title: "" });
+  };
+
+  const handleRemoveHoliday = (dateStr: string) => {
+    setHolidays(holidays.filter(h => h.date !== dateStr));
+  };
+
+  const handleSaveAvailability = () => {
+    updateProfileMutation.mutate({
+      holidays,
+      workingHours,
+    });
+  };
+
   // Show loading state while user data is being fetched
   if (userLoading) {
     return (
@@ -403,6 +498,10 @@ export default function VendorProfile() {
             <TabsTrigger value="sla" data-testid="tab-sla">
               <Clock className="h-4 w-4 mr-2" />
               SLA
+            </TabsTrigger>
+            <TabsTrigger value="availability" data-testid="tab-availability">
+              <CalendarDays className="h-4 w-4 mr-2" />
+              Availability
             </TabsTrigger>
           </TabsList>
 
@@ -988,6 +1087,176 @@ export default function VendorProfile() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="availability">
+            <div className="space-y-6">
+              {/* Working Hours Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Globe className="h-5 w-5" />
+                    Working Hours
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label>Time Zone</Label>
+                      <Select
+                        value={workingHours.timezone}
+                        onValueChange={(value) => setWorkingHours({ ...workingHours, timezone: value })}
+                      >
+                        <SelectTrigger data-testid="select-timezone">
+                          <SelectValue placeholder="Select timezone" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TIMEZONES.map((tz) => (
+                            <SelectItem key={tz.value} value={tz.value}>
+                              {tz.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Start Hour</Label>
+                      <Input
+                        type="time"
+                        value={workingHours.startHour}
+                        onChange={(e) => setWorkingHours({ ...workingHours, startHour: e.target.value })}
+                        data-testid="input-start-hour"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>End Hour</Label>
+                      <Input
+                        type="time"
+                        value={workingHours.endHour}
+                        onChange={(e) => setWorkingHours({ ...workingHours, endHour: e.target.value })}
+                        data-testid="input-end-hour"
+                      />
+                    </div>
+                  </div>
+
+                  {/* US Timezone Conversion Display */}
+                  <div className="mt-4 p-4 bg-muted/50 rounded-md">
+                    <Label className="text-sm font-medium mb-3 block">Hours in US Time Zones</Label>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="text-center">
+                        <p className="text-xs text-muted-foreground mb-1">PST (Pacific)</p>
+                        <p className="font-medium">
+                          {convertTimeToUSZones(workingHours.startHour, workingHours.timezone).pst} - {convertTimeToUSZones(workingHours.endHour, workingHours.timezone).pst}
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-muted-foreground mb-1">CST (Central)</p>
+                        <p className="font-medium">
+                          {convertTimeToUSZones(workingHours.startHour, workingHours.timezone).cst} - {convertTimeToUSZones(workingHours.endHour, workingHours.timezone).cst}
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-muted-foreground mb-1">EST (Eastern)</p>
+                        <p className="font-medium">
+                          {convertTimeToUSZones(workingHours.startHour, workingHours.timezone).est} - {convertTimeToUSZones(workingHours.endHour, workingHours.timezone).est}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Holidays Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CalendarDays className="h-5 w-5" />
+                    Holidays / Out of Office Days
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Add Holiday Form */}
+                  <div className="flex items-end gap-4 p-4 border rounded-md bg-muted/30">
+                    <div className="flex-1 space-y-2">
+                      <Label>Holiday Title</Label>
+                      <Input
+                        value={newHoliday.title}
+                        onChange={(e) => setNewHoliday({ ...newHoliday, title: e.target.value })}
+                        placeholder="e.g., Christmas"
+                        data-testid="input-holiday-title"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="w-[180px] justify-start text-left font-normal" data-testid="button-select-date">
+                            <CalendarDays className="mr-2 h-4 w-4" />
+                            {newHoliday.date ? format(newHoliday.date, "MMM d, yyyy") : "Select date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={newHoliday.date}
+                            onSelect={(date) => setNewHoliday({ ...newHoliday, date })}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <Button onClick={handleAddHoliday} data-testid="button-add-holiday">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add
+                    </Button>
+                  </div>
+
+                  {/* Holidays List */}
+                  {holidays.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">
+                      No holidays added yet. Add your first holiday or OOO day above.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {holidays
+                        .sort((a, b) => a.date.localeCompare(b.date))
+                        .map((holiday) => (
+                          <div
+                            key={holiday.date}
+                            className="flex items-center justify-between p-3 border rounded-md"
+                            data-testid={`row-holiday-${holiday.date}`}
+                          >
+                            <div className="flex items-center gap-4">
+                              <Badge variant="outline">
+                                {format(new Date(holiday.date + "T00:00:00"), "MMM d, yyyy")}
+                              </Badge>
+                              <span className="font-medium">{holiday.title}</span>
+                            </div>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleRemoveHoliday(holiday.date)}
+                              data-testid={`button-remove-holiday-${holiday.date}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+
+                  <div className="flex justify-end pt-4">
+                    <Button
+                      onClick={handleSaveAvailability}
+                      disabled={updateProfileMutation.isPending}
+                      data-testid="button-save-availability"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {updateProfileMutation.isPending ? "Saving..." : "Save Availability"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
           </Tabs>
         </div>
