@@ -231,6 +231,9 @@ export default function UserManagement() {
   const canToggleUserActive = (targetUser: User): boolean => {
     if (!currentUser) return false;
     if (currentUser.role === "admin") return true;
+    if (currentUser.role === "internal_designer") {
+      return ["internal_designer", "vendor", "vendor_designer"].includes(targetUser.role);
+    }
     if (currentUser.role === "vendor") {
       const vendorStructureId = currentUser.vendorId || currentUser.id;
       return (
@@ -252,6 +255,9 @@ export default function UserManagement() {
   const canEditUser = (targetUser: User): boolean => {
     if (!currentUser) return false;
     if (currentUser.role === "admin") return true;
+    if (currentUser.role === "internal_designer") {
+      return ["internal_designer", "vendor", "vendor_designer"].includes(targetUser.role);
+    }
     if (currentUser.role === "vendor") {
       const vendorStructureId = currentUser.vendorId || currentUser.id;
       return (
