@@ -2090,12 +2090,12 @@ function BundleFieldDefaultsManager() {
           {selectedBundleId && (
             <div className="flex items-center gap-2">
               <Label>Filter by Service:</Label>
-              <Select value={selectedServiceId} onValueChange={setSelectedServiceId}>
+              <Select value={selectedServiceId || "all"} onValueChange={(val) => setSelectedServiceId(val === "all" ? "" : val)}>
                 <SelectTrigger className="w-[250px]" data-testid="select-service-filter">
                   <SelectValue placeholder="All services" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Services</SelectItem>
+                  <SelectItem value="all">All Services</SelectItem>
                   {allServices.map((service) => (
                     <SelectItem key={service.id} value={service.id}>
                       {service.title}
