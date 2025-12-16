@@ -1,0 +1,521 @@
+Below is a **dev-ready specification** for an **Admin Services Configurator** that makes your existing Ad-hoc Service forms **fully configurable** (fields, required/optional, input types, dropdown values per service, defaults for bundles), **without changing your current UI/UX**.
+
+---
+
+## Goal
+
+1. **Admins can create/manage reusable “Input Fields”** (text/number/dropdown/file/etc).
+2. **Admins can build Ad-hoc Services by attaching fields** and marking each as required/optional + single/multi (e.g., file upload).
+3. **Bundles can override defaults** for the fields of included Ad-hoc Services (so clients fill less).
+4. **Line Items** exist only for bundle cost/value math (no client fields).
+5. **Keep current client forms intact** — only switch the form renderer to “read configuration” instead of hard-coded fields.
+6. Support “same looking field name” with **different dropdown values per service** (Output Format differs by service).
+
+---
+
+## Core Concepts
+
+### Entity Types
+
+* **InputField**: global reusable field definition (label, type, etc.)
+* **Service** (Ad-hoc): offered individually; has base price; has a set of “ServiceFields”
+* **LineItem**: not sold alone; used in bundles; has description + price/cost
+* **Bundle**: includes Services + LineItems; has bundle price; can set **defaults per included service field**
+
+### Key Requirement: per-service customization
+
+A global InputField can be reused across services, but each service can define:
+
+* required/optional
+* UI hint/placeholder
+* single vs multi value
+* **service-specific options** (for dropdown)
+* **service-specific default value** (for bundle prefill, or general default)
+
+That means you need a **join model**: `ServiceField` (Service ↔ InputField) that holds overrides.
+
+---
+
+## Data Model (Database)
+
+### 1) `input_fields`
+
+Stores the reusable “field concept”.
+
+**Columns**
+
+* `id` (uuid)
+* `key` (string, unique) — stable identifier, e.g. `output_format`, `color_mode`
+* `label` (string) — “Output Format”
+* `description` (text, optional)
+* `input_type` (enum)
+
+  * `text`, `textarea`, `number`, `dropdown`, `multi_select`, `radio`, `checkbox`, `file`, `url`, `date`
+* `value_mode` (enum) — `single` | `multiple` (also used for file: single/multi)
+* `validation` (jsonb) — min/max, regex, allowed mime types, max file size, etc.
+* `default_value` (jsonb, nullable) — global default (rarely used if per-service defaults are preferred)
+* `is_active` (bool)
+* `created_at`, `updated_at`
+
+> Note: Do **not** store dropdown options here if they vary by service. Options should be primarily on `service_fields` (overrideable). You *can* optionally support “global options” for common fields, then override per service.
+
+---
+
+### 2) `services`
+
+Ad-hoc services only.
+
+* `id` (uuid)
+* `slug` (string, unique) — `vectorization`, `embroidery_digitizing`
+* `name` (string)
+* `description` (text)
+* `base_price` (decimal)
+* `cost_basis` (decimal, optional, if you track margin here)
+* `is_active` (bool)
+* `sort_order` (int)
+* `created_at`, `updated_at`
+
+---
+
+### 3) `service_fields`
+
+This is the join table that defines how a field behaves **inside a specific service**.
+
+* `id` (uuid)
+* `service_id` (fk)
+* `input_field_id` (fk)
+* `required` (bool)
+* `display_label_override` (string, nullable)
+* `help_text_override` (text, nullable)
+* `placeholder_override` (string, nullable)
+* `value_mode_override` (enum nullable) — override single/multiple if needed
+* `options_json` (jsonb, nullable)
+
+  * For dropdown/radio/multi_select: list of `{label, value}`
+  * **This solves “Output Format differs per service”**
+* `default_value` (jsonb, nullable)
+
+  * service-level default (used for bundles unless bundle overrides)
+* `ui_group` (string, nullable) — “Artwork Specs”, “Files”, “Notes”
+* `sort_order` (int)
+* `is_active` (bool)
+
+**Uniqueness**
+
+* unique(`service_id`, `input_field_id`)
+
+---
+
+### 4) `line_items`
+
+* `id` (uuid)
+* `name` (string) — e.g. “Project Management”, “QA Pass”
+* `description` (text)
+* `price` (decimal) — used for “sum of parts”
+* `cost` (decimal, optional) — internal cost (optional)
+* `is_active` (bool)
+
+---
+
+### 5) `bundles`
+
+* `id` (uuid)
+* `slug` (string unique)
+* `name` (string)
+* `description` (text)
+* `bundle_price` (decimal)
+* `is_active` (bool)
+* `sort_order` (int)
+
+---
+
+### 6) `bundle_items`
+
+Bundle composition: services + line items.
+
+* `id` (uuid)
+* `bundle_id` (fk)
+* `item_type` (enum) — `service` | `line_item`
+* `service_id` (fk nullable)
+* `line_item_id` (fk nullable)
+* `quantity` (int default 1)
+
+---
+
+### 7) `bundle_field_defaults`
+
+This is where you prefill fields for bundle-contained services to reduce user inputs.
+
+* `id` (uuid)
+* `bundle_id` (fk)
+* `service_id` (fk)
+* `input_field_id` (fk)
+* `default_value` (jsonb) — e.g. `"RGB"`, or `{width: 1080, height: 1920}`, etc.
+
+**Rules**
+
+* When rendering bundle request forms:
+
+  * effective default = `bundle_field_defaults` > `service_fields.default_value` > `input_fields.default_value` > null
+
+---
+
+## API Contracts (Backend)
+
+### Input Fields
+
+* `GET /admin/input-fields`
+* `POST /admin/input-fields`
+* `GET /admin/input-fields/:id`
+* `PUT /admin/input-fields/:id`
+* `DELETE /admin/input-fields/:id` (soft delete recommended: `is_active=false`)
+
+Response should include **usage chips**:
+
+* `usage_services: [{service_id, service_name, slug}]`
+  This can be computed by join on `service_fields`.
+
+---
+
+### Services + Service Fields
+
+* `GET /admin/services`
+* `POST /admin/services`
+* `GET /admin/services/:id`
+* `PUT /admin/services/:id`
+
+Service Fields management:
+
+* `GET /admin/services/:id/fields`
+  Returns list of `service_fields` + embedded `input_field` info
+* `POST /admin/services/:id/fields`
+  Body: `{ input_field_id, required, options_json, default_value, sort_order, ... }`
+* `PUT /admin/services/:id/fields/:service_field_id`
+* `DELETE /admin/services/:id/fields/:service_field_id` (soft delete recommended)
+
+**Client runtime endpoints (for the form renderer):**
+
+* `GET /catalog/services/:slug/form-schema`
+  Returns the **final schema** the UI uses to render the existing service form:
+
+  ```json
+  {
+    "service": { "slug":"vectorization", "name":"Vectorization", "base_price": 9.99 },
+    "groups": [
+      {
+        "title": "Artwork Specs",
+        "fields": [
+          {
+            "key":"color_mode",
+            "label":"Color Mode",
+            "input_type":"dropdown",
+            "required":true,
+            "value_mode":"single",
+            "options":[{"label":"RGB","value":"RGB"},{"label":"CMYK","value":"CMYK"},{"label":"Pantone","value":"PANTONE"}],
+            "default_value":"RGB",
+            "validation": {}
+          }
+        ]
+      }
+    ]
+  }
+  ```
+
+---
+
+### Line Items
+
+* `GET /admin/line-items`
+* `POST /admin/line-items`
+* `PUT /admin/line-items/:id`
+* `DELETE /admin/line-items/:id` (soft delete)
+
+---
+
+### Bundles + Defaults
+
+* `GET /admin/bundles`
+* `POST /admin/bundles`
+* `GET /admin/bundles/:id`
+* `PUT /admin/bundles/:id`
+
+Bundle items:
+
+* `GET /admin/bundles/:id/items`
+* `POST /admin/bundles/:id/items` (add service/line_item + qty)
+* `DELETE /admin/bundles/:id/items/:bundle_item_id`
+
+Bundle defaults:
+
+* `GET /admin/bundles/:id/defaults?service_id=...`
+* `PUT /admin/bundles/:id/defaults`
+  Body:
+
+  ```json
+  {
+    "service_id": "uuid",
+    "defaults": [
+      { "input_field_id":"uuid", "default_value":"RGB" },
+      { "input_field_id":"uuid", "default_value": 1080 }
+    ]
+  }
+  ```
+
+Client runtime:
+
+* `GET /catalog/bundles/:slug/form-schema`
+  Returns combined schema for each included service + prefilled defaults.
+
+---
+
+## Admin UI Screens (Exact Requirements)
+
+### Screen A — Input Fields Manager
+
+**Table columns**
+
+* Field Name (label)
+* Key
+* Type
+* Single/Multiple
+* Active
+* **Used in Services (chips)** ← required
+* Actions (Edit / Disable)
+
+**Create/Edit Field modal**
+
+* Label
+* Key (auto-generated from label, editable)
+* Description
+* Input Type
+* Value mode single/multi
+* Validation (dynamic per type)
+
+  * number: min/max
+  * file: allowed mime types, max size, multi
+  * text: regex/maxlength
+* (Optional) Global default value (usually empty)
+* Save
+
+**Important behavior**
+
+* If field is used by any service, you can still edit label/validation, but warn if changing type breaks existing requests.
+
+---
+
+### Screen B — Service Configurator (Ad-hoc Service)
+
+**Header**
+
+* Service name, base price, active toggle
+
+**Section: Assigned Fields**
+A sortable list of fields attached to this service.
+
+Each row shows:
+
+* Field label
+* Required toggle
+* Type badge
+* Value mode
+* “Options” (only for dropdown/radio/multi_select)
+* “Default Value” editor
+* Group selector (Artwork Specs / Files / Notes etc.)
+* Remove button
+
+**Add Field drawer**
+
+* Search existing input fields
+* Or “Create new field” inline
+* On add, immediately configure:
+
+  * required
+  * options (if dropdown)
+  * default
+  * sort order / group
+
+**Critical: dropdown values per service**
+
+* The “Options” editor is on **ServiceField** level.
+* When selecting a field like `output_format`, Vectorization can have AI/SVG/EPS/PDF; Digitizing can have DST/PES/JEF/EMB.
+
+**Remove field behavior**
+
+* Removing from service means: it disappears from the client request form going forward.
+* Existing requests keep stored values (don’t delete data).
+
+---
+
+### Screen C — Line Items Manager
+
+Simple CRUD:
+
+* Name
+* Description
+* Price (+ optional internal cost)
+* Active toggle
+
+---
+
+### Screen D — Bundle Configurator
+
+**Bundle composition**
+
+* Add Ad-hoc Services (with qty)
+* Add Line Items (with qty)
+* Show “Sum of parts” = (sum(service.base_price * qty) + sum(line_item.price * qty))
+* Bundle price
+* Savings = sum_of_parts - bundle_price
+
+**Bundle Defaults per Service (key feature)**
+When you click a service inside the bundle, show:
+
+* All fields used by that service (pulled from `service_fields`)
+* Each field row includes a “Bundle Default” input
+
+  * If set, it overrides the service default
+  * Also show a “lock” icon to indicate it’s being prefilled
+* Goal: reduce client inputs by pre-filling common specs.
+
+---
+
+## Form Rendering (Do NOT change your current UI/UX)
+
+### Requirement
+
+Your existing Ad-hoc service forms stay visually the same. The only change is:
+
+* Replace hard-coded field definitions with a **schema-driven mapping**.
+* For each service page, the UI calls `GET /catalog/services/:slug/form-schema`.
+* The renderer loops through schema fields and binds them to your existing components:
+
+  * `text` → existing text input
+  * `dropdown` → existing select component
+  * `file` → existing uploader (single/multi based on value_mode)
+  * etc.
+
+### Stability / “Don’t break everything” plan
+
+1. **Introduce schema endpoints** but keep existing forms functioning.
+2. For each service form, keep the component/layout **as-is**, but replace the internal “fields array” with server schema.
+3. Add a **feature flag**:
+
+   * If schema exists: use schema
+   * Else fallback to legacy hard-coded list
+4. Migrate service-by-service.
+
+---
+
+## Auto-Create All Existing Fields (Scrape without restarting)
+
+You asked: “automatically create the section with all the input fields that exist currently on every ad-hoc service with the values in case of dropdown.”
+
+### Migration Script Spec
+
+Create a one-time script `seed_services_fields_from_legacy.ts` that:
+
+* Has a JSON map of **legacy form definitions** (what you already have in code today)
+* Creates:
+
+  * `input_fields` for unique field concepts (by `key`)
+  * `services` entries for each service
+  * `service_fields` for each service’s fields
+  * Writes dropdown options to `service_fields.options_json` per service
+  * Writes required/optional + multi flags
+  * Writes sort order + ui_group
+
+**Deduping logic**
+
+* Same `key` = same InputField
+* Different dropdown options per service go into `service_fields.options_json`
+
+**Example legacy map entry**
+
+```json
+{
+  "service_slug": "vectorization",
+  "fields": [
+    { "key":"output_format", "label":"Output Format", "type":"dropdown", "required":true,
+      "options":["AI","SVG","EPS","PDF"], "default":"AI" },
+    { "key":"source_files", "label":"Upload Files", "type":"file", "required":true, "multiple":true }
+  ]
+}
+```
+
+---
+
+## Request Data Storage (for Service Requests)
+
+Wherever you store requests today, store field values as:
+
+* `request_fields` table:
+
+  * `request_id`
+  * `input_field_key` (string) **or** `input_field_id` (uuid)
+  * `value_json` (jsonb)
+  * `created_at`
+
+This protects you when admins change field configs later.
+
+For files, store references:
+
+* `value_json`: `[ {fileId, url, name, size, mime} ]`
+
+---
+
+## Validation Rules
+
+Validation happens at two levels:
+
+* **Schema validation** (admin configuration sanity)
+
+  * dropdown must have options
+  * default must be among options (if dropdown)
+  * required file must allow file types, etc.
+* **Request-time validation**
+
+  * required fields present
+  * type-correct values
+  * file constraints enforced
+
+---
+
+## Edge Cases You Explicitly Mentioned
+
+### “Same field looks same but different values per service”
+
+Solved by storing dropdown options in `service_fields.options_json`.
+
+### “Remove an input field from a service should remove it from the form”
+
+Yes: the form schema endpoint only returns active service_fields.
+
+### “Chip for each input field showing which services use it”
+
+Return `usage_services` on Input Fields Manager via join.
+
+### “Don’t restart forms; scrape form-by-form”
+
+Use feature flag + seed script + migrate service-by-service.
+
+---
+
+## What to Tell Replit (copy/paste prompt)
+
+**Prompt you can paste into Replit:**
+
+> Implement an Admin Services Configurator that makes existing Ad-hoc Service forms schema-driven without changing current UI/UX.
+> Build CRUD for Input Fields, Services, ServiceFields (service-field assignment), Line Items, Bundles, Bundle Items, and Bundle Field Defaults.
+> Add endpoints `/catalog/services/:slug/form-schema` and `/catalog/bundles/:slug/form-schema` that return grouped fields with per-service options and default values (bundle defaults override service defaults).
+> Add a one-time seed/migration script that reads the current hard-coded form definitions and populates input_fields, services, and service_fields (including dropdown values per service).
+> Add in Input Fields Manager a “Used in Services” chip list showing services that reference that field.
+> Ensure removing a field from a service updates the schema and removes it from the client form, but does not delete historical request data.
+> Use feature flag fallback: if no schema exists for a service, keep using legacy hard-coded fields.
+
+---
+
+If you want, I can also output:
+
+* a **Postgres SQL schema** (tables + indexes + constraints),
+* a **TypeScript types file** for all DTOs,
+* and a **minimal UI wireframe HTML** for the 4 admin screens (Input Fields, Service Config, Line Items, Bundle Config) matching your current Tri-POD admin style.

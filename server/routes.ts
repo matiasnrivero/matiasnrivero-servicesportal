@@ -1780,6 +1780,374 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== INPUT FIELDS ROUTES ====================
+
+  // Get all input fields (admin only)
+  app.get("/api/input-fields", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const fields = await storage.getAllInputFields();
+      res.json(fields);
+    } catch (error) {
+      console.error("Error fetching input fields:", error);
+      res.status(500).json({ error: "Failed to fetch input fields" });
+    }
+  });
+
+  // Get single input field (admin only)
+  app.get("/api/input-fields/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const field = await storage.getInputField(req.params.id);
+      if (!field) {
+        return res.status(404).json({ error: "Input field not found" });
+      }
+      res.json(field);
+    } catch (error) {
+      console.error("Error fetching input field:", error);
+      res.status(500).json({ error: "Failed to fetch input field" });
+    }
+  });
+
+  // Create input field (admin only)
+  app.post("/api/input-fields", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const field = await storage.createInputField(req.body);
+      res.status(201).json(field);
+    } catch (error) {
+      console.error("Error creating input field:", error);
+      res.status(500).json({ error: "Failed to create input field" });
+    }
+  });
+
+  // Update input field (admin only)
+  app.patch("/api/input-fields/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const field = await storage.updateInputField(req.params.id, req.body);
+      if (!field) {
+        return res.status(404).json({ error: "Input field not found" });
+      }
+      res.json(field);
+    } catch (error) {
+      console.error("Error updating input field:", error);
+      res.status(500).json({ error: "Failed to update input field" });
+    }
+  });
+
+  // Delete input field (admin only)
+  app.delete("/api/input-fields/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      await storage.deleteInputField(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting input field:", error);
+      res.status(500).json({ error: "Failed to delete input field" });
+    }
+  });
+
+  // Get input field with service usage info (admin only)
+  app.get("/api/input-fields/:id/usage", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const serviceFieldsList = await storage.getServiceFieldsByInputField(req.params.id);
+      const allServices = await storage.getAllServices();
+      const usage = await Promise.all(serviceFieldsList.map(async (sf) => {
+        const service = allServices.find(s => s.id === sf.serviceId);
+        return {
+          serviceFieldId: sf.id,
+          serviceId: sf.serviceId,
+          serviceName: service?.title || "Unknown",
+          required: sf.required,
+          optionsJson: sf.optionsJson,
+          defaultValue: sf.defaultValue,
+        };
+      }));
+      res.json(usage);
+    } catch (error) {
+      console.error("Error fetching input field usage:", error);
+      res.status(500).json({ error: "Failed to fetch input field usage" });
+    }
+  });
+
+  // ==================== SERVICE FIELDS ROUTES ====================
+
+  // Get service fields for a service (admin only)
+  app.get("/api/services/:serviceId/fields", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const fields = await storage.getServiceFields(req.params.serviceId);
+      res.json(fields);
+    } catch (error) {
+      console.error("Error fetching service fields:", error);
+      res.status(500).json({ error: "Failed to fetch service fields" });
+    }
+  });
+
+  // Add field to service (admin only)
+  app.post("/api/services/:serviceId/fields", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const field = await storage.createServiceField({ ...req.body, serviceId: req.params.serviceId });
+      res.status(201).json(field);
+    } catch (error) {
+      console.error("Error creating service field:", error);
+      res.status(500).json({ error: "Failed to create service field" });
+    }
+  });
+
+  // Update service field (admin only)
+  app.patch("/api/service-fields/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const field = await storage.updateServiceField(req.params.id, req.body);
+      if (!field) {
+        return res.status(404).json({ error: "Service field not found" });
+      }
+      res.json(field);
+    } catch (error) {
+      console.error("Error updating service field:", error);
+      res.status(500).json({ error: "Failed to update service field" });
+    }
+  });
+
+  // Delete service field (admin only)
+  app.delete("/api/service-fields/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      await storage.deleteServiceField(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting service field:", error);
+      res.status(500).json({ error: "Failed to delete service field" });
+    }
+  });
+
+  // ==================== BUNDLE FIELD DEFAULTS ROUTES ====================
+
+  // Get bundle field defaults (admin only)
+  app.get("/api/bundles/:bundleId/field-defaults", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const { serviceId } = req.query;
+      let defaults;
+      if (serviceId) {
+        defaults = await storage.getBundleFieldDefaultsForService(req.params.bundleId, serviceId as string);
+      } else {
+        defaults = await storage.getBundleFieldDefaults(req.params.bundleId);
+      }
+      res.json(defaults);
+    } catch (error) {
+      console.error("Error fetching bundle field defaults:", error);
+      res.status(500).json({ error: "Failed to fetch bundle field defaults" });
+    }
+  });
+
+  // Create or update bundle field default (admin only)
+  app.post("/api/bundles/:bundleId/field-defaults", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const fieldDefault = await storage.createBundleFieldDefault({ ...req.body, bundleId: req.params.bundleId });
+      res.status(201).json(fieldDefault);
+    } catch (error) {
+      console.error("Error creating bundle field default:", error);
+      res.status(500).json({ error: "Failed to create bundle field default" });
+    }
+  });
+
+  // Update bundle field default (admin only)
+  app.patch("/api/bundle-field-defaults/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const fieldDefault = await storage.updateBundleFieldDefault(req.params.id, req.body.defaultValue);
+      if (!fieldDefault) {
+        return res.status(404).json({ error: "Bundle field default not found" });
+      }
+      res.json(fieldDefault);
+    } catch (error) {
+      console.error("Error updating bundle field default:", error);
+      res.status(500).json({ error: "Failed to update bundle field default" });
+    }
+  });
+
+  // Delete bundle field default (admin only)
+  app.delete("/api/bundle-field-defaults/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      await storage.deleteBundleFieldDefault(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting bundle field default:", error);
+      res.status(500).json({ error: "Failed to delete bundle field default" });
+    }
+  });
+
+  // ==================== SEED INPUT FIELDS ROUTE ====================
+
+  // Seed input fields from existing service forms (admin only, one-time use)
+  app.post("/api/admin/seed-input-fields", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      // Check if already seeded
+      const existingFields = await storage.getAllInputFields();
+      if (existingFields.length > 0) {
+        return res.status(400).json({ error: "Input fields already seeded. Clear existing fields first." });
+      }
+
+      // Define all input fields from existing service forms
+      const inputFieldsToCreate = [
+        { fieldKey: "artwork_file", label: "Upload Artwork File", inputType: "file", valueMode: "multiple", sortOrder: 1 },
+        { fieldKey: "output_format", label: "Output Format", inputType: "dropdown", valueMode: "single", sortOrder: 2 },
+        { fieldKey: "color_mode", label: "Color Mode", inputType: "dropdown", valueMode: "single", sortOrder: 3 },
+        { fieldKey: "number_of_colors", label: "Number of Colors", inputType: "number", valueMode: "single", sortOrder: 4 },
+        { fieldKey: "width_inches", label: "Width in Inches", inputType: "number", valueMode: "single", sortOrder: 5 },
+        { fieldKey: "height_inches", label: "Height in Inches", inputType: "number", valueMode: "single", sortOrder: 6 },
+        { fieldKey: "thread_colors", label: "Thread Colors", inputType: "chips", valueMode: "multiple", sortOrder: 7 },
+        { fieldKey: "fabric_type", label: "Fabric Type", inputType: "dropdown", valueMode: "single", sortOrder: 8 },
+        { fieldKey: "vectorization_needed", label: "Vectorization Needed", inputType: "checkbox", valueMode: "single", sortOrder: 9 },
+        { fieldKey: "complexity", label: "Complexity", inputType: "dropdown", valueMode: "single", sortOrder: 10 },
+        { fieldKey: "project_brief", label: "Project Brief", inputType: "textarea", valueMode: "single", sortOrder: 11 },
+        { fieldKey: "reference_images", label: "Reference Images", inputType: "file", valueMode: "multiple", sortOrder: 12 },
+        { fieldKey: "garment_size", label: "Garment Size", inputType: "dropdown", valueMode: "single", sortOrder: 13 },
+        { fieldKey: "bleed_margin", label: "Bleed Margin", inputType: "dropdown", valueMode: "single", sortOrder: 14 },
+        { fieldKey: "front_back_both", label: "Front / Back / Both", inputType: "dropdown", valueMode: "single", sortOrder: 15 },
+        { fieldKey: "composition_notes", label: "Composition Notes", inputType: "textarea", valueMode: "single", sortOrder: 16 },
+        { fieldKey: "number_of_designs", label: "Number of Designs", inputType: "number", valueMode: "single", sortOrder: 17 },
+        { fieldKey: "store_url", label: "Store URL", inputType: "url", valueMode: "single", sortOrder: 18 },
+        { fieldKey: "amount_of_products", label: "Amount of Products", inputType: "number", valueMode: "single", sortOrder: 19 },
+        { fieldKey: "supplier_preference", label: "Supplier Preference", inputType: "dropdown", valueMode: "single", sortOrder: 20 },
+        { fieldKey: "blank_url", label: "Blank Product URL", inputType: "url", valueMode: "single", sortOrder: 21 },
+        { fieldKey: "flyer_size", label: "Flyer Size", inputType: "dropdown", valueMode: "single", sortOrder: 22 },
+        { fieldKey: "orientation", label: "Orientation", inputType: "dropdown", valueMode: "single", sortOrder: 23 },
+        { fieldKey: "banner_type", label: "Banner Type", inputType: "dropdown", valueMode: "single", sortOrder: 24 },
+        { fieldKey: "special_instructions", label: "Special Instructions", inputType: "textarea", valueMode: "single", sortOrder: 25 },
+        { fieldKey: "job_notes", label: "Job Notes", inputType: "textarea", valueMode: "single", sortOrder: 26 },
+      ];
+
+      const createdFields: any[] = [];
+      for (const fieldData of inputFieldsToCreate) {
+        const field = await storage.createInputField(fieldData);
+        createdFields.push(field);
+      }
+
+      res.status(201).json({ 
+        message: `Successfully seeded ${createdFields.length} input fields`,
+        fields: createdFields 
+      });
+    } catch (error) {
+      console.error("Error seeding input fields:", error);
+      res.status(500).json({ error: "Failed to seed input fields" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

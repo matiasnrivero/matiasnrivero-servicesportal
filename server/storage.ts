@@ -27,6 +27,14 @@ import {
   type InsertServicePack,
   type ServicePackItem,
   type InsertServicePackItem,
+  type InputField,
+  type InsertInputField,
+  type UpdateInputField,
+  type ServiceField,
+  type InsertServiceField,
+  type UpdateServiceField,
+  type BundleFieldDefault,
+  type InsertBundleFieldDefault,
   users,
   services,
   serviceRequests,
@@ -39,6 +47,9 @@ import {
   bundleItems,
   servicePacks,
   servicePackItems,
+  inputFields,
+  serviceFields,
+  bundleFieldDefaults,
 } from "@shared/schema";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -119,6 +130,29 @@ export interface IStorage {
   getServicePackItems(packId: string): Promise<ServicePackItem[]>;
   addServicePackItem(data: InsertServicePackItem): Promise<ServicePackItem>;
   removeServicePackItem(id: string): Promise<void>;
+
+  // Input Field methods
+  getAllInputFields(): Promise<InputField[]>;
+  getInputField(id: string): Promise<InputField | undefined>;
+  getInputFieldByKey(fieldKey: string): Promise<InputField | undefined>;
+  createInputField(data: InsertInputField): Promise<InputField>;
+  updateInputField(id: string, data: UpdateInputField): Promise<InputField | undefined>;
+  deleteInputField(id: string): Promise<void>;
+
+  // Service Field methods
+  getServiceFields(serviceId: string): Promise<ServiceField[]>;
+  getServiceField(id: string): Promise<ServiceField | undefined>;
+  getServiceFieldsByInputField(inputFieldId: string): Promise<ServiceField[]>;
+  createServiceField(data: InsertServiceField): Promise<ServiceField>;
+  updateServiceField(id: string, data: UpdateServiceField): Promise<ServiceField | undefined>;
+  deleteServiceField(id: string): Promise<void>;
+
+  // Bundle Field Default methods
+  getBundleFieldDefaults(bundleId: string): Promise<BundleFieldDefault[]>;
+  getBundleFieldDefaultsForService(bundleId: string, serviceId: string): Promise<BundleFieldDefault[]>;
+  createBundleFieldDefault(data: InsertBundleFieldDefault): Promise<BundleFieldDefault>;
+  updateBundleFieldDefault(id: string, defaultValue: any): Promise<BundleFieldDefault | undefined>;
+  deleteBundleFieldDefault(id: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -468,6 +502,102 @@ export class DbStorage implements IStorage {
 
   async removeServicePackItem(id: string): Promise<void> {
     await db.delete(servicePackItems).where(eq(servicePackItems.id, id));
+  }
+
+  // Input Field methods
+  async getAllInputFields(): Promise<InputField[]> {
+    return await db.select().from(inputFields).orderBy(inputFields.sortOrder, inputFields.label);
+  }
+
+  async getInputField(id: string): Promise<InputField | undefined> {
+    const result = await db.select().from(inputFields).where(eq(inputFields.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getInputFieldByKey(fieldKey: string): Promise<InputField | undefined> {
+    const result = await db.select().from(inputFields).where(eq(inputFields.fieldKey, fieldKey)).limit(1);
+    return result[0];
+  }
+
+  async createInputField(data: InsertInputField): Promise<InputField> {
+    const result = await db.insert(inputFields).values(data).returning();
+    return result[0];
+  }
+
+  async updateInputField(id: string, data: UpdateInputField): Promise<InputField | undefined> {
+    const result = await db.update(inputFields)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(inputFields.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteInputField(id: string): Promise<void> {
+    await db.delete(serviceFields).where(eq(serviceFields.inputFieldId, id));
+    await db.delete(inputFields).where(eq(inputFields.id, id));
+  }
+
+  // Service Field methods
+  async getServiceFields(serviceId: string): Promise<ServiceField[]> {
+    return await db.select().from(serviceFields)
+      .where(eq(serviceFields.serviceId, serviceId))
+      .orderBy(serviceFields.sortOrder);
+  }
+
+  async getServiceField(id: string): Promise<ServiceField | undefined> {
+    const result = await db.select().from(serviceFields).where(eq(serviceFields.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getServiceFieldsByInputField(inputFieldId: string): Promise<ServiceField[]> {
+    return await db.select().from(serviceFields).where(eq(serviceFields.inputFieldId, inputFieldId));
+  }
+
+  async createServiceField(data: InsertServiceField): Promise<ServiceField> {
+    const result = await db.insert(serviceFields).values(data).returning();
+    return result[0];
+  }
+
+  async updateServiceField(id: string, data: UpdateServiceField): Promise<ServiceField | undefined> {
+    const result = await db.update(serviceFields)
+      .set(data)
+      .where(eq(serviceFields.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteServiceField(id: string): Promise<void> {
+    await db.delete(serviceFields).where(eq(serviceFields.id, id));
+  }
+
+  // Bundle Field Default methods
+  async getBundleFieldDefaults(bundleId: string): Promise<BundleFieldDefault[]> {
+    return await db.select().from(bundleFieldDefaults).where(eq(bundleFieldDefaults.bundleId, bundleId));
+  }
+
+  async getBundleFieldDefaultsForService(bundleId: string, serviceId: string): Promise<BundleFieldDefault[]> {
+    return await db.select().from(bundleFieldDefaults)
+      .where(and(
+        eq(bundleFieldDefaults.bundleId, bundleId),
+        eq(bundleFieldDefaults.serviceId, serviceId)
+      ));
+  }
+
+  async createBundleFieldDefault(data: InsertBundleFieldDefault): Promise<BundleFieldDefault> {
+    const result = await db.insert(bundleFieldDefaults).values(data).returning();
+    return result[0];
+  }
+
+  async updateBundleFieldDefault(id: string, defaultValue: any): Promise<BundleFieldDefault | undefined> {
+    const result = await db.update(bundleFieldDefaults)
+      .set({ defaultValue })
+      .where(eq(bundleFieldDefaults.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteBundleFieldDefault(id: string): Promise<void> {
+    await db.delete(bundleFieldDefaults).where(eq(bundleFieldDefaults.id, id));
   }
 }
 

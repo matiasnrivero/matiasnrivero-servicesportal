@@ -180,6 +180,74 @@ export const clientPackSubscriptions = pgTable("client_pack_subscriptions", {
 
 // ==================== END PHASE 2 TABLES ====================
 
+// ==================== PHASE 3: CONFIGURABLE INPUT FIELDS ====================
+
+// Input field types enum
+export const inputFieldTypes = [
+  "text",
+  "textarea", 
+  "number",
+  "dropdown",
+  "multi_select",
+  "radio",
+  "checkbox",
+  "file",
+  "url",
+  "date",
+  "chips"
+] as const;
+export type InputFieldType = typeof inputFieldTypes[number];
+
+// Value modes for fields
+export const valueModes = ["single", "multiple"] as const;
+export type ValueMode = typeof valueModes[number];
+
+// Input fields - global reusable field definitions
+export const inputFields = pgTable("input_fields", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fieldKey: text("field_key").notNull().unique(),
+  label: text("label").notNull(),
+  description: text("description"),
+  inputType: text("input_type").notNull(),
+  valueMode: text("value_mode").notNull().default("single"),
+  validation: jsonb("validation"),
+  globalDefaultValue: jsonb("global_default_value"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Service fields - join table linking input fields to services with per-service configuration
+export const serviceFields = pgTable("service_fields", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  serviceId: varchar("service_id").notNull().references(() => services.id, { onDelete: "cascade" }),
+  inputFieldId: varchar("input_field_id").notNull().references(() => inputFields.id, { onDelete: "cascade" }),
+  required: boolean("required").notNull().default(false),
+  displayLabelOverride: text("display_label_override"),
+  helpTextOverride: text("help_text_override"),
+  placeholderOverride: text("placeholder_override"),
+  valueModeOverride: text("value_mode_override"),
+  optionsJson: jsonb("options_json"),
+  defaultValue: jsonb("default_value"),
+  uiGroup: text("ui_group"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Bundle field defaults - allows bundles to override service field defaults
+export const bundleFieldDefaults = pgTable("bundle_field_defaults", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bundleId: varchar("bundle_id").notNull().references(() => bundles.id, { onDelete: "cascade" }),
+  serviceId: varchar("service_id").notNull().references(() => services.id, { onDelete: "cascade" }),
+  inputFieldId: varchar("input_field_id").notNull().references(() => inputFields.id, { onDelete: "cascade" }),
+  defaultValue: jsonb("default_value").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ==================== END PHASE 3 TABLES ====================
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -263,6 +331,33 @@ export const insertClientPackSubscriptionSchema = createInsertSchema(clientPackS
   createdAt: true,
 });
 
+// Phase 3: Input Fields schemas
+export const insertInputFieldSchema = createInsertSchema(inputFields).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateInputFieldSchema = createInsertSchema(inputFields).partial().omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertServiceFieldSchema = createInsertSchema(serviceFields).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const updateServiceFieldSchema = createInsertSchema(serviceFields).partial().omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertBundleFieldDefaultSchema = createInsertSchema(bundleFieldDefaults).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type VendorProfile = typeof vendorProfiles.$inferSelect;
@@ -292,6 +387,33 @@ export type ServicePackItem = typeof servicePackItems.$inferSelect;
 export type InsertServicePackItem = z.infer<typeof insertServicePackItemSchema>;
 export type ClientPackSubscription = typeof clientPackSubscriptions.$inferSelect;
 export type InsertClientPackSubscription = z.infer<typeof insertClientPackSubscriptionSchema>;
+
+// Phase 3: Input Fields types
+export type InputField = typeof inputFields.$inferSelect;
+export type InsertInputField = z.infer<typeof insertInputFieldSchema>;
+export type UpdateInputField = z.infer<typeof updateInputFieldSchema>;
+export type ServiceField = typeof serviceFields.$inferSelect;
+export type InsertServiceField = z.infer<typeof insertServiceFieldSchema>;
+export type UpdateServiceField = z.infer<typeof updateServiceFieldSchema>;
+export type BundleFieldDefault = typeof bundleFieldDefaults.$inferSelect;
+export type InsertBundleFieldDefault = z.infer<typeof insertBundleFieldDefaultSchema>;
+
+// Helper type for dropdown options
+export type FieldOption = {
+  value: string;
+  label: string;
+  price?: number;
+};
+
+// Helper type for field validation rules
+export type FieldValidation = {
+  min?: number;
+  max?: number;
+  pattern?: string;
+  maxLength?: number;
+  allowedMimeTypes?: string[];
+  maxFileSize?: number;
+};
 
 // Helper type for pricing agreements structure
 export type PricingAgreement = {
