@@ -212,6 +212,15 @@ export default function VendorProfile() {
     title: "",
     workMode: "Totally Off",
   });
+  
+  // Edit holiday state
+  const [editHolidayDialogOpen, setEditHolidayDialogOpen] = useState(false);
+  const [editingHoliday, setEditingHoliday] = useState<Holiday | null>(null);
+  const [editHolidayForm, setEditHolidayForm] = useState<{ date: Date | undefined; title: string; workMode: string }>({
+    date: undefined,
+    title: "",
+    workMode: "Totally Off",
+  });
 
   // Edit team member state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -422,6 +431,36 @@ export default function VendorProfile() {
 
   const handleRemoveHoliday = (dateStr: string) => {
     setHolidays(holidays.filter(h => h.date !== dateStr));
+  };
+
+  const handleEditHoliday = (holiday: Holiday) => {
+    setEditingHoliday(holiday);
+    setEditHolidayForm({
+      date: new Date(holiday.date + "T00:00:00"),
+      title: holiday.title,
+      workMode: holiday.workMode || "Totally Off",
+    });
+    setEditHolidayDialogOpen(true);
+  };
+
+  const handleSaveEditHoliday = () => {
+    if (!editHolidayForm.date || !editHolidayForm.title.trim() || !editingHoliday) {
+      toast({ title: "Please fill in all fields", variant: "destructive" });
+      return;
+    }
+    const newDateStr = format(editHolidayForm.date, "yyyy-MM-dd");
+    // Check if new date conflicts with another holiday (not the one being edited)
+    if (newDateStr !== editingHoliday.date && holidays.some(h => h.date === newDateStr)) {
+      toast({ title: "This date already has a holiday", variant: "destructive" });
+      return;
+    }
+    setHolidays(holidays.map(h => 
+      h.date === editingHoliday.date 
+        ? { date: newDateStr, title: editHolidayForm.title.trim(), workMode: editHolidayForm.workMode }
+        : h
+    ));
+    setEditHolidayDialogOpen(false);
+    setEditingHoliday(null);
   };
 
   const handleSaveAvailability = () => {
@@ -1191,10 +1230,10 @@ export default function VendorProfile() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Date</Label>
+                      <Label className="block">Date</Label>
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" className="w-[180px] justify-start text-left font-normal" data-testid="button-select-date">
+                          <Button variant="outline" className="w-[160px] justify-start text-left font-normal" data-testid="button-select-date">
                             <CalendarDays className="mr-2 h-4 w-4" />
                             {newHoliday.date ? format(newHoliday.date, "MMM d, yyyy") : "Select date"}
                           </Button>
@@ -1254,14 +1293,24 @@ export default function VendorProfile() {
                                 {holiday.workMode || "Totally Off"}
                               </Badge>
                             </div>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleRemoveHoliday(holiday.date)}
-                              data-testid={`button-remove-holiday-${holiday.date}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleEditHoliday(holiday)}
+                                data-testid={`button-edit-holiday-${holiday.date}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleRemoveHoliday(holiday.date)}
+                                data-testid={`button-remove-holiday-${holiday.date}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
                           </div>
                         ))}
                     </div>
@@ -1279,6 +1328,76 @@ export default function VendorProfile() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Edit Holiday Dialog */}
+              <Dialog open={editHolidayDialogOpen} onOpenChange={setEditHolidayDialogOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Edit Holiday</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <div className="space-y-2">
+                      <Label>Holiday Title</Label>
+                      <Input
+                        value={editHolidayForm.title}
+                        onChange={(e) => setEditHolidayForm({ ...editHolidayForm, title: e.target.value })}
+                        placeholder="e.g., Christmas"
+                        data-testid="input-edit-holiday-title"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="block">Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="w-full justify-start text-left font-normal" data-testid="button-edit-select-date">
+                            <CalendarDays className="mr-2 h-4 w-4" />
+                            {editHolidayForm.date ? format(editHolidayForm.date, "MMM d, yyyy") : "Select date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={editHolidayForm.date}
+                            onSelect={(date) => setEditHolidayForm({ ...editHolidayForm, date })}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Work Mode</Label>
+                      <Select
+                        value={editHolidayForm.workMode}
+                        onValueChange={(value) => setEditHolidayForm({ ...editHolidayForm, workMode: value })}
+                      >
+                        <SelectTrigger data-testid="select-edit-work-mode">
+                          <SelectValue placeholder="Select mode" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Full-Time">Full-Time</SelectItem>
+                          <SelectItem value="Part-Time">Part-Time</SelectItem>
+                          <SelectItem value="Totally Off">Totally Off</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => setEditHolidayDialogOpen(false)}
+                        data-testid="button-cancel-edit-holiday"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleSaveEditHoliday}
+                        disabled={!editHolidayForm.title.trim() || !editHolidayForm.date}
+                        data-testid="button-save-edit-holiday"
+                      >
+                        Save Changes
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </TabsContent>
           </Tabs>
