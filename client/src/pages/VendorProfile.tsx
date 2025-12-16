@@ -229,7 +229,7 @@ export default function VendorProfile() {
       await queryClient.invalidateQueries({ queryKey: ["/api/default-user"] });
       await queryClient.refetchQueries({ queryKey: ["/api/default-user"] });
       toast({ title: "Logged in as team member" });
-      setLocation("/requests");
+      setLocation("/service-requests");
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
