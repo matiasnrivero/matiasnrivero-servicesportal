@@ -46,9 +46,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2 } from "lucide-react";
-import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem } from "@shared/schema";
-import { insertBundleLineItemSchema } from "@shared/schema";
+import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2 } from "lucide-react";
+import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem, InputField, ServiceField } from "@shared/schema";
+import { insertBundleLineItemSchema, inputFieldTypes, valueModes } from "@shared/schema";
 
 const BASE_PRICE_SERVICES = [
   { name: "Vectorization & Color Separation" },
@@ -892,6 +892,557 @@ function PackTableRow({
   );
 }
 
+// Input Field Form Schema
+const inputFieldFormSchema = z.object({
+  fieldKey: z.string().min(1, "Field key is required").regex(/^[a-z_]+$/, "Must be lowercase with underscores only"),
+  label: z.string().min(1, "Label is required"),
+  inputType: z.enum(inputFieldTypes),
+  valueMode: z.enum(valueModes),
+  description: z.string().optional(),
+  globalDefaultValue: z.any().optional(),
+  sortOrder: z.number().int().min(0).default(0),
+  isActive: z.boolean().default(true),
+});
+
+type InputFieldFormData = z.infer<typeof inputFieldFormSchema>;
+
+function InputFieldsTabContent() {
+  const { toast } = useToast();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingField, setEditingField] = useState<InputField | null>(null);
+  const [seedLoading, setSeedLoading] = useState(false);
+
+  const { data: inputFieldsList = [], isLoading } = useQuery<InputField[]>({
+    queryKey: ["/api/input-fields"],
+  });
+
+  const { data: allServices = [] } = useQuery<Service[]>({
+    queryKey: ["/api/services"],
+  });
+
+  const createFieldMutation = useMutation({
+    mutationFn: async (data: InputFieldFormData) => {
+      return apiRequest("POST", "/api/input-fields", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/input-fields"] });
+      setIsCreateDialogOpen(false);
+      toast({ title: "Input field created successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create input field", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateFieldMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<InputFieldFormData> }) => {
+      return apiRequest("PATCH", `/api/input-fields/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/input-fields"] });
+      setEditingField(null);
+      toast({ title: "Input field updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to update input field", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteFieldMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/input-fields/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/input-fields"] });
+      toast({ title: "Input field deleted successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to delete input field", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const seedFieldsMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/admin/seed-input-fields");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/input-fields"] });
+      toast({ title: "Input fields seeded successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to seed input fields", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const form = useForm<InputFieldFormData>({
+    resolver: zodResolver(inputFieldFormSchema),
+    defaultValues: {
+      fieldKey: "",
+      label: "",
+      inputType: "text",
+      valueMode: "single",
+      description: "",
+      sortOrder: 0,
+      isActive: true,
+    },
+  });
+
+  const editForm = useForm<InputFieldFormData>({
+    resolver: zodResolver(inputFieldFormSchema),
+    defaultValues: {
+      fieldKey: "",
+      label: "",
+      inputType: "text",
+      valueMode: "single",
+      description: "",
+      sortOrder: 0,
+      isActive: true,
+    },
+  });
+
+  useEffect(() => {
+    if (editingField) {
+      editForm.reset({
+        fieldKey: editingField.fieldKey,
+        label: editingField.label,
+        inputType: editingField.inputType as any,
+        valueMode: editingField.valueMode as any,
+        description: editingField.description || "",
+        sortOrder: editingField.sortOrder ?? 0,
+        isActive: editingField.isActive ?? true,
+      });
+    }
+  }, [editingField, editForm]);
+
+  const onCreateSubmit = (data: InputFieldFormData) => {
+    createFieldMutation.mutate(data);
+  };
+
+  const onEditSubmit = (data: InputFieldFormData) => {
+    if (!editingField) return;
+    updateFieldMutation.mutate({ id: editingField.id, data });
+  };
+
+  const handleSeedFields = async () => {
+    if (inputFieldsList.length > 0) {
+      toast({ title: "Cannot seed", description: "Input fields already exist. Clear them first.", variant: "destructive" });
+      return;
+    }
+    seedFieldsMutation.mutate();
+  };
+
+  const getInputTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      text: "Text",
+      textarea: "Text Area",
+      number: "Number",
+      dropdown: "Dropdown",
+      checkbox: "Checkbox",
+      file: "File Upload",
+      chips: "Chips/Tags",
+      url: "URL",
+      date: "Date",
+    };
+    return labels[type] || type;
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />
+          <p className="text-muted-foreground">Loading input fields...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-2">
+        <div>
+          <CardTitle>Input Fields Library</CardTitle>
+          <CardDescription>Manage configurable input fields that can be assigned to different services</CardDescription>
+        </div>
+        <div className="flex gap-2">
+          {inputFieldsList.length === 0 && (
+            <Button 
+              variant="outline" 
+              onClick={handleSeedFields} 
+              disabled={seedFieldsMutation.isPending}
+              data-testid="button-seed-fields"
+            >
+              {seedFieldsMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Seed Default Fields
+            </Button>
+          )}
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-add-input-field">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Field
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Create Input Field</DialogTitle>
+                <DialogDescription>Add a new input field to the library</DialogDescription>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onCreateSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="fieldKey"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Field Key</FormLabel>
+                        <FormControl>
+                          <Input placeholder="output_format" {...field} data-testid="input-field-key" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="label"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Display Label</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Output Format" {...field} data-testid="input-field-label" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="inputType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Input Type</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-input-type">
+                                <SelectValue placeholder="Select type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {inputFieldTypes.map((type) => (
+                                <SelectItem key={type} value={type}>
+                                  {getInputTypeLabel(type)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="valueMode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Value Mode</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-value-mode">
+                                <SelectValue placeholder="Select mode" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="single">Single Value</SelectItem>
+                              <SelectItem value="multiple">Multiple Values</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Optional description or help text" {...field} data-testid="input-description" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="sortOrder"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Sort Order</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              {...field} 
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              data-testid="input-sort-order" 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="isActive"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                          <FormLabel>Active</FormLabel>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              data-testid="switch-is-active"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={createFieldMutation.isPending} data-testid="button-submit-field">
+                      {createFieldMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                      Create Field
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {inputFieldsList.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <FormInput className="h-12 w-12 mx-auto mb-2 opacity-50" />
+            <p>No input fields configured yet.</p>
+            <p className="text-sm">Click "Seed Default Fields" to populate from existing service forms, or add fields manually.</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[180px]">Field Key</TableHead>
+                <TableHead>Label</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Mode</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {inputFieldsList.map((field) => (
+                <TableRow key={field.id} data-testid={`row-input-field-${field.id}`}>
+                  <TableCell className="font-mono text-sm">{field.fieldKey}</TableCell>
+                  <TableCell>{field.label}</TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{getInputTypeLabel(field.inputType)}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{field.valueMode}</Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {field.isActive ? (
+                      <Badge variant="default">Active</Badge>
+                    ) : (
+                      <Badge variant="secondary">Inactive</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setEditingField(field)}
+                        data-testid={`button-edit-field-${field.id}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => {
+                          if (confirm(`Delete input field "${field.label}"? This will remove it from all services.`)) {
+                            deleteFieldMutation.mutate(field.id);
+                          }
+                        }}
+                        data-testid={`button-delete-field-${field.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+
+      {/* Edit Field Dialog */}
+      <Dialog open={!!editingField} onOpenChange={(open) => !open && setEditingField(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Input Field</DialogTitle>
+            <DialogDescription>Update input field configuration</DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="fieldKey"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Field Key</FormLabel>
+                    <FormControl>
+                      <Input {...field} disabled data-testid="input-edit-field-key" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="label"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Display Label</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-edit-field-label" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="inputType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Input Type</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-edit-input-type">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {inputFieldTypes.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {getInputTypeLabel(type)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="valueMode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Value Mode</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-edit-value-mode">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="single">Single Value</SelectItem>
+                          <SelectItem value="multiple">Multiple Values</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={editForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-edit-description" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="sortOrder"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Sort Order</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          {...field} 
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                          data-testid="input-edit-sort-order" 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="isActive"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                      <FormLabel>Active</FormLabel>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-edit-is-active"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setEditingField(null)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateFieldMutation.isPending} data-testid="button-update-field">
+                  {updateFieldMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Update Field
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 export default function Settings() {
   const { toast } = useToast();
 
@@ -992,6 +1543,10 @@ export default function Settings() {
                 <CalendarRange className="h-4 w-4 mr-1" />
                 Packs
               </TabsTrigger>
+              <TabsTrigger value="input-fields" data-testid="tab-input-fields">
+                <FormInput className="h-4 w-4 mr-1" />
+                Input Fields
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="pricing">
@@ -1013,6 +1568,10 @@ export default function Settings() {
 
             <TabsContent value="packs">
               <PacksTabContent />
+            </TabsContent>
+
+            <TabsContent value="input-fields">
+              <InputFieldsTabContent />
             </TabsContent>
           </Tabs>
         </div>
