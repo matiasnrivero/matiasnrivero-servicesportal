@@ -25,7 +25,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Users, DollarSign, Clock, UserPlus, Save, ArrowLeft } from "lucide-react";
+import { Building2, Users, DollarSign, Clock, UserPlus, Save, ArrowLeft, CalendarDays, Globe } from "lucide-react";
 import { Link } from "wouter";
 import type { User, VendorProfile as VendorProfileType } from "@shared/schema";
 
@@ -54,6 +54,56 @@ const SLA_SERVICES = [
   "Flyer Design",
   "Blank Product - PSD",
 ];
+
+// Common timezones for vendor availability
+const TIMEZONES = [
+  { value: "America/Los_Angeles", label: "Pacific Time (PT)", offset: -8 },
+  { value: "America/Denver", label: "Mountain Time (MT)", offset: -7 },
+  { value: "America/Chicago", label: "Central Time (CT)", offset: -6 },
+  { value: "America/New_York", label: "Eastern Time (ET)", offset: -5 },
+  { value: "America/Argentina/Buenos_Aires", label: "Argentina (ART)", offset: -3 },
+  { value: "UTC", label: "UTC (Coordinated Universal Time)", offset: 0 },
+  { value: "Europe/London", label: "London (GMT)", offset: 0 },
+  { value: "Europe/Paris", label: "Central European (CET)", offset: 1 },
+  { value: "Asia/Karachi", label: "Pakistan (PKT)", offset: 5 },
+  { value: "Asia/Kolkata", label: "India (IST)", offset: 5.5 },
+  { value: "Asia/Manila", label: "Philippines (PHT)", offset: 8 },
+  { value: "Asia/Tokyo", label: "Japan (JST)", offset: 9 },
+];
+
+type Holiday = { date: string; title: string; workMode?: string };
+type WorkingHours = { timezone: string; startHour: string; endHour: string };
+
+// Helper to convert time from one timezone to US timezones
+function convertTimeToUSZones(time: string, fromTimezone: string): { pst: string; mst: string; cst: string; est: string } {
+  if (!time) return { pst: "--:--", mst: "--:--", cst: "--:--", est: "--:--" };
+  
+  const fromTz = TIMEZONES.find(tz => tz.value === fromTimezone);
+  if (!fromTz) return { pst: "--:--", mst: "--:--", cst: "--:--", est: "--:--" };
+  
+  const [hours, minutes] = time.split(":").map(Number);
+  const totalMinutes = hours * 60 + minutes;
+  
+  const utcMinutes = totalMinutes - (fromTz.offset * 60);
+  
+  const pstMinutes = (utcMinutes + (-8 * 60) + 1440) % 1440;
+  const mstMinutes = (utcMinutes + (-7 * 60) + 1440) % 1440;
+  const cstMinutes = (utcMinutes + (-6 * 60) + 1440) % 1440;
+  const estMinutes = (utcMinutes + (-5 * 60) + 1440) % 1440;
+  
+  const formatTime = (mins: number) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+  };
+  
+  return {
+    pst: formatTime(pstMinutes),
+    mst: formatTime(mstMinutes),
+    cst: formatTime(cstMinutes),
+    est: formatTime(estMinutes),
+  };
+}
 
 const roleLabels: Record<string, string> = {
   vendor: "Vendor Admin",
@@ -334,6 +384,10 @@ export default function VendorDetail() {
               <TabsTrigger value="sla" data-testid="tab-sla">
                 <Clock className="h-4 w-4 mr-2" />
                 SLA
+              </TabsTrigger>
+              <TabsTrigger value="availability" data-testid="tab-availability">
+                <CalendarDays className="h-4 w-4 mr-2" />
+                Availability
               </TabsTrigger>
             </TabsList>
 
@@ -831,6 +885,123 @@ export default function VendorDetail() {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="availability">
+              <div className="space-y-6">
+                {/* Working Hours Section */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Globe className="h-5 w-5" />
+                      Working Hours
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {(() => {
+                      const wh = vendorProfile?.workingHours as WorkingHours | null;
+                      if (!wh) {
+                        return (
+                          <p className="text-muted-foreground text-center py-8">
+                            No working hours configured yet.
+                          </p>
+                        );
+                      }
+                      const tzLabel = TIMEZONES.find(tz => tz.value === wh.timezone)?.label || wh.timezone;
+                      return (
+                        <>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                              <Label className="text-sm text-muted-foreground">Time Zone</Label>
+                              <p className="font-medium">{tzLabel}</p>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm text-muted-foreground">Start Hour</Label>
+                              <p className="font-medium">{wh.startHour}</p>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm text-muted-foreground">End Hour</Label>
+                              <p className="font-medium">{wh.endHour}</p>
+                            </div>
+                          </div>
+                          <div className="mt-4 p-4 bg-muted/50 rounded-md">
+                            <Label className="text-sm font-medium mb-3 block">Hours in US Time Zones</Label>
+                            <div className="grid grid-cols-4 gap-4">
+                              <div className="text-center">
+                                <p className="text-xs text-muted-foreground mb-1">PST (Pacific)</p>
+                                <p className="font-medium">
+                                  {convertTimeToUSZones(wh.startHour, wh.timezone).pst} - {convertTimeToUSZones(wh.endHour, wh.timezone).pst}
+                                </p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-xs text-muted-foreground mb-1">MST (Mountain)</p>
+                                <p className="font-medium">
+                                  {convertTimeToUSZones(wh.startHour, wh.timezone).mst} - {convertTimeToUSZones(wh.endHour, wh.timezone).mst}
+                                </p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-xs text-muted-foreground mb-1">CST (Central)</p>
+                                <p className="font-medium">
+                                  {convertTimeToUSZones(wh.startHour, wh.timezone).cst} - {convertTimeToUSZones(wh.endHour, wh.timezone).cst}
+                                </p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-xs text-muted-foreground mb-1">EST (Eastern)</p>
+                                <p className="font-medium">
+                                  {convertTimeToUSZones(wh.startHour, wh.timezone).est} - {convertTimeToUSZones(wh.endHour, wh.timezone).est}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+
+                {/* Holidays Section */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CalendarDays className="h-5 w-5" />
+                      Holidays / Out of Office Days
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(() => {
+                      const holidays = (vendorProfile?.holidays as Holiday[] | null) || [];
+                      if (holidays.length === 0) {
+                        return (
+                          <p className="text-muted-foreground text-center py-8">
+                            No holidays configured yet.
+                          </p>
+                        );
+                      }
+                      return (
+                        <div className="space-y-2">
+                          {holidays
+                            .sort((a, b) => a.date.localeCompare(b.date))
+                            .map((holiday) => (
+                              <div
+                                key={holiday.date}
+                                className="flex items-center gap-4 p-3 border rounded-md"
+                                data-testid={`row-holiday-${holiday.date}`}
+                              >
+                                <Badge variant="outline">
+                                  {new Date(holiday.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                </Badge>
+                                <span className="font-medium">{holiday.title}</span>
+                                <Badge variant={holiday.workMode === "Totally Off" ? "destructive" : holiday.workMode === "Part-Time" ? "secondary" : "default"}>
+                                  {holiday.workMode || "Totally Off"}
+                                </Badge>
+                              </div>
+                            ))}
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
           </Tabs>
         </div>

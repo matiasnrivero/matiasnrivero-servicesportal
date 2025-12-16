@@ -1174,9 +1174,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "User not found" });
       }
 
-      // Only admin can create vendor profiles
-      if (sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Only admins can create vendor profiles" });
+      // Admin can create profiles for anyone, vendors can create their own profile
+      if (sessionUser.role !== "admin" && sessionUser.role !== "vendor") {
+        return res.status(403).json({ error: "Only admins and vendors can create vendor profiles" });
+      }
+
+      // Vendors can only create their own profile
+      if (sessionUser.role === "vendor" && req.body.userId !== sessionUserId) {
+        return res.status(403).json({ error: "Vendors can only create their own profile" });
+      }
+
+      // Check if profile already exists for this user
+      const existingProfile = await storage.getVendorProfile(req.body.userId);
+      if (existingProfile) {
+        return res.status(400).json({ error: "Profile already exists for this user" });
       }
 
       const profile = await storage.createVendorProfile(req.body);

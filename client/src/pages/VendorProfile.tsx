@@ -83,11 +83,11 @@ const TIMEZONES = [
 ];
 
 // Helper to convert time from one timezone to US timezones
-function convertTimeToUSZones(time: string, fromTimezone: string): { pst: string; cst: string; est: string } {
-  if (!time) return { pst: "--:--", cst: "--:--", est: "--:--" };
+function convertTimeToUSZones(time: string, fromTimezone: string): { pst: string; mst: string; cst: string; est: string } {
+  if (!time) return { pst: "--:--", mst: "--:--", cst: "--:--", est: "--:--" };
   
   const fromTz = TIMEZONES.find(tz => tz.value === fromTimezone);
-  if (!fromTz) return { pst: "--:--", cst: "--:--", est: "--:--" };
+  if (!fromTz) return { pst: "--:--", mst: "--:--", cst: "--:--", est: "--:--" };
   
   const [hours, minutes] = time.split(":").map(Number);
   const totalMinutes = hours * 60 + minutes;
@@ -96,6 +96,7 @@ function convertTimeToUSZones(time: string, fromTimezone: string): { pst: string
   const utcMinutes = totalMinutes - (fromTz.offset * 60);
   
   const pstMinutes = (utcMinutes + (-8 * 60) + 1440) % 1440;
+  const mstMinutes = (utcMinutes + (-7 * 60) + 1440) % 1440;
   const cstMinutes = (utcMinutes + (-6 * 60) + 1440) % 1440;
   const estMinutes = (utcMinutes + (-5 * 60) + 1440) % 1440;
   
@@ -107,6 +108,7 @@ function convertTimeToUSZones(time: string, fromTimezone: string): { pst: string
   
   return {
     pst: formatTime(pstMinutes),
+    mst: formatTime(mstMinutes),
     cst: formatTime(cstMinutes),
     est: formatTime(estMinutes),
   };
@@ -254,11 +256,23 @@ export default function VendorProfile() {
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: any) => {
-      if (!vendorProfile?.id) throw new Error("No profile found");
-      return apiRequest("PATCH", `/api/vendor-profiles/${vendorProfile.id}`, data);
+      if (vendorProfile?.id) {
+        // Update existing profile
+        return apiRequest("PATCH", `/api/vendor-profiles/${vendorProfile.id}`, data);
+      } else if (currentUser?.id) {
+        // Create new profile for this vendor if they don't have one yet
+        return apiRequest("POST", "/api/vendor-profiles", {
+          userId: currentUser.id,
+          companyName: profileForm.companyName || currentUser.username,
+          ...data,
+        });
+      } else {
+        throw new Error("No user found");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vendor-profiles/user"] });
+      refetchProfile();
       toast({ title: "Profile updated successfully" });
     },
     onError: (error: Error) => {
@@ -1185,11 +1199,17 @@ export default function VendorProfile() {
                   {/* US Timezone Conversion Display */}
                   <div className="mt-4 p-4 bg-muted/50 rounded-md">
                     <Label className="text-sm font-medium mb-3 block">Hours in US Time Zones</Label>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-4 gap-4">
                       <div className="text-center">
                         <p className="text-xs text-muted-foreground mb-1">PST (Pacific)</p>
                         <p className="font-medium">
                           {convertTimeToUSZones(workingHours.startHour, workingHours.timezone).pst} - {convertTimeToUSZones(workingHours.endHour, workingHours.timezone).pst}
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-muted-foreground mb-1">MST (Mountain)</p>
+                        <p className="font-medium">
+                          {convertTimeToUSZones(workingHours.startHour, workingHours.timezone).mst} - {convertTimeToUSZones(workingHours.endHour, workingHours.timezone).mst}
                         </p>
                       </div>
                       <div className="text-center">
