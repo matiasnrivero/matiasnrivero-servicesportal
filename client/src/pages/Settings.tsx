@@ -1540,10 +1540,26 @@ function ServiceFieldsManager() {
     }
   }, [editingServiceField, editFieldForm]);
 
+  // Helper to parse options - accepts JSON array or comma-separated values
+  const parseOptionsInput = (input: string): string[] | null => {
+    if (!input || !input.trim()) return null;
+    const trimmed = input.trim();
+    // Try parsing as JSON first
+    if (trimmed.startsWith('[')) {
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        // Fall through to comma parsing
+      }
+    }
+    // Parse as comma-separated values
+    return trimmed.split(',').map(s => s.trim()).filter(s => s.length > 0);
+  };
+
   const handleAddField = (data: { inputFieldId: string; optionsJson: string; defaultValue: string; isRequired: boolean; sortOrder: number }) => {
     addFieldMutation.mutate({
       inputFieldId: data.inputFieldId,
-      optionsJson: data.optionsJson ? JSON.parse(data.optionsJson) : undefined,
+      optionsJson: parseOptionsInput(data.optionsJson) || undefined,
       defaultValue: data.defaultValue || undefined,
       isRequired: data.isRequired,
       sortOrder: data.sortOrder,
@@ -1555,7 +1571,7 @@ function ServiceFieldsManager() {
     updateServiceFieldMutation.mutate({
       id: editingServiceField.id,
       data: {
-        optionsJson: data.optionsJson ? JSON.parse(data.optionsJson) : null,
+        optionsJson: parseOptionsInput(data.optionsJson),
         defaultValue: data.defaultValue || null,
         required: data.isRequired,
         sortOrder: data.sortOrder,
@@ -1654,10 +1670,10 @@ function ServiceFieldsManager() {
                         name="optionsJson"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Service-Specific Options (JSON array)</FormLabel>
+                            <FormLabel>Service-Specific Options (comma-separated)</FormLabel>
                             <FormControl>
                               <Textarea
-                                placeholder='["Option A", "Option B"]'
+                                placeholder="PDF, AI, EPS, PSD"
                                 {...field}
                                 data-testid="input-add-service-options"
                                 className="font-mono text-sm"
@@ -1810,13 +1826,13 @@ function ServiceFieldsManager() {
                 name="optionsJson"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Service-Specific Options (JSON array)</FormLabel>
+                    <FormLabel>Service-Specific Options (comma-separated)</FormLabel>
                     <FormControl>
                       <Textarea
                         {...field}
                         data-testid="input-edit-service-options"
                         className="font-mono text-sm"
-                        placeholder='["Option A", "Option B"]'
+                        placeholder="PDF, AI, EPS, PSD"
                       />
                     </FormControl>
                     <FormMessage />
