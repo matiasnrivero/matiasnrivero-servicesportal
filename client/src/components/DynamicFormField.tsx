@@ -145,11 +145,13 @@ export function DynamicFormField({
                     id={`${fieldKey}-${opt.value}`}
                     checked={selectedValues.includes(opt.value)}
                     onCheckedChange={(checked) => {
-                      if (checked) {
+                      // Explicitly check for true/false to handle tri-state Checkbox output
+                      if (checked === true) {
                         onChange(fieldKey, [...selectedValues, opt.value]);
-                      } else {
+                      } else if (checked === false) {
                         onChange(fieldKey, selectedValues.filter((v: string) => v !== opt.value));
                       }
+                      // Ignore "indeterminate" state
                     }}
                     data-testid={`checkbox-${fieldKey}-${opt.value}`}
                   />
@@ -185,20 +187,22 @@ export function DynamicFormField({
 
       case "multi_select":
         const multiOptions = getOptions();
-        const selectedValues = Array.isArray(value) ? value : [];
+        const multiSelectedValues = Array.isArray(value) ? value : [];
         return (
           <div className="border rounded-md p-3 space-y-2 bg-white dark:bg-background">
             {multiOptions.map((opt) => (
               <div key={opt.value} className="flex items-center gap-2">
                 <Checkbox
                   id={`${fieldKey}-${opt.value}`}
-                  checked={selectedValues.includes(opt.value)}
+                  checked={multiSelectedValues.includes(opt.value)}
                   onCheckedChange={(checked) => {
-                    if (checked) {
-                      onChange(fieldKey, [...selectedValues, opt.value]);
-                    } else {
-                      onChange(fieldKey, selectedValues.filter((v: string) => v !== opt.value));
+                    // Explicitly check for true/false to handle tri-state Checkbox output
+                    if (checked === true) {
+                      onChange(fieldKey, [...multiSelectedValues, opt.value]);
+                    } else if (checked === false) {
+                      onChange(fieldKey, multiSelectedValues.filter((v: string) => v !== opt.value));
                     }
+                    // Ignore "indeterminate" state
                   }}
                   data-testid={`checkbox-${fieldKey}-${opt.value}`}
                 />
@@ -244,7 +248,7 @@ export function DynamicFormField({
             <Checkbox
               id={fieldKey}
               checked={!!value}
-              onCheckedChange={(checked) => onChange(fieldKey, checked)}
+              onCheckedChange={(checked) => onChange(fieldKey, checked === true)}
               data-testid={`checkbox-${fieldKey}`}
             />
             <Label htmlFor={fieldKey} className="font-normal cursor-pointer flex items-center gap-1">

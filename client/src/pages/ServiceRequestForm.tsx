@@ -422,16 +422,21 @@ export default function ServiceRequestForm() {
         selectedAddOns: Array.from(selectedAddOns), // Include selected add-on service IDs
       };
 
+      // Get orderNumber and dueDate from formData (dynamic fields) or RHF data (fallback for legacy)
+      const orderNumber = formData.order_project_reference || formData.orderNumber || data.orderNumber || null;
+      const rawDueDate = formData.due_date || formData.dueDate || data.dueDate;
+      const dueDate = rawDueDate ? new Date(rawDueDate) : null;
+
       mutation.mutate({
         userId: currentUser?.userId || "",
         serviceId: selectedServiceId,
         status: "pending",
-        orderNumber: data.orderNumber || null,
+        orderNumber,
         customerName: currentUser?.username || data.customerName,
         notes: data.jobNotes,
         requirements: data.requirements,
         quantity: data.quantity ? parseInt(data.quantity) : null,
-        dueDate: data.dueDate ? new Date(data.dueDate) : null,
+        dueDate,
         formData: allFormData,
       });
     } catch (error) {
