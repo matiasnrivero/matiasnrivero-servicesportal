@@ -1998,6 +1998,8 @@ function ServiceManagementTabContent() {
       pricingStructure: "single" as "single" | "complexity" | "quantity",
       basePrice: "0",
       displayOrder: "999",
+      serviceHierarchy: "father" as "father" | "son",
+      parentServiceId: "" as string,
     },
   });
 
@@ -2009,11 +2011,18 @@ function ServiceManagementTabContent() {
       pricingStructure: "single" as "single" | "complexity" | "quantity",
       basePrice: "0",
       displayOrder: "999",
+      serviceHierarchy: "father" as "father" | "son",
+      parentServiceId: "" as string,
     },
   });
 
   const selectedPricingStructure = createForm.watch("pricingStructure");
   const editPricingStructure = editForm.watch("pricingStructure");
+  const selectedHierarchy = createForm.watch("serviceHierarchy");
+  const editHierarchy = editForm.watch("serviceHierarchy");
+
+  // Filter to get only father services (for parent selection dropdown)
+  const fatherServices = (allServices || []).filter(s => s.serviceHierarchy === "father");
 
   useEffect(() => {
     if (editingService) {
@@ -2024,6 +2033,8 @@ function ServiceManagementTabContent() {
         pricingStructure: (editingService.pricingStructure as "single" | "complexity" | "quantity") || "single",
         basePrice: editingService.basePrice || "0",
         displayOrder: String(editingService.displayOrder || 999),
+        serviceHierarchy: (editingService.serviceHierarchy as "father" | "son") || "father",
+        parentServiceId: editingService.parentServiceId || "",
       });
       // Load existing tiers
       fetch(`/api/services/${editingService.id}/tiers`)
@@ -2036,10 +2047,12 @@ function ServiceManagementTabContent() {
   }, [editingService, editForm]);
 
   const createServiceMutation = useMutation({
-    mutationFn: async (data: { title: string; description: string; category: string; pricingStructure: string; basePrice: string; displayOrder: string }) => {
+    mutationFn: async (data: { title: string; description: string; category: string; pricingStructure: string; basePrice: string; displayOrder: string; serviceHierarchy: string; parentServiceId: string }) => {
       const service = await apiRequest("POST", "/api/services", {
         ...data,
         displayOrder: parseInt(data.displayOrder, 10) || 999,
+        serviceHierarchy: data.serviceHierarchy,
+        parentServiceId: data.serviceHierarchy === "son" ? data.parentServiceId : null,
       });
       const serviceData = await service.json();
       // Create pricing tiers if multi-price
@@ -2063,11 +2076,13 @@ function ServiceManagementTabContent() {
   });
 
   const updateServiceMutation = useMutation({
-    mutationFn: async (data: { id: string; title: string; description: string; category: string; pricingStructure: string; basePrice: string; displayOrder: string }) => {
+    mutationFn: async (data: { id: string; title: string; description: string; category: string; pricingStructure: string; basePrice: string; displayOrder: string; serviceHierarchy: string; parentServiceId: string }) => {
       const { id, ...updateData } = data;
       await apiRequest("PATCH", `/api/services/${id}`, {
         ...updateData,
         displayOrder: parseInt(updateData.displayOrder, 10) || 999,
+        serviceHierarchy: updateData.serviceHierarchy,
+        parentServiceId: updateData.serviceHierarchy === "son" ? updateData.parentServiceId : null,
       });
       // Update pricing tiers
       if (data.pricingStructure !== "single") {
@@ -2130,11 +2145,11 @@ function ServiceManagementTabContent() {
     setPricingTiers(newTiers);
   };
 
-  const handleCreateService = (data: { title: string; description: string; category: string; pricingStructure: string; basePrice: string; displayOrder: string }) => {
+  const handleCreateService = (data: { title: string; description: string; category: string; pricingStructure: string; basePrice: string; displayOrder: string; serviceHierarchy: string; parentServiceId: string }) => {
     createServiceMutation.mutate(data);
   };
 
-  const handleUpdateService = (data: { title: string; description: string; category: string; pricingStructure: string; basePrice: string; displayOrder: string }) => {
+  const handleUpdateService = (data: { title: string; description: string; category: string; pricingStructure: string; basePrice: string; displayOrder: string; serviceHierarchy: string; parentServiceId: string }) => {
     if (!editingService) return;
     updateServiceMutation.mutate({ id: editingService.id, ...data });
   };
@@ -2218,6 +2233,56 @@ function ServiceManagementTabContent() {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={createForm.control}
+                  name="serviceHierarchy"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Service Type</FormLabel>
+                      <Select onValueChange={(value) => {
+                        field.onChange(value);
+                        if (value === "father") {
+                          createForm.setValue("parentServiceId", "");
+                        }
+                      }} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-service-hierarchy">
+                            <SelectValue placeholder="Select service type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="father">Main Service (shown to clients)</SelectItem>
+                          <SelectItem value="son">Add-on Service (linked to parent)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {selectedHierarchy === "son" && (
+                  <FormField
+                    control={createForm.control}
+                    name="parentServiceId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Parent Service</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-parent-service">
+                              <SelectValue placeholder="Select parent service" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {fatherServices.map(s => (
+                              <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 <FormField
                   control={createForm.control}
                   name="pricingStructure"
@@ -2326,6 +2391,7 @@ function ServiceManagementTabContent() {
               <TableRow>
                 <TableHead>Service Name</TableHead>
                 <TableHead>Description</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Pricing Structure</TableHead>
                 <TableHead className="text-center">Order</TableHead>
                 <TableHead className="text-center">Status</TableHead>
@@ -2335,8 +2401,20 @@ function ServiceManagementTabContent() {
             <TableBody>
               {[...allServices].sort((a, b) => (a.displayOrder || 999) - (b.displayOrder || 999)).map((service) => (
                 <TableRow key={service.id} data-testid={`row-service-${service.id}`}>
-                  <TableCell className="font-medium">{service.title}</TableCell>
+                  <TableCell className="font-medium">
+                    {service.title}
+                    {service.parentServiceId && (
+                      <span className="text-xs text-muted-foreground ml-1">
+                        (child of {allServices.find(s => s.id === service.parentServiceId)?.title})
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell className="max-w-[200px] truncate">{service.description}</TableCell>
+                  <TableCell>
+                    <Badge variant={service.serviceHierarchy === "son" ? "secondary" : "outline"}>
+                      {service.serviceHierarchy === "son" ? "Add-on" : "Main"}
+                    </Badge>
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline">
                       {getPricingStructureLabel(service.pricingStructure || "single")}
@@ -2430,6 +2508,56 @@ function ServiceManagementTabContent() {
                   </FormItem>
                 )}
               />
+              <FormField
+                control={editForm.control}
+                name="serviceHierarchy"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Service Type</FormLabel>
+                    <Select onValueChange={(value) => {
+                      field.onChange(value);
+                      if (value === "father") {
+                        editForm.setValue("parentServiceId", "");
+                      }
+                    }} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-service-hierarchy">
+                          <SelectValue placeholder="Select service type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="father">Main Service (shown to clients)</SelectItem>
+                        <SelectItem value="son">Add-on Service (linked to parent)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {editHierarchy === "son" && (
+                <FormField
+                  control={editForm.control}
+                  name="parentServiceId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Parent Service</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-edit-parent-service">
+                            <SelectValue placeholder="Select parent service" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {fatherServices.filter(s => s.id !== editingService?.id).map(s => (
+                            <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               <FormField
                 control={editForm.control}
                 name="pricingStructure"
