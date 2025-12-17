@@ -1714,17 +1714,6 @@ export default function ServiceRequestForm() {
                 </div>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="jobNotes">Job Notes</Label>
-                <Textarea
-                  id="jobNotes"
-                  {...register("jobNotes")}
-                  placeholder="Please leave your comments here"
-                  rows={3}
-                  data-testid="textarea-job-notes"
-                />
-              </div>
-
               <div className="flex items-center justify-between pt-4 border-t">
                 <Button 
                   type="button" 
