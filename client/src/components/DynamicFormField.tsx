@@ -56,10 +56,16 @@ export function DynamicFormField({
   const inputField = field.inputField;
   const fieldKey = inputField.fieldKey;
   const label = field.displayLabelOverride || inputField.label;
-  const helpText = field.helpTextOverride || inputField.description;
-  const placeholder = field.placeholderOverride || "";
+  const description = field.helpTextOverride || inputField.description || "";
   const isRequired = field.required;
   const inputType = inputField.inputType;
+  const valueMode = inputField.valueMode;
+  
+  // For text-based inputs, use description as placeholder
+  // For non-text inputs (dropdown, date, file, number), show tooltip
+  const isTextBasedInput = ["text", "textarea", "url", "chips"].includes(inputType);
+  const placeholder = field.placeholderOverride || (isTextBasedInput ? description : "");
+  const showTooltip = !isTextBasedInput && description;
 
   const getOptions = (): FieldOption[] => {
     if (field.optionsJson && Array.isArray(field.optionsJson)) {
@@ -128,13 +134,42 @@ export function DynamicFormField({
 
       case "dropdown":
         const dropdownOptions = getOptions();
+        // If valueMode is "multi", render as multi-select checkboxes
+        if (valueMode === "multi" && dropdownOptions.length > 0) {
+          const selectedValues = Array.isArray(value) ? value : [];
+          return (
+            <div className="border rounded-md p-3 space-y-2 bg-white dark:bg-background">
+              {dropdownOptions.map((opt) => (
+                <div key={opt.value} className="flex items-center gap-2">
+                  <Checkbox
+                    id={`${fieldKey}-${opt.value}`}
+                    checked={selectedValues.includes(opt.value)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        onChange(fieldKey, [...selectedValues, opt.value]);
+                      } else {
+                        onChange(fieldKey, selectedValues.filter((v: string) => v !== opt.value));
+                      }
+                    }}
+                    data-testid={`checkbox-${fieldKey}-${opt.value}`}
+                  />
+                  <Label htmlFor={`${fieldKey}-${opt.value}`} className="font-normal cursor-pointer">
+                    {showPricing && opt.price !== undefined
+                      ? `${opt.label} - $${opt.price}`
+                      : opt.label}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          );
+        }
         return (
           <Select 
             value={value || ""} 
             onValueChange={(v) => onChange(fieldKey, v)}
           >
             <SelectTrigger data-testid={`select-${fieldKey}`}>
-              <SelectValue placeholder={placeholder || "Select an option"} />
+              <SelectValue placeholder="Select an option" />
             </SelectTrigger>
             <SelectContent>
               {dropdownOptions.map((opt) => (
@@ -214,13 +249,13 @@ export function DynamicFormField({
             />
             <Label htmlFor={fieldKey} className="font-normal cursor-pointer flex items-center gap-1">
               {label}
-              {helpText && (
+              {description && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <HelpCircle className="h-4 w-4 text-dark-gray cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent className="bg-dark-blue-night text-white max-w-[200px]">
-                    <p>{helpText}</p>
+                    <p>{description}</p>
                   </TooltipContent>
                 </Tooltip>
               )}
@@ -318,13 +353,13 @@ export function DynamicFormField({
       <Label className="flex items-center gap-1">
         {label}
         {isRequired && <span className="text-destructive">*</span>}
-        {helpText && inputType !== "checkbox" && (
+        {showTooltip && (
           <Tooltip>
             <TooltipTrigger asChild>
               <HelpCircle className="h-4 w-4 text-dark-gray cursor-help" />
             </TooltipTrigger>
             <TooltipContent className="bg-dark-blue-night text-white max-w-[200px]">
-              <p>{helpText}</p>
+              <p>{description}</p>
             </TooltipContent>
           </Tooltip>
         )}

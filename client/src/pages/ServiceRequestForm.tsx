@@ -859,17 +859,14 @@ export default function ServiceRequestForm() {
   const renderGeneralInfoFromDatabase = () => {
     const { generalInfoFields } = groupFieldsBySection(serviceFormFields);
     
-    // Exclude fixed fields that are already hardcoded in the form
-    const fixedFieldKeys = ['order_project_reference', 'due_date', 'orderNumber', 'dueDate'];
-    const filteredFields = generalInfoFields.filter(
-      field => !fixedFieldKeys.includes(field.fieldKey)
-    );
-    
-    if (filteredFields.length === 0) return null;
+    if (generalInfoFields.length === 0) return null;
     
     return (
       <>
-        {filteredFields.map(field => renderDynamicField(field))}
+        <h3 className="font-body-2-semibold text-dark-blue-night">General Info</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {generalInfoFields.map(field => renderDynamicField(field))}
+        </div>
       </>
     );
   };
@@ -1662,36 +1659,7 @@ export default function ServiceRequestForm() {
         <Card>
           <CardContent className="p-6">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-              <h3 className="font-body-2-semibold text-dark-blue-night">General Info</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="orderNumber">Order/Project Reference</Label>
-                  <Input
-                    id="orderNumber"
-                    {...register("orderNumber")}
-                    placeholder="Add an order or project reference (optional)"
-                    data-testid="input-order-reference"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dueDate">Due Date</Label>
-                  <Input
-                    id="dueDate"
-                    type="date"
-                    lang="en-US"
-                    min={(() => {
-                      const tomorrow = new Date();
-                      tomorrow.setDate(tomorrow.getDate() + 1);
-                      return tomorrow.toLocaleDateString('en-CA');
-                    })()}
-                    {...register("dueDate")}
-                    data-testid="input-due-date"
-                  />
-                </div>
-              </div>
-
-              {/* Render any database-configured general_info fields */}
+              {/* Render general_info fields from Service Field Assignment */}
               {renderGeneralInfoFromDatabase()}
 
               <h3 className="font-body-2-semibold text-dark-blue-night pt-4">Info Details</h3>
