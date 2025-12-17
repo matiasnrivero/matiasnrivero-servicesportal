@@ -54,9 +54,18 @@ interface CurrentUser {
 }
 
 async function fetchServices(): Promise<Service[]> {
-  const response = await fetch("/api/services");
+  // Only fetch father services (main services) for client selection
+  const response = await fetch("/api/services?fathersOnly=true");
   if (!response.ok) {
     throw new Error("Failed to fetch services");
+  }
+  return response.json();
+}
+
+async function fetchChildServices(parentId: string): Promise<Service[]> {
+  const response = await fetch(`/api/services/${parentId}/children`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch child services");
   }
   return response.json();
 }
@@ -247,6 +256,22 @@ export default function ServiceRequestForm() {
     },
     enabled: !!selectedServiceId,
   });
+
+  // Fetch child services (add-ons) for the selected service
+  const { data: childServices = [] } = useQuery<Service[]>({
+    queryKey: ["/api/services", selectedServiceId, "children"],
+    queryFn: () => fetchChildServices(selectedServiceId),
+    enabled: !!selectedServiceId,
+  });
+
+  // Track selected add-on services
+  const [selectedAddOns, setSelectedAddOns] = useState<Set<string>>(new Set());
+
+  // Reset add-ons when service changes
+  useEffect(() => {
+    setSelectedAddOns(new Set());
+  }, [selectedServiceId]);
+
   const [selectedBundleId, setSelectedBundleId] = useState<string>("");
   const [selectedPackId, setSelectedPackId] = useState<string>("");
   const [selectionMode, setSelectionMode] = useState<"adhoc" | "bundle" | "pack">("adhoc");
@@ -296,13 +321,21 @@ export default function ServiceRequestForm() {
   // Pricing visible only for Clients and Admins
   const showPricing = currentUser && (currentUser.role === "client" || currentUser.role === "admin");
 
+  // Calculate total price including base price and selected add-ons
   useEffect(() => {
-    if (selectedService?.title === "Embroidery Digitization") {
-      const basePrice = parseFloat(selectedService.basePrice) || 15;
-      const vectorizationAddOn = formData.vectorizationNeeded ? 5 : 0;
-      setCalculatedPrice(basePrice + vectorizationAddOn);
+    if (selectedService) {
+      let total = parseFloat(selectedService.basePrice) || 0;
+      
+      // Add prices of selected add-on services
+      childServices.forEach((addon) => {
+        if (selectedAddOns.has(addon.id)) {
+          total += parseFloat(addon.basePrice) || 0;
+        }
+      });
+      
+      setCalculatedPrice(total);
     }
-  }, [formData.vectorizationNeeded, selectedService]);
+  }, [selectedService, childServices, selectedAddOns]);
 
   const mutation = useMutation({
     mutationFn: createServiceRequest,
@@ -318,6 +351,7 @@ export default function ServiceRequestForm() {
       setCalculatedPrice(0);
       setThreadColorInput("");
       setThreadColorChips([]);
+      setSelectedAddOns(new Set());
       queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
       navigate("/service-requests");
     },
@@ -385,6 +419,7 @@ export default function ServiceRequestForm() {
         ...formData,
         uploadedFiles,
         calculatedPrice: calculatedPrice > 0 ? calculatedPrice : undefined,
+        selectedAddOns: Array.from(selectedAddOns), // Include selected add-on service IDs
       };
 
       mutation.mutate({
@@ -1656,6 +1691,49 @@ export default function ServiceRequestForm() {
               <h3 className="font-body-2-semibold text-dark-blue-night pt-4">Info Details</h3>
               
               {renderDynamicFormFields()}
+
+              {/* Add-on Services Section */}
+              {childServices.length > 0 && (
+                <div className="space-y-3 pt-4 border-t">
+                  <h3 className="font-body-2-semibold text-dark-blue-night">Additional Services</h3>
+                  <div className="space-y-2">
+                    {childServices.map((addon) => (
+                      <div key={addon.id} className="flex items-center gap-3 p-3 border rounded-md">
+                        <Checkbox
+                          id={`addon-${addon.id}`}
+                          checked={selectedAddOns.has(addon.id)}
+                          onCheckedChange={(checked) => {
+                            const newSet = new Set(selectedAddOns);
+                            if (checked) {
+                              newSet.add(addon.id);
+                            } else {
+                              newSet.delete(addon.id);
+                            }
+                            setSelectedAddOns(newSet);
+                          }}
+                          data-testid={`checkbox-addon-${addon.id}`}
+                        />
+                        <label htmlFor={`addon-${addon.id}`} className="flex-1 cursor-pointer">
+                          <span className="font-medium">{addon.title}</span>
+                          {addon.description && (
+                            <p className="text-sm text-muted-foreground">{addon.description}</p>
+                          )}
+                        </label>
+                        {showPricing && addon.basePrice && (
+                          <span className="text-sky-blue-accent font-semibold">
+                            +${parseFloat(addon.basePrice).toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {showPricing && selectedAddOns.size > 0 && (
+                    <div className="flex justify-end text-lg font-semibold text-dark-blue-night">
+                      Total: ${calculatedPrice.toFixed(2)}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="jobNotes">Job Notes</Label>
