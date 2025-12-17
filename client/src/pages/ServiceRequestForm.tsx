@@ -35,9 +35,10 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import type { Service, InsertServiceRequest, Bundle, BundleItem, ServicePack, ServicePackItem } from "@shared/schema";
+import type { Service, InsertServiceRequest, Bundle, BundleItem, ServicePack, ServicePackItem, InputField, ServiceField } from "@shared/schema";
 import { Header } from "@/components/Header";
 import { FileUploader } from "@/components/FileUploader";
+import { DynamicFormField, type ServiceFieldWithInput } from "@/components/DynamicFormField";
 import { ChevronRight, HelpCircle, X, Boxes, CalendarRange, Package, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 
@@ -230,7 +231,19 @@ export default function ServiceRequestForm() {
   });
 
   const urlParams = new URLSearchParams(window.location.search);
-  const preSelectedServiceId = urlParams.get("serviceId") || "";
+  const preSelectedServiceIdFromUrl = urlParams.get("serviceId") || "";
+
+  const { data: serviceFormFields = [] } = useQuery<ServiceFieldWithInput[]>({
+    queryKey: ["/api/services", preSelectedServiceIdFromUrl, "form-fields"],
+    queryFn: async () => {
+      if (!preSelectedServiceIdFromUrl) return [];
+      const response = await fetch(`/api/services/${preSelectedServiceIdFromUrl}/form-fields`);
+      if (!response.ok) throw new Error("Failed to fetch form fields");
+      return response.json();
+    },
+    enabled: !!preSelectedServiceIdFromUrl,
+  });
+  const preSelectedServiceId = preSelectedServiceIdFromUrl;
 
   const [selectedServiceId, setSelectedServiceId] = useState<string>(preSelectedServiceId);
   const [selectedBundleId, setSelectedBundleId] = useState<string>("");
@@ -690,9 +703,144 @@ export default function ServiceRequestForm() {
     </Dialog>
   );
 
+  // Helper to group fields by uiGroup
+  const groupFieldsBySection = (fields: ServiceFieldWithInput[]) => {
+    const generalInfoFields: ServiceFieldWithInput[] = [];
+    const infoDetailsFields: ServiceFieldWithInput[] = [];
+    
+    fields.forEach(field => {
+      if (field.uiGroup === "general_info") {
+        generalInfoFields.push(field);
+      } else {
+        // Default to info_details if not specified
+        infoDetailsFields.push(field);
+      }
+    });
+    
+    return { generalInfoFields, infoDetailsFields };
+  };
+
+  // Render a single dynamic field with special case handling
+  const renderDynamicField = (field: ServiceFieldWithInput) => {
+    if (!field.inputField) return null;
+    
+    const fieldKey = field.inputField.fieldKey;
+    
+    // Special case: Complexity field for Creative Art - add help link
+    if (selectedService?.title === "Creative Art" && fieldKey === "complexity") {
+      return (
+        <div key={field.id} className="space-y-2">
+          <DynamicFormField
+            field={field}
+            value={formData[fieldKey]}
+            onChange={handleFormDataChange}
+            showPricing={showPricing || false}
+            onFileUpload={handleFileUpload}
+            onFileRemove={handleFileRemove}
+            customContent={
+              <button 
+                type="button"
+                className="text-sky-blue-accent text-sm hover:underline"
+                onClick={() => setComplexityHelpModalOpen(true)}
+                data-testid="button-complexity-help"
+              >
+                Artwork Complexities Help
+              </button>
+            }
+          />
+        </div>
+      );
+    }
+    
+    // Special case: Vectorization checkbox for Embroidery Digitization
+    if (selectedService?.title === "Embroidery Digitization" && fieldKey === "vectorizationNeeded") {
+      return (
+        <div key={field.id}>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="vectorizationNeeded"
+              onCheckedChange={(checked) => handleFormDataChange("vectorizationNeeded", checked)}
+              data-testid="checkbox-vectorization-needed"
+            />
+            <Label htmlFor="vectorizationNeeded" className="flex items-center gap-1">
+              Vectorization Needed
+              {showPricing && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-4 w-4 text-dark-gray cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-dark-blue-night text-white max-w-[200px]">
+                    <p>By Requiring Vectorization $5 are gonna be added to the final price.</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </Label>
+          </div>
+          {showPricing && (
+            <div className="p-3 bg-blue-lavender/30 rounded-md mt-2">
+              <p className="text-sm font-semibold text-dark-blue-night">
+                Service Price: ${calculatedPrice}
+                {formData.vectorizationNeeded && (
+                  <span className="font-normal text-dark-gray ml-2">
+                    ($15 base + $5 vectorization)
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    return (
+      <DynamicFormField
+        key={field.id}
+        field={field}
+        value={formData[fieldKey]}
+        onChange={handleFormDataChange}
+        showPricing={showPricing || false}
+        onFileUpload={handleFileUpload}
+        onFileRemove={handleFileRemove}
+      />
+    );
+  };
+
+  // Render Info Details section fields from database
+  const renderInfoDetailsFromDatabase = () => {
+    const { infoDetailsFields } = groupFieldsBySection(serviceFormFields);
+    
+    if (infoDetailsFields.length === 0) return null;
+    
+    return (
+      <>
+        {infoDetailsFields.map(field => renderDynamicField(field))}
+        {selectedService?.title === "Creative Art" && renderComplexityHelpModal()}
+      </>
+    );
+  };
+
+  // Render General Info section fields from database (excluding fixed fields)
+  const renderGeneralInfoFromDatabase = () => {
+    const { generalInfoFields } = groupFieldsBySection(serviceFormFields);
+    
+    if (generalInfoFields.length === 0) return null;
+    
+    return (
+      <>
+        {generalInfoFields.map(field => renderDynamicField(field))}
+      </>
+    );
+  };
+
   const renderDynamicFormFields = () => {
     if (!selectedService) return null;
 
+    // If we have database-configured fields, use them
+    if (serviceFormFields.length > 0) {
+      return renderInfoDetailsFromDatabase();
+    }
+
+    // Fall back to hardcoded fields for backwards compatibility
     const title = selectedService.title;
 
     if (title === "Vectorization & Color Separation") {
@@ -1500,6 +1648,9 @@ export default function ServiceRequestForm() {
                   />
                 </div>
               </div>
+
+              {/* Render any database-configured general_info fields */}
+              {renderGeneralInfoFromDatabase()}
 
               <h3 className="font-body-2-semibold text-dark-blue-night pt-4">Info Details</h3>
               
