@@ -232,20 +232,21 @@ export default function ServiceRequestForm() {
 
   const urlParams = new URLSearchParams(window.location.search);
   const preSelectedServiceIdFromUrl = urlParams.get("serviceId") || "";
-
-  const { data: serviceFormFields = [] } = useQuery<ServiceFieldWithInput[]>({
-    queryKey: ["/api/services", preSelectedServiceIdFromUrl, "form-fields"],
-    queryFn: async () => {
-      if (!preSelectedServiceIdFromUrl) return [];
-      const response = await fetch(`/api/services/${preSelectedServiceIdFromUrl}/form-fields`);
-      if (!response.ok) throw new Error("Failed to fetch form fields");
-      return response.json();
-    },
-    enabled: !!preSelectedServiceIdFromUrl,
-  });
   const preSelectedServiceId = preSelectedServiceIdFromUrl;
 
   const [selectedServiceId, setSelectedServiceId] = useState<string>(preSelectedServiceId);
+
+  // Fetch form fields for the currently selected service
+  const { data: serviceFormFields = [], isLoading: serviceFieldsLoading } = useQuery<ServiceFieldWithInput[]>({
+    queryKey: ["/api/services", selectedServiceId, "form-fields"],
+    queryFn: async () => {
+      if (!selectedServiceId) return [];
+      const response = await fetch(`/api/services/${selectedServiceId}/form-fields`);
+      if (!response.ok) throw new Error("Failed to fetch form fields");
+      return response.json();
+    },
+    enabled: !!selectedServiceId,
+  });
   const [selectedBundleId, setSelectedBundleId] = useState<string>("");
   const [selectedPackId, setSelectedPackId] = useState<string>("");
   const [selectionMode, setSelectionMode] = useState<"adhoc" | "bundle" | "pack">("adhoc");
