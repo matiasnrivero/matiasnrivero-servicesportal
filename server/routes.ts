@@ -36,11 +36,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Services routes
   app.get("/api/services", async (req, res) => {
     try {
-      const services = await storage.getAllServices();
+      const { fathersOnly } = req.query;
+      let services;
+      if (fathersOnly === "true") {
+        // For client-facing service selection - only show father services
+        services = await storage.getFatherServices();
+      } else {
+        services = await storage.getAllServices();
+      }
       res.json(services);
     } catch (error) {
       console.error("Error fetching services:", error);
       res.status(500).json({ error: "Failed to fetch services", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // Get child services for a parent service
+  app.get("/api/services/:id/children", async (req, res) => {
+    try {
+      const children = await storage.getChildServices(req.params.id);
+      res.json(children);
+    } catch (error) {
+      console.error("Error fetching child services:", error);
+      res.status(500).json({ error: "Failed to fetch child services" });
     }
   });
 
