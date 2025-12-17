@@ -15,6 +15,10 @@ export type PaymentMethod = typeof paymentMethods[number];
 export const pricingStructures = ["single", "complexity", "quantity"] as const;
 export type PricingStructure = typeof pricingStructures[number];
 
+// Service hierarchy types - father services are standalone, son services add-on to fathers
+export const serviceHierarchyTypes = ["father", "son"] as const;
+export type ServiceHierarchy = typeof serviceHierarchyTypes[number];
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
@@ -65,6 +69,10 @@ export const services = pgTable("services", {
   pricingStructure: text("pricing_structure").notNull().default("single"),
   isActive: integer("is_active").notNull().default(1),
   displayOrder: integer("display_order").notNull().default(999),
+  // Service hierarchy - father services are standalone, son services are add-ons
+  serviceHierarchy: text("service_hierarchy").notNull().default("father"),
+  // Parent service ID - only required when serviceHierarchy is "son"
+  parentServiceId: varchar("parent_service_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
