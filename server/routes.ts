@@ -1579,8 +1579,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      // Allow admin, vendor, and vendor_designer to read bundle line items
+      if (!sessionUser || !["admin", "vendor", "vendor_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
       }
       const items = await storage.getAllBundleLineItems();
       res.json(items);
@@ -1713,7 +1714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ==================== BUNDLES ROUTES (Admin only) ====================
+  // ==================== BUNDLES ROUTES (Admin + Vendor read access) ====================
   app.get("/api/bundles", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -1721,8 +1722,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      // Allow admin, vendor, and vendor_designer to read bundles
+      if (!sessionUser || !["admin", "vendor", "vendor_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
       }
       const bundlesList = await storage.getAllBundles();
       res.json(bundlesList);
@@ -1739,8 +1741,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      // Allow admin, vendor, and vendor_designer to read bundles
+      if (!sessionUser || !["admin", "vendor", "vendor_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
       }
       const bundle = await storage.getBundle(req.params.id);
       if (!bundle) {
@@ -1817,8 +1820,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      // Allow admin, vendor, and vendor_designer to read bundle items
+      if (!sessionUser || !["admin", "vendor", "vendor_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
       }
       const items = await storage.getBundleItems(req.params.id);
       res.json(items);
@@ -1872,8 +1876,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      // Allow admin, vendor, and vendor_designer to read service packs
+      if (!sessionUser || !["admin", "vendor", "vendor_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
       }
       const packs = await storage.getAllServicePacks();
       res.json(packs);
@@ -1890,8 +1895,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      // Allow admin, vendor, and vendor_designer to read service packs
+      if (!sessionUser || !["admin", "vendor", "vendor_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
       }
       const pack = await storage.getServicePack(req.params.id);
       if (!pack) {
@@ -1968,8 +1974,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      // Allow admin, vendor, and vendor_designer to read service pack items
+      if (!sessionUser || !["admin", "vendor", "vendor_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
       }
       const items = await storage.getServicePackItems(req.params.id);
       res.json(items);

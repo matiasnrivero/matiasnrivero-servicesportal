@@ -250,22 +250,26 @@ export default function VendorProfile() {
   const [viewPackDialogOpen, setViewPackDialogOpen] = useState(false);
   const [viewingPack, setViewingPack] = useState<ServicePack | null>(null);
 
-  // Initialize bundle/pack cost inputs from fetched data
+  // Initialize bundle/pack cost inputs from fetched data (using JSON comparison to avoid infinite loops)
+  const bundleCostsKey = JSON.stringify(vendorBundleCosts.map(v => ({ id: v.bundleId, cost: v.cost })));
   useEffect(() => {
     const inputs: Record<string, string> = {};
     vendorBundleCosts.forEach(vbc => {
       inputs[vbc.bundleId] = vbc.cost || "";
     });
     setBundleCostInputs(inputs);
-  }, [vendorBundleCosts]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bundleCostsKey]);
 
+  const packCostsKey = JSON.stringify(vendorPackCosts.map(v => ({ id: v.packId, cost: v.cost })));
   useEffect(() => {
     const inputs: Record<string, string> = {};
     vendorPackCosts.forEach(vpc => {
       inputs[vpc.packId] = vpc.cost || "";
     });
     setPackCostInputs(inputs);
-  }, [vendorPackCosts]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [packCostsKey]);
 
   // Fetch bundle items when viewing a bundle
   const fetchBundleItems = async (bundleId: string) => {
