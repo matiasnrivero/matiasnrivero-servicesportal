@@ -46,7 +46,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X } from "lucide-react";
+import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List } from "lucide-react";
 import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem, InputField, ServiceField, BundleFieldDefault, ServicePricingTier } from "@shared/schema";
 import { insertBundleLineItemSchema, inputFieldTypes, valueModes, pricingStructures } from "@shared/schema";
 
@@ -1480,9 +1480,22 @@ function InputFieldsTabContent() {
 }
 
 // Service Fields Manager - Configure per-service field options and defaults
-function ServiceFieldsManager() {
+interface ServiceFieldsManagerProps {
+  initialServiceId?: string;
+  onServiceIdConsumed?: () => void;
+}
+
+function ServiceFieldsManager({ initialServiceId, onServiceIdConsumed }: ServiceFieldsManagerProps) {
   const { toast } = useToast();
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
+  
+  // Handle preselected service ID from parent
+  useEffect(() => {
+    if (initialServiceId && initialServiceId !== selectedServiceId) {
+      setSelectedServiceId(initialServiceId);
+      onServiceIdConsumed?.();
+    }
+  }, [initialServiceId, onServiceIdConsumed]);
   const [isAddFieldDialogOpen, setIsAddFieldDialogOpen] = useState(false);
   const [editingServiceField, setEditingServiceField] = useState<ServiceField | null>(null);
 
@@ -1999,7 +2012,11 @@ function ServiceFieldsManager() {
 }
 
 // Service Management Tab Content - Create and manage service types with pricing structures
-function ServiceManagementTabContent() {
+interface ServiceManagementTabContentProps {
+  onNavigateToServiceFields?: (serviceId: string) => void;
+}
+
+function ServiceManagementTabContent({ onNavigateToServiceFields }: ServiceManagementTabContentProps) {
   const { toast } = useToast();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
@@ -2415,6 +2432,7 @@ function ServiceManagementTabContent() {
                 <TableHead>Pricing Structure</TableHead>
                 <TableHead className="text-center">Order</TableHead>
                 <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-center">Fields</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -2454,6 +2472,17 @@ function ServiceManagementTabContent() {
                         {service.isActive === 1 ? "Active" : "Inactive"}
                       </Badge>
                     </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => onNavigateToServiceFields?.(service.id)}
+                      data-testid={`button-fields-service-${service.id}`}
+                      title="Manage field assignments"
+                    >
+                      <List className="h-4 w-4" />
+                    </Button>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -3077,6 +3106,8 @@ function BundleFieldDefaultsManager() {
 
 export default function Settings() {
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("pricing");
+  const [preselectedServiceId, setPreselectedServiceId] = useState<string>("");
 
   const { data: currentUser } = useQuery<User | null>({
     queryKey: ["/api/default-user"],
@@ -3093,6 +3124,11 @@ export default function Settings() {
   });
 
   const [pricingData, setPricingData] = useState<Record<string, any>>({});
+  
+  const handleNavigateToServiceFields = (serviceId: string) => {
+    setPreselectedServiceId(serviceId);
+    setActiveTab("input-fields");
+  };
 
   useEffect(() => {
     if (pricingSettings) {
@@ -3157,7 +3193,7 @@ export default function Settings() {
             <h1 className="text-2xl font-semibold text-dark-blue-night">Settings</h1>
           </div>
 
-          <Tabs defaultValue="pricing" className="space-y-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList>
               <TabsTrigger value="services" data-testid="tab-services">
                 <Layers className="h-4 w-4 mr-1" />
@@ -3186,7 +3222,7 @@ export default function Settings() {
             </TabsList>
 
             <TabsContent value="services">
-              <ServiceManagementTabContent />
+              <ServiceManagementTabContent onNavigateToServiceFields={handleNavigateToServiceFields} />
             </TabsContent>
 
             <TabsContent value="pricing">
@@ -3212,7 +3248,7 @@ export default function Settings() {
 
             <TabsContent value="input-fields">
               <InputFieldsTabContent />
-              <ServiceFieldsManager />
+              <ServiceFieldsManager initialServiceId={preselectedServiceId} onServiceIdConsumed={() => setPreselectedServiceId("")} />
               <BundleFieldDefaultsManager />
             </TabsContent>
           </Tabs>

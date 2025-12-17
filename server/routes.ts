@@ -140,8 +140,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Join with input field details
       const fieldsWithDetails = await Promise.all(serviceFields.map(async (sf) => {
         const inputField = await storage.getInputField(sf.inputFieldId);
+        // Parse optionsJson if it's a string
+        let parsedOptionsJson = sf.optionsJson;
+        if (typeof sf.optionsJson === 'string' && sf.optionsJson) {
+          try {
+            parsedOptionsJson = JSON.parse(sf.optionsJson);
+          } catch (e) {
+            // If it's comma-separated, split it
+            parsedOptionsJson = sf.optionsJson.split(',').map((s: string) => s.trim()).filter(Boolean);
+          }
+        }
         return {
           ...sf,
+          optionsJson: parsedOptionsJson,
           inputField: inputField || null,
         };
       }));
