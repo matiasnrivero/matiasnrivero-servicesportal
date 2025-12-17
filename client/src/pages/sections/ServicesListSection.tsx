@@ -76,7 +76,9 @@ export const ServicesListSection = ({ showHeader = true }: ServicesListSectionPr
   });
 
   const activeServices = useMemo(() => {
-    return services.filter((s) => s.isActive === 1);
+    return services
+      .filter((s) => s.isActive === 1)
+      .sort((a, b) => (a.displayOrder || 999) - (b.displayOrder || 999));
   }, [services]);
 
   const { data: allTiers = {} } = useQuery({

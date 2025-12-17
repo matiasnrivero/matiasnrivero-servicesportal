@@ -64,6 +64,7 @@ export const services = pgTable("services", {
   decorationMethods: text("decoration_methods"),
   pricingStructure: text("pricing_structure").notNull().default("single"),
   isActive: integer("is_active").notNull().default(1),
+  displayOrder: integer("display_order").notNull().default(999),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

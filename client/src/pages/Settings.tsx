@@ -1997,6 +1997,7 @@ function ServiceManagementTabContent() {
       category: "artwork",
       pricingStructure: "single" as "single" | "complexity" | "quantity",
       basePrice: "0",
+      displayOrder: "999",
     },
   });
 
@@ -2007,6 +2008,7 @@ function ServiceManagementTabContent() {
       category: "artwork",
       pricingStructure: "single" as "single" | "complexity" | "quantity",
       basePrice: "0",
+      displayOrder: "999",
     },
   });
 
@@ -2021,6 +2023,7 @@ function ServiceManagementTabContent() {
         category: editingService.category,
         pricingStructure: (editingService.pricingStructure as "single" | "complexity" | "quantity") || "single",
         basePrice: editingService.basePrice || "0",
+        displayOrder: String(editingService.displayOrder || 999),
       });
       // Load existing tiers
       fetch(`/api/services/${editingService.id}/tiers`)
@@ -2033,8 +2036,11 @@ function ServiceManagementTabContent() {
   }, [editingService, editForm]);
 
   const createServiceMutation = useMutation({
-    mutationFn: async (data: { title: string; description: string; category: string; pricingStructure: string; basePrice: string }) => {
-      const service = await apiRequest("POST", "/api/services", data);
+    mutationFn: async (data: { title: string; description: string; category: string; pricingStructure: string; basePrice: string; displayOrder: string }) => {
+      const service = await apiRequest("POST", "/api/services", {
+        ...data,
+        displayOrder: parseInt(data.displayOrder, 10) || 999,
+      });
       const serviceData = await service.json();
       // Create pricing tiers if multi-price
       if (data.pricingStructure !== "single" && pricingTiers.length > 0) {
@@ -2057,9 +2063,12 @@ function ServiceManagementTabContent() {
   });
 
   const updateServiceMutation = useMutation({
-    mutationFn: async (data: { id: string; title: string; description: string; category: string; pricingStructure: string; basePrice: string }) => {
+    mutationFn: async (data: { id: string; title: string; description: string; category: string; pricingStructure: string; basePrice: string; displayOrder: string }) => {
       const { id, ...updateData } = data;
-      await apiRequest("PATCH", `/api/services/${id}`, updateData);
+      await apiRequest("PATCH", `/api/services/${id}`, {
+        ...updateData,
+        displayOrder: parseInt(updateData.displayOrder, 10) || 999,
+      });
       // Update pricing tiers
       if (data.pricingStructure !== "single") {
         await apiRequest("PUT", `/api/services/${id}/tiers`, {
@@ -2121,11 +2130,11 @@ function ServiceManagementTabContent() {
     setPricingTiers(newTiers);
   };
 
-  const handleCreateService = (data: { title: string; description: string; category: string; pricingStructure: string; basePrice: string }) => {
+  const handleCreateService = (data: { title: string; description: string; category: string; pricingStructure: string; basePrice: string; displayOrder: string }) => {
     createServiceMutation.mutate(data);
   };
 
-  const handleUpdateService = (data: { title: string; description: string; category: string; pricingStructure: string; basePrice: string }) => {
+  const handleUpdateService = (data: { title: string; description: string; category: string; pricingStructure: string; basePrice: string; displayOrder: string }) => {
     if (!editingService) return;
     updateServiceMutation.mutate({ id: editingService.id, ...data });
   };
@@ -2279,6 +2288,19 @@ function ServiceManagementTabContent() {
                     ))}
                   </div>
                 )}
+                <FormField
+                  control={createForm.control}
+                  name="displayOrder"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Display Order</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} data-testid="input-display-order" placeholder="1" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <div className="flex justify-end gap-2 pt-4">
                   <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                     Cancel
@@ -2305,12 +2327,13 @@ function ServiceManagementTabContent() {
                 <TableHead>Service Name</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Pricing Structure</TableHead>
+                <TableHead className="text-center">Order</TableHead>
                 <TableHead className="text-center">Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {allServices.map((service) => (
+              {[...allServices].sort((a, b) => (a.displayOrder || 999) - (b.displayOrder || 999)).map((service) => (
                 <TableRow key={service.id} data-testid={`row-service-${service.id}`}>
                   <TableCell className="font-medium">{service.title}</TableCell>
                   <TableCell className="max-w-[200px] truncate">{service.description}</TableCell>
@@ -2318,6 +2341,9 @@ function ServiceManagementTabContent() {
                     <Badge variant="outline">
                       {getPricingStructureLabel(service.pricingStructure || "single")}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {service.displayOrder || 999}
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-2">
@@ -2474,6 +2500,19 @@ function ServiceManagementTabContent() {
                   ))}
                 </div>
               )}
+              <FormField
+                control={editForm.control}
+                name="displayOrder"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Display Order</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} data-testid="input-edit-display-order" placeholder="1" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <div className="flex justify-end gap-2 pt-4">
                 <Button type="button" variant="outline" onClick={() => setEditingService(null)}>
                   Cancel
