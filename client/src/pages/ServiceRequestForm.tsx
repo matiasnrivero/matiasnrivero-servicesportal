@@ -403,6 +403,7 @@ export default function ServiceRequestForm() {
     navigate("/");
   };
 
+  const activeServices = services.filter((s: Service) => s.isActive);
   const activeBundles = bundles.filter((b: Bundle) => b.isActive);
   const activePacks = servicePacks.filter((p: ServicePack) => p.isActive);
 
@@ -439,7 +440,7 @@ export default function ServiceRequestForm() {
 
           <TabsContent value="adhoc">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {sortServices(services).map((service) => (
+              {sortServices(activeServices).map((service) => (
                 <Card
                   key={service.id}
                   className={`cursor-pointer transition-all hover-elevate border-2 ${
@@ -501,9 +502,9 @@ export default function ServiceRequestForm() {
                             <h3 className="font-body-2-semibold text-dark-blue-night">
                               {bundle.name}
                             </h3>
-                            {bundle.discountPercentage && parseFloat(bundle.discountPercentage) > 0 && (
+                            {bundle.discountPercent && parseFloat(bundle.discountPercent) > 0 && (
                               <Badge variant="secondary" className="text-xs">
-                                {bundle.discountPercentage}% off
+                                {bundle.discountPercent}% off
                               </Badge>
                             )}
                           </div>
@@ -561,9 +562,9 @@ export default function ServiceRequestForm() {
                           )}
                         </div>
                         <div className="flex flex-col items-end gap-1">
-                          {showPricing && pack.monthlyPrice && (
+                          {showPricing && pack.price && (
                             <span className="text-sky-blue-accent font-body-2-semibold">
-                              ${parseFloat(pack.monthlyPrice).toFixed(2)}/mo
+                              ${parseFloat(pack.price).toFixed(2)}/mo
                             </span>
                           )}
                           <ChevronRight className="h-5 w-5 text-dark-gray" />
@@ -1575,8 +1576,8 @@ export default function ServiceRequestForm() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <Boxes className="h-6 w-6 text-sky-blue-accent" />
                   <h2 className="font-title-semibold text-dark-blue-night text-xl">{bundle.name}</h2>
-                  {bundle.discountPercentage && parseFloat(bundle.discountPercentage) > 0 && (
-                    <Badge variant="secondary">{bundle.discountPercentage}% off</Badge>
+                  {bundle.discountPercent && parseFloat(bundle.discountPercent) > 0 && (
+                    <Badge variant="secondary">{bundle.discountPercent}% off</Badge>
                   )}
                 </div>
                 {showPricing && bundle.finalPrice && (
@@ -1619,9 +1620,9 @@ export default function ServiceRequestForm() {
                   <CalendarRange className="h-6 w-6 text-sky-blue-accent" />
                   <h2 className="font-title-semibold text-dark-blue-night text-xl">{pack.name}</h2>
                 </div>
-                {showPricing && pack.monthlyPrice && (
+                {showPricing && pack.price && (
                   <span className="text-sky-blue-accent font-title-semibold text-xl">
-                    ${parseFloat(pack.monthlyPrice).toFixed(2)}/mo
+                    ${parseFloat(pack.price).toFixed(2)}/mo
                   </span>
                 )}
               </div>

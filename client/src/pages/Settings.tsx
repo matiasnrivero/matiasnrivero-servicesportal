@@ -50,19 +50,6 @@ import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxe
 import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem, InputField, ServiceField, BundleFieldDefault, ServicePricingTier } from "@shared/schema";
 import { insertBundleLineItemSchema, inputFieldTypes, valueModes, pricingStructures } from "@shared/schema";
 
-const BASE_PRICE_SERVICES = [
-  { name: "Vectorization & Color Separation" },
-  { name: "Artwork Touch-Ups (DTF/DTG)" },
-  { name: "Embroidery Digitization", subServices: ["Vectorization for Embroidery"] },
-  { name: "Artwork Composition" },
-  { name: "Dye-Sublimation Template" },
-  { name: "Store Banner Design" },
-  { name: "Flyer Design" },
-  { name: "Blank Product - PSD" },
-];
-
-const STORE_QUANTITY_TIERS = ["1-50", "51-75", "76-100", ">101"];
-
 async function getDefaultUser(): Promise<User | null> {
   const res = await fetch("/api/default-user");
   if (!res.ok) return null;
@@ -80,6 +67,41 @@ function PricingTabContent({
   handleSavePricing: () => void;
   isPending: boolean;
 }) {
+  // Fetch all services and their tiers from the database
+  const { data: services = [] } = useQuery<Service[]>({
+    queryKey: ["/api/services"],
+  });
+
+  const [serviceTiers, setServiceTiers] = useState<Record<string, ServicePricingTier[]>>({});
+
+  // Fetch tiers for each service with multi-price structure
+  useEffect(() => {
+    const fetchTiers = async () => {
+      const tiersMap: Record<string, ServicePricingTier[]> = {};
+      for (const service of services) {
+        if (service.pricingStructure !== "single") {
+          try {
+            const res = await fetch(`/api/services/${service.id}/tiers`);
+            if (res.ok) {
+              tiersMap[service.id] = await res.json();
+            }
+          } catch {
+            // ignore fetch errors
+          }
+        }
+      }
+      setServiceTiers(tiersMap);
+    };
+    if (services.length > 0) {
+      fetchTiers();
+    }
+  }, [services]);
+
+  // Group services by pricing structure
+  const singlePriceServices = services.filter((s) => s.pricingStructure === "single" || !s.pricingStructure);
+  const complexityServices = services.filter((s) => s.pricingStructure === "complexity");
+  const quantityServices = services.filter((s) => s.pricingStructure === "quantity");
+
   const handlePricingChange = (serviceType: string, field: string, value: number) => {
     setPricingData((prev) => ({
       ...prev,
@@ -116,6 +138,21 @@ function PricingTabContent({
     }));
   };
 
+  if (services.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Service Pricing</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-muted-foreground border rounded-md">
+            No services configured yet. Go to the Services tab to create services first.
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
@@ -127,17 +164,19 @@ function PricingTabContent({
       </CardHeader>
       <CardContent>
         <div className="space-y-8">
-          <div className="space-y-4">
-            <h3 className="font-semibold text-dark-blue-night">Base Price Services</h3>
-            <div className="space-y-2">
-              {BASE_PRICE_SERVICES.map((service) => (
-                <div key={service.name}>
+          {/* Single Price Services */}
+          {singlePriceServices.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="font-semibold text-dark-blue-night">Base Price Services</h3>
+              <div className="space-y-2">
+                {singlePriceServices.map((service) => (
                   <div
+                    key={service.id}
                     className="grid grid-cols-[minmax(220px,1fr)_repeat(4,minmax(0,1fr))] items-center gap-2 p-4 border rounded-md"
-                    data-testid={`pricing-row-${service.name.toLowerCase().replace(/\s+/g, "-")}`}
+                    data-testid={`pricing-row-${service.title.toLowerCase().replace(/\s+/g, "-")}`}
                   >
                     <div className="font-medium text-dark-blue-night whitespace-nowrap">
-                      {service.name}
+                      {service.title}
                     </div>
                     <div className="flex items-center gap-2 col-span-4 justify-end">
                       <Label className="text-sm text-dark-gray">Price:</Label>
@@ -145,126 +184,106 @@ function PricingTabContent({
                         <span className="text-dark-gray">$</span>
                         <Input
                           type="number"
-                          value={pricingData[service.name]?.basePrice || ""}
+                          value={pricingData[service.title]?.basePrice || ""}
                           onChange={(e) =>
-                            handlePricingChange(service.name, "basePrice", parseFloat(e.target.value) || 0)
+                            handlePricingChange(service.title, "basePrice", parseFloat(e.target.value) || 0)
                           }
                           placeholder="0.00"
                           className="w-24"
-                          data-testid={`input-pricing-${service.name.toLowerCase().replace(/\s+/g, "-")}`}
+                          data-testid={`input-pricing-${service.title.toLowerCase().replace(/\s+/g, "-")}`}
                         />
                       </div>
                     </div>
                   </div>
-                  {service.subServices?.map((subService) => (
-                    <div
-                      key={subService}
-                      className="grid grid-cols-[minmax(220px,1fr)_repeat(4,minmax(0,1fr))] items-center gap-2 p-4 border rounded-md mt-2"
-                      data-testid={`pricing-row-${subService.toLowerCase().replace(/\s+/g, "-")}`}
-                    >
-                      <div className="font-medium text-dark-blue-night whitespace-nowrap">
-                        {subService}
-                      </div>
-                      <div className="flex items-center gap-2 col-span-4 justify-end">
-                        <Label className="text-sm text-dark-gray">Price:</Label>
-                        <div className="flex items-center gap-1">
-                          <span className="text-dark-gray">$</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Complexity-based Services */}
+          {complexityServices.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="font-semibold text-dark-blue-night">Complexity-based Services</h3>
+              {complexityServices.map((service) => {
+                const tiers = serviceTiers[service.id] || [];
+                const gridCols = tiers.length > 0 
+                  ? `grid-cols-[minmax(200px,1fr)_repeat(${tiers.length},120px)]`
+                  : "grid-cols-[minmax(200px,1fr)_120px]";
+                
+                return (
+                  <div
+                    key={service.id}
+                    className={`grid ${gridCols} items-center gap-2 p-4 border rounded-md`}
+                    data-testid={`pricing-row-${service.title.toLowerCase().replace(/\s+/g, "-")}`}
+                  >
+                    <div className="font-medium text-dark-blue-night">{service.title}</div>
+                    {tiers.length > 0 ? (
+                      tiers.map((tier) => (
+                        <div key={tier.id} className="flex flex-col items-center">
+                          <Label className="text-sm text-dark-gray mb-1">{tier.label}:</Label>
                           <Input
                             type="number"
-                            value={pricingData[subService]?.basePrice || ""}
-                            onChange={(e) =>
-                              handlePricingChange(subService, "basePrice", parseFloat(e.target.value) || 0)
-                            }
+                            value={pricingData[service.title]?.complexity?.[tier.label.toLowerCase()] || ""}
+                            onChange={(e) => handleComplexityChange(service.title, tier.label.toLowerCase(), parseFloat(e.target.value) || 0)}
                             placeholder="0.00"
-                            className="w-24"
-                            data-testid={`input-pricing-${subService.toLowerCase().replace(/\s+/g, "-")}`}
+                            className="w-20"
+                            data-testid={`input-pricing-${service.title.toLowerCase().replace(/\s+/g, "-")}-${tier.label.toLowerCase()}`}
                           />
                         </div>
+                      ))
+                    ) : (
+                      <div className="text-muted-foreground text-sm">
+                        No tiers configured
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          )}
 
-          <div className="space-y-4">
-            <h3 className="font-semibold text-dark-blue-night">Creative Art (Complexity-based)</h3>
-            <div
-              className="grid grid-cols-[minmax(200px,1fr)_repeat(4,120px)] items-center gap-2 p-4 border rounded-md"
-              data-testid="pricing-row-creative-art"
-            >
-              <div className="font-medium text-dark-blue-night">Creative Art</div>
-              <div className="flex flex-col items-center">
-                <Label className="text-sm text-dark-gray mb-1">Basic:</Label>
-                <Input
-                  type="number"
-                  value={pricingData["Creative Art"]?.complexity?.basic || ""}
-                  onChange={(e) => handleComplexityChange("Creative Art", "basic", parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
-                  className="w-20"
-                  data-testid="input-pricing-creative-basic"
-                />
-              </div>
-              <div className="flex flex-col items-center">
-                <Label className="text-sm text-dark-gray mb-1">Standard:</Label>
-                <Input
-                  type="number"
-                  value={pricingData["Creative Art"]?.complexity?.standard || ""}
-                  onChange={(e) => handleComplexityChange("Creative Art", "standard", parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
-                  className="w-20"
-                  data-testid="input-pricing-creative-standard"
-                />
-              </div>
-              <div className="flex flex-col items-center">
-                <Label className="text-sm text-dark-gray mb-1">Advance:</Label>
-                <Input
-                  type="number"
-                  value={pricingData["Creative Art"]?.complexity?.advanced || ""}
-                  onChange={(e) => handleComplexityChange("Creative Art", "advanced", parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
-                  className="w-20"
-                  data-testid="input-pricing-creative-advance"
-                />
-              </div>
-              <div className="flex flex-col items-center">
-                <Label className="text-sm text-dark-gray mb-1">Ultimate:</Label>
-                <Input
-                  type="number"
-                  value={pricingData["Creative Art"]?.complexity?.ultimate || ""}
-                  onChange={(e) => handleComplexityChange("Creative Art", "ultimate", parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
-                  className="w-20"
-                  data-testid="input-pricing-creative-ultimate"
-                />
-              </div>
-            </div>
-          </div>
+          {/* Quantity-based Services */}
+          {quantityServices.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="font-semibold text-dark-blue-night">Quantity-based Services</h3>
+              {quantityServices.map((service) => {
+                const tiers = serviceTiers[service.id] || [];
+                const gridCols = tiers.length > 0
+                  ? `grid-cols-[minmax(200px,1fr)_repeat(${tiers.length},120px)]`
+                  : "grid-cols-[minmax(200px,1fr)_120px]";
 
-          <div className="space-y-4">
-            <h3 className="font-semibold text-dark-blue-night">Store Creation (Quantity-based)</h3>
-            <div
-              className="grid grid-cols-[minmax(200px,1fr)_repeat(4,120px)] items-center gap-2 p-4 border rounded-md"
-              data-testid="pricing-row-store-creation"
-            >
-              <div className="font-medium text-dark-blue-night">Store Creation</div>
-              {STORE_QUANTITY_TIERS.map((tier) => (
-                <div key={tier} className="flex flex-col items-center">
-                  <Label className="text-sm text-dark-gray mb-1">{tier}:</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={pricingData["Store Creation"]?.quantity?.[tier] || ""}
-                    onChange={(e) => handleQuantityChange("Store Creation", tier, parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                    className="w-20"
-                    data-testid={`input-pricing-store-${tier.replace(/[^a-zA-Z0-9]/g, "")}`}
-                  />
-                </div>
-              ))}
+                return (
+                  <div
+                    key={service.id}
+                    className={`grid ${gridCols} items-center gap-2 p-4 border rounded-md`}
+                    data-testid={`pricing-row-${service.title.toLowerCase().replace(/\s+/g, "-")}`}
+                  >
+                    <div className="font-medium text-dark-blue-night">{service.title}</div>
+                    {tiers.length > 0 ? (
+                      tiers.map((tier) => (
+                        <div key={tier.id} className="flex flex-col items-center">
+                          <Label className="text-sm text-dark-gray mb-1">{tier.label}:</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={pricingData[service.title]?.quantity?.[tier.label] || ""}
+                            onChange={(e) => handleQuantityChange(service.title, tier.label, parseFloat(e.target.value) || 0)}
+                            placeholder="0.00"
+                            className="w-20"
+                            data-testid={`input-pricing-${service.title.toLowerCase().replace(/\s+/g, "-")}-${tier.label.replace(/[^a-zA-Z0-9]/g, "")}`}
+                          />
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-muted-foreground text-sm">
+                        No tiers configured
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          )}
         </div>
       </CardContent>
     </Card>
