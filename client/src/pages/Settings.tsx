@@ -206,14 +206,15 @@ function PricingTabContent({
               <h3 className="font-semibold text-dark-blue-night">Complexity-based Services</h3>
               {complexityServices.map((service) => {
                 const tiers = serviceTiers[service.id] || [];
-                const gridCols = tiers.length > 0 
-                  ? `grid-cols-[minmax(200px,1fr)_repeat(${tiers.length},120px)]`
-                  : "grid-cols-[minmax(200px,1fr)_120px]";
+                const gridStyle = tiers.length > 0
+                  ? { gridTemplateColumns: `minmax(200px, 1fr) repeat(${tiers.length}, 120px)` }
+                  : { gridTemplateColumns: "minmax(200px, 1fr) 120px" };
                 
                 return (
                   <div
                     key={service.id}
-                    className={`grid ${gridCols} items-center gap-2 p-4 border rounded-md`}
+                    className="grid items-center gap-2 p-4 border rounded-md"
+                    style={gridStyle}
                     data-testid={`pricing-row-${service.title.toLowerCase().replace(/\s+/g, "-")}`}
                   >
                     <div className="font-medium text-dark-blue-night">{service.title}</div>
@@ -248,14 +249,15 @@ function PricingTabContent({
               <h3 className="font-semibold text-dark-blue-night">Quantity-based Services</h3>
               {quantityServices.map((service) => {
                 const tiers = serviceTiers[service.id] || [];
-                const gridCols = tiers.length > 0
-                  ? `grid-cols-[minmax(200px,1fr)_repeat(${tiers.length},120px)]`
-                  : "grid-cols-[minmax(200px,1fr)_120px]";
+                const gridStyle = tiers.length > 0
+                  ? { gridTemplateColumns: `minmax(200px, 1fr) repeat(${tiers.length}, 120px)` }
+                  : { gridTemplateColumns: "minmax(200px, 1fr) 120px" };
 
                 return (
                   <div
                     key={service.id}
-                    className={`grid ${gridCols} items-center gap-2 p-4 border rounded-md`}
+                    className="grid items-center gap-2 p-4 border rounded-md"
+                    style={gridStyle}
                     data-testid={`pricing-row-${service.title.toLowerCase().replace(/\s+/g, "-")}`}
                   >
                     <div className="font-medium text-dark-blue-night">{service.title}</div>

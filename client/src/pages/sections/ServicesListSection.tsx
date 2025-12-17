@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -9,13 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Info } from "lucide-react";
-import type { Service } from "@shared/schema";
+import type { Service, ServicePricingTier } from "@shared/schema";
 
 interface CurrentUser {
   userId: string;
@@ -26,7 +20,7 @@ interface CurrentUser {
 interface PricingSettings {
   [serviceName: string]: {
     basePrice?: number;
-    complexity?: { basic?: number; standard?: number; advanced?: number; ultimate?: number };
+    complexity?: Record<string, number>;
     quantity?: Record<string, number>;
   };
 }
@@ -45,34 +39,17 @@ async function fetchPricingSettings(): Promise<PricingSettings> {
   return response.json();
 }
 
-const SERVICE_ORDER = [
-  "Vectorization & Color Separation",
-  "Artwork Touch-Ups (DTF / DTG)",
-  "Embroidery Digitization",
-  "Creative Art",
-  "Artwork Composition",
-  "Dye-Sublimation Template",
-  "Store Creation",
-  "Store Banner Design",
-  "Flyer Design",
-  "Blank Product - PSD",
-];
-
-function sortServices(services: Service[]): Service[] {
-  return [...services].sort((a, b) => {
-    const indexA = SERVICE_ORDER.indexOf(a.title);
-    const indexB = SERVICE_ORDER.indexOf(b.title);
-    const orderA = indexA === -1 ? 999 : indexA;
-    const orderB = indexB === -1 ? 999 : indexB;
-    return orderA - orderB;
-  });
-}
-
 async function fetchServices(): Promise<Service[]> {
   const response = await fetch("/api/services");
   if (!response.ok) {
     throw new Error("Failed to fetch services");
   }
+  return response.json();
+}
+
+async function fetchServiceTiers(serviceId: string): Promise<ServicePricingTier[]> {
+  const response = await fetch(`/api/services/${serviceId}/tiers`);
+  if (!response.ok) return [];
   return response.json();
 }
 
@@ -84,7 +61,7 @@ export const ServicesListSection = ({ showHeader = true }: ServicesListSectionPr
   const [pricingModalOpen, setPricingModalOpen] = useState(false);
   
   const { data: services = [], isLoading } = useQuery({
-    queryKey: ["services"],
+    queryKey: ["/api/services"],
     queryFn: fetchServices,
   });
 
@@ -98,49 +75,117 @@ export const ServicesListSection = ({ showHeader = true }: ServicesListSectionPr
     queryFn: fetchPricingSettings,
   });
 
-  // Pricing visible only for Clients and Admins
+  const activeServices = useMemo(() => {
+    return services.filter((s) => s.isActive === 1);
+  }, [services]);
+
+  const { data: allTiers = {} } = useQuery({
+    queryKey: ["/api/all-service-tiers", activeServices.map(s => s.id)],
+    queryFn: async () => {
+      const tierMap: Record<string, ServicePricingTier[]> = {};
+      const tieredServices = activeServices.filter(
+        s => s.pricingStructure === "complexity" || s.pricingStructure === "quantity"
+      );
+      await Promise.all(
+        tieredServices.map(async (service) => {
+          tierMap[service.id] = await fetchServiceTiers(service.id);
+        })
+      );
+      return tierMap;
+    },
+    enabled: activeServices.length > 0,
+  });
+
   const showPricing = currentUser && (currentUser.role === "client" || currentUser.role === "admin");
 
-  const getDisplayPrice = (service: Service): { price: string; hasSubPrice?: boolean; subPrice?: string } => {
+  const getDisplayPrice = (service: Service): string => {
     const serviceName = service.title;
     const pricing = pricingSettings[serviceName];
+    const tiers = allTiers[service.id] || [];
 
     if (serviceName === "Store Creation") {
-      return { price: "" };
+      return "";
     }
 
-    if (serviceName === "Creative Art") {
-      const complexity = pricing?.complexity || {};
-      const basic = complexity.basic || 0;
-      const ultimate = complexity.ultimate || 0;
-      if (basic && ultimate) {
-        return { price: `$${basic} - $${ultimate}` };
+    if (service.pricingStructure === "single") {
+      const basePrice = pricing?.basePrice || parseFloat(service.basePrice || "0");
+      return basePrice > 0 ? `$${basePrice}` : "";
+    }
+
+    if (service.pricingStructure === "complexity" && tiers.length > 0) {
+      const complexityPrices = pricing?.complexity || {};
+      const prices: number[] = [];
+      
+      for (const tier of tiers) {
+        const tierKey = tier.label.toLowerCase();
+        const price = complexityPrices[tierKey];
+        if (price !== undefined && price > 0) {
+          prices.push(price);
+        }
       }
-      return { price: service.priceRange || "" };
+      
+      if (prices.length > 0) {
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        if (minPrice === maxPrice) {
+          return `$${minPrice}`;
+        }
+        return `$${minPrice} - $${maxPrice}`;
+      }
+      
+      return service.priceRange || "";
     }
 
-    if (serviceName === "Embroidery Digitization") {
-      const basePrice = pricing?.basePrice || 0;
-      return {
-        price: basePrice ? `$${basePrice}` : (service.priceRange || ""),
-      };
+    if (service.pricingStructure === "quantity" && tiers.length > 0) {
+      const quantityPrices = pricing?.quantity || {};
+      const prices: number[] = [];
+      
+      for (const tier of tiers) {
+        const price = quantityPrices[tier.label];
+        if (price !== undefined && price > 0) {
+          prices.push(price);
+        }
+      }
+      
+      if (prices.length > 0) {
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        if (minPrice === maxPrice) {
+          return `$${minPrice}`;
+        }
+        return `$${minPrice} - $${maxPrice}`;
+      }
+      
+      return service.priceRange || "";
     }
 
     const basePrice = pricing?.basePrice;
     if (basePrice) {
-      return { price: `$${basePrice}` };
+      return `$${basePrice}`;
     }
 
-    return { price: service.priceRange || "" };
+    return service.priceRange || "";
   };
 
   const getStorePricingTiers = () => {
+    const storeService = activeServices.find(s => s.title === "Store Creation");
     const storeQuantity = pricingSettings["Store Creation"]?.quantity || {};
+    
+    if (storeService) {
+      const tiers = allTiers[storeService.id] || [];
+      if (tiers.length > 0) {
+        return tiers.map(tier => ({
+          range: tier.label,
+          price: storeQuantity[tier.label] || 2.00,
+        }));
+      }
+    }
+    
     return [
-      { range: "1-50", price: storeQuantity["1-50"] || 1.50 },
-      { range: "51-75", price: storeQuantity["51-75"] || 1.30 },
-      { range: "76-100", price: storeQuantity["76-100"] || 1.10 },
-      { range: "> 101", price: storeQuantity[">101"] || 1.00 },
+      { range: "1-50", price: storeQuantity["1-50"] || 2.00 },
+      { range: "51-75", price: storeQuantity["51-75"] || 1.80 },
+      { range: "76-100", price: storeQuantity["76-100"] || 1.50 },
+      { range: "> 101", price: storeQuantity[">101"] || 1.30 },
     ];
   };
 
@@ -170,14 +215,17 @@ export const ServicesListSection = ({ showHeader = true }: ServicesListSectionPr
           <div className="col-span-3 text-center py-8">
             <p className="text-dark-gray">Loading services...</p>
           </div>
-        ) : services.length === 0 ? (
+        ) : activeServices.length === 0 ? (
           <div className="col-span-3 text-center py-8">
             <p className="text-dark-gray">No services available</p>
           </div>
         ) : (
-          sortServices(services).map((service) => (
+          activeServices.map((service) => (
             <Link key={service.id} href={`/service-requests/new?serviceId=${service.id}`}>
-              <Card className="border border-[#f0f0f5] rounded-2xl overflow-hidden bg-white cursor-pointer hover:shadow-lg transition-shadow h-full">
+              <Card 
+                className="border border-[#f0f0f5] rounded-2xl overflow-hidden bg-white cursor-pointer hover:shadow-lg transition-shadow h-full"
+                data-testid={`card-service-${service.id}`}
+              >
                 <CardContent className="p-6">
                   <div className="flex flex-col gap-2">
                     <div className="flex items-start justify-between gap-4">
@@ -197,31 +245,9 @@ export const ServicesListSection = ({ showHeader = true }: ServicesListSectionPr
                           );
                         }
                         const displayPrice = getDisplayPrice(service);
-                        if (displayPrice.hasSubPrice && displayPrice.subPrice) {
-                          return (
-                            <div className="flex items-center gap-1">
-                              <span className="font-semibold text-sky-blue-accent whitespace-nowrap">
-                                {displayPrice.price}
-                              </span>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="flex items-center gap-1 cursor-help">
-                                    <span className="text-sm text-dark-gray whitespace-nowrap">
-                                      {displayPrice.subPrice}
-                                    </span>
-                                    <Info className="h-3 w-3 text-dark-gray" />
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Vectorization for Embroidery</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
-                          );
-                        }
                         return (
                           <span className="font-semibold text-sky-blue-accent whitespace-nowrap">
-                            {displayPrice.price}
+                            {displayPrice}
                           </span>
                         );
                       })()}
@@ -256,8 +282,8 @@ export const ServicesListSection = ({ showHeader = true }: ServicesListSectionPr
                 </tr>
               </thead>
               <tbody>
-                {getStorePricingTiers().map((tier, index) => (
-                  <tr key={tier.range} className={index < 3 ? "border-b" : ""}>
+                {getStorePricingTiers().map((tier, index, arr) => (
+                  <tr key={tier.range} className={index < arr.length - 1 ? "border-b" : ""}>
                     <td className="py-4 text-dark-blue-night">{tier.range}</td>
                     <td className="py-4 text-dark-blue-night">$ {tier.price.toFixed(2)}</td>
                   </tr>
