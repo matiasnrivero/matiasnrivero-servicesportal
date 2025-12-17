@@ -11,6 +11,10 @@ export type UserRole = typeof userRoles[number];
 export const paymentMethods = ["pay_as_you_go", "monthly_payment", "deduct_from_royalties"] as const;
 export type PaymentMethod = typeof paymentMethods[number];
 
+// Pricing structure types for services
+export const pricingStructures = ["single", "complexity", "quantity"] as const;
+export type PricingStructure = typeof pricingStructures[number];
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
@@ -58,7 +62,18 @@ export const services = pgTable("services", {
   priceRange: text("price_range"),
   category: text("category").notNull(),
   decorationMethods: text("decoration_methods"),
+  pricingStructure: text("pricing_structure").notNull().default("single"),
   isActive: integer("is_active").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Service pricing tiers - dynamic tier labels for complexity/quantity-based services
+export const servicePricingTiers = pgTable("service_pricing_tiers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  serviceId: varchar("service_id").notNull().references(() => services.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }),
+  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -275,6 +290,21 @@ export const insertServiceSchema = createInsertSchema(services).omit({
   createdAt: true,
 });
 
+export const updateServiceSchema = createInsertSchema(services).partial().omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertServicePricingTierSchema = createInsertSchema(servicePricingTiers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const updateServicePricingTierSchema = createInsertSchema(servicePricingTiers).partial().omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertServiceRequestSchema = createInsertSchema(serviceRequests).omit({
   id: true,
   createdAt: true,
@@ -365,6 +395,10 @@ export type InsertVendorProfile = z.infer<typeof insertVendorProfileSchema>;
 export type UpdateVendorProfile = z.infer<typeof updateVendorProfileSchema>;
 export type Service = typeof services.$inferSelect;
 export type InsertService = z.infer<typeof insertServiceSchema>;
+export type UpdateService = z.infer<typeof updateServiceSchema>;
+export type ServicePricingTier = typeof servicePricingTiers.$inferSelect;
+export type InsertServicePricingTier = z.infer<typeof insertServicePricingTierSchema>;
+export type UpdateServicePricingTier = z.infer<typeof updateServicePricingTierSchema>;
 export type ServiceRequest = typeof serviceRequests.$inferSelect;
 export type InsertServiceRequest = z.infer<typeof insertServiceRequestSchema>;
 export type UpdateServiceRequest = z.infer<typeof updateServiceRequestSchema>;

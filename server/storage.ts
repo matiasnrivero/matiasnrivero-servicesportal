@@ -6,6 +6,10 @@ import {
   type InsertUser,
   type Service,
   type InsertService,
+  type UpdateService,
+  type ServicePricingTier,
+  type InsertServicePricingTier,
+  type UpdateServicePricingTier,
   type ServiceRequest,
   type InsertServiceRequest,
   type UpdateServiceRequest,
@@ -37,6 +41,7 @@ import {
   type InsertBundleFieldDefault,
   users,
   services,
+  servicePricingTiers,
   serviceRequests,
   serviceAttachments,
   comments,
@@ -75,9 +80,18 @@ export interface IStorage {
 
   // Service methods
   getAllServices(): Promise<Service[]>;
+  getActiveServices(): Promise<Service[]>;
   getService(id: string): Promise<Service | undefined>;
   createService(service: InsertService): Promise<Service>;
   updateService(id: string, service: Partial<InsertService>): Promise<Service | undefined>;
+  deleteService(id: string): Promise<void>;
+
+  // Service Pricing Tiers methods
+  getServicePricingTiers(serviceId: string): Promise<ServicePricingTier[]>;
+  createServicePricingTier(tier: InsertServicePricingTier): Promise<ServicePricingTier>;
+  updateServicePricingTier(id: string, tier: UpdateServicePricingTier): Promise<ServicePricingTier | undefined>;
+  deleteServicePricingTier(id: string): Promise<void>;
+  deleteServicePricingTiersByService(serviceId: string): Promise<void>;
 
   // Service request methods
   getAllServiceRequests(): Promise<ServiceRequest[]>;
@@ -238,6 +252,10 @@ export class DbStorage implements IStorage {
 
   // Service methods
   async getAllServices(): Promise<Service[]> {
+    return await db.select().from(services).orderBy(services.title);
+  }
+
+  async getActiveServices(): Promise<Service[]> {
     return await db.select().from(services).where(eq(services.isActive, 1)).orderBy(services.title);
   }
 
@@ -254,6 +272,38 @@ export class DbStorage implements IStorage {
   async updateService(id: string, service: Partial<InsertService>): Promise<Service | undefined> {
     const result = await db.update(services).set(service).where(eq(services.id, id)).returning();
     return result[0];
+  }
+
+  async deleteService(id: string): Promise<void> {
+    await db.delete(services).where(eq(services.id, id));
+  }
+
+  // Service Pricing Tiers methods
+  async getServicePricingTiers(serviceId: string): Promise<ServicePricingTier[]> {
+    return await db.select().from(servicePricingTiers)
+      .where(eq(servicePricingTiers.serviceId, serviceId))
+      .orderBy(servicePricingTiers.sortOrder);
+  }
+
+  async createServicePricingTier(tier: InsertServicePricingTier): Promise<ServicePricingTier> {
+    const result = await db.insert(servicePricingTiers).values(tier).returning();
+    return result[0];
+  }
+
+  async updateServicePricingTier(id: string, tier: UpdateServicePricingTier): Promise<ServicePricingTier | undefined> {
+    const result = await db.update(servicePricingTiers)
+      .set(tier)
+      .where(eq(servicePricingTiers.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteServicePricingTier(id: string): Promise<void> {
+    await db.delete(servicePricingTiers).where(eq(servicePricingTiers.id, id));
+  }
+
+  async deleteServicePricingTiersByService(serviceId: string): Promise<void> {
+    await db.delete(servicePricingTiers).where(eq(servicePricingTiers.serviceId, serviceId));
   }
 
   // Service request methods
