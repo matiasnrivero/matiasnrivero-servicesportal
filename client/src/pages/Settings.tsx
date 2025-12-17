@@ -958,6 +958,7 @@ function InputFieldsTabContent() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/input-fields"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
       setIsCreateDialogOpen(false);
       toast({ title: "Input field created successfully" });
     },
@@ -972,6 +973,7 @@ function InputFieldsTabContent() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/input-fields"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
       setEditingField(null);
       toast({ title: "Input field updated successfully" });
     },
@@ -986,6 +988,7 @@ function InputFieldsTabContent() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/input-fields"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
       toast({ title: "Input field deleted successfully" });
     },
     onError: (error: any) => {
@@ -999,6 +1002,7 @@ function InputFieldsTabContent() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/input-fields"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
       toast({ title: "Input fields seeded successfully" });
     },
     onError: (error: any) => {
@@ -1508,6 +1512,7 @@ function ServiceFieldsManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/services", selectedServiceId, "fields"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services", selectedServiceId, "form-fields"] });
       setIsAddFieldDialogOpen(false);
       toast({ title: "Field added to service" });
     },
@@ -1522,6 +1527,7 @@ function ServiceFieldsManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/services", selectedServiceId, "fields"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services", selectedServiceId, "form-fields"] });
       setEditingServiceField(null);
       toast({ title: "Service field updated" });
     },
@@ -1536,6 +1542,7 @@ function ServiceFieldsManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/services", selectedServiceId, "fields"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services", selectedServiceId, "form-fields"] });
       toast({ title: "Field removed from service" });
     },
     onError: (error: Error) => {
@@ -2077,7 +2084,7 @@ function ServiceManagementTabContent() {
       return serviceData;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/services", { excludeSons: false }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
       setIsCreateDialogOpen(false);
       createForm.reset();
       setPricingTiers([]);
@@ -2108,7 +2115,7 @@ function ServiceManagementTabContent() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/services", { excludeSons: false }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
       setEditingService(null);
       setPricingTiers([]);
       toast({ title: "Service updated successfully" });
@@ -2123,7 +2130,7 @@ function ServiceManagementTabContent() {
       return apiRequest("PATCH", `/api/services/${id}`, { isActive });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/services", { excludeSons: false }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
       toast({ title: "Service status updated" });
     },
     onError: (error: Error) => {
@@ -2136,7 +2143,7 @@ function ServiceManagementTabContent() {
       return apiRequest("DELETE", `/api/services/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/services", { excludeSons: false }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
       toast({ title: "Service deleted" });
     },
     onError: (error: Error) => {
