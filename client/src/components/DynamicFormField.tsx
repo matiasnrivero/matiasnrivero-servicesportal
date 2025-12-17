@@ -243,6 +243,37 @@ export function DynamicFormField({
         );
 
       case "checkbox":
+        const checkboxOptions = getOptions();
+        // If valueMode is "multi" and there are options, render multiple checkboxes
+        if (valueMode === "multi" && checkboxOptions.length > 0) {
+          const selectedCheckboxValues = Array.isArray(value) ? value : [];
+          return (
+            <div className="border rounded-md p-3 space-y-2 bg-white dark:bg-background">
+              {checkboxOptions.map((opt) => (
+                <div key={opt.value} className="flex items-center gap-2">
+                  <Checkbox
+                    id={`${fieldKey}-${opt.value}`}
+                    checked={selectedCheckboxValues.includes(opt.value)}
+                    onCheckedChange={(checked) => {
+                      if (checked === true) {
+                        onChange(fieldKey, [...selectedCheckboxValues, opt.value]);
+                      } else if (checked === false) {
+                        onChange(fieldKey, selectedCheckboxValues.filter((v: string) => v !== opt.value));
+                      }
+                    }}
+                    data-testid={`checkbox-${fieldKey}-${opt.value}`}
+                  />
+                  <Label htmlFor={`${fieldKey}-${opt.value}`} className="font-normal cursor-pointer">
+                    {showPricing && opt.price !== undefined
+                      ? `${opt.label} - $${opt.price}`
+                      : opt.label}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          );
+        }
+        // Single boolean checkbox
         return (
           <div className="flex items-center gap-2">
             <Checkbox
@@ -343,7 +374,12 @@ export function DynamicFormField({
     }
   };
 
-  if (inputType === "checkbox") {
+  // For single boolean checkbox, the label is rendered inline
+  // For multi-checkbox with options, show label above
+  const hasMultiCheckboxOptions = inputType === "checkbox" && valueMode === "multi" && 
+    field.optionsJson && Array.isArray(field.optionsJson) && field.optionsJson.length > 0;
+  
+  if (inputType === "checkbox" && !hasMultiCheckboxOptions) {
     return (
       <div className="space-y-2">
         {renderField()}
