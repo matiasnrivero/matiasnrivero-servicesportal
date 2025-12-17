@@ -55,7 +55,7 @@ interface CurrentUser {
 
 async function fetchServices(): Promise<Service[]> {
   // Only fetch father services (main services) for client selection
-  const response = await fetch("/api/services?fathersOnly=true");
+  const response = await fetch("/api/services");
   if (!response.ok) {
     throw new Error("Failed to fetch services");
   }

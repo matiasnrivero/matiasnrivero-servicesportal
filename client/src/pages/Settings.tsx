@@ -56,6 +56,13 @@ async function getDefaultUser(): Promise<User | null> {
   return res.json();
 }
 
+// Admin service fetching - includes all services (including son services)
+async function fetchAllServices(): Promise<Service[]> {
+  const res = await fetch("/api/services?excludeSons=false");
+  if (!res.ok) throw new Error("Failed to fetch services");
+  return res.json();
+}
+
 function PricingTabContent({ 
   pricingData, 
   setPricingData, 
@@ -67,9 +74,10 @@ function PricingTabContent({
   handleSavePricing: () => void;
   isPending: boolean;
 }) {
-  // Fetch all services and their tiers from the database
+  // Fetch all services and their tiers from the database (including son services for admin)
   const { data: services = [] } = useQuery<Service[]>({
-    queryKey: ["/api/services"],
+    queryKey: ["/api/services", { excludeSons: false }],
+    queryFn: fetchAllServices,
   });
 
   const [serviceTiers, setServiceTiers] = useState<Record<string, ServicePricingTier[]>>({});
@@ -573,7 +581,8 @@ function BundlesTabContent() {
   });
 
   const { data: services = [] } = useQuery<Service[]>({
-    queryKey: ["/api/services"],
+    queryKey: ["/api/services", { excludeSons: false }],
+    queryFn: fetchAllServices,
   });
 
   const { data: lineItems = [] } = useQuery<BundleLineItem[]>({
@@ -758,7 +767,8 @@ function PacksTabContent() {
   });
 
   const { data: services = [] } = useQuery<Service[]>({
-    queryKey: ["/api/services"],
+    queryKey: ["/api/services", { excludeSons: false }],
+    queryFn: fetchAllServices,
   });
 
   if (isLoading) {
@@ -938,7 +948,8 @@ function InputFieldsTabContent() {
   });
 
   const { data: allServices = [] } = useQuery<Service[]>({
-    queryKey: ["/api/services"],
+    queryKey: ["/api/services", { excludeSons: false }],
+    queryFn: fetchAllServices,
   });
 
   const createFieldMutation = useMutation({
@@ -1472,7 +1483,8 @@ function ServiceFieldsManager() {
   const [editingServiceField, setEditingServiceField] = useState<ServiceField | null>(null);
 
   const { data: allServices = [] } = useQuery<Service[]>({
-    queryKey: ["/api/services"],
+    queryKey: ["/api/services", { excludeSons: false }],
+    queryFn: fetchAllServices,
   });
 
   const { data: inputFieldsList = [] } = useQuery<InputField[]>({
@@ -1987,7 +1999,8 @@ function ServiceManagementTabContent() {
   const [pricingTiers, setPricingTiers] = useState<{ label: string; price: string }[]>([]);
 
   const { data: allServices = [], isLoading } = useQuery<Service[]>({
-    queryKey: ["/api/services"],
+    queryKey: ["/api/services", { excludeSons: false }],
+    queryFn: fetchAllServices,
   });
 
   const createForm = useForm({
@@ -2671,7 +2684,8 @@ function BundleFieldDefaultsManager() {
   });
 
   const { data: allServices = [] } = useQuery<Service[]>({
-    queryKey: ["/api/services"],
+    queryKey: ["/api/services", { excludeSons: false }],
+    queryFn: fetchAllServices,
   });
 
   const { data: inputFieldsList = [] } = useQuery<InputField[]>({

@@ -36,13 +36,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Services routes
   app.get("/api/services", async (req, res) => {
     try {
-      const { fathersOnly } = req.query;
+      const { excludeSons } = req.query;
       let services;
-      if (fathersOnly === "true") {
-        // For client-facing service selection - only show father services
-        services = await storage.getFatherServices();
-      } else {
+      // Default: exclude son services (excludeSons defaults to true)
+      // Only include son services if explicitly set to "false"
+      if (excludeSons === "false") {
         services = await storage.getAllServices();
+      } else {
+        // Default behavior: only show father services (excludeSons=true or not specified)
+        services = await storage.getFatherServices();
       }
       res.json(services);
     } catch (error) {
