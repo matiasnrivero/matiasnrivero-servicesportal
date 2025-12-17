@@ -25,9 +25,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Users, DollarSign, Clock, UserPlus, Save, ArrowLeft, CalendarDays, Globe } from "lucide-react";
+import { Building2, Users, DollarSign, Clock, UserPlus, Save, ArrowLeft, CalendarDays, Globe, Package, Layers, Eye } from "lucide-react";
 import { Link } from "wouter";
-import type { User, VendorProfile as VendorProfileType, Service, ServicePricingTier } from "@shared/schema";
+import type { User, VendorProfile as VendorProfileType, Service, ServicePricingTier, Bundle, BundleItem, BundleLineItem, ServicePack, ServicePackItem, VendorBundleCost, VendorPackCost } from "@shared/schema";
 
 // Common timezones for vendor availability
 const TIMEZONES = [
@@ -194,6 +194,165 @@ export default function VendorDetail() {
   }>>({});
 
   const [slaData, setSlaData] = useState<Record<string, { days: number; hours?: number }>>({});
+
+  // Bundles and Packs queries
+  const { data: allBundles = [] } = useQuery<Bundle[]>({
+    queryKey: ["/api/bundles"],
+  });
+
+  const { data: allBundleLineItems = [] } = useQuery<BundleLineItem[]>({
+    queryKey: ["/api/bundle-line-items"],
+  });
+
+  const { data: allServicePacks = [] } = useQuery<ServicePack[]>({
+    queryKey: ["/api/service-packs"],
+  });
+
+  const { data: vendorBundleCosts = [] } = useQuery<VendorBundleCost[]>({
+    queryKey: ["/api/vendor-bundle-costs", vendorId],
+    queryFn: async () => {
+      if (!vendorId) return [];
+      const res = await fetch(`/api/vendor-bundle-costs?vendorId=${vendorId}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!vendorId,
+  });
+
+  const { data: vendorPackCosts = [] } = useQuery<VendorPackCost[]>({
+    queryKey: ["/api/vendor-pack-costs", vendorId],
+    queryFn: async () => {
+      if (!vendorId) return [];
+      const res = await fetch(`/api/vendor-pack-costs?vendorId=${vendorId}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!vendorId,
+  });
+
+  // State for bundle/pack cost inputs
+  const [bundleCostInputs, setBundleCostInputs] = useState<Record<string, string>>({});
+  const [packCostInputs, setPackCostInputs] = useState<Record<string, string>>({});
+  
+  // State for viewing bundle/pack details
+  const [viewBundleDialogOpen, setViewBundleDialogOpen] = useState(false);
+  const [viewingBundle, setViewingBundle] = useState<Bundle | null>(null);
+  const [viewPackDialogOpen, setViewPackDialogOpen] = useState(false);
+  const [viewingPack, setViewingPack] = useState<ServicePack | null>(null);
+  const [bundleItemsMap, setBundleItemsMap] = useState<Record<string, BundleItem[]>>({});
+  const [packItemsMap, setPackItemsMap] = useState<Record<string, ServicePackItem[]>>({});
+
+  // Initialize bundle/pack cost inputs from fetched data
+  useEffect(() => {
+    if (vendorBundleCosts.length > 0) {
+      const newInputs: Record<string, string> = {};
+      vendorBundleCosts.forEach((costItem) => {
+        newInputs[costItem.bundleId] = costItem.cost?.toString() || "";
+      });
+      setBundleCostInputs(prev => {
+        if (JSON.stringify(prev) === JSON.stringify(newInputs)) return prev;
+        return newInputs;
+      });
+    }
+  }, [vendorBundleCosts]);
+
+  useEffect(() => {
+    if (vendorPackCosts.length > 0) {
+      const newInputs: Record<string, string> = {};
+      vendorPackCosts.forEach((costItem) => {
+        newInputs[costItem.packId] = costItem.cost?.toString() || "";
+      });
+      setPackCostInputs(prev => {
+        if (JSON.stringify(prev) === JSON.stringify(newInputs)) return prev;
+        return newInputs;
+      });
+    }
+  }, [vendorPackCosts]);
+
+  // Fetch bundle items when viewing a bundle
+  const fetchBundleItems = async (bundleId: string) => {
+    if (bundleItemsMap[bundleId]) return;
+    try {
+      const res = await fetch(`/api/bundles/${bundleId}/items`);
+      if (res.ok) {
+        const items = await res.json();
+        setBundleItemsMap(prev => ({ ...prev, [bundleId]: items }));
+      }
+    } catch {
+      // ignore errors
+    }
+  };
+
+  // Fetch pack items when viewing a pack
+  const fetchPackItems = async (packId: string) => {
+    if (packItemsMap[packId]) return;
+    try {
+      const res = await fetch(`/api/service-packs/${packId}/items`);
+      if (res.ok) {
+        const items = await res.json();
+        setPackItemsMap(prev => ({ ...prev, [packId]: items }));
+      }
+    } catch {
+      // ignore errors
+    }
+  };
+
+  const handleViewBundle = (bundle: Bundle) => {
+    setViewingBundle(bundle);
+    fetchBundleItems(bundle.id);
+    setViewBundleDialogOpen(true);
+  };
+
+  const handleViewPack = (pack: ServicePack) => {
+    setViewingPack(pack);
+    fetchPackItems(pack.id);
+    setViewPackDialogOpen(true);
+  };
+
+  // Bundle/Pack cost mutations
+  const upsertBundleCostMutation = useMutation({
+    mutationFn: async (data: { bundleId: string; costPrice: number }) => {
+      return apiRequest("POST", "/api/vendor-bundle-costs", {
+        vendorId,
+        bundleId: data.bundleId,
+        costPrice: data.costPrice,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor-bundle-costs", vendorId] });
+      toast({ title: "Bundle cost saved successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const upsertPackCostMutation = useMutation({
+    mutationFn: async (data: { packId: string; costPrice: number }) => {
+      return apiRequest("POST", "/api/vendor-pack-costs", {
+        vendorId,
+        packId: data.packId,
+        costPrice: data.costPrice,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor-pack-costs", vendorId] });
+      toast({ title: "Pack cost saved successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSaveBundleCost = (bundleId: string) => {
+    const costValue = parseFloat(bundleCostInputs[bundleId] || "0");
+    upsertBundleCostMutation.mutate({ bundleId, costPrice: costValue });
+  };
+
+  const handleSavePackCost = (packId: string) => {
+    const costValue = parseFloat(packCostInputs[packId] || "0");
+    upsertPackCostMutation.mutate({ packId, costPrice: costValue });
+  };
 
   useEffect(() => {
     if (vendorProfile) {
@@ -397,6 +556,14 @@ export default function VendorDetail() {
               <TabsTrigger value="availability" data-testid="tab-availability">
                 <CalendarDays className="h-4 w-4 mr-2" />
                 Availability
+              </TabsTrigger>
+              <TabsTrigger value="bundles" data-testid="tab-bundles">
+                <Package className="h-4 w-4 mr-2" />
+                Bundles
+              </TabsTrigger>
+              <TabsTrigger value="packs" data-testid="tab-packs">
+                <Layers className="h-4 w-4 mr-2" />
+                Packs
               </TabsTrigger>
             </TabsList>
 
@@ -966,6 +1133,242 @@ export default function VendorDetail() {
                   </CardContent>
                 </Card>
               </div>
+            </TabsContent>
+
+            <TabsContent value="bundles">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Bundle Cost Pricing</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {allBundles.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground border rounded-md">
+                      No bundles configured yet.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-12 gap-4 p-3 bg-muted/50 rounded-md font-medium text-sm">
+                        <div className="col-span-4">Bundle Name</div>
+                        <div className="col-span-2 text-center">Status</div>
+                        <div className="col-span-3 text-center">Cost Price</div>
+                        <div className="col-span-3 text-center">Actions</div>
+                      </div>
+                      {allBundles.map((bundle) => (
+                        <div
+                          key={bundle.id}
+                          className="grid grid-cols-12 gap-4 p-3 border rounded-md items-center"
+                          data-testid={`bundle-row-${bundle.id}`}
+                        >
+                          <div className="col-span-4 font-medium">{bundle.name}</div>
+                          <div className="col-span-2 text-center">
+                            <Badge variant={bundle.isActive ? "default" : "secondary"}>
+                              {bundle.isActive ? "Active" : "Inactive"}
+                            </Badge>
+                          </div>
+                          <div className="col-span-3 flex items-center gap-2 justify-center">
+                            <span className="text-muted-foreground">$</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              className="w-24"
+                              value={bundleCostInputs[bundle.id] || ""}
+                              onChange={(e) =>
+                                setBundleCostInputs(prev => ({ ...prev, [bundle.id]: e.target.value }))
+                              }
+                              data-testid={`input-bundle-cost-${bundle.id}`}
+                            />
+                            <Button
+                              size="sm"
+                              onClick={() => handleSaveBundleCost(bundle.id)}
+                              disabled={upsertBundleCostMutation.isPending}
+                              data-testid={`button-save-bundle-cost-${bundle.id}`}
+                            >
+                              <Save className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="col-span-3 text-center">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleViewBundle(bundle)}
+                              data-testid={`button-view-bundle-${bundle.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Dialog open={viewBundleDialogOpen} onOpenChange={setViewBundleDialogOpen}>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Bundle Details: {viewingBundle?.name}</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">Status:</span>
+                      <Badge variant={viewingBundle?.isActive ? "default" : "secondary"}>
+                        {viewingBundle?.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                    {viewingBundle?.description && (
+                      <div>
+                        <span className="text-muted-foreground">Description:</span>
+                        <p className="mt-1">{viewingBundle.description}</p>
+                      </div>
+                    )}
+                    <div>
+                      <h4 className="font-medium mb-2">Bundle Line Items</h4>
+                      {viewingBundle && bundleItemsMap[viewingBundle.id] ? (
+                        bundleItemsMap[viewingBundle.id].length === 0 ? (
+                          <div className="text-muted-foreground text-sm">No items in this bundle</div>
+                        ) : (
+                          <div className="space-y-2">
+                            {bundleItemsMap[viewingBundle.id].map((item) => {
+                              const lineItem = allBundleLineItems.find(li => li.id === item.lineItemId);
+                              return (
+                                <div
+                                  key={item.id}
+                                  className="flex items-center justify-between p-2 border rounded-md"
+                                >
+                                  <span>{lineItem?.name || "Unknown Item"}</span>
+                                  <Badge variant="outline">Qty: {item.quantity}</Badge>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )
+                      ) : (
+                        <div className="text-muted-foreground text-sm">Loading...</div>
+                      )}
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </TabsContent>
+
+            <TabsContent value="packs">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pack Cost Pricing</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {allServicePacks.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground border rounded-md">
+                      No service packs configured yet.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-12 gap-4 p-3 bg-muted/50 rounded-md font-medium text-sm">
+                        <div className="col-span-4">Pack Name</div>
+                        <div className="col-span-2 text-center">Status</div>
+                        <div className="col-span-3 text-center">Pack Cost</div>
+                        <div className="col-span-3 text-center">Actions</div>
+                      </div>
+                      {allServicePacks.map((pack) => (
+                        <div
+                          key={pack.id}
+                          className="grid grid-cols-12 gap-4 p-3 border rounded-md items-center"
+                          data-testid={`pack-row-${pack.id}`}
+                        >
+                          <div className="col-span-4 font-medium">{pack.name}</div>
+                          <div className="col-span-2 text-center">
+                            <Badge variant={pack.isActive ? "default" : "secondary"}>
+                              {pack.isActive ? "Active" : "Inactive"}
+                            </Badge>
+                          </div>
+                          <div className="col-span-3 flex items-center gap-2 justify-center">
+                            <span className="text-muted-foreground">$</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              className="w-24"
+                              value={packCostInputs[pack.id] || ""}
+                              onChange={(e) =>
+                                setPackCostInputs(prev => ({ ...prev, [pack.id]: e.target.value }))
+                              }
+                              data-testid={`input-pack-cost-${pack.id}`}
+                            />
+                            <Button
+                              size="sm"
+                              onClick={() => handleSavePackCost(pack.id)}
+                              disabled={upsertPackCostMutation.isPending}
+                              data-testid={`button-save-pack-cost-${pack.id}`}
+                            >
+                              <Save className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="col-span-3 text-center">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleViewPack(pack)}
+                              data-testid={`button-view-pack-${pack.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Dialog open={viewPackDialogOpen} onOpenChange={setViewPackDialogOpen}>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Pack Details: {viewingPack?.name}</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">Status:</span>
+                      <Badge variant={viewingPack?.isActive ? "default" : "secondary"}>
+                        {viewingPack?.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                    {viewingPack?.description && (
+                      <div>
+                        <span className="text-muted-foreground">Description:</span>
+                        <p className="mt-1">{viewingPack.description}</p>
+                      </div>
+                    )}
+                    <div>
+                      <h4 className="font-medium mb-2">Pack Services</h4>
+                      {viewingPack && packItemsMap[viewingPack.id] ? (
+                        packItemsMap[viewingPack.id].length === 0 ? (
+                          <div className="text-muted-foreground text-sm">No services in this pack</div>
+                        ) : (
+                          <div className="space-y-2">
+                            {packItemsMap[viewingPack.id].map((item) => {
+                              const service = allServices.find(s => s.id === item.serviceId);
+                              return (
+                                <div
+                                  key={item.id}
+                                  className="flex items-center justify-between p-2 border rounded-md"
+                                >
+                                  <span>{service?.title || "Unknown Service"}</span>
+                                  <Badge variant="outline">Qty: {item.quantity}</Badge>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )
+                      ) : (
+                        <div className="text-muted-foreground text-sm">Loading...</div>
+                      )}
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </TabsContent>
           </Tabs>
         </div>

@@ -1625,6 +1625,12 @@ export default function VendorProfile() {
                       {viewingBundle?.isActive ? "Active" : "Inactive"}
                     </Badge>
                   </div>
+                  {viewingBundle?.description && (
+                    <div>
+                      <span className="text-muted-foreground">Description:</span>
+                      <p className="mt-1">{viewingBundle.description}</p>
+                    </div>
+                  )}
                   <div>
                     <h4 className="font-medium mb-2">Bundle Line Items</h4>
                     {viewingBundle && bundleItemsMap[viewingBundle.id] ? (
@@ -1633,7 +1639,7 @@ export default function VendorProfile() {
                       ) : (
                         <div className="space-y-2">
                           {bundleItemsMap[viewingBundle.id].map((item) => {
-                            const lineItem = allBundleLineItems.find(li => li.id === item.bundleLineItemId);
+                            const lineItem = allBundleLineItems.find(li => li.id === item.lineItemId);
                             return (
                               <div
                                 key={item.id}
