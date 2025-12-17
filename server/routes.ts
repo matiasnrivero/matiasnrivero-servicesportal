@@ -113,6 +113,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public endpoint to get service form fields (with input field details joined)
+  app.get("/api/services/:serviceId/form-fields", async (req, res) => {
+    try {
+      const serviceFields = await storage.getServiceFields(req.params.serviceId);
+      // Join with input field details
+      const fieldsWithDetails = await Promise.all(serviceFields.map(async (sf) => {
+        const inputField = await storage.getInputField(sf.inputFieldId);
+        return {
+          ...sf,
+          inputField: inputField || null,
+        };
+      }));
+      // Filter out inactive fields and sort by sortOrder
+      const activeFields = fieldsWithDetails
+        .filter(f => f.isActive && f.inputField?.isActive)
+        .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+      res.json(activeFields);
+    } catch (error) {
+      console.error("Error fetching service form fields:", error);
+      res.status(500).json({ error: "Failed to fetch form fields" });
+    }
+  });
+
   // Service pricing tiers routes
   app.get("/api/services/:serviceId/tiers", async (req, res) => {
     try {
