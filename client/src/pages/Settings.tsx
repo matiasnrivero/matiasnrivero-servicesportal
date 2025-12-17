@@ -2077,7 +2077,7 @@ function ServiceManagementTabContent() {
       return serviceData;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services", { excludeSons: false }] });
       setIsCreateDialogOpen(false);
       createForm.reset();
       setPricingTiers([]);
@@ -2108,7 +2108,7 @@ function ServiceManagementTabContent() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services", { excludeSons: false }] });
       setEditingService(null);
       setPricingTiers([]);
       toast({ title: "Service updated successfully" });
@@ -2123,7 +2123,7 @@ function ServiceManagementTabContent() {
       return apiRequest("PATCH", `/api/services/${id}`, { isActive });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services", { excludeSons: false }] });
       toast({ title: "Service status updated" });
     },
     onError: (error: Error) => {
@@ -2136,7 +2136,7 @@ function ServiceManagementTabContent() {
       return apiRequest("DELETE", `/api/services/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services", { excludeSons: false }] });
       toast({ title: "Service deleted" });
     },
     onError: (error: Error) => {
