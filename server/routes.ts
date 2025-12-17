@@ -1117,6 +1117,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           priceRange: "$ 15",
           category: "production",
           decorationMethods: "Embroidery",
+          serviceHierarchy: "father",
+        },
+        {
+          title: "Vectorization for Embroidery",
+          description: "Convert raster artwork to vector format for clean embroidery digitization.",
+          basePrice: "5.00",
+          priceRange: "+ $ 5",
+          category: "production",
+          decorationMethods: "Embroidery",
+          serviceHierarchy: "son",
+          parentServiceTitle: "Embroidery Digitization", // Will be resolved to ID after creation
         },
         {
           title: "Dye-Sublimation Template",
@@ -1160,9 +1171,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       ];
 
+      // First pass: create father services and services without hierarchy
+      const createdServices: Record<string, string> = {}; // title -> id mapping
+      
       for (const serviceData of servicesData) {
-        console.log("Creating service:", serviceData.title);
-        await storage.createService(serviceData);
+        if (serviceData.serviceHierarchy !== "son") {
+          console.log("Creating service:", serviceData.title);
+          const created = await storage.createService(serviceData);
+          createdServices[serviceData.title] = created.id;
+        }
+      }
+      
+      // Second pass: create son services with resolved parent IDs
+      for (const serviceData of servicesData) {
+        if (serviceData.serviceHierarchy === "son" && (serviceData as any).parentServiceTitle) {
+          const parentId = createdServices[(serviceData as any).parentServiceTitle];
+          if (parentId) {
+            console.log("Creating son service:", serviceData.title, "with parent:", (serviceData as any).parentServiceTitle);
+            const { parentServiceTitle, ...data } = serviceData as any;
+            await storage.createService({
+              ...data,
+              parentServiceId: parentId,
+            });
+          } else {
+            console.warn("Parent service not found for:", serviceData.title);
+          }
+        }
       }
 
       console.log("Services and users seeded successfully");

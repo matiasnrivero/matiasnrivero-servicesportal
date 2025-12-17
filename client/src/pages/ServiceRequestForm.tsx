@@ -855,15 +855,21 @@ export default function ServiceRequestForm() {
     );
   };
 
-  // Render General Info section fields from database (excluding fixed fields)
+  // Render General Info section fields from database (excluding fixed fields that are hardcoded)
   const renderGeneralInfoFromDatabase = () => {
     const { generalInfoFields } = groupFieldsBySection(serviceFormFields);
     
-    if (generalInfoFields.length === 0) return null;
+    // Exclude fixed fields that are already hardcoded in the form
+    const fixedFieldKeys = ['order_project_reference', 'due_date', 'orderNumber', 'dueDate'];
+    const filteredFields = generalInfoFields.filter(
+      field => !fixedFieldKeys.includes(field.fieldKey)
+    );
+    
+    if (filteredFields.length === 0) return null;
     
     return (
       <>
-        {generalInfoFields.map(field => renderDynamicField(field))}
+        {filteredFields.map(field => renderDynamicField(field))}
       </>
     );
   };
