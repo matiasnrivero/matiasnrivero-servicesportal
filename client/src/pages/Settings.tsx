@@ -46,9 +46,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2 } from "lucide-react";
-import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem, InputField, ServiceField, BundleFieldDefault } from "@shared/schema";
-import { insertBundleLineItemSchema, inputFieldTypes, valueModes } from "@shared/schema";
+import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X } from "lucide-react";
+import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem, InputField, ServiceField, BundleFieldDefault, ServicePricingTier } from "@shared/schema";
+import { insertBundleLineItemSchema, inputFieldTypes, valueModes, pricingStructures } from "@shared/schema";
 
 const BASE_PRICE_SERVICES = [
   { name: "Vectorization & Color Separation" },
@@ -1958,6 +1958,562 @@ function ServiceFieldsManager() {
   );
 }
 
+// Service Management Tab Content - Create and manage service types with pricing structures
+function ServiceManagementTabContent() {
+  const { toast } = useToast();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingService, setEditingService] = useState<Service | null>(null);
+  const [pricingTiers, setPricingTiers] = useState<{ label: string; price: string }[]>([]);
+
+  const { data: allServices = [], isLoading } = useQuery<Service[]>({
+    queryKey: ["/api/services"],
+  });
+
+  const createForm = useForm({
+    defaultValues: {
+      title: "",
+      description: "",
+      category: "artwork",
+      pricingStructure: "single" as "single" | "complexity" | "quantity",
+      basePrice: "0",
+    },
+  });
+
+  const editForm = useForm({
+    defaultValues: {
+      title: "",
+      description: "",
+      category: "artwork",
+      pricingStructure: "single" as "single" | "complexity" | "quantity",
+      basePrice: "0",
+    },
+  });
+
+  const selectedPricingStructure = createForm.watch("pricingStructure");
+  const editPricingStructure = editForm.watch("pricingStructure");
+
+  useEffect(() => {
+    if (editingService) {
+      editForm.reset({
+        title: editingService.title,
+        description: editingService.description,
+        category: editingService.category,
+        pricingStructure: (editingService.pricingStructure as "single" | "complexity" | "quantity") || "single",
+        basePrice: editingService.basePrice || "0",
+      });
+      // Load existing tiers
+      fetch(`/api/services/${editingService.id}/tiers`)
+        .then(res => res.json())
+        .then((tiers: ServicePricingTier[]) => {
+          setPricingTiers(tiers.map(t => ({ label: t.label, price: t.price || "" })));
+        })
+        .catch(() => setPricingTiers([]));
+    }
+  }, [editingService, editForm]);
+
+  const createServiceMutation = useMutation({
+    mutationFn: async (data: { title: string; description: string; category: string; pricingStructure: string; basePrice: string }) => {
+      const service = await apiRequest("POST", "/api/services", data);
+      const serviceData = await service.json();
+      // Create pricing tiers if multi-price
+      if (data.pricingStructure !== "single" && pricingTiers.length > 0) {
+        await apiRequest("PUT", `/api/services/${serviceData.id}/tiers`, {
+          tiers: pricingTiers.map(t => ({ label: t.label, price: t.price || null })),
+        });
+      }
+      return serviceData;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      setIsCreateDialogOpen(false);
+      createForm.reset();
+      setPricingTiers([]);
+      toast({ title: "Service created successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateServiceMutation = useMutation({
+    mutationFn: async (data: { id: string; title: string; description: string; category: string; pricingStructure: string; basePrice: string }) => {
+      const { id, ...updateData } = data;
+      await apiRequest("PATCH", `/api/services/${id}`, updateData);
+      // Update pricing tiers
+      if (data.pricingStructure !== "single") {
+        await apiRequest("PUT", `/api/services/${id}/tiers`, {
+          tiers: pricingTiers.map(t => ({ label: t.label, price: t.price || null })),
+        });
+      } else {
+        // Clear tiers for single price
+        await apiRequest("PUT", `/api/services/${id}/tiers`, { tiers: [] });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      setEditingService(null);
+      setPricingTiers([]);
+      toast({ title: "Service updated successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: number }) => {
+      return apiRequest("PATCH", `/api/services/${id}`, { isActive });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      toast({ title: "Service status updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteServiceMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/services/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      toast({ title: "Service deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const addTier = () => {
+    setPricingTiers([...pricingTiers, { label: "", price: "" }]);
+  };
+
+  const removeTier = (index: number) => {
+    setPricingTiers(pricingTiers.filter((_, i) => i !== index));
+  };
+
+  const updateTier = (index: number, field: "label" | "price", value: string) => {
+    const newTiers = [...pricingTiers];
+    newTiers[index][field] = value;
+    setPricingTiers(newTiers);
+  };
+
+  const handleCreateService = (data: { title: string; description: string; category: string; pricingStructure: string; basePrice: string }) => {
+    createServiceMutation.mutate(data);
+  };
+
+  const handleUpdateService = (data: { title: string; description: string; category: string; pricingStructure: string; basePrice: string }) => {
+    if (!editingService) return;
+    updateServiceMutation.mutate({ id: editingService.id, ...data });
+  };
+
+  const getPricingStructureLabel = (structure: string) => {
+    switch (structure) {
+      case "single": return "Single Price";
+      case "complexity": return "Complexity-based";
+      case "quantity": return "Quantity-based";
+      default: return structure;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-2">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <Layers className="h-5 w-5" />
+            Service Management
+          </CardTitle>
+          <CardDescription>
+            Create and configure service types with their pricing structures.
+          </CardDescription>
+        </div>
+        <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (!open) {
+            createForm.reset();
+            setPricingTiers([]);
+          }
+        }}>
+          <DialogTrigger asChild>
+            <Button data-testid="button-create-service">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Service
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Create New Service</DialogTitle>
+              <DialogDescription>
+                Define a new service type with its pricing structure.
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...createForm}>
+              <form onSubmit={createForm.handleSubmit(handleCreateService)} className="space-y-4">
+                <FormField
+                  control={createForm.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Service Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-service-title" placeholder="e.g., Creative Art" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={createForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} data-testid="input-service-description" placeholder="Description shown to clients on service cards" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={createForm.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-service-category">
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="artwork">Artwork</SelectItem>
+                          <SelectItem value="design">Design</SelectItem>
+                          <SelectItem value="production">Production</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={createForm.control}
+                  name="pricingStructure"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Pricing Structure</FormLabel>
+                      <Select onValueChange={(value) => {
+                        field.onChange(value);
+                        if (value === "single") {
+                          setPricingTiers([]);
+                        }
+                      }} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-pricing-structure">
+                            <SelectValue placeholder="Select pricing type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="single">Single Price</SelectItem>
+                          <SelectItem value="complexity">Multiple Prices (Complexity-based)</SelectItem>
+                          <SelectItem value="quantity">Multiple Prices (Quantity-based)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {selectedPricingStructure === "single" && (
+                  <FormField
+                    control={createForm.control}
+                    name="basePrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Base Price ($)</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" {...field} data-testid="input-base-price" placeholder="0.00" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+                {(selectedPricingStructure === "complexity" || selectedPricingStructure === "quantity") && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Pricing Tiers</Label>
+                      <Button type="button" variant="outline" size="sm" onClick={addTier} data-testid="button-add-tier">
+                        <Plus className="h-3 w-3 mr-1" />
+                        Add Tier
+                      </Button>
+                    </div>
+                    {pricingTiers.length === 0 && (
+                      <p className="text-sm text-muted-foreground">No tiers added. Click "Add Tier" to define pricing levels.</p>
+                    )}
+                    {pricingTiers.map((tier, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <Input
+                          value={tier.label}
+                          onChange={(e) => updateTier(index, "label", e.target.value)}
+                          placeholder={selectedPricingStructure === "complexity" ? "e.g., Basic" : "e.g., 1-50"}
+                          className="flex-1"
+                          data-testid={`input-tier-label-${index}`}
+                        />
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeTier(index)} data-testid={`button-remove-tier-${index}`}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={createServiceMutation.isPending} data-testid="button-submit-create-service">
+                    {createServiceMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                    Create Service
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      </CardHeader>
+      <CardContent>
+        {allServices.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground border rounded-md">
+            No services configured yet. Click "Create Service" to add your first service type.
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Service Name</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Pricing Structure</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {allServices.map((service) => (
+                <TableRow key={service.id} data-testid={`row-service-${service.id}`}>
+                  <TableCell className="font-medium">{service.title}</TableCell>
+                  <TableCell className="max-w-[200px] truncate">{service.description}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">
+                      {getPricingStructureLabel(service.pricingStructure || "single")}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <Switch
+                        checked={service.isActive === 1}
+                        onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: service.id, isActive: checked ? 1 : 0 })}
+                        data-testid={`switch-service-active-${service.id}`}
+                      />
+                      <Badge variant={service.isActive === 1 ? "default" : "secondary"}>
+                        {service.isActive === 1 ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setEditingService(service)}
+                        data-testid={`button-edit-service-${service.id}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => {
+                          if (confirm("Are you sure you want to delete this service? This will also delete all associated field assignments.")) {
+                            deleteServiceMutation.mutate(service.id);
+                          }
+                        }}
+                        data-testid={`button-delete-service-${service.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+
+      {/* Edit Service Dialog */}
+      <Dialog open={!!editingService} onOpenChange={(open) => {
+        if (!open) {
+          setEditingService(null);
+          setPricingTiers([]);
+        }
+      }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Service</DialogTitle>
+            <DialogDescription>
+              Update service details and pricing structure.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(handleUpdateService)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Service Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-edit-service-title" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} data-testid="input-edit-service-description" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-service-category">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="artwork">Artwork</SelectItem>
+                        <SelectItem value="design">Design</SelectItem>
+                        <SelectItem value="production">Production</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="pricingStructure"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Pricing Structure</FormLabel>
+                    <Select onValueChange={(value) => {
+                      field.onChange(value);
+                      if (value === "single") {
+                        setPricingTiers([]);
+                      }
+                    }} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-pricing-structure">
+                          <SelectValue placeholder="Select pricing type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="single">Single Price</SelectItem>
+                        <SelectItem value="complexity">Multiple Prices (Complexity-based)</SelectItem>
+                        <SelectItem value="quantity">Multiple Prices (Quantity-based)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {editPricingStructure === "single" && (
+                <FormField
+                  control={editForm.control}
+                  name="basePrice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Base Price ($)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" {...field} data-testid="input-edit-base-price" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              {(editPricingStructure === "complexity" || editPricingStructure === "quantity") && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Pricing Tiers</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={addTier} data-testid="button-edit-add-tier">
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Tier
+                    </Button>
+                  </div>
+                  {pricingTiers.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No tiers added. Click "Add Tier" to define pricing levels.</p>
+                  )}
+                  {pricingTiers.map((tier, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Input
+                        value={tier.label}
+                        onChange={(e) => updateTier(index, "label", e.target.value)}
+                        placeholder={editPricingStructure === "complexity" ? "e.g., Basic" : "e.g., 1-50"}
+                        className="flex-1"
+                        data-testid={`input-edit-tier-label-${index}`}
+                      />
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeTier(index)} data-testid={`button-edit-remove-tier-${index}`}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex justify-end gap-2 pt-4">
+                <Button type="button" variant="outline" onClick={() => setEditingService(null)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateServiceMutation.isPending} data-testid="button-submit-edit-service">
+                  {updateServiceMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Update Service
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 // Bundle Field Defaults Manager - Override default values for bundle submissions
 function BundleFieldDefaultsManager() {
   const { toast } = useToast();
@@ -2438,6 +2994,10 @@ export default function Settings() {
 
           <Tabs defaultValue="pricing" className="space-y-6">
             <TabsList>
+              <TabsTrigger value="services" data-testid="tab-services">
+                <Layers className="h-4 w-4 mr-1" />
+                Services
+              </TabsTrigger>
               <TabsTrigger value="pricing" data-testid="tab-pricing">
                 <DollarSign className="h-4 w-4 mr-1" />
                 Pricing
@@ -2459,6 +3019,10 @@ export default function Settings() {
                 Input Fields
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="services">
+              <ServiceManagementTabContent />
+            </TabsContent>
 
             <TabsContent value="pricing">
               <PricingTabContent

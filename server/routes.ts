@@ -58,10 +58,157 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/services", async (req, res) => {
     try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
       const service = await storage.createService(req.body);
       res.status(201).json(service);
     } catch (error) {
+      console.error("Error creating service:", error);
       res.status(500).json({ error: "Failed to create service" });
+    }
+  });
+
+  app.patch("/api/services/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const service = await storage.updateService(req.params.id, req.body);
+      if (!service) {
+        return res.status(404).json({ error: "Service not found" });
+      }
+      res.json(service);
+    } catch (error) {
+      console.error("Error updating service:", error);
+      res.status(500).json({ error: "Failed to update service" });
+    }
+  });
+
+  app.delete("/api/services/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      await storage.deleteService(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting service:", error);
+      res.status(500).json({ error: "Failed to delete service" });
+    }
+  });
+
+  // Service pricing tiers routes
+  app.get("/api/services/:serviceId/tiers", async (req, res) => {
+    try {
+      const tiers = await storage.getServicePricingTiers(req.params.serviceId);
+      res.json(tiers);
+    } catch (error) {
+      console.error("Error fetching service pricing tiers:", error);
+      res.status(500).json({ error: "Failed to fetch pricing tiers" });
+    }
+  });
+
+  app.post("/api/services/:serviceId/tiers", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const tier = await storage.createServicePricingTier({ ...req.body, serviceId: req.params.serviceId });
+      res.status(201).json(tier);
+    } catch (error) {
+      console.error("Error creating pricing tier:", error);
+      res.status(500).json({ error: "Failed to create pricing tier" });
+    }
+  });
+
+  app.patch("/api/service-tiers/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const tier = await storage.updateServicePricingTier(req.params.id, req.body);
+      if (!tier) {
+        return res.status(404).json({ error: "Pricing tier not found" });
+      }
+      res.json(tier);
+    } catch (error) {
+      console.error("Error updating pricing tier:", error);
+      res.status(500).json({ error: "Failed to update pricing tier" });
+    }
+  });
+
+  app.delete("/api/service-tiers/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      await storage.deleteServicePricingTier(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting pricing tier:", error);
+      res.status(500).json({ error: "Failed to delete pricing tier" });
+    }
+  });
+
+  // Bulk update pricing tiers for a service
+  app.put("/api/services/:serviceId/tiers", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const { tiers } = req.body;
+      // Delete existing tiers and create new ones
+      await storage.deleteServicePricingTiersByService(req.params.serviceId);
+      const createdTiers = [];
+      for (let i = 0; i < tiers.length; i++) {
+        const tier = await storage.createServicePricingTier({
+          serviceId: req.params.serviceId,
+          label: tiers[i].label,
+          price: tiers[i].price,
+          sortOrder: i,
+        });
+        createdTiers.push(tier);
+      }
+      res.json(createdTiers);
+    } catch (error) {
+      console.error("Error updating pricing tiers:", error);
+      res.status(500).json({ error: "Failed to update pricing tiers" });
     }
   });
 
