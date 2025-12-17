@@ -81,6 +81,8 @@ export interface IStorage {
   // Service methods
   getAllServices(): Promise<Service[]>;
   getActiveServices(): Promise<Service[]>;
+  getFatherServices(): Promise<Service[]>;
+  getChildServices(parentId: string): Promise<Service[]>;
   getService(id: string): Promise<Service | undefined>;
   createService(service: InsertService): Promise<Service>;
   updateService(id: string, service: Partial<InsertService>): Promise<Service | undefined>;
@@ -257,6 +259,24 @@ export class DbStorage implements IStorage {
 
   async getActiveServices(): Promise<Service[]> {
     return await db.select().from(services).where(eq(services.isActive, 1)).orderBy(services.title);
+  }
+
+  async getFatherServices(): Promise<Service[]> {
+    return await db.select().from(services)
+      .where(and(
+        eq(services.isActive, 1),
+        eq(services.serviceHierarchy, "father")
+      ))
+      .orderBy(services.displayOrder);
+  }
+
+  async getChildServices(parentId: string): Promise<Service[]> {
+    return await db.select().from(services)
+      .where(and(
+        eq(services.isActive, 1),
+        eq(services.parentServiceId, parentId)
+      ))
+      .orderBy(services.displayOrder);
   }
 
   async getService(id: string): Promise<Service | undefined> {
