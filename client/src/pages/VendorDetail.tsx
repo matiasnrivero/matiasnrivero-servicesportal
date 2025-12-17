@@ -209,10 +209,10 @@ export default function VendorDetail() {
   });
 
   const { data: vendorBundleCosts = [] } = useQuery<VendorBundleCost[]>({
-    queryKey: ["/api/vendor-bundle-costs", vendorId],
+    queryKey: ["/api/vendors", vendorId, "bundle-costs"],
     queryFn: async () => {
       if (!vendorId) return [];
-      const res = await fetch(`/api/vendor-bundle-costs?vendorId=${vendorId}`);
+      const res = await fetch(`/api/vendors/${vendorId}/bundle-costs`);
       if (!res.ok) return [];
       return res.json();
     },
@@ -220,10 +220,10 @@ export default function VendorDetail() {
   });
 
   const { data: vendorPackCosts = [] } = useQuery<VendorPackCost[]>({
-    queryKey: ["/api/vendor-pack-costs", vendorId],
+    queryKey: ["/api/vendors", vendorId, "pack-costs"],
     queryFn: async () => {
       if (!vendorId) return [];
-      const res = await fetch(`/api/vendor-pack-costs?vendorId=${vendorId}`);
+      const res = await fetch(`/api/vendors/${vendorId}/pack-costs`);
       if (!res.ok) return [];
       return res.json();
     },
