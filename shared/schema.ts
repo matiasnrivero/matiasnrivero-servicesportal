@@ -202,6 +202,26 @@ export const clientPackSubscriptions = pgTable("client_pack_subscriptions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Vendor bundle costs - vendor-specific pricing for bundles
+export const vendorBundleCosts = pgTable("vendor_bundle_costs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vendorId: varchar("vendor_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  bundleId: varchar("bundle_id").notNull().references(() => bundles.id, { onDelete: "cascade" }),
+  cost: decimal("cost", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Vendor pack costs - vendor-specific pricing for service packs
+export const vendorPackCosts = pgTable("vendor_pack_costs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vendorId: varchar("vendor_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  packId: varchar("pack_id").notNull().references(() => servicePacks.id, { onDelete: "cascade" }),
+  cost: decimal("cost", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // ==================== END PHASE 2 TABLES ====================
 
 // ==================== PHASE 3: CONFIGURABLE INPUT FIELDS ====================
@@ -397,6 +417,19 @@ export const insertBundleFieldDefaultSchema = createInsertSchema(bundleFieldDefa
   createdAt: true,
 });
 
+// Vendor bundle/pack cost schemas
+export const insertVendorBundleCostSchema = createInsertSchema(vendorBundleCosts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertVendorPackCostSchema = createInsertSchema(vendorPackCosts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type VendorProfile = typeof vendorProfiles.$inferSelect;
@@ -440,6 +473,10 @@ export type InsertServiceField = z.infer<typeof insertServiceFieldSchema>;
 export type UpdateServiceField = z.infer<typeof updateServiceFieldSchema>;
 export type BundleFieldDefault = typeof bundleFieldDefaults.$inferSelect;
 export type InsertBundleFieldDefault = z.infer<typeof insertBundleFieldDefaultSchema>;
+export type VendorBundleCost = typeof vendorBundleCosts.$inferSelect;
+export type InsertVendorBundleCost = z.infer<typeof insertVendorBundleCostSchema>;
+export type VendorPackCost = typeof vendorPackCosts.$inferSelect;
+export type InsertVendorPackCost = z.infer<typeof insertVendorPackCostSchema>;
 
 // Helper type for dropdown options
 export type FieldOption = {

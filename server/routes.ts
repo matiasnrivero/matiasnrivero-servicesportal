@@ -2317,6 +2317,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== VENDOR BUNDLE/PACK COSTS ====================
+
+  // Get vendor bundle costs for a specific vendor
+  app.get("/api/vendors/:vendorId/bundle-costs", async (req, res) => {
+    try {
+      const costs = await storage.getVendorBundleCosts(req.params.vendorId);
+      res.json(costs);
+    } catch (error) {
+      console.error("Error fetching vendor bundle costs:", error);
+      res.status(500).json({ error: "Failed to fetch vendor bundle costs" });
+    }
+  });
+
+  // Upsert vendor bundle cost
+  app.put("/api/vendors/:vendorId/bundle-costs/:bundleId", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      // Only vendor themselves, admin, or internal_designer can update costs
+      const isVendorItself = sessionUser.role === "vendor" && sessionUser.id === req.params.vendorId;
+      const isAdmin = sessionUser.role === "admin";
+      const isInternalDesigner = sessionUser.role === "internal_designer";
+      if (!isVendorItself && !isAdmin && !isInternalDesigner) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const { cost } = req.body;
+      const result = await storage.upsertVendorBundleCost(req.params.vendorId, req.params.bundleId, cost);
+      res.json(result);
+    } catch (error) {
+      console.error("Error upserting vendor bundle cost:", error);
+      res.status(500).json({ error: "Failed to update vendor bundle cost" });
+    }
+  });
+
+  // Get vendor pack costs for a specific vendor
+  app.get("/api/vendors/:vendorId/pack-costs", async (req, res) => {
+    try {
+      const costs = await storage.getVendorPackCosts(req.params.vendorId);
+      res.json(costs);
+    } catch (error) {
+      console.error("Error fetching vendor pack costs:", error);
+      res.status(500).json({ error: "Failed to fetch vendor pack costs" });
+    }
+  });
+
+  // Upsert vendor pack cost
+  app.put("/api/vendors/:vendorId/pack-costs/:packId", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      // Only vendor themselves, admin, or internal_designer can update costs
+      const isVendorItself = sessionUser.role === "vendor" && sessionUser.id === req.params.vendorId;
+      const isAdmin = sessionUser.role === "admin";
+      const isInternalDesigner = sessionUser.role === "internal_designer";
+      if (!isVendorItself && !isAdmin && !isInternalDesigner) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const { cost } = req.body;
+      const result = await storage.upsertVendorPackCost(req.params.vendorId, req.params.packId, cost);
+      res.json(result);
+    } catch (error) {
+      console.error("Error upserting vendor pack cost:", error);
+      res.status(500).json({ error: "Failed to update vendor pack cost" });
+    }
+  });
+
   // ==================== SEED INPUT FIELDS ROUTE ====================
 
   // Seed input fields from existing service forms (admin only, one-time use)

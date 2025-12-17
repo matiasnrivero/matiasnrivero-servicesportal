@@ -39,6 +39,10 @@ import {
   type UpdateServiceField,
   type BundleFieldDefault,
   type InsertBundleFieldDefault,
+  type VendorBundleCost,
+  type InsertVendorBundleCost,
+  type VendorPackCost,
+  type InsertVendorPackCost,
   users,
   services,
   servicePricingTiers,
@@ -55,6 +59,8 @@ import {
   inputFields,
   serviceFields,
   bundleFieldDefaults,
+  vendorBundleCosts,
+  vendorPackCosts,
 } from "@shared/schema";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -169,6 +175,16 @@ export interface IStorage {
   createBundleFieldDefault(data: InsertBundleFieldDefault): Promise<BundleFieldDefault>;
   updateBundleFieldDefault(id: string, defaultValue: any): Promise<BundleFieldDefault | undefined>;
   deleteBundleFieldDefault(id: string): Promise<void>;
+
+  // Vendor Bundle Cost methods
+  getVendorBundleCosts(vendorId: string): Promise<VendorBundleCost[]>;
+  getVendorBundleCost(vendorId: string, bundleId: string): Promise<VendorBundleCost | undefined>;
+  upsertVendorBundleCost(vendorId: string, bundleId: string, cost: string): Promise<VendorBundleCost>;
+
+  // Vendor Pack Cost methods
+  getVendorPackCosts(vendorId: string): Promise<VendorPackCost[]>;
+  getVendorPackCost(vendorId: string, packId: string): Promise<VendorPackCost | undefined>;
+  upsertVendorPackCost(vendorId: string, packId: string, cost: string): Promise<VendorPackCost>;
 }
 
 export class DbStorage implements IStorage {
@@ -668,6 +684,68 @@ export class DbStorage implements IStorage {
 
   async deleteBundleFieldDefault(id: string): Promise<void> {
     await db.delete(bundleFieldDefaults).where(eq(bundleFieldDefaults.id, id));
+  }
+
+  // Vendor Bundle Cost methods
+  async getVendorBundleCosts(vendorId: string): Promise<VendorBundleCost[]> {
+    return await db.select().from(vendorBundleCosts).where(eq(vendorBundleCosts.vendorId, vendorId));
+  }
+
+  async getVendorBundleCost(vendorId: string, bundleId: string): Promise<VendorBundleCost | undefined> {
+    const result = await db.select().from(vendorBundleCosts)
+      .where(and(
+        eq(vendorBundleCosts.vendorId, vendorId),
+        eq(vendorBundleCosts.bundleId, bundleId)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async upsertVendorBundleCost(vendorId: string, bundleId: string, cost: string): Promise<VendorBundleCost> {
+    const existing = await this.getVendorBundleCost(vendorId, bundleId);
+    if (existing) {
+      const result = await db.update(vendorBundleCosts)
+        .set({ cost, updatedAt: new Date() })
+        .where(eq(vendorBundleCosts.id, existing.id))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(vendorBundleCosts)
+        .values({ vendorId, bundleId, cost })
+        .returning();
+      return result[0];
+    }
+  }
+
+  // Vendor Pack Cost methods
+  async getVendorPackCosts(vendorId: string): Promise<VendorPackCost[]> {
+    return await db.select().from(vendorPackCosts).where(eq(vendorPackCosts.vendorId, vendorId));
+  }
+
+  async getVendorPackCost(vendorId: string, packId: string): Promise<VendorPackCost | undefined> {
+    const result = await db.select().from(vendorPackCosts)
+      .where(and(
+        eq(vendorPackCosts.vendorId, vendorId),
+        eq(vendorPackCosts.packId, packId)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async upsertVendorPackCost(vendorId: string, packId: string, cost: string): Promise<VendorPackCost> {
+    const existing = await this.getVendorPackCost(vendorId, packId);
+    if (existing) {
+      const result = await db.update(vendorPackCosts)
+        .set({ cost, updatedAt: new Date() })
+        .where(eq(vendorPackCosts.id, existing.id))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(vendorPackCosts)
+        .values({ vendorId, packId, cost })
+        .returning();
+      return result[0];
+    }
   }
 }
 
