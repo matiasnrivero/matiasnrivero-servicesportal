@@ -1537,16 +1537,26 @@ export default function JobDetailView() {
                           <SelectValue placeholder="Select a designer..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {designers.map((designer) => (
-                            <SelectItem 
-                              key={designer.id} 
-                              value={designer.id}
-                              data-testid={`select-designer-${designer.id}`}
-                            >
-                              {designer.username}
-                              {designer.id === currentUser?.userId && " (You)"}
-                            </SelectItem>
-                          ))}
+                          {designers.map((designer) => {
+                            const roleLabel = designer.role === "internal_designer" ? "Internal Designer" 
+                              : designer.role === "vendor_designer" ? "Vendor Designer"
+                              : designer.role.charAt(0).toUpperCase() + designer.role.slice(1);
+                            return (
+                              <SelectItem 
+                                key={designer.id} 
+                                value={designer.id}
+                                data-testid={`select-designer-${designer.id}`}
+                              >
+                                <span className="flex items-center gap-2">
+                                  {designer.username}
+                                  {designer.id === currentUser?.userId && " (You)"}
+                                  <Badge variant="secondary" className="text-xs">
+                                    {roleLabel}
+                                  </Badge>
+                                </span>
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
                       <Button
