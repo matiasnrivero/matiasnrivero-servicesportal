@@ -242,6 +242,8 @@ export default function ServiceRequestForm() {
   const urlParams = new URLSearchParams(window.location.search);
   const preSelectedServiceIdFromUrl = urlParams.get("serviceId") || "";
   const preSelectedServiceId = preSelectedServiceIdFromUrl;
+  const tabFromUrl = urlParams.get("tab");
+  const initialTab = (tabFromUrl === "bundle" || tabFromUrl === "pack") ? tabFromUrl : "adhoc";
 
   const [selectedServiceId, setSelectedServiceId] = useState<string>(preSelectedServiceId);
 
@@ -274,7 +276,7 @@ export default function ServiceRequestForm() {
 
   const [selectedBundleId, setSelectedBundleId] = useState<string>("");
   const [selectedPackId, setSelectedPackId] = useState<string>("");
-  const [selectionMode, setSelectionMode] = useState<"adhoc" | "bundle" | "pack">("adhoc");
+  const [selectionMode, setSelectionMode] = useState<"adhoc" | "bundle" | "pack">(initialTab);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, Array<{ url: string; name: string }>>>({});
   const [calculatedPrice, setCalculatedPrice] = useState<number>(0);
@@ -471,7 +473,7 @@ export default function ServiceRequestForm() {
       </p>
       
       <div className="w-full max-w-4xl">
-        <Tabs defaultValue="adhoc" onValueChange={(v) => {
+        <Tabs value={selectionMode} onValueChange={(v) => {
           setSelectionMode(v as "adhoc" | "bundle" | "pack");
           setSelectedServiceId("");
           setSelectedBundleId("");

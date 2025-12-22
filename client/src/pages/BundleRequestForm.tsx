@@ -352,7 +352,7 @@ export default function BundleRequestForm() {
       {/* Topbar - matching ad-hoc service form style */}
       <div className="bg-gradient-to-r from-dark-blue-night to-space-cadet px-8 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
-          <Link href="/?tab=bundles">
+          <Link href="/?tab=bundle">
             <Button variant="outline" className="bg-white hover:bg-gray-100" data-testid="button-back">
               <ArrowLeft className="h-4 w-4 mr-1" />
               Back
@@ -525,7 +525,7 @@ export default function BundleRequestForm() {
         <Separator className="my-6" />
 
         <div className="flex justify-end gap-4">
-          <Link href="/?tab=bundles">
+          <Link href="/?tab=bundle">
             <Button variant="outline" data-testid="button-cancel">
               Cancel
             </Button>
