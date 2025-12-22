@@ -930,6 +930,7 @@ const inputFieldFormSchema = z.object({
   inputType: z.enum(inputFieldTypes),
   valueMode: z.enum(valueModes),
   assignTo: z.enum(assignToModes),
+  showOnBundleForm: z.boolean().default(true),
   description: z.string().optional(),
   globalDefaultValue: z.any().optional(),
   sortOrder: z.number().int().min(0).default(0),
@@ -1019,6 +1020,7 @@ function InputFieldsTabContent() {
       inputType: "text",
       valueMode: "single",
       assignTo: "service",
+      showOnBundleForm: true,
       description: "",
       sortOrder: 0,
       isActive: true,
@@ -1033,6 +1035,7 @@ function InputFieldsTabContent() {
       inputType: "text",
       valueMode: "single",
       assignTo: "service",
+      showOnBundleForm: true,
       description: "",
       sortOrder: 0,
       isActive: true,
@@ -1047,6 +1050,7 @@ function InputFieldsTabContent() {
         inputType: editingField.inputType as any,
         valueMode: editingField.valueMode as any,
         assignTo: (editingField.assignTo as any) || "service",
+        showOnBundleForm: editingField.showOnBundleForm ?? true,
         description: editingField.description || "",
         sortOrder: editingField.sortOrder ?? 0,
         isActive: editingField.isActive ?? true,
@@ -1285,6 +1289,25 @@ function InputFieldsTabContent() {
                       )}
                     />
                   </div>
+                  <FormField
+                    control={form.control}
+                    name="showOnBundleForm"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel>Request on Bundle</FormLabel>
+                          <p className="text-sm text-muted-foreground">Show this field on bundle request forms</p>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-show-on-bundle-form"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
                   <div className="flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                       Cancel
@@ -1526,6 +1549,25 @@ function InputFieldsTabContent() {
                   )}
                 />
               </div>
+              <FormField
+                control={editForm.control}
+                name="showOnBundleForm"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-0.5">
+                      <FormLabel>Request on Bundle</FormLabel>
+                      <p className="text-sm text-muted-foreground">Show this field on bundle request forms</p>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="switch-edit-show-on-bundle-form"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setEditingField(null)}>
                   Cancel

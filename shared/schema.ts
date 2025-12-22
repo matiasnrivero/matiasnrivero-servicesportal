@@ -259,6 +259,7 @@ export const inputFields = pgTable("input_fields", {
   inputType: text("input_type").notNull(),
   valueMode: text("value_mode").notNull().default("single"),
   assignTo: text("assign_to").notNull().default("service"),
+  showOnBundleForm: boolean("show_on_bundle_form").notNull().default(true),
   validation: jsonb("validation"),
   globalDefaultValue: jsonb("global_default_value"),
   isActive: boolean("is_active").notNull().default(true),
