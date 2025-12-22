@@ -363,7 +363,7 @@ export default function BundleRequestForm() {
             disabled={createMutation.isPending}
             data-testid="button-submit-top"
           >
-            {createMutation.isPending ? "Saving..." : "Save"}
+            {createMutation.isPending ? "Submitting..." : "Submit Request"}
           </Button>
         </div>
       </div>

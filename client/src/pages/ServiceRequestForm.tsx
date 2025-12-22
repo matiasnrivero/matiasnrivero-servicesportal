@@ -1630,7 +1630,7 @@ export default function ServiceRequestForm() {
             </Button>
           </Link>
           <Button type="button" onClick={handleSubmit(onSubmit)} disabled={mutation.isPending}>
-            {mutation.isPending ? "Saving..." : "Save"}
+            {mutation.isPending ? "Submitting..." : "Submit Request"}
           </Button>
         </div>
       </div>
@@ -1738,7 +1738,7 @@ export default function ServiceRequestForm() {
                     disabled={mutation.isPending}
                     data-testid="button-save"
                   >
-                    {mutation.isPending ? "Saving..." : "Save"}
+                    {mutation.isPending ? "Submitting..." : "Submit Request"}
                   </Button>
                 </div>
               </div>
