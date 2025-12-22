@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Header } from "@/components/Header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -95,12 +96,12 @@ function BundlesTab(): JSX.Element {
         const savings = fullPrice - bundlePrice;
 
         return (
-          <Card 
-            key={bundle.id} 
-            className="border border-[#f0f0f5] rounded-2xl overflow-hidden bg-white h-full"
-            data-testid={`card-bundle-${bundle.id}`}
-          >
-            <CardContent className="p-6">
+          <Link key={bundle.id} href={`/bundle-request/${bundle.id}`}>
+            <Card 
+              className="border border-[#f0f0f5] rounded-2xl overflow-hidden bg-white h-full cursor-pointer hover-elevate"
+              data-testid={`card-bundle-${bundle.id}`}
+            >
+              <CardContent className="p-6">
               <div className="flex flex-col gap-3">
                 <div className="flex items-start justify-between gap-4">
                   <h3 className="flex-1 font-semibold text-dark-blue-night">
@@ -151,6 +152,7 @@ function BundlesTab(): JSX.Element {
               </div>
             </CardContent>
           </Card>
+          </Link>
         );
       })}
     </div>
