@@ -47,8 +47,8 @@ import {
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List } from "lucide-react";
-import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem, InputField, ServiceField, BundleFieldDefault, ServicePricingTier } from "@shared/schema";
-import { insertBundleLineItemSchema, inputFieldTypes, valueModes, pricingStructures } from "@shared/schema";
+import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem, InputField, ServiceField, BundleFieldDefault, ServicePricingTier, LineItemField } from "@shared/schema";
+import { insertBundleLineItemSchema, inputFieldTypes, valueModes, pricingStructures, assignToModes } from "@shared/schema";
 
 async function getDefaultUser(): Promise<User | null> {
   const res = await fetch("/api/default-user");
@@ -929,6 +929,7 @@ const inputFieldFormSchema = z.object({
   label: z.string().min(1, "Label is required"),
   inputType: z.enum(inputFieldTypes),
   valueMode: z.enum(valueModes),
+  assignTo: z.enum(assignToModes),
   description: z.string().optional(),
   globalDefaultValue: z.any().optional(),
   sortOrder: z.number().int().min(0).default(0),
@@ -1017,6 +1018,7 @@ function InputFieldsTabContent() {
       label: "",
       inputType: "text",
       valueMode: "single",
+      assignTo: "service",
       description: "",
       sortOrder: 0,
       isActive: true,
@@ -1030,6 +1032,7 @@ function InputFieldsTabContent() {
       label: "",
       inputType: "text",
       valueMode: "single",
+      assignTo: "service",
       description: "",
       sortOrder: 0,
       isActive: true,
@@ -1043,6 +1046,7 @@ function InputFieldsTabContent() {
         label: editingField.label,
         inputType: editingField.inputType as any,
         valueMode: editingField.valueMode as any,
+        assignTo: (editingField.assignTo as any) || "service",
         description: editingField.description || "",
         sortOrder: editingField.sortOrder ?? 0,
         isActive: editingField.isActive ?? true,
@@ -1080,6 +1084,15 @@ function InputFieldsTabContent() {
       date: "Date",
     };
     return labels[type] || type;
+  };
+
+  const getAssignToLabel = (assignTo: string) => {
+    const labels: Record<string, string> = {
+      service: "Service",
+      line_item: "Line Item",
+      both: "Both",
+    };
+    return labels[assignTo] || assignTo;
   };
 
   if (isLoading) {
@@ -1201,6 +1214,28 @@ function InputFieldsTabContent() {
                   </div>
                   <FormField
                     control={form.control}
+                    name="assignTo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Assign To</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-assign-to">
+                              <SelectValue placeholder="Select assignment" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="service">Service</SelectItem>
+                            <SelectItem value="line_item">Line Item</SelectItem>
+                            <SelectItem value="both">Both</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
                     name="description"
                     render={({ field }) => (
                       <FormItem>
@@ -1278,6 +1313,7 @@ function InputFieldsTabContent() {
                 <TableHead>Label</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Mode</TableHead>
+                <TableHead>Assign To</TableHead>
                 <TableHead className="text-center">Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -1292,6 +1328,9 @@ function InputFieldsTabContent() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline">{field.valueMode}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" data-testid={`badge-assign-to-${field.id}`}>{getAssignToLabel(field.assignTo || "service")}</Badge>
                   </TableCell>
                   <TableCell className="text-center">
                     {field.isActive ? (
@@ -1413,6 +1452,28 @@ function InputFieldsTabContent() {
                   )}
                 />
               </div>
+              <FormField
+                control={editForm.control}
+                name="assignTo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Assign To</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-assign-to">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="service">Service</SelectItem>
+                        <SelectItem value="line_item">Line Item</SelectItem>
+                        <SelectItem value="both">Both</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={editForm.control}
                 name="description"
@@ -2000,6 +2061,520 @@ function ServiceFieldsManager({ initialServiceId, onServiceIdConsumed }: Service
                 </Button>
                 <Button type="submit" disabled={updateServiceFieldMutation.isPending} data-testid="button-submit-edit-service-field">
                   {updateServiceFieldMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Update
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
+// Line Item Fields Manager - Configure per-line-item field options and defaults
+function LineItemFieldsManager() {
+  const { toast } = useToast();
+  const [selectedLineItemId, setSelectedLineItemId] = useState<string>("");
+  const [isAddFieldDialogOpen, setIsAddFieldDialogOpen] = useState(false);
+  const [editingLineItemField, setEditingLineItemField] = useState<LineItemField | null>(null);
+
+  const { data: lineItems = [] } = useQuery<BundleLineItem[]>({
+    queryKey: ["/api/bundle-line-items"],
+  });
+
+  const { data: inputFieldsList = [] } = useQuery<InputField[]>({
+    queryKey: ["/api/input-fields"],
+  });
+
+  const { data: lineItemFieldsList = [], isLoading: loadingLineItemFields } = useQuery<LineItemField[]>({
+    queryKey: ["/api/line-items", selectedLineItemId, "fields"],
+    queryFn: async () => {
+      if (!selectedLineItemId) return [];
+      const res = await fetch(`/api/line-items/${selectedLineItemId}/fields`);
+      if (!res.ok) {
+        throw new Error("Failed to load line item fields");
+      }
+      return res.json();
+    },
+    enabled: !!selectedLineItemId,
+  });
+
+  const addFieldMutation = useMutation({
+    mutationFn: async (data: { inputFieldId: string; optionsJson?: string[]; defaultValue?: string; required?: boolean; sortOrder?: number; uiGroup?: string }) => {
+      return apiRequest("POST", `/api/line-items/${selectedLineItemId}/fields`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/line-items", selectedLineItemId, "fields"] });
+      setIsAddFieldDialogOpen(false);
+      toast({ title: "Field added to line item" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to add field", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateLineItemFieldMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<LineItemField> }) => {
+      return apiRequest("PATCH", `/api/line-item-fields/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/line-items", selectedLineItemId, "fields"] });
+      setEditingLineItemField(null);
+      toast({ title: "Line item field updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteLineItemFieldMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/line-item-fields/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/line-items", selectedLineItemId, "fields"] });
+      toast({ title: "Field removed from line item" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to remove", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const addFieldForm = useForm({
+    defaultValues: {
+      inputFieldId: "",
+      optionsJson: "",
+      defaultValue: "",
+      isRequired: false,
+      sortOrder: 0,
+      uiGroup: "general_info",
+    },
+  });
+
+  const editFieldForm = useForm({
+    defaultValues: {
+      optionsJson: "",
+      defaultValue: "",
+      isRequired: false,
+      sortOrder: 0,
+      uiGroup: "general_info",
+    },
+  });
+
+  useEffect(() => {
+    if (editingLineItemField) {
+      editFieldForm.reset({
+        optionsJson: editingLineItemField.optionsJson ? JSON.stringify(editingLineItemField.optionsJson) : "",
+        defaultValue: (editingLineItemField.defaultValue as string) || "",
+        isRequired: editingLineItemField.required ?? false,
+        sortOrder: editingLineItemField.sortOrder ?? 0,
+        uiGroup: editingLineItemField.uiGroup || "general_info",
+      });
+    }
+  }, [editingLineItemField, editFieldForm]);
+
+  const parseOptionsInput = (input: string): string[] | null => {
+    if (!input || !input.trim()) return null;
+    const trimmed = input.trim();
+    if (trimmed.startsWith('[')) {
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        // Fall through to comma parsing
+      }
+    }
+    return trimmed.split(',').map(s => s.trim()).filter(s => s.length > 0);
+  };
+
+  const handleAddField = (data: { inputFieldId: string; optionsJson: string; defaultValue: string; isRequired: boolean; sortOrder: number; uiGroup: string }) => {
+    addFieldMutation.mutate({
+      inputFieldId: data.inputFieldId,
+      optionsJson: parseOptionsInput(data.optionsJson) || undefined,
+      defaultValue: data.defaultValue || undefined,
+      required: data.isRequired,
+      sortOrder: data.sortOrder,
+      uiGroup: data.uiGroup,
+    });
+  };
+
+  const handleUpdateField = (data: { optionsJson: string; defaultValue: string; isRequired: boolean; sortOrder: number; uiGroup: string }) => {
+    if (!editingLineItemField) return;
+    updateLineItemFieldMutation.mutate({
+      id: editingLineItemField.id,
+      data: {
+        optionsJson: parseOptionsInput(data.optionsJson),
+        defaultValue: data.defaultValue || null,
+        required: data.isRequired,
+        sortOrder: data.sortOrder,
+        uiGroup: data.uiGroup,
+      },
+    });
+  };
+
+  const getInputFieldName = (inputFieldId: string) => {
+    const field = inputFieldsList.find(f => f.id === inputFieldId);
+    return field?.label || "Unknown Field";
+  };
+
+  const getInputFieldType = (inputFieldId: string) => {
+    const field = inputFieldsList.find(f => f.id === inputFieldId);
+    return field?.inputType || "text";
+  };
+
+  const availableFieldsToAdd = inputFieldsList.filter(
+    f => (f.assignTo === "line_item" || f.assignTo === "both") && !lineItemFieldsList.some(lf => lf.inputFieldId === f.id)
+  );
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <List className="h-5 w-5" />
+          Line Item Field Assignments
+        </CardTitle>
+        <CardDescription>
+          Configure which input fields appear on each line item, with per-line-item dropdown options and default values.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center gap-4">
+          <Label>Select Line Item:</Label>
+          <Select value={selectedLineItemId} onValueChange={setSelectedLineItemId}>
+            <SelectTrigger className="w-[300px]" data-testid="select-line-item-for-fields">
+              <SelectValue placeholder="Choose a line item..." />
+            </SelectTrigger>
+            <SelectContent>
+              {lineItems.map((item) => (
+                <SelectItem key={item.id} value={item.id}>
+                  {item.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {selectedLineItemId && (
+          <>
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-medium">Fields assigned to this line item:</h4>
+              <Dialog open={isAddFieldDialogOpen} onOpenChange={setIsAddFieldDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" disabled={availableFieldsToAdd.length === 0} data-testid="button-add-field-to-line-item">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Field
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Field to Line Item</DialogTitle>
+                    <DialogDescription>
+                      Select an input field and configure its options for this line item.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Form {...addFieldForm}>
+                    <form onSubmit={addFieldForm.handleSubmit(handleAddField)} className="space-y-4">
+                      <FormField
+                        control={addFieldForm.control}
+                        name="inputFieldId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Input Field</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-add-line-item-input-field">
+                                  <SelectValue placeholder="Choose a field..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {availableFieldsToAdd.map((f) => (
+                                  <SelectItem key={f.id} value={f.id}>
+                                    {f.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={addFieldForm.control}
+                        name="optionsJson"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Line Item-Specific Options (comma-separated)</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                placeholder="Option 1, Option 2, Option 3"
+                                {...field}
+                                data-testid="input-add-line-item-options"
+                                className="font-mono text-sm"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={addFieldForm.control}
+                        name="defaultValue"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Line Item Default Value</FormLabel>
+                            <FormControl>
+                              <Input {...field} data-testid="input-add-line-item-default" placeholder="Leave empty to use global default" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={addFieldForm.control}
+                        name="uiGroup"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Section</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-add-line-item-section">
+                                  <SelectValue placeholder="Choose section..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="general_info">General Info</SelectItem>
+                                <SelectItem value="info_details">Info Details</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={addFieldForm.control}
+                          name="sortOrder"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Sort Order</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  {...field}
+                                  onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                  data-testid="input-add-line-item-sort"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={addFieldForm.control}
+                          name="isRequired"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                              <FormLabel>Required</FormLabel>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  data-testid="switch-add-line-item-required"
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button type="button" variant="outline" onClick={() => setIsAddFieldDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" disabled={addFieldMutation.isPending} data-testid="button-submit-add-line-item-field">
+                          {addFieldMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                          Add Field
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {loadingLineItemFields ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : lineItemFieldsList.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground border rounded-md">
+                No fields assigned to this line item yet. Click "Add Field" to get started.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Field Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Section</TableHead>
+                    <TableHead>Line Item Options</TableHead>
+                    <TableHead>Default Value</TableHead>
+                    <TableHead>Required</TableHead>
+                    <TableHead>Order</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {lineItemFieldsList.map((lf) => (
+                    <TableRow key={lf.id} data-testid={`row-line-item-field-${lf.id}`}>
+                      <TableCell className="font-medium">{getInputFieldName(lf.inputFieldId)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{getInputFieldType(lf.inputFieldId)}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {lf.uiGroup === "info_details" ? "Info Details" : "General Info"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate">
+                        {lf.optionsJson ? JSON.stringify(lf.optionsJson) : "-"}
+                      </TableCell>
+                      <TableCell>{(lf.defaultValue as string) || "-"}</TableCell>
+                      <TableCell>{lf.required ? "Yes" : "No"}</TableCell>
+                      <TableCell>{lf.sortOrder}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setEditingLineItemField(lf)}
+                            data-testid={`button-edit-line-item-field-${lf.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => deleteLineItemFieldMutation.mutate(lf.id)}
+                            data-testid={`button-delete-line-item-field-${lf.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </>
+        )}
+      </CardContent>
+
+      {/* Edit Line Item Field Dialog */}
+      <Dialog open={!!editingLineItemField} onOpenChange={(open) => !open && setEditingLineItemField(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Line Item Field</DialogTitle>
+            <DialogDescription>
+              Update the line item-specific options and default value for this field.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editFieldForm}>
+            <form onSubmit={editFieldForm.handleSubmit(handleUpdateField)} className="space-y-4">
+              <FormField
+                control={editFieldForm.control}
+                name="optionsJson"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Line Item-Specific Options (comma-separated)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        data-testid="input-edit-line-item-options"
+                        className="font-mono text-sm"
+                        placeholder="Option 1, Option 2, Option 3"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editFieldForm.control}
+                name="defaultValue"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Line Item Default Value</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-edit-line-item-default" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editFieldForm.control}
+                name="uiGroup"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Section</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-line-item-section">
+                          <SelectValue placeholder="Choose section..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="general_info">General Info</SelectItem>
+                        <SelectItem value="info_details">Info Details</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editFieldForm.control}
+                  name="sortOrder"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Sort Order</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          {...field}
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                          data-testid="input-edit-line-item-sort"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editFieldForm.control}
+                  name="isRequired"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                      <FormLabel>Required</FormLabel>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-edit-line-item-required"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setEditingLineItemField(null)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateLineItemFieldMutation.isPending} data-testid="button-submit-edit-line-item-field">
+                  {updateLineItemFieldMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                   Update
                 </Button>
               </div>
@@ -3249,6 +3824,7 @@ export default function Settings() {
             <TabsContent value="input-fields">
               <InputFieldsTabContent />
               <ServiceFieldsManager initialServiceId={preselectedServiceId} onServiceIdConsumed={() => setPreselectedServiceId("")} />
+              <LineItemFieldsManager />
               <BundleFieldDefaultsManager />
             </TabsContent>
           </Tabs>
