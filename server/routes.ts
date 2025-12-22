@@ -2514,6 +2514,489 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== BUNDLE REQUEST ROUTES ====================
+
+  // Get all bundle requests (filtered by user role)
+  app.get("/api/bundle-requests", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      const { status } = req.query;
+      
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      let requests: any[] = [];
+
+      // Filter requests based on user's role hierarchy
+      if (sessionUser.role === "client") {
+        // Clients can only see their own requests
+        requests = await storage.getBundleRequestsByUser(sessionUserId);
+      } else if (["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(sessionUser.role)) {
+        // Admin, Internal Designers, Vendors, Vendor Designers can see all requests
+        if (status) {
+          requests = await storage.getBundleRequestsByStatus(status as string);
+        } else {
+          requests = await storage.getAllBundleRequests();
+        }
+      }
+
+      res.json(requests);
+    } catch (error) {
+      console.error("Error fetching bundle requests:", error);
+      res.status(500).json({ error: "Failed to fetch bundle requests" });
+    }
+  });
+
+  // Get single bundle request
+  app.get("/api/bundle-requests/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const request = await storage.getBundleRequest(req.params.id);
+      if (!request) {
+        return res.status(404).json({ error: "Bundle request not found" });
+      }
+
+      // Clients can only view their own requests
+      if (sessionUser.role === "client" && request.userId !== sessionUserId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      res.json(request);
+    } catch (error) {
+      console.error("Error fetching bundle request:", error);
+      res.status(500).json({ error: "Failed to fetch bundle request" });
+    }
+  });
+
+  // Create bundle request
+  app.post("/api/bundle-requests", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const requestData = {
+        ...req.body,
+        userId: sessionUserId,
+        dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
+      };
+      const request = await storage.createBundleRequest(requestData);
+      res.status(201).json(request);
+    } catch (error) {
+      console.error("Error creating bundle request:", error);
+      res.status(500).json({ error: "Failed to create bundle request", details: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // Update bundle request
+  app.patch("/api/bundle-requests/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const existingRequest = await storage.getBundleRequest(req.params.id);
+      if (!existingRequest) {
+        return res.status(404).json({ error: "Bundle request not found" });
+      }
+
+      // Only admins, internal_designers, or the original requester can update
+      const isAdmin = sessionUser.role === "admin";
+      const isInternalDesigner = sessionUser.role === "internal_designer";
+      const isOwner = existingRequest.userId === sessionUserId;
+      const isAssignee = existingRequest.assigneeId === sessionUserId;
+
+      if (!isAdmin && !isInternalDesigner && !isOwner && !isAssignee) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const updateData = { ...req.body };
+      if (req.body.dueDate) {
+        updateData.dueDate = new Date(req.body.dueDate);
+      }
+
+      const request = await storage.updateBundleRequest(req.params.id, updateData);
+      res.json(request);
+    } catch (error) {
+      console.error("Error updating bundle request:", error);
+      res.status(500).json({ error: "Failed to update bundle request" });
+    }
+  });
+
+  // Assign designer to bundle request
+  app.post("/api/bundle-requests/:id/assign", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      // Only admins, internal_designers, vendors, vendor_designers can assign
+      if (!["admin", "internal_designer", "vendor", "vendor_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { assigneeId } = req.body;
+      if (!assigneeId) {
+        return res.status(400).json({ error: "assigneeId is required" });
+      }
+
+      const request = await storage.assignBundleDesigner(req.params.id, assigneeId);
+      if (!request) {
+        return res.status(404).json({ error: "Bundle request not found" });
+      }
+
+      res.json(request);
+    } catch (error) {
+      console.error("Error assigning designer to bundle request:", error);
+      res.status(500).json({ error: "Failed to assign designer" });
+    }
+  });
+
+  // Deliver bundle request
+  app.post("/api/bundle-requests/:id/deliver", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const existingRequest = await storage.getBundleRequest(req.params.id);
+      if (!existingRequest) {
+        return res.status(404).json({ error: "Bundle request not found" });
+      }
+
+      // Only the assigned designer, admin, or internal_designer can deliver
+      const isAdmin = sessionUser.role === "admin";
+      const isInternalDesigner = sessionUser.role === "internal_designer";
+      const isAssignee = existingRequest.assigneeId === sessionUserId;
+
+      if (!isAdmin && !isInternalDesigner && !isAssignee) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const request = await storage.deliverBundleRequest(req.params.id, sessionUserId);
+      res.json(request);
+    } catch (error) {
+      console.error("Error delivering bundle request:", error);
+      res.status(500).json({ error: "Failed to deliver bundle request" });
+    }
+  });
+
+  // Request change on bundle request
+  app.post("/api/bundle-requests/:id/change-request", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const existingRequest = await storage.getBundleRequest(req.params.id);
+      if (!existingRequest) {
+        return res.status(404).json({ error: "Bundle request not found" });
+      }
+
+      // Clients can only request changes on their own requests
+      if (sessionUser.role === "client" && existingRequest.userId !== sessionUserId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { changeNote } = req.body;
+      if (!changeNote) {
+        return res.status(400).json({ error: "changeNote is required" });
+      }
+
+      const request = await storage.requestBundleChange(req.params.id, changeNote);
+      res.json(request);
+    } catch (error) {
+      console.error("Error requesting change on bundle request:", error);
+      res.status(500).json({ error: "Failed to request change" });
+    }
+  });
+
+  // Get bundle request attachments
+  app.get("/api/bundle-requests/:id/attachments", async (req, res) => {
+    try {
+      const attachments = await storage.getBundleRequestAttachments(req.params.id);
+      res.json(attachments);
+    } catch (error) {
+      console.error("Error fetching bundle request attachments:", error);
+      res.status(500).json({ error: "Failed to fetch attachments" });
+    }
+  });
+
+  // Create bundle request attachment
+  app.post("/api/bundle-requests/:id/attachments", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const attachment = await storage.createBundleRequestAttachment({
+        ...req.body,
+        requestId: req.params.id,
+        uploadedBy: sessionUserId,
+      });
+      res.status(201).json(attachment);
+    } catch (error) {
+      console.error("Error creating bundle request attachment:", error);
+      res.status(500).json({ error: "Failed to create attachment" });
+    }
+  });
+
+  // Get bundle request comments
+  app.get("/api/bundle-requests/:id/comments", async (req, res) => {
+    try {
+      const comments = await storage.getBundleRequestComments(req.params.id);
+      res.json(comments);
+    } catch (error) {
+      console.error("Error fetching bundle request comments:", error);
+      res.status(500).json({ error: "Failed to fetch comments" });
+    }
+  });
+
+  // Create bundle request comment
+  app.post("/api/bundle-requests/:id/comments", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const comment = await storage.createBundleRequestComment({
+        ...req.body,
+        requestId: req.params.id,
+        authorId: sessionUserId,
+      });
+      res.status(201).json(comment);
+    } catch (error) {
+      console.error("Error creating bundle request comment:", error);
+      res.status(500).json({ error: "Failed to create comment" });
+    }
+  });
+
+  // Get bundle form structure for a specific bundle (for client form)
+  // This returns the bundle, its services, and the service fields (excluding those with defaults)
+  app.get("/api/bundles/:id/form-structure", async (req, res) => {
+    try {
+      const bundle = await storage.getBundle(req.params.id);
+      if (!bundle) {
+        return res.status(404).json({ error: "Bundle not found" });
+      }
+
+      // Get bundle items (services in this bundle)
+      const bundleItems = await storage.getBundleItems(req.params.id);
+
+      // Get bundle field defaults
+      const bundleFieldDefaults = await storage.getBundleFieldDefaults(req.params.id);
+
+      // For each service in the bundle, get its fields
+      const servicesWithFields = await Promise.all(
+        bundleItems.map(async (item) => {
+          if (!item.serviceId) return null;
+          const service = await storage.getService(item.serviceId);
+          if (!service) return null;
+
+          const serviceFields = await storage.getServiceFields(item.serviceId);
+          
+          // Enrich each field with input field details
+          const enrichedFields = await Promise.all(
+            serviceFields.map(async (sf) => {
+              const inputField = await storage.getInputField(sf.inputFieldId);
+              // Check if this field has a bundle default (matches by serviceId + inputFieldId)
+              const hasDefault = bundleFieldDefaults.some(
+                (d) => d.serviceId === item.serviceId && d.inputFieldId === sf.inputFieldId
+              );
+              return {
+                ...sf,
+                inputField,
+                hasDefault,
+              };
+            })
+          );
+
+          // Only return fields without defaults for client form
+          const fieldsWithoutDefaults = enrichedFields.filter((f) => !f.hasDefault);
+
+          return {
+            bundleItemId: item.id,
+            serviceId: item.serviceId,
+            service,
+            fields: fieldsWithoutDefaults,
+            allFields: enrichedFields,
+          };
+        })
+      );
+
+      res.json({
+        bundle,
+        services: servicesWithFields.filter(Boolean),
+      });
+    } catch (error) {
+      console.error("Error fetching bundle form structure:", error);
+      res.status(500).json({ error: "Failed to fetch bundle form structure" });
+    }
+  });
+
+  // Get full bundle request detail (for admin/designer view)
+  // This includes all fields with defaults, line item fields, etc.
+  app.get("/api/bundle-requests/:id/full-detail", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      // Only admins, internal_designers, vendors, vendor_designers can see full detail
+      if (!["admin", "internal_designer", "vendor", "vendor_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const request = await storage.getBundleRequest(req.params.id);
+      if (!request) {
+        return res.status(404).json({ error: "Bundle request not found" });
+      }
+
+      const bundle = await storage.getBundle(request.bundleId);
+      if (!bundle) {
+        return res.status(404).json({ error: "Bundle not found" });
+      }
+
+      // Get bundle items
+      const bundleItems = await storage.getBundleItems(request.bundleId);
+
+      // Get bundle field defaults
+      const bundleFieldDefaults = await storage.getBundleFieldDefaults(request.bundleId);
+
+      // Get all line items
+      const allLineItems = await storage.getAllBundleLineItems();
+
+      // For each service in the bundle, get its fields and line item fields
+      const servicesWithFields = await Promise.all(
+        bundleItems.map(async (item) => {
+          if (!item.serviceId) return null;
+          const service = await storage.getService(item.serviceId);
+          if (!service) return null;
+
+          const serviceFields = await storage.getServiceFields(item.serviceId);
+
+          // Enrich each field with input field details and default values
+          const enrichedFields = await Promise.all(
+            serviceFields.map(async (sf) => {
+              const inputField = await storage.getInputField(sf.inputFieldId);
+              const defaultRecord = bundleFieldDefaults.find(
+                (d) => d.serviceId === item.serviceId && d.inputFieldId === sf.inputFieldId
+              );
+              // Get value from formData if provided, otherwise use default
+              const formData = request.formData as Record<string, any> | null;
+              const formValue = formData?.[`${item.serviceId}_${sf.id}`];
+              return {
+                ...sf,
+                inputField,
+                defaultValue: defaultRecord?.defaultValue,
+                value: formValue ?? defaultRecord?.defaultValue,
+              };
+            })
+          );
+
+          // Get line item fields for this service
+          const lineItemFieldsForService = await Promise.all(
+            allLineItems.map(async (li) => {
+              const liFields = await storage.getLineItemFields(li.id);
+              // Filter to fields that apply to this service (via service linking or bundle scope)
+              const relevantFields = await Promise.all(
+                liFields.map(async (lif) => {
+                  const inputField = await storage.getInputField(lif.inputFieldId);
+                  const lineItemData = request.lineItemData as Record<string, any> | null;
+                  const value = lineItemData?.[`${item.serviceId}_${li.id}_${lif.id}`];
+                  return {
+                    ...lif,
+                    inputField,
+                    lineItem: li,
+                    value,
+                  };
+                })
+              );
+              return relevantFields;
+            })
+          );
+
+          return {
+            bundleItemId: item.id,
+            serviceId: item.serviceId,
+            service,
+            fields: enrichedFields,
+            lineItemFields: lineItemFieldsForService.flat(),
+          };
+        })
+      );
+
+      // Get attachments and comments
+      const attachments = await storage.getBundleRequestAttachments(req.params.id);
+      const comments = await storage.getBundleRequestComments(req.params.id);
+
+      // Get user info
+      const requester = await storage.getUser(request.userId);
+      const assignee = request.assigneeId ? await storage.getUser(request.assigneeId) : null;
+
+      res.json({
+        request,
+        bundle,
+        services: servicesWithFields.filter(Boolean),
+        attachments,
+        comments,
+        requester,
+        assignee,
+      });
+    } catch (error) {
+      console.error("Error fetching bundle request full detail:", error);
+      res.status(500).json({ error: "Failed to fetch bundle request detail" });
+    }
+  });
+
   // ==================== SEED INPUT FIELDS ROUTE ====================
 
   // Seed input fields from existing service forms (admin only, one-time use)

@@ -315,6 +315,58 @@ export const bundleFieldDefaults = pgTable("bundle_field_defaults", {
 
 // ==================== END PHASE 3 TABLES ====================
 
+// ==================== PHASE 4: BUNDLE REQUESTS ====================
+
+// Bundle request status workflow
+export const bundleRequestStatuses = ["pending", "in-progress", "delivered", "change-request"] as const;
+export type BundleRequestStatus = typeof bundleRequestStatuses[number];
+
+// Bundle requests - tracks client submissions for bundles
+export const bundleRequests = pgTable("bundle_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  bundleId: varchar("bundle_id").notNull().references(() => bundles.id),
+  assigneeId: varchar("assignee_id").references(() => users.id),
+  status: text("status").notNull().default("pending"),
+  // Client input values for service fields (keyed by serviceId + inputFieldId)
+  formData: jsonb("form_data"),
+  // Designer input values for line item fields (keyed by lineItemId + inputFieldId)
+  lineItemData: jsonb("line_item_data"),
+  notes: text("notes"),
+  dueDate: timestamp("due_date"),
+  deliveredAt: timestamp("delivered_at"),
+  deliveredBy: varchar("delivered_by").references(() => users.id),
+  changeRequestNote: text("change_request_note"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Bundle request attachments - files associated with bundle requests
+export const bundleRequestAttachments = pgTable("bundle_request_attachments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  requestId: varchar("request_id").notNull().references(() => bundleRequests.id, { onDelete: "cascade" }),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileType: text("file_type"),
+  kind: text("kind").notNull().default("request"), // request, delivery
+  uploadedBy: varchar("uploaded_by").references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+});
+
+// Bundle request comments - discussion threads on bundle requests
+export const bundleRequestComments = pgTable("bundle_request_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  requestId: varchar("request_id").notNull().references(() => bundleRequests.id, { onDelete: "cascade" }),
+  authorId: varchar("author_id").notNull().references(() => users.id),
+  body: text("body").notNull(),
+  visibility: text("visibility").notNull().default("public"),
+  parentId: varchar("parent_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ==================== END PHASE 4 TABLES ====================
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -463,6 +515,31 @@ export const insertVendorPackCostSchema = createInsertSchema(vendorPackCosts).om
   updatedAt: true,
 });
 
+// Phase 4: Bundle Request schemas
+export const insertBundleRequestSchema = createInsertSchema(bundleRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  deliveredAt: true,
+  deliveredBy: true,
+});
+
+export const updateBundleRequestSchema = createInsertSchema(bundleRequests).partial().omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertBundleRequestAttachmentSchema = createInsertSchema(bundleRequestAttachments).omit({
+  id: true,
+  uploadedAt: true,
+});
+
+export const insertBundleRequestCommentSchema = createInsertSchema(bundleRequestComments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type VendorProfile = typeof vendorProfiles.$inferSelect;
@@ -513,6 +590,15 @@ export type VendorBundleCost = typeof vendorBundleCosts.$inferSelect;
 export type InsertVendorBundleCost = z.infer<typeof insertVendorBundleCostSchema>;
 export type VendorPackCost = typeof vendorPackCosts.$inferSelect;
 export type InsertVendorPackCost = z.infer<typeof insertVendorPackCostSchema>;
+
+// Phase 4: Bundle Request types
+export type BundleRequest = typeof bundleRequests.$inferSelect;
+export type InsertBundleRequest = z.infer<typeof insertBundleRequestSchema>;
+export type UpdateBundleRequest = z.infer<typeof updateBundleRequestSchema>;
+export type BundleRequestAttachment = typeof bundleRequestAttachments.$inferSelect;
+export type InsertBundleRequestAttachment = z.infer<typeof insertBundleRequestAttachmentSchema>;
+export type BundleRequestComment = typeof bundleRequestComments.$inferSelect;
+export type InsertBundleRequestComment = z.infer<typeof insertBundleRequestCommentSchema>;
 
 // Helper type for dropdown options
 export type FieldOption = {

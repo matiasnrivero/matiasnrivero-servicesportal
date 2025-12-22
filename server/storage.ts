@@ -46,6 +46,13 @@ import {
   type InsertVendorBundleCost,
   type VendorPackCost,
   type InsertVendorPackCost,
+  type BundleRequest,
+  type InsertBundleRequest,
+  type UpdateBundleRequest,
+  type BundleRequestAttachment,
+  type InsertBundleRequestAttachment,
+  type BundleRequestComment,
+  type InsertBundleRequestComment,
   users,
   services,
   servicePricingTiers,
@@ -65,6 +72,9 @@ import {
   bundleFieldDefaults,
   vendorBundleCosts,
   vendorPackCosts,
+  bundleRequests,
+  bundleRequestAttachments,
+  bundleRequestComments,
 } from "@shared/schema";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -197,6 +207,26 @@ export interface IStorage {
   getVendorPackCosts(vendorId: string): Promise<VendorPackCost[]>;
   getVendorPackCost(vendorId: string, packId: string): Promise<VendorPackCost | undefined>;
   upsertVendorPackCost(vendorId: string, packId: string, cost: string): Promise<VendorPackCost>;
+
+  // Bundle Request methods
+  getAllBundleRequests(): Promise<BundleRequest[]>;
+  getBundleRequest(id: string): Promise<BundleRequest | undefined>;
+  getBundleRequestsByUser(userId: string): Promise<BundleRequest[]>;
+  getBundleRequestsByAssignee(assigneeId: string): Promise<BundleRequest[]>;
+  getBundleRequestsByStatus(status: string): Promise<BundleRequest[]>;
+  createBundleRequest(request: InsertBundleRequest): Promise<BundleRequest>;
+  updateBundleRequest(id: string, request: UpdateBundleRequest): Promise<BundleRequest | undefined>;
+  assignBundleDesigner(requestId: string, assigneeId: string): Promise<BundleRequest | undefined>;
+  deliverBundleRequest(requestId: string, deliveredBy: string): Promise<BundleRequest | undefined>;
+  requestBundleChange(requestId: string, changeNote: string): Promise<BundleRequest | undefined>;
+
+  // Bundle Request Attachment methods
+  getBundleRequestAttachments(requestId: string): Promise<BundleRequestAttachment[]>;
+  createBundleRequestAttachment(attachment: InsertBundleRequestAttachment): Promise<BundleRequestAttachment>;
+
+  // Bundle Request Comment methods
+  getBundleRequestComments(requestId: string): Promise<BundleRequestComment[]>;
+  createBundleRequestComment(comment: InsertBundleRequestComment): Promise<BundleRequestComment>;
 }
 
 export class DbStorage implements IStorage {
@@ -792,6 +822,104 @@ export class DbStorage implements IStorage {
         .returning();
       return result[0];
     }
+  }
+
+  // Bundle Request methods
+  async getAllBundleRequests(): Promise<BundleRequest[]> {
+    return await db.select().from(bundleRequests).orderBy(bundleRequests.createdAt);
+  }
+
+  async getBundleRequest(id: string): Promise<BundleRequest | undefined> {
+    const result = await db.select().from(bundleRequests).where(eq(bundleRequests.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getBundleRequestsByUser(userId: string): Promise<BundleRequest[]> {
+    return await db.select().from(bundleRequests)
+      .where(eq(bundleRequests.userId, userId))
+      .orderBy(bundleRequests.createdAt);
+  }
+
+  async getBundleRequestsByAssignee(assigneeId: string): Promise<BundleRequest[]> {
+    return await db.select().from(bundleRequests)
+      .where(eq(bundleRequests.assigneeId, assigneeId))
+      .orderBy(bundleRequests.createdAt);
+  }
+
+  async getBundleRequestsByStatus(status: string): Promise<BundleRequest[]> {
+    return await db.select().from(bundleRequests)
+      .where(eq(bundleRequests.status, status))
+      .orderBy(bundleRequests.createdAt);
+  }
+
+  async createBundleRequest(request: InsertBundleRequest): Promise<BundleRequest> {
+    const result = await db.insert(bundleRequests).values(request).returning();
+    return result[0];
+  }
+
+  async updateBundleRequest(id: string, request: UpdateBundleRequest): Promise<BundleRequest | undefined> {
+    const result = await db.update(bundleRequests)
+      .set({ ...request, updatedAt: new Date() })
+      .where(eq(bundleRequests.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async assignBundleDesigner(requestId: string, assigneeId: string): Promise<BundleRequest | undefined> {
+    const result = await db.update(bundleRequests)
+      .set({ assigneeId, status: "in-progress", updatedAt: new Date() })
+      .where(eq(bundleRequests.id, requestId))
+      .returning();
+    return result[0];
+  }
+
+  async deliverBundleRequest(requestId: string, deliveredBy: string): Promise<BundleRequest | undefined> {
+    const result = await db.update(bundleRequests)
+      .set({
+        status: "delivered",
+        deliveredAt: new Date(),
+        deliveredBy,
+        updatedAt: new Date()
+      })
+      .where(eq(bundleRequests.id, requestId))
+      .returning();
+    return result[0];
+  }
+
+  async requestBundleChange(requestId: string, changeNote: string): Promise<BundleRequest | undefined> {
+    const result = await db.update(bundleRequests)
+      .set({
+        status: "change-request",
+        changeRequestNote: changeNote,
+        updatedAt: new Date()
+      })
+      .where(eq(bundleRequests.id, requestId))
+      .returning();
+    return result[0];
+  }
+
+  // Bundle Request Attachment methods
+  async getBundleRequestAttachments(requestId: string): Promise<BundleRequestAttachment[]> {
+    return await db.select().from(bundleRequestAttachments)
+      .where(eq(bundleRequestAttachments.requestId, requestId))
+      .orderBy(bundleRequestAttachments.uploadedAt);
+  }
+
+  async createBundleRequestAttachment(attachment: InsertBundleRequestAttachment): Promise<BundleRequestAttachment> {
+    const result = await db.insert(bundleRequestAttachments).values(attachment).returning();
+    return result[0];
+  }
+
+  // Bundle Request Comment methods
+  async getBundleRequestComments(requestId: string): Promise<BundleRequestComment[]> {
+    return await db.select().from(bundleRequestComments)
+      .where(eq(bundleRequestComments.requestId, requestId))
+      .orderBy(bundleRequestComments.createdAt);
+  }
+
+  async createBundleRequestComment(comment: InsertBundleRequestComment): Promise<BundleRequestComment> {
+    const result = await db.insert(bundleRequestComments).values(comment).returning();
+    return result[0];
   }
 }
 

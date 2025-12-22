@@ -16,6 +16,8 @@ import VendorDetail from "@/pages/VendorDetail";
 import Settings from "@/pages/Settings";
 import BundleEditor from "@/pages/BundleEditor";
 import PackEditor from "@/pages/PackEditor";
+import BundleRequestForm from "@/pages/BundleRequestForm";
+import BundleRequestDetail from "@/pages/BundleRequestDetail";
 
 function Router() {
   return (
@@ -34,6 +36,8 @@ function Router() {
       <Route path="/settings/bundles/:id/edit" component={BundleEditor} />
       <Route path="/settings/packs/new" component={PackEditor} />
       <Route path="/settings/packs/:id/edit" component={PackEditor} />
+      <Route path="/bundle-request/:bundleId" component={BundleRequestForm} />
+      <Route path="/bundle-requests/:id" component={BundleRequestDetail} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>
