@@ -246,6 +246,10 @@ export type InputFieldType = typeof inputFieldTypes[number];
 export const valueModes = ["single", "multiple"] as const;
 export type ValueMode = typeof valueModes[number];
 
+// Assign to modes for input fields - determines where field can be used
+export const assignToModes = ["service", "line_item", "both"] as const;
+export type AssignToMode = typeof assignToModes[number];
+
 // Input fields - global reusable field definitions
 export const inputFields = pgTable("input_fields", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -254,6 +258,7 @@ export const inputFields = pgTable("input_fields", {
   description: text("description"),
   inputType: text("input_type").notNull(),
   valueMode: text("value_mode").notNull().default("single"),
+  assignTo: text("assign_to").notNull().default("service"),
   validation: jsonb("validation"),
   globalDefaultValue: jsonb("global_default_value"),
   isActive: boolean("is_active").notNull().default(true),
@@ -266,6 +271,24 @@ export const inputFields = pgTable("input_fields", {
 export const serviceFields = pgTable("service_fields", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   serviceId: varchar("service_id").notNull().references(() => services.id, { onDelete: "cascade" }),
+  inputFieldId: varchar("input_field_id").notNull().references(() => inputFields.id, { onDelete: "cascade" }),
+  required: boolean("required").notNull().default(false),
+  displayLabelOverride: text("display_label_override"),
+  helpTextOverride: text("help_text_override"),
+  placeholderOverride: text("placeholder_override"),
+  valueModeOverride: text("value_mode_override"),
+  optionsJson: jsonb("options_json"),
+  defaultValue: jsonb("default_value"),
+  uiGroup: text("ui_group"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Line item fields - join table linking input fields to line items with per-line-item configuration
+export const lineItemFields = pgTable("line_item_fields", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  lineItemId: varchar("line_item_id").notNull().references(() => bundleLineItems.id, { onDelete: "cascade" }),
   inputFieldId: varchar("input_field_id").notNull().references(() => inputFields.id, { onDelete: "cascade" }),
   required: boolean("required").notNull().default(false),
   displayLabelOverride: text("display_label_override"),
@@ -412,6 +435,16 @@ export const updateServiceFieldSchema = createInsertSchema(serviceFields).partia
   createdAt: true,
 });
 
+export const insertLineItemFieldSchema = createInsertSchema(lineItemFields).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const updateLineItemFieldSchema = createInsertSchema(lineItemFields).partial().omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertBundleFieldDefaultSchema = createInsertSchema(bundleFieldDefaults).omit({
   id: true,
   createdAt: true,
@@ -471,6 +504,9 @@ export type UpdateInputField = z.infer<typeof updateInputFieldSchema>;
 export type ServiceField = typeof serviceFields.$inferSelect;
 export type InsertServiceField = z.infer<typeof insertServiceFieldSchema>;
 export type UpdateServiceField = z.infer<typeof updateServiceFieldSchema>;
+export type LineItemField = typeof lineItemFields.$inferSelect;
+export type InsertLineItemField = z.infer<typeof insertLineItemFieldSchema>;
+export type UpdateLineItemField = z.infer<typeof updateLineItemFieldSchema>;
 export type BundleFieldDefault = typeof bundleFieldDefaults.$inferSelect;
 export type InsertBundleFieldDefault = z.infer<typeof insertBundleFieldDefaultSchema>;
 export type VendorBundleCost = typeof vendorBundleCosts.$inferSelect;

@@ -2237,6 +2237,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== LINE ITEM FIELDS ROUTES ====================
+
+  // Get line item fields for a line item (admin only)
+  app.get("/api/line-items/:lineItemId/fields", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const fields = await storage.getLineItemFields(req.params.lineItemId);
+      res.json(fields);
+    } catch (error) {
+      console.error("Error fetching line item fields:", error);
+      res.status(500).json({ error: "Failed to fetch line item fields" });
+    }
+  });
+
+  // Add field to line item (admin only)
+  app.post("/api/line-items/:lineItemId/fields", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const field = await storage.createLineItemField({ ...req.body, lineItemId: req.params.lineItemId });
+      res.status(201).json(field);
+    } catch (error) {
+      console.error("Error creating line item field:", error);
+      res.status(500).json({ error: "Failed to create line item field" });
+    }
+  });
+
+  // Update line item field (admin only)
+  app.patch("/api/line-item-fields/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const field = await storage.updateLineItemField(req.params.id, req.body);
+      if (!field) {
+        return res.status(404).json({ error: "Line item field not found" });
+      }
+      res.json(field);
+    } catch (error) {
+      console.error("Error updating line item field:", error);
+      res.status(500).json({ error: "Failed to update line item field" });
+    }
+  });
+
+  // Delete line item field (admin only)
+  app.delete("/api/line-item-fields/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      await storage.deleteLineItemField(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting line item field:", error);
+      res.status(500).json({ error: "Failed to delete line item field" });
+    }
+  });
+
+  // Get line item field usage by input field (admin only)
+  app.get("/api/input-fields/:id/line-item-usage", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const lineItemFieldsList = await storage.getLineItemFieldsByInputField(req.params.id);
+      const allLineItems = await storage.getAllBundleLineItems();
+      const usage = await Promise.all(lineItemFieldsList.map(async (lif) => {
+        const lineItem = allLineItems.find(li => li.id === lif.lineItemId);
+        return {
+          lineItemFieldId: lif.id,
+          lineItemId: lif.lineItemId,
+          lineItemName: lineItem?.name || "Unknown",
+          required: lif.required,
+          optionsJson: lif.optionsJson,
+          defaultValue: lif.defaultValue,
+        };
+      }));
+      res.json(usage);
+    } catch (error) {
+      console.error("Error fetching input field line item usage:", error);
+      res.status(500).json({ error: "Failed to fetch input field line item usage" });
+    }
+  });
+
   // ==================== BUNDLE FIELD DEFAULTS ROUTES ====================
 
   // Get bundle field defaults (admin only)

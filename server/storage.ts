@@ -37,6 +37,9 @@ import {
   type ServiceField,
   type InsertServiceField,
   type UpdateServiceField,
+  type LineItemField,
+  type InsertLineItemField,
+  type UpdateLineItemField,
   type BundleFieldDefault,
   type InsertBundleFieldDefault,
   type VendorBundleCost,
@@ -58,6 +61,7 @@ import {
   servicePackItems,
   inputFields,
   serviceFields,
+  lineItemFields,
   bundleFieldDefaults,
   vendorBundleCosts,
   vendorPackCosts,
@@ -168,6 +172,14 @@ export interface IStorage {
   createServiceField(data: InsertServiceField): Promise<ServiceField>;
   updateServiceField(id: string, data: UpdateServiceField): Promise<ServiceField | undefined>;
   deleteServiceField(id: string): Promise<void>;
+
+  // Line Item Field methods
+  getLineItemFields(lineItemId: string): Promise<LineItemField[]>;
+  getLineItemField(id: string): Promise<LineItemField | undefined>;
+  getLineItemFieldsByInputField(inputFieldId: string): Promise<LineItemField[]>;
+  createLineItemField(data: InsertLineItemField): Promise<LineItemField>;
+  updateLineItemField(id: string, data: UpdateLineItemField): Promise<LineItemField | undefined>;
+  deleteLineItemField(id: string): Promise<void>;
 
   // Bundle Field Default methods
   getBundleFieldDefaults(bundleId: string): Promise<BundleFieldDefault[]>;
@@ -620,6 +632,7 @@ export class DbStorage implements IStorage {
 
   async deleteInputField(id: string): Promise<void> {
     await db.delete(serviceFields).where(eq(serviceFields.inputFieldId, id));
+    await db.delete(lineItemFields).where(eq(lineItemFields.inputFieldId, id));
     await db.delete(inputFields).where(eq(inputFields.id, id));
   }
 
@@ -654,6 +667,39 @@ export class DbStorage implements IStorage {
 
   async deleteServiceField(id: string): Promise<void> {
     await db.delete(serviceFields).where(eq(serviceFields.id, id));
+  }
+
+  // Line Item Field methods
+  async getLineItemFields(lineItemId: string): Promise<LineItemField[]> {
+    return await db.select().from(lineItemFields)
+      .where(eq(lineItemFields.lineItemId, lineItemId))
+      .orderBy(lineItemFields.sortOrder);
+  }
+
+  async getLineItemField(id: string): Promise<LineItemField | undefined> {
+    const result = await db.select().from(lineItemFields).where(eq(lineItemFields.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getLineItemFieldsByInputField(inputFieldId: string): Promise<LineItemField[]> {
+    return await db.select().from(lineItemFields).where(eq(lineItemFields.inputFieldId, inputFieldId));
+  }
+
+  async createLineItemField(data: InsertLineItemField): Promise<LineItemField> {
+    const result = await db.insert(lineItemFields).values(data).returning();
+    return result[0];
+  }
+
+  async updateLineItemField(id: string, data: UpdateLineItemField): Promise<LineItemField | undefined> {
+    const result = await db.update(lineItemFields)
+      .set(data)
+      .where(eq(lineItemFields.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteLineItemField(id: string): Promise<void> {
+    await db.delete(lineItemFields).where(eq(lineItemFields.id, id));
   }
 
   // Bundle Field Default methods
