@@ -2882,11 +2882,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             })
           );
 
-          // Filter out fields where showOnBundleForm is false
-          // These fields should only appear in the bundle header, not in each service section
+          // Filter out fields where:
+          // 1. showOnBundleForm is false (field should only appear in bundle header)
+          // 2. defaultValue is set (field has a preset value and doesn't need user input)
           const filteredFields = enrichedFields.filter((f) => {
             if (!f.inputField) return true;
-            return f.inputField.showOnBundleForm !== false;
+            // Hide if showOnBundleForm is explicitly false
+            if (f.inputField.showOnBundleForm === false) return false;
+            // Hide if this service field has a default value configured
+            if (f.defaultValue && typeof f.defaultValue === "string" && f.defaultValue.trim() !== "") return false;
+            return true;
           });
 
           return {
