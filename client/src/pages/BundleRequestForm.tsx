@@ -348,16 +348,27 @@ export default function BundleRequestForm() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="mb-6">
-          <Link href="/">
-            <Button variant="ghost" size="sm" data-testid="button-back">
-              <ArrowLeft className="w-4 h-4 mr-2" />
+      
+      {/* Topbar - matching ad-hoc service form style */}
+      <div className="bg-gradient-to-r from-dark-blue-night to-space-cadet px-8 py-4">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+          <Link href="/?tab=bundles">
+            <Button variant="outline" className="bg-white hover:bg-gray-100" data-testid="button-back">
+              <ArrowLeft className="h-4 w-4 mr-1" />
               Back
             </Button>
           </Link>
+          <Button
+            onClick={handleSubmit}
+            disabled={createMutation.isPending}
+            data-testid="button-submit-top"
+          >
+            {createMutation.isPending ? "Saving..." : "Save"}
+          </Button>
         </div>
+      </div>
 
+      <div className="max-w-4xl mx-auto px-4 py-8">
         <Card className="mb-6">
           <CardHeader className="flex flex-row items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
@@ -514,7 +525,7 @@ export default function BundleRequestForm() {
         <Separator className="my-6" />
 
         <div className="flex justify-end gap-4">
-          <Link href="/">
+          <Link href="/?tab=bundles">
             <Button variant="outline" data-testid="button-cancel">
               Cancel
             </Button>
