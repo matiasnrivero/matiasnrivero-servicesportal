@@ -6,13 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/Header";
 import { DynamicFormField, type ServiceFieldWithInput } from "@/components/DynamicFormField";
 import { FileUploader } from "@/components/FileUploader";
-import { ArrowLeft, Package, Loader2 } from "lucide-react";
+import { ArrowLeft, Package, Loader2, User, ClipboardList } from "lucide-react";
 import { Link } from "wouter";
-import type { Bundle, Service, InputField, ServiceField, InsertBundleRequest } from "@shared/schema";
+import type { Bundle, Service, InputField, ServiceField, BundleField, InsertBundleRequest, User as UserType } from "@shared/schema";
 
 interface EnrichedServiceField extends ServiceField {
   inputField: InputField | null;
@@ -27,8 +29,13 @@ interface ServiceWithFields {
   allFields: EnrichedServiceField[];
 }
 
+interface EnrichedBundleField extends BundleField {
+  inputField: InputField | null;
+}
+
 interface BundleFormStructure {
   bundle: Bundle;
+  bundleFields: EnrichedBundleField[];
   services: ServiceWithFields[];
 }
 
@@ -74,6 +81,8 @@ export default function BundleRequestForm() {
   const { toast } = useToast();
 
   const [formData, setFormData] = useState<Record<string, any>>({});
+  const [bundleHeaderData, setBundleHeaderData] = useState<Record<string, any>>({});
+  const [selectedAssignee, setSelectedAssignee] = useState<string>("");
   const [notes, setNotes] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<Array<{ url: string; fileName: string }>>([]);
 
@@ -86,6 +95,20 @@ export default function BundleRequestForm() {
   const { data: currentUser } = useQuery<CurrentUser>({
     queryKey: ["/api/default-user"],
     queryFn: getDefaultUser,
+  });
+
+  // Fetch designers that can be assigned to the bundle request
+  const { data: designers } = useQuery<UserType[]>({
+    queryKey: ["/api/users", "designers"],
+    queryFn: async () => {
+      // Fetch users who can be assigned: admin, internal_designer, vendor_designer
+      const [admins, internalDesigners, vendorDesigners] = await Promise.all([
+        fetch("/api/users?role=admin").then(r => r.json()),
+        fetch("/api/users?role=internal_designer").then(r => r.json()),
+        fetch("/api/users?role=vendor_designer").then(r => r.json()),
+      ]);
+      return [...admins, ...internalDesigners, ...vendorDesigners].filter((u: UserType) => u.isActive);
+    },
   });
 
   const createMutation = useMutation({
@@ -134,6 +157,13 @@ export default function BundleRequestForm() {
     }));
   };
 
+  const handleBundleHeaderFieldChange = (fieldId: string, value: any) => {
+    setBundleHeaderData((prev) => ({
+      ...prev,
+      [`bundle_${fieldId}`]: value,
+    }));
+  };
+
   const handleFileUpload = (url: string, fileName: string) => {
     setUploadedFiles((prev) => [...prev, { url, fileName }]);
   };
@@ -145,10 +175,14 @@ export default function BundleRequestForm() {
   const handleSubmit = () => {
     if (!bundleId) return;
 
+    // Merge bundle header data with service form data
+    const combinedFormData = { ...formData, ...bundleHeaderData };
+
     const requestData = {
       bundleId,
-      formData,
+      formData: combinedFormData,
       notes: notes || null,
+      assigneeId: selectedAssignee || null,
     };
 
     createMutation.mutate(requestData as InsertBundleRequest);
@@ -187,8 +221,127 @@ export default function BundleRequestForm() {
     );
   }
 
-  const { bundle, services } = bundleStructure;
+  const { bundle, bundleFields, services } = bundleStructure;
   const servicesWithFields = services.filter((s) => s.fields.length > 0);
+
+  // Helper to render bundle header field input
+  const renderBundleHeaderField = (bf: EnrichedBundleField) => {
+    if (!bf.inputField) return null;
+    const inputField = bf.inputField;
+    const fieldKey = `bundle_${bf.id}`;
+    const value = bundleHeaderData[fieldKey] ?? bf.defaultValue ?? "";
+
+    // Use description from inputField as fallback help text
+    const helpText = bf.helpTextOverride || inputField.description || "";
+    const placeholder = bf.placeholderOverride || "";
+
+    switch (inputField.inputType) {
+      case "text":
+        return (
+          <div key={bf.id} className="space-y-2">
+            <Label htmlFor={fieldKey}>
+              {bf.displayLabelOverride || inputField.label}
+              {bf.required && <span className="text-destructive ml-1">*</span>}
+            </Label>
+            <Input
+              id={fieldKey}
+              placeholder={placeholder}
+              value={value}
+              onChange={(e) => handleBundleHeaderFieldChange(bf.id, e.target.value)}
+              data-testid={`input-bundle-${inputField.fieldKey}`}
+            />
+            {helpText && (
+              <p className="text-xs text-muted-foreground">{helpText}</p>
+            )}
+          </div>
+        );
+      case "date":
+        return (
+          <div key={bf.id} className="space-y-2">
+            <Label htmlFor={fieldKey}>
+              {bf.displayLabelOverride || inputField.label}
+              {bf.required && <span className="text-destructive ml-1">*</span>}
+            </Label>
+            <Input
+              id={fieldKey}
+              type="date"
+              value={value}
+              onChange={(e) => handleBundleHeaderFieldChange(bf.id, e.target.value)}
+              data-testid={`input-bundle-${inputField.fieldKey}`}
+            />
+            {helpText && (
+              <p className="text-xs text-muted-foreground">{helpText}</p>
+            )}
+          </div>
+        );
+      case "textarea":
+        return (
+          <div key={bf.id} className="space-y-2">
+            <Label htmlFor={fieldKey}>
+              {bf.displayLabelOverride || inputField.label}
+              {bf.required && <span className="text-destructive ml-1">*</span>}
+            </Label>
+            <Textarea
+              id={fieldKey}
+              placeholder={placeholder}
+              value={value}
+              onChange={(e) => handleBundleHeaderFieldChange(bf.id, e.target.value)}
+              rows={3}
+              data-testid={`input-bundle-${inputField.fieldKey}`}
+            />
+            {helpText && (
+              <p className="text-xs text-muted-foreground">{helpText}</p>
+            )}
+          </div>
+        );
+      case "dropdown":
+        const options = bf.optionsJson || [];
+        return (
+          <div key={bf.id} className="space-y-2">
+            <Label>
+              {bf.displayLabelOverride || inputField.label}
+              {bf.required && <span className="text-destructive ml-1">*</span>}
+            </Label>
+            <Select
+              value={value}
+              onValueChange={(v) => handleBundleHeaderFieldChange(bf.id, v)}
+            >
+              <SelectTrigger data-testid={`select-bundle-${inputField.fieldKey}`}>
+                <SelectValue placeholder={`Select ${inputField.label}`} />
+              </SelectTrigger>
+              <SelectContent>
+                {(Array.isArray(options) ? options : []).map((opt: string) => (
+                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {helpText && (
+              <p className="text-xs text-muted-foreground">{helpText}</p>
+            )}
+          </div>
+        );
+      default:
+        return (
+          <div key={bf.id} className="space-y-2">
+            <Label htmlFor={fieldKey}>
+              {bf.displayLabelOverride || inputField.label}
+              {bf.required && <span className="text-destructive ml-1">*</span>}
+            </Label>
+            <Input
+              id={fieldKey}
+              placeholder={placeholder}
+              value={value}
+              onChange={(e) => handleBundleHeaderFieldChange(bf.id, e.target.value)}
+              data-testid={`input-bundle-${inputField.fieldKey}`}
+            />
+          </div>
+        );
+    }
+  };
+
+  // Check if we have bundle-level fields to show
+  const hasBundleFields = bundleFields && bundleFields.length > 0;
+  const showAssigneeSelector = currentUser?.role !== "client";
 
   return (
     <div className="min-h-screen bg-background">
@@ -216,6 +369,54 @@ export default function BundleRequestForm() {
             </div>
           </CardHeader>
         </Card>
+
+        {/* Bundle Header Section - General Info */}
+        {(hasBundleFields || showAssigneeSelector) && (
+          <Card className="mb-6">
+            <CardHeader className="flex flex-row items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
+                <ClipboardList className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">General Information</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Enter details that apply to all services in this bundle
+                </p>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Assignee Selector (for non-clients) */}
+              {showAssigneeSelector && (
+                <div className="space-y-2">
+                  <Label htmlFor="assignee">
+                    <span className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Assign To
+                    </span>
+                  </Label>
+                  <Select value={selectedAssignee} onValueChange={setSelectedAssignee}>
+                    <SelectTrigger data-testid="select-bundle-assignee">
+                      <SelectValue placeholder="Select a designer (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {designers?.map((designer) => (
+                        <SelectItem key={designer.id} value={designer.id}>
+                          {designer.username} ({designer.role.replace(/_/g, " ")})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Optionally assign this request to a designer
+                  </p>
+                </div>
+              )}
+
+              {/* Bundle-level Input Fields */}
+              {bundleFields?.map((bf) => renderBundleHeaderField(bf))}
+            </CardContent>
+          </Card>
+        )}
 
         {servicesWithFields.length > 0 ? (
           <div className="space-y-6">

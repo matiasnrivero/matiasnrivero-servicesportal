@@ -2882,11 +2882,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             })
           );
 
+          // Filter out fields where showOnBundleForm is false
+          // These fields should only appear in the bundle header, not in each service section
+          const filteredFields = enrichedFields.filter((f) => {
+            if (!f.inputField) return true;
+            return f.inputField.showOnBundleForm !== false;
+          });
+
           return {
             bundleItemId: item.id,
             serviceId: item.serviceId,
             service,
-            fields: enrichedFields,
+            fields: filteredFields,
+            allFields: enrichedFields, // Keep all fields for reference if needed
           };
         })
       );
