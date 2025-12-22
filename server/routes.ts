@@ -2349,10 +2349,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ==================== BUNDLE FIELD DEFAULTS ROUTES ====================
+  // ==================== BUNDLE FIELDS ROUTES ====================
 
-  // Get bundle field defaults (admin only)
-  app.get("/api/bundles/:bundleId/field-defaults", async (req, res) => {
+  // Get bundle fields for a bundle (admin only)
+  app.get("/api/bundles/:bundleId/fields", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
       if (!sessionUserId) {
@@ -2362,22 +2362,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!sessionUser || sessionUser.role !== "admin") {
         return res.status(403).json({ error: "Admin access required" });
       }
-      const { serviceId } = req.query;
-      let defaults;
-      if (serviceId) {
-        defaults = await storage.getBundleFieldDefaultsForService(req.params.bundleId, serviceId as string);
-      } else {
-        defaults = await storage.getBundleFieldDefaults(req.params.bundleId);
-      }
-      res.json(defaults);
+      const bundleFields = await storage.getBundleFields(req.params.bundleId);
+      res.json(bundleFields);
     } catch (error) {
-      console.error("Error fetching bundle field defaults:", error);
-      res.status(500).json({ error: "Failed to fetch bundle field defaults" });
+      console.error("Error fetching bundle fields:", error);
+      res.status(500).json({ error: "Failed to fetch bundle fields" });
     }
   });
 
-  // Create or update bundle field default (admin only)
-  app.post("/api/bundles/:bundleId/field-defaults", async (req, res) => {
+  // Create bundle field (admin only)
+  app.post("/api/bundles/:bundleId/fields", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
       if (!sessionUserId) {
@@ -2387,16 +2381,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!sessionUser || sessionUser.role !== "admin") {
         return res.status(403).json({ error: "Admin access required" });
       }
-      const fieldDefault = await storage.createBundleFieldDefault({ ...req.body, bundleId: req.params.bundleId });
-      res.status(201).json(fieldDefault);
+      const bundleField = await storage.createBundleField({ ...req.body, bundleId: req.params.bundleId });
+      res.status(201).json(bundleField);
     } catch (error) {
-      console.error("Error creating bundle field default:", error);
-      res.status(500).json({ error: "Failed to create bundle field default" });
+      console.error("Error creating bundle field:", error);
+      res.status(500).json({ error: "Failed to create bundle field" });
     }
   });
 
-  // Update bundle field default (admin only)
-  app.patch("/api/bundle-field-defaults/:id", async (req, res) => {
+  // Update bundle field (admin only)
+  app.patch("/api/bundle-fields/:id", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
       if (!sessionUserId) {
@@ -2406,19 +2400,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!sessionUser || sessionUser.role !== "admin") {
         return res.status(403).json({ error: "Admin access required" });
       }
-      const fieldDefault = await storage.updateBundleFieldDefault(req.params.id, req.body.defaultValue);
-      if (!fieldDefault) {
-        return res.status(404).json({ error: "Bundle field default not found" });
+      const bundleField = await storage.updateBundleField(req.params.id, req.body);
+      if (!bundleField) {
+        return res.status(404).json({ error: "Bundle field not found" });
       }
-      res.json(fieldDefault);
+      res.json(bundleField);
     } catch (error) {
-      console.error("Error updating bundle field default:", error);
-      res.status(500).json({ error: "Failed to update bundle field default" });
+      console.error("Error updating bundle field:", error);
+      res.status(500).json({ error: "Failed to update bundle field" });
     }
   });
 
-  // Delete bundle field default (admin only)
-  app.delete("/api/bundle-field-defaults/:id", async (req, res) => {
+  // Delete bundle field (admin only)
+  app.delete("/api/bundle-fields/:id", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
       if (!sessionUserId) {
@@ -2428,11 +2422,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!sessionUser || sessionUser.role !== "admin") {
         return res.status(403).json({ error: "Admin access required" });
       }
-      await storage.deleteBundleFieldDefault(req.params.id);
+      await storage.deleteBundleField(req.params.id);
       res.status(204).send();
     } catch (error) {
-      console.error("Error deleting bundle field default:", error);
-      res.status(500).json({ error: "Failed to delete bundle field default" });
+      console.error("Error deleting bundle field:", error);
+      res.status(500).json({ error: "Failed to delete bundle field" });
+    }
+  });
+
+  // Get bundle field usage for an input field (admin only)
+  app.get("/api/input-fields/:id/bundle-usage", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const bundleFieldsList = await storage.getBundleFieldsByInputField(req.params.id);
+      const allBundles = await storage.getAllBundles();
+      const usage = await Promise.all(bundleFieldsList.map(async (bf) => {
+        const bundle = allBundles.find(b => b.id === bf.bundleId);
+        return {
+          bundleFieldId: bf.id,
+          bundleId: bf.bundleId,
+          bundleName: bundle?.name || "Unknown",
+          required: bf.required,
+          optionsJson: bf.optionsJson,
+          defaultValue: bf.defaultValue,
+        };
+      }));
+      res.json(usage);
+    } catch (error) {
+      console.error("Error fetching input field bundle usage:", error);
+      res.status(500).json({ error: "Failed to fetch input field bundle usage" });
     }
   });
 
@@ -2814,7 +2839,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get bundle form structure for a specific bundle (for client form)
-  // This returns the bundle, its services, and the service fields (excluding those with defaults)
+  // This returns the bundle, its services, service fields, and bundle-level fields
   app.get("/api/bundles/:id/form-structure", async (req, res) => {
     try {
       const bundle = await storage.getBundle(req.params.id);
@@ -2825,8 +2850,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get bundle items (services in this bundle)
       const bundleItems = await storage.getBundleItems(req.params.id);
 
-      // Get bundle field defaults
-      const bundleFieldDefaults = await storage.getBundleFieldDefaults(req.params.id);
+      // Get bundle-level fields (fields assigned directly to this bundle)
+      const bundleFieldsList = await storage.getBundleFields(req.params.id);
+      const enrichedBundleFields = await Promise.all(
+        bundleFieldsList.map(async (bf) => {
+          const inputField = await storage.getInputField(bf.inputFieldId);
+          return {
+            ...bf,
+            inputField,
+          };
+        })
+      );
 
       // For each service in the bundle, get its fields
       const servicesWithFields = await Promise.all(
@@ -2841,33 +2875,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const enrichedFields = await Promise.all(
             serviceFields.map(async (sf) => {
               const inputField = await storage.getInputField(sf.inputFieldId);
-              // Check if this field has a bundle default (matches by serviceId + inputFieldId)
-              const hasDefault = bundleFieldDefaults.some(
-                (d) => d.serviceId === item.serviceId && d.inputFieldId === sf.inputFieldId
-              );
               return {
                 ...sf,
                 inputField,
-                hasDefault,
               };
             })
           );
-
-          // Only return fields without defaults for client form
-          const fieldsWithoutDefaults = enrichedFields.filter((f) => !f.hasDefault);
 
           return {
             bundleItemId: item.id,
             serviceId: item.serviceId,
             service,
-            fields: fieldsWithoutDefaults,
-            allFields: enrichedFields,
+            fields: enrichedFields,
           };
         })
       );
 
       res.json({
         bundle,
+        bundleFields: enrichedBundleFields,
         services: servicesWithFields.filter(Boolean),
       });
     } catch (error) {
@@ -2877,7 +2903,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get full bundle request detail (for admin/designer view)
-  // This includes all fields with defaults, line item fields, etc.
+  // This includes all fields with values, line item fields, bundle-level fields, etc.
   app.get("/api/bundle-requests/:id/full-detail", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2908,8 +2934,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get bundle items
       const bundleItems = await storage.getBundleItems(request.bundleId);
 
-      // Get bundle field defaults
-      const bundleFieldDefaults = await storage.getBundleFieldDefaults(request.bundleId);
+      // Get bundle-level fields
+      const bundleFieldsList = await storage.getBundleFields(request.bundleId);
+      const formData = request.formData as Record<string, any> | null;
+      const enrichedBundleFields = await Promise.all(
+        bundleFieldsList.map(async (bf) => {
+          const inputField = await storage.getInputField(bf.inputFieldId);
+          const value = formData?.[`bundle_${bf.id}`] ?? bf.defaultValue;
+          return {
+            ...bf,
+            inputField,
+            value,
+          };
+        })
+      );
 
       // Get all line items
       const allLineItems = await storage.getAllBundleLineItems();
@@ -2923,21 +2961,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const serviceFields = await storage.getServiceFields(item.serviceId);
 
-          // Enrich each field with input field details and default values
+          // Enrich each field with input field details
           const enrichedFields = await Promise.all(
             serviceFields.map(async (sf) => {
               const inputField = await storage.getInputField(sf.inputFieldId);
-              const defaultRecord = bundleFieldDefaults.find(
-                (d) => d.serviceId === item.serviceId && d.inputFieldId === sf.inputFieldId
-              );
               // Get value from formData if provided, otherwise use default
               const formData = request.formData as Record<string, any> | null;
               const formValue = formData?.[`${item.serviceId}_${sf.id}`];
               return {
                 ...sf,
                 inputField,
-                defaultValue: defaultRecord?.defaultValue,
-                value: formValue ?? defaultRecord?.defaultValue,
+                defaultValue: sf.defaultValue,
+                value: formValue ?? sf.defaultValue,
               };
             })
           );
@@ -2985,6 +3020,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         request,
         bundle,
+        bundleFields: enrichedBundleFields,
         services: servicesWithFields.filter(Boolean),
         attachments,
         comments,

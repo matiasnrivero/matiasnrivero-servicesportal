@@ -40,8 +40,9 @@ import {
   type LineItemField,
   type InsertLineItemField,
   type UpdateLineItemField,
-  type BundleFieldDefault,
-  type InsertBundleFieldDefault,
+  type BundleField,
+  type InsertBundleField,
+  type UpdateBundleField,
   type VendorBundleCost,
   type InsertVendorBundleCost,
   type VendorPackCost,
@@ -69,7 +70,7 @@ import {
   inputFields,
   serviceFields,
   lineItemFields,
-  bundleFieldDefaults,
+  bundleFields,
   vendorBundleCosts,
   vendorPackCosts,
   bundleRequests,
@@ -191,12 +192,13 @@ export interface IStorage {
   updateLineItemField(id: string, data: UpdateLineItemField): Promise<LineItemField | undefined>;
   deleteLineItemField(id: string): Promise<void>;
 
-  // Bundle Field Default methods
-  getBundleFieldDefaults(bundleId: string): Promise<BundleFieldDefault[]>;
-  getBundleFieldDefaultsForService(bundleId: string, serviceId: string): Promise<BundleFieldDefault[]>;
-  createBundleFieldDefault(data: InsertBundleFieldDefault): Promise<BundleFieldDefault>;
-  updateBundleFieldDefault(id: string, defaultValue: any): Promise<BundleFieldDefault | undefined>;
-  deleteBundleFieldDefault(id: string): Promise<void>;
+  // Bundle Field methods
+  getBundleFields(bundleId: string): Promise<BundleField[]>;
+  getBundleField(id: string): Promise<BundleField | undefined>;
+  getBundleFieldsByInputField(inputFieldId: string): Promise<BundleField[]>;
+  createBundleField(data: InsertBundleField): Promise<BundleField>;
+  updateBundleField(id: string, data: UpdateBundleField): Promise<BundleField | undefined>;
+  deleteBundleField(id: string): Promise<void>;
 
   // Vendor Bundle Cost methods
   getVendorBundleCosts(vendorId: string): Promise<VendorBundleCost[]>;
@@ -732,34 +734,37 @@ export class DbStorage implements IStorage {
     await db.delete(lineItemFields).where(eq(lineItemFields.id, id));
   }
 
-  // Bundle Field Default methods
-  async getBundleFieldDefaults(bundleId: string): Promise<BundleFieldDefault[]> {
-    return await db.select().from(bundleFieldDefaults).where(eq(bundleFieldDefaults.bundleId, bundleId));
+  // Bundle Field methods
+  async getBundleFields(bundleId: string): Promise<BundleField[]> {
+    return await db.select().from(bundleFields)
+      .where(eq(bundleFields.bundleId, bundleId))
+      .orderBy(bundleFields.sortOrder);
   }
 
-  async getBundleFieldDefaultsForService(bundleId: string, serviceId: string): Promise<BundleFieldDefault[]> {
-    return await db.select().from(bundleFieldDefaults)
-      .where(and(
-        eq(bundleFieldDefaults.bundleId, bundleId),
-        eq(bundleFieldDefaults.serviceId, serviceId)
-      ));
-  }
-
-  async createBundleFieldDefault(data: InsertBundleFieldDefault): Promise<BundleFieldDefault> {
-    const result = await db.insert(bundleFieldDefaults).values(data).returning();
+  async getBundleField(id: string): Promise<BundleField | undefined> {
+    const result = await db.select().from(bundleFields).where(eq(bundleFields.id, id)).limit(1);
     return result[0];
   }
 
-  async updateBundleFieldDefault(id: string, defaultValue: any): Promise<BundleFieldDefault | undefined> {
-    const result = await db.update(bundleFieldDefaults)
-      .set({ defaultValue })
-      .where(eq(bundleFieldDefaults.id, id))
+  async getBundleFieldsByInputField(inputFieldId: string): Promise<BundleField[]> {
+    return await db.select().from(bundleFields).where(eq(bundleFields.inputFieldId, inputFieldId));
+  }
+
+  async createBundleField(data: InsertBundleField): Promise<BundleField> {
+    const result = await db.insert(bundleFields).values(data).returning();
+    return result[0];
+  }
+
+  async updateBundleField(id: string, data: UpdateBundleField): Promise<BundleField | undefined> {
+    const result = await db.update(bundleFields)
+      .set(data)
+      .where(eq(bundleFields.id, id))
       .returning();
     return result[0];
   }
 
-  async deleteBundleFieldDefault(id: string): Promise<void> {
-    await db.delete(bundleFieldDefaults).where(eq(bundleFieldDefaults.id, id));
+  async deleteBundleField(id: string): Promise<void> {
+    await db.delete(bundleFields).where(eq(bundleFields.id, id));
   }
 
   // Vendor Bundle Cost methods

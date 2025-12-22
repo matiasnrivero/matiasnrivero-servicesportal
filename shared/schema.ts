@@ -247,7 +247,7 @@ export const valueModes = ["single", "multiple"] as const;
 export type ValueMode = typeof valueModes[number];
 
 // Assign to modes for input fields - determines where field can be used
-export const assignToModes = ["service", "line_item", "both"] as const;
+export const assignToModes = ["service", "line_item", "bundle", "all"] as const;
 export type AssignToMode = typeof assignToModes[number];
 
 // Input fields - global reusable field definitions
@@ -303,13 +303,21 @@ export const lineItemFields = pgTable("line_item_fields", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Bundle field defaults - allows bundles to override service field defaults
-export const bundleFieldDefaults = pgTable("bundle_field_defaults", {
+// Bundle fields - join table linking input fields to bundles with per-bundle configuration
+export const bundleFields = pgTable("bundle_fields", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   bundleId: varchar("bundle_id").notNull().references(() => bundles.id, { onDelete: "cascade" }),
-  serviceId: varchar("service_id").notNull().references(() => services.id, { onDelete: "cascade" }),
   inputFieldId: varchar("input_field_id").notNull().references(() => inputFields.id, { onDelete: "cascade" }),
-  defaultValue: jsonb("default_value").notNull(),
+  required: boolean("required").notNull().default(false),
+  displayLabelOverride: text("display_label_override"),
+  helpTextOverride: text("help_text_override"),
+  placeholderOverride: text("placeholder_override"),
+  valueModeOverride: text("value_mode_override"),
+  optionsJson: jsonb("options_json"),
+  defaultValue: jsonb("default_value"),
+  uiGroup: text("ui_group"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -497,7 +505,12 @@ export const updateLineItemFieldSchema = createInsertSchema(lineItemFields).part
   createdAt: true,
 });
 
-export const insertBundleFieldDefaultSchema = createInsertSchema(bundleFieldDefaults).omit({
+export const insertBundleFieldSchema = createInsertSchema(bundleFields).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const updateBundleFieldSchema = createInsertSchema(bundleFields).partial().omit({
   id: true,
   createdAt: true,
 });
@@ -584,8 +597,9 @@ export type UpdateServiceField = z.infer<typeof updateServiceFieldSchema>;
 export type LineItemField = typeof lineItemFields.$inferSelect;
 export type InsertLineItemField = z.infer<typeof insertLineItemFieldSchema>;
 export type UpdateLineItemField = z.infer<typeof updateLineItemFieldSchema>;
-export type BundleFieldDefault = typeof bundleFieldDefaults.$inferSelect;
-export type InsertBundleFieldDefault = z.infer<typeof insertBundleFieldDefaultSchema>;
+export type BundleField = typeof bundleFields.$inferSelect;
+export type InsertBundleField = z.infer<typeof insertBundleFieldSchema>;
+export type UpdateBundleField = z.infer<typeof updateBundleFieldSchema>;
 export type VendorBundleCost = typeof vendorBundleCosts.$inferSelect;
 export type InsertVendorBundleCost = z.infer<typeof insertVendorBundleCostSchema>;
 export type VendorPackCost = typeof vendorPackCosts.$inferSelect;
