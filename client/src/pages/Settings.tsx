@@ -47,7 +47,7 @@ import {
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List } from "lucide-react";
-import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem, InputField, ServiceField, BundleFieldDefault, ServicePricingTier, LineItemField } from "@shared/schema";
+import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem, InputField, ServiceField, BundleField, ServicePricingTier, LineItemField } from "@shared/schema";
 import { insertBundleLineItemSchema, inputFieldTypes, valueModes, pricingStructures, assignToModes } from "@shared/schema";
 
 async function getDefaultUser(): Promise<User | null> {
@@ -1090,7 +1090,8 @@ function InputFieldsTabContent() {
     const labels: Record<string, string> = {
       service: "Service",
       line_item: "Line Item",
-      both: "Both",
+      bundle: "Bundle",
+      all: "All",
     };
     return labels[assignTo] || assignTo;
   };
@@ -1227,7 +1228,8 @@ function InputFieldsTabContent() {
                           <SelectContent>
                             <SelectItem value="service">Service</SelectItem>
                             <SelectItem value="line_item">Line Item</SelectItem>
-                            <SelectItem value="both">Both</SelectItem>
+                            <SelectItem value="bundle">Bundle</SelectItem>
+                            <SelectItem value="all">All</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -1467,7 +1469,8 @@ function InputFieldsTabContent() {
                       <SelectContent>
                         <SelectItem value="service">Service</SelectItem>
                         <SelectItem value="line_item">Line Item</SelectItem>
-                        <SelectItem value="both">Both</SelectItem>
+                        <SelectItem value="bundle">Bundle</SelectItem>
+                        <SelectItem value="all">All</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -2223,7 +2226,7 @@ function LineItemFieldsManager() {
   };
 
   const availableFieldsToAdd = inputFieldsList.filter(
-    f => (f.assignTo === "line_item" || f.assignTo === "both") && !lineItemFieldsList.some(lf => lf.inputFieldId === f.id)
+    f => (f.assignTo === "line_item" || f.assignTo === "all") && !lineItemFieldsList.some(lf => lf.inputFieldId === f.id)
   );
 
   return (
@@ -3282,143 +3285,152 @@ function ServiceManagementTabContent({ onNavigateToServiceFields }: ServiceManag
   );
 }
 
-// Bundle Field Defaults Manager - Override default values for bundle submissions
-function BundleFieldDefaultsManager() {
+// Bundle Fields Assignments Manager - Assign input fields to bundles with per-bundle configuration
+function BundleFieldsAssignmentsManager() {
   const { toast } = useToast();
   const [selectedBundleId, setSelectedBundleId] = useState<string>("");
-  const [selectedServiceId, setSelectedServiceId] = useState<string>("");
-  const [isAddDefaultDialogOpen, setIsAddDefaultDialogOpen] = useState(false);
-  const [editingDefault, setEditingDefault] = useState<BundleFieldDefault | null>(null);
+  const [isAddFieldDialogOpen, setIsAddFieldDialogOpen] = useState(false);
+  const [editingBundleField, setEditingBundleField] = useState<BundleField | null>(null);
 
   const { data: allBundles = [] } = useQuery<Bundle[]>({
     queryKey: ["/api/bundles"],
-  });
-
-  const { data: allServices = [] } = useQuery<Service[]>({
-    queryKey: ["/api/services", { excludeSons: false }],
-    queryFn: fetchAllServices,
   });
 
   const { data: inputFieldsList = [] } = useQuery<InputField[]>({
     queryKey: ["/api/input-fields"],
   });
 
-  const { data: serviceFieldsList = [] } = useQuery<ServiceField[]>({
-    queryKey: ["/api/services", selectedServiceId, "fields"],
-    queryFn: async () => {
-      if (!selectedServiceId) return [];
-      const res = await fetch(`/api/services/${selectedServiceId}/fields`);
-      if (!res.ok) return [];
-      return res.json();
-    },
-    enabled: !!selectedServiceId,
-  });
-
-  const { data: bundleDefaults = [], isLoading: loadingDefaults } = useQuery<BundleFieldDefault[]>({
-    queryKey: ["/api/bundles", selectedBundleId, "field-defaults", selectedServiceId],
+  const { data: bundleFieldsList = [], isLoading: loadingBundleFields } = useQuery<BundleField[]>({
+    queryKey: ["/api/bundles", selectedBundleId, "fields"],
     queryFn: async () => {
       if (!selectedBundleId) return [];
-      let url = `/api/bundles/${selectedBundleId}/field-defaults`;
-      if (selectedServiceId) {
-        url += `?serviceId=${selectedServiceId}`;
-      }
-      const res = await fetch(url);
+      const res = await fetch(`/api/bundles/${selectedBundleId}/fields`);
       if (!res.ok) return [];
       return res.json();
     },
     enabled: !!selectedBundleId,
   });
 
-  const createDefaultMutation = useMutation({
-    mutationFn: async (data: { serviceId: string; inputFieldId: string; defaultValue: any }) => {
-      return apiRequest("POST", `/api/bundles/${selectedBundleId}/field-defaults`, data);
+  const addBundleFieldMutation = useMutation({
+    mutationFn: async (data: { inputFieldId: string; optionsJson?: string[]; defaultValue?: unknown; required: boolean; sortOrder: number }) => {
+      return apiRequest("POST", `/api/bundles/${selectedBundleId}/fields`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bundles", selectedBundleId, "field-defaults"] });
-      setIsAddDefaultDialogOpen(false);
-      toast({ title: "Bundle default created" });
+      queryClient.invalidateQueries({ queryKey: ["/api/bundles", selectedBundleId, "fields"] });
+      setIsAddFieldDialogOpen(false);
+      addFieldForm.reset();
+      toast({ title: "Field added to bundle" });
     },
     onError: (error: Error) => {
-      toast({ title: "Failed to create default", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to add field", description: error.message, variant: "destructive" });
     },
   });
 
-  const updateDefaultMutation = useMutation({
-    mutationFn: async ({ id, defaultValue }: { id: string; defaultValue: any }) => {
-      return apiRequest("PATCH", `/api/bundle-field-defaults/${id}`, { defaultValue });
+  const updateBundleFieldMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { optionsJson?: string[] | null; defaultValue?: unknown; required?: boolean; sortOrder?: number } }) => {
+      return apiRequest("PATCH", `/api/bundle-fields/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bundles", selectedBundleId, "field-defaults"] });
-      setEditingDefault(null);
-      toast({ title: "Bundle default updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/bundles", selectedBundleId, "fields"] });
+      setEditingBundleField(null);
+      toast({ title: "Bundle field updated" });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to update", description: error.message, variant: "destructive" });
     },
   });
 
-  const deleteDefaultMutation = useMutation({
+  const deleteBundleFieldMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/bundle-field-defaults/${id}`);
+      return apiRequest("DELETE", `/api/bundle-fields/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bundles", selectedBundleId, "field-defaults"] });
-      toast({ title: "Bundle default removed" });
+      queryClient.invalidateQueries({ queryKey: ["/api/bundles", selectedBundleId, "fields"] });
+      toast({ title: "Field removed from bundle" });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to remove", description: error.message, variant: "destructive" });
     },
   });
 
-  const addDefaultForm = useForm({
+  const addFieldForm = useForm({
     defaultValues: {
-      serviceId: "",
       inputFieldId: "",
+      optionsJson: "",
       defaultValue: "",
+      isRequired: false,
+      sortOrder: 0,
     },
   });
 
-  const editDefaultForm = useForm({
+  const editFieldForm = useForm({
     defaultValues: {
+      optionsJson: "",
       defaultValue: "",
+      isRequired: false,
+      sortOrder: 0,
     },
   });
 
   useEffect(() => {
-    if (editingDefault) {
-      editDefaultForm.reset({
-        defaultValue: typeof editingDefault.defaultValue === 'string' 
-          ? editingDefault.defaultValue 
-          : JSON.stringify(editingDefault.defaultValue),
+    if (editingBundleField) {
+      editFieldForm.reset({
+        optionsJson: editingBundleField.optionsJson ? JSON.stringify(editingBundleField.optionsJson) : "",
+        defaultValue: typeof editingBundleField.defaultValue === 'string' 
+          ? editingBundleField.defaultValue 
+          : (editingBundleField.defaultValue ? JSON.stringify(editingBundleField.defaultValue) : ""),
+        isRequired: editingBundleField.required,
+        sortOrder: editingBundleField.sortOrder,
       });
     }
-  }, [editingDefault, editDefaultForm]);
+  }, [editingBundleField, editFieldForm]);
 
-  const handleAddDefault = (data: { serviceId: string; inputFieldId: string; defaultValue: string }) => {
-    let parsedValue: any = data.defaultValue;
-    try {
-      parsedValue = JSON.parse(data.defaultValue);
-    } catch {
-      // Keep as string if not valid JSON
+  const parseOptionsInput = (input: string): string[] | null => {
+    if (!input || !input.trim()) return null;
+    const trimmed = input.trim();
+    if (trimmed.startsWith('[')) {
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        // Fall through to comma parsing
+      }
     }
-    createDefaultMutation.mutate({
-      serviceId: data.serviceId,
+    return trimmed.split(',').map(s => s.trim()).filter(s => s.length > 0);
+  };
+
+  const parseDefaultValue = (input: string): unknown => {
+    if (!input || !input.trim()) return undefined;
+    const trimmed = input.trim();
+    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        // Not valid JSON, return as string
+      }
+    }
+    return trimmed;
+  };
+
+  const handleAddField = (data: { inputFieldId: string; optionsJson: string; defaultValue: string; isRequired: boolean; sortOrder: number }) => {
+    addBundleFieldMutation.mutate({
       inputFieldId: data.inputFieldId,
-      defaultValue: parsedValue,
+      optionsJson: parseOptionsInput(data.optionsJson) || undefined,
+      defaultValue: parseDefaultValue(data.defaultValue),
+      required: data.isRequired,
+      sortOrder: data.sortOrder,
     });
   };
 
-  const handleUpdateDefault = (data: { defaultValue: string }) => {
-    if (!editingDefault) return;
-    let parsedValue: any = data.defaultValue;
-    try {
-      parsedValue = JSON.parse(data.defaultValue);
-    } catch {
-      // Keep as string if not valid JSON
-    }
-    updateDefaultMutation.mutate({
-      id: editingDefault.id,
-      defaultValue: parsedValue,
+  const handleUpdateField = (data: { optionsJson: string; defaultValue: string; isRequired: boolean; sortOrder: number }) => {
+    if (!editingBundleField) return;
+    updateBundleFieldMutation.mutate({
+      id: editingBundleField.id,
+      data: {
+        optionsJson: parseOptionsInput(data.optionsJson),
+        defaultValue: parseDefaultValue(data.defaultValue) ?? null,
+        required: data.isRequired,
+        sortOrder: data.sortOrder,
+      },
     });
   };
 
@@ -3427,124 +3439,80 @@ function BundleFieldDefaultsManager() {
     return field?.label || "Unknown Field";
   };
 
-  const getServiceName = (serviceId: string) => {
-    const service = allServices.find(s => s.id === serviceId);
-    return service?.title || "Unknown Service";
+  const getInputFieldType = (inputFieldId: string) => {
+    const field = inputFieldsList.find(f => f.id === inputFieldId);
+    return field?.inputType || "text";
   };
 
-  // Get available fields for the selected service (only fields assigned to that service)
-  const availableFieldsToAdd = selectedServiceId 
-    ? serviceFieldsList.filter(sf => !bundleDefaults.some(bd => bd.inputFieldId === sf.inputFieldId && bd.serviceId === selectedServiceId))
-    : [];
+  // Get available fields to add (bundle or all assignTo types, not already assigned)
+  const availableFieldsToAdd = inputFieldsList.filter(
+    f => (f.assignTo === "bundle" || f.assignTo === "all") && !bundleFieldsList.some(bf => bf.inputFieldId === f.id)
+  );
 
   return (
     <Card className="mt-6">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Boxes className="h-5 w-5" />
-          Bundle Field Defaults
+          Bundle Field Assignments
         </CardTitle>
         <CardDescription>
-          Pre-fill default values for bundle submissions. When a client selects a bundle, these values are automatically applied.
+          Configure which input fields appear on each bundle, with per-bundle dropdown options and default values.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Label>Bundle:</Label>
-            <Select value={selectedBundleId} onValueChange={setSelectedBundleId}>
-              <SelectTrigger className="w-[250px]" data-testid="select-bundle-for-defaults">
-                <SelectValue placeholder="Choose a bundle..." />
-              </SelectTrigger>
-              <SelectContent>
-                {allBundles.map((bundle) => (
-                  <SelectItem key={bundle.id} value={bundle.id}>
-                    {bundle.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {selectedBundleId && (
-            <div className="flex items-center gap-2">
-              <Label>Filter by Service:</Label>
-              <Select value={selectedServiceId || "all"} onValueChange={(val) => setSelectedServiceId(val === "all" ? "" : val)}>
-                <SelectTrigger className="w-[250px]" data-testid="select-service-filter">
-                  <SelectValue placeholder="All services" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Services</SelectItem>
-                  {allServices.map((service) => (
-                    <SelectItem key={service.id} value={service.id}>
-                      {service.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+        <div className="flex items-center gap-4">
+          <Label>Select Bundle:</Label>
+          <Select value={selectedBundleId} onValueChange={setSelectedBundleId}>
+            <SelectTrigger className="w-[300px]" data-testid="select-bundle-for-fields">
+              <SelectValue placeholder="Choose a bundle..." />
+            </SelectTrigger>
+            <SelectContent>
+              {allBundles.map((bundle) => (
+                <SelectItem key={bundle.id} value={bundle.id}>
+                  {bundle.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {selectedBundleId && (
           <>
             <div className="flex items-center justify-between">
-              <h4 className="text-sm font-medium">Default values for this bundle:</h4>
-              <Dialog open={isAddDefaultDialogOpen} onOpenChange={setIsAddDefaultDialogOpen}>
+              <h4 className="text-sm font-medium">Fields assigned to this bundle:</h4>
+              <Dialog open={isAddFieldDialogOpen} onOpenChange={setIsAddFieldDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button size="sm" disabled={!selectedServiceId || availableFieldsToAdd.length === 0} data-testid="button-add-bundle-default">
+                  <Button size="sm" disabled={availableFieldsToAdd.length === 0} data-testid="button-add-field-to-bundle">
                     <Plus className="h-4 w-4 mr-1" />
-                    Add Default
+                    Add Field
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Add Bundle Default Value</DialogTitle>
+                    <DialogTitle>Add Field to Bundle</DialogTitle>
                     <DialogDescription>
-                      Set a default value for a field when this bundle is selected.
+                      Select an input field and configure its options for this bundle.
                     </DialogDescription>
                   </DialogHeader>
-                  <Form {...addDefaultForm}>
-                    <form onSubmit={addDefaultForm.handleSubmit(handleAddDefault)} className="space-y-4">
+                  <Form {...addFieldForm}>
+                    <form onSubmit={addFieldForm.handleSubmit(handleAddField)} className="space-y-4">
                       <FormField
-                        control={addDefaultForm.control}
-                        name="serviceId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Service</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value || selectedServiceId}>
-                              <FormControl>
-                                <SelectTrigger data-testid="select-default-service">
-                                  <SelectValue placeholder="Choose service..." />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {allServices.map((s) => (
-                                  <SelectItem key={s.id} value={s.id}>
-                                    {s.title}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={addDefaultForm.control}
+                        control={addFieldForm.control}
                         name="inputFieldId"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Field</FormLabel>
+                            <FormLabel>Input Field</FormLabel>
                             <Select onValueChange={field.onChange} value={field.value}>
                               <FormControl>
-                                <SelectTrigger data-testid="select-default-field">
-                                  <SelectValue placeholder="Choose field..." />
+                                <SelectTrigger data-testid="select-add-bundle-input-field">
+                                  <SelectValue placeholder="Choose a field..." />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                {availableFieldsToAdd.map((sf) => (
-                                  <SelectItem key={sf.inputFieldId} value={sf.inputFieldId}>
-                                    {getInputFieldName(sf.inputFieldId)}
+                                {availableFieldsToAdd.map((f) => (
+                                  <SelectItem key={f.id} value={f.id}>
+                                    {f.label}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -3554,25 +3522,79 @@ function BundleFieldDefaultsManager() {
                         )}
                       />
                       <FormField
-                        control={addDefaultForm.control}
-                        name="defaultValue"
+                        control={addFieldForm.control}
+                        name="optionsJson"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Default Value</FormLabel>
+                            <FormLabel>Bundle-Specific Options (comma-separated)</FormLabel>
                             <FormControl>
-                              <Input {...field} data-testid="input-default-value" placeholder="Enter default value" />
+                              <Textarea
+                                placeholder="Option 1, Option 2, Option 3"
+                                {...field}
+                                data-testid="input-add-bundle-options"
+                                className="font-mono text-sm"
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+                      <FormField
+                        control={addFieldForm.control}
+                        name="defaultValue"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Bundle Default Value</FormLabel>
+                            <FormControl>
+                              <Input {...field} data-testid="input-add-bundle-default" placeholder="Leave empty to use global default" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={addFieldForm.control}
+                          name="sortOrder"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Sort Order</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  {...field}
+                                  onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                  data-testid="input-add-bundle-sort"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={addFieldForm.control}
+                          name="isRequired"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                              <FormLabel>Required</FormLabel>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  data-testid="switch-add-bundle-required"
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
                       <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => setIsAddDefaultDialogOpen(false)}>
+                        <Button type="button" variant="outline" onClick={() => setIsAddFieldDialogOpen(false)}>
                           Cancel
                         </Button>
-                        <Button type="submit" disabled={createDefaultMutation.isPending} data-testid="button-submit-add-default">
-                          {createDefaultMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                          Add Default
+                        <Button type="submit" disabled={addBundleFieldMutation.isPending} data-testid="button-submit-add-bundle-field">
+                          {addBundleFieldMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                          Add Field
                         </Button>
                       </div>
                     </form>
@@ -3581,49 +3603,55 @@ function BundleFieldDefaultsManager() {
               </Dialog>
             </div>
 
-            {loadingDefaults ? (
+            {loadingBundleFields ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin" />
               </div>
-            ) : bundleDefaults.length === 0 ? (
+            ) : bundleFieldsList.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground border rounded-md">
-                {selectedServiceId 
-                  ? "No bundle defaults configured for this service. Click \"Add Default\" to create one."
-                  : "No bundle defaults configured. Select a service filter and click \"Add Default\" to create one."}
+                No fields assigned to this bundle yet. Click "Add Field" to get started.
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Service</TableHead>
-                    <TableHead>Field</TableHead>
+                    <TableHead>Field Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Bundle Options</TableHead>
                     <TableHead>Default Value</TableHead>
+                    <TableHead>Required</TableHead>
+                    <TableHead>Order</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {bundleDefaults.map((bd) => (
-                    <TableRow key={bd.id} data-testid={`row-bundle-default-${bd.id}`}>
-                      <TableCell>{getServiceName(bd.serviceId)}</TableCell>
-                      <TableCell className="font-medium">{getInputFieldName(bd.inputFieldId)}</TableCell>
-                      <TableCell className="max-w-[200px] truncate">
-                        {typeof bd.defaultValue === 'string' ? bd.defaultValue : JSON.stringify(bd.defaultValue)}
+                  {bundleFieldsList.map((bf) => (
+                    <TableRow key={bf.id} data-testid={`row-bundle-field-${bf.id}`}>
+                      <TableCell className="font-medium">{getInputFieldName(bf.inputFieldId)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{getInputFieldType(bf.inputFieldId)}</Badge>
                       </TableCell>
+                      <TableCell className="max-w-[200px] truncate">
+                        {bf.optionsJson ? JSON.stringify(bf.optionsJson) : "-"}
+                      </TableCell>
+                      <TableCell>{(bf.defaultValue as string) || "-"}</TableCell>
+                      <TableCell>{bf.required ? "Yes" : "No"}</TableCell>
+                      <TableCell>{bf.sortOrder}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={() => setEditingDefault(bd)}
-                            data-testid={`button-edit-bundle-default-${bd.id}`}
+                            onClick={() => setEditingBundleField(bf)}
+                            data-testid={`button-edit-bundle-field-${bf.id}`}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={() => deleteDefaultMutation.mutate(bd.id)}
-                            data-testid={`button-delete-bundle-default-${bd.id}`}
+                            onClick={() => deleteBundleFieldMutation.mutate(bf.id)}
+                            data-testid={`button-delete-bundle-field-${bf.id}`}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -3638,36 +3666,90 @@ function BundleFieldDefaultsManager() {
         )}
       </CardContent>
 
-      {/* Edit Bundle Default Dialog */}
-      <Dialog open={!!editingDefault} onOpenChange={(open) => !open && setEditingDefault(null)}>
+      {/* Edit Bundle Field Dialog */}
+      <Dialog open={!!editingBundleField} onOpenChange={(open) => !open && setEditingBundleField(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Bundle Default</DialogTitle>
+            <DialogTitle>Edit Bundle Field</DialogTitle>
             <DialogDescription>
-              Update the default value for this field when this bundle is selected.
+              Update the bundle-specific options and default value for this field.
             </DialogDescription>
           </DialogHeader>
-          <Form {...editDefaultForm}>
-            <form onSubmit={editDefaultForm.handleSubmit(handleUpdateDefault)} className="space-y-4">
+          <Form {...editFieldForm}>
+            <form onSubmit={editFieldForm.handleSubmit(handleUpdateField)} className="space-y-4">
               <FormField
-                control={editDefaultForm.control}
-                name="defaultValue"
+                control={editFieldForm.control}
+                name="optionsJson"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Default Value</FormLabel>
+                    <FormLabel>Bundle-Specific Options (comma-separated)</FormLabel>
                     <FormControl>
-                      <Input {...field} data-testid="input-edit-default-value" />
+                      <Textarea
+                        {...field}
+                        data-testid="input-edit-bundle-options"
+                        className="font-mono text-sm"
+                        placeholder="Option 1, Option 2, Option 3"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              <FormField
+                control={editFieldForm.control}
+                name="defaultValue"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bundle Default Value</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-edit-bundle-default" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editFieldForm.control}
+                  name="sortOrder"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Sort Order</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          {...field}
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                          data-testid="input-edit-bundle-sort"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editFieldForm.control}
+                  name="isRequired"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                      <FormLabel>Required</FormLabel>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-edit-bundle-required"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setEditingDefault(null)}>
+                <Button type="button" variant="outline" onClick={() => setEditingBundleField(null)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={updateDefaultMutation.isPending} data-testid="button-submit-edit-default">
-                  {updateDefaultMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                <Button type="submit" disabled={updateBundleFieldMutation.isPending} data-testid="button-submit-edit-bundle-field">
+                  {updateBundleFieldMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                   Update
                 </Button>
               </div>
@@ -3825,7 +3907,7 @@ export default function Settings() {
               <InputFieldsTabContent />
               <ServiceFieldsManager initialServiceId={preselectedServiceId} onServiceIdConsumed={() => setPreselectedServiceId("")} />
               <LineItemFieldsManager />
-              <BundleFieldDefaultsManager />
+              <BundleFieldsAssignmentsManager />
             </TabsContent>
           </Tabs>
         </div>
