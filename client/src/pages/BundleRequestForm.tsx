@@ -221,7 +221,9 @@ export default function BundleRequestForm() {
     );
   }
 
-  const { bundle, bundleFields, services } = bundleStructure;
+  const { bundle, bundleFields: rawBundleFields, services } = bundleStructure;
+  // Sort bundle fields by sortOrder to ensure correct display order
+  const bundleFields = [...(rawBundleFields || [])].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   const servicesWithFields = services.filter((s) => s.fields.length > 0);
 
   // Helper to render bundle header field input
