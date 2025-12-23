@@ -204,9 +204,29 @@ export default function BundleRequestDetail() {
   const canAssign = ["admin", "internal_designer", "vendor", "vendor_designer"].includes(currentUser?.role || "");
   const canDeliver = canAssign && request.status !== "delivered";
 
-  const renderFieldValue = (value: any): string => {
+  const renderFieldValue = (value: any): React.ReactNode => {
     if (value === null || value === undefined) return "Not provided";
-    if (Array.isArray(value)) return value.join(", ");
+    if (Array.isArray(value)) {
+      // Check if it's an array of file objects
+      if (value.length > 0 && value[0]?.url && value[0]?.fileName) {
+        return (
+          <div className="flex flex-col gap-1">
+            {value.map((file: { url: string; fileName: string }, idx: number) => (
+              <a
+                key={idx}
+                href={file.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                {file.fileName}
+              </a>
+            ))}
+          </div>
+        );
+      }
+      return value.join(", ");
+    }
     if (typeof value === "object") return JSON.stringify(value);
     return String(value);
   };

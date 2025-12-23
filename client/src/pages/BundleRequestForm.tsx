@@ -174,6 +174,32 @@ export default function BundleRequestForm() {
     setUploadedFiles((prev) => prev.filter((f) => f.fileName !== fileName));
   };
 
+  const handleServiceFileUpload = (serviceId: string, fieldKey: string, url: string, fileName: string) => {
+    const key = `${serviceId}_${fieldKey}`;
+    setFormData((prev) => {
+      const existing = prev[key];
+      const files = Array.isArray(existing) ? existing : [];
+      return {
+        ...prev,
+        [key]: [...files, { url, fileName }],
+      };
+    });
+  };
+
+  const handleServiceFileRemove = (serviceId: string, fieldKey: string, fileName: string) => {
+    const key = `${serviceId}_${fieldKey}`;
+    setFormData((prev) => {
+      const existing = prev[key];
+      if (Array.isArray(existing)) {
+        return {
+          ...prev,
+          [key]: existing.filter((f: { fileName: string }) => f.fileName !== fileName),
+        };
+      }
+      return prev;
+    });
+  };
+
   const handleSubmit = () => {
     if (!bundleId) return;
 
@@ -458,8 +484,8 @@ export default function BundleRequestForm() {
                           handleFieldChange(serviceData.serviceId, fieldKey, value)
                         }
                         showPricing={currentUser?.role === "client" || currentUser?.role === "admin"}
-                        onFileUpload={(fieldKey, url, fileName) => handleFileUpload(url, fileName)}
-                        onFileRemove={(fieldKey, fileName) => handleFileRemove(fileName)}
+                        onFileUpload={(fieldKey, url, fileName) => handleServiceFileUpload(serviceData.serviceId, fieldKey, url, fileName)}
+                        onFileRemove={(fieldKey, fileName) => handleServiceFileRemove(serviceData.serviceId, fieldKey, fileName)}
                       />
                     ))}
                   </div>
