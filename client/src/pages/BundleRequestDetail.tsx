@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -657,6 +658,80 @@ export default function BundleRequestDetail() {
                 </CardContent>
               </Card>
             )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Status History</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                    <span className="text-sm text-dark-blue-night">Created</span>
+                    <span className="text-xs text-dark-gray ml-auto">
+                      {format(new Date(request.createdAt), "MMM dd, h:mm a")}
+                    </span>
+                  </div>
+                  {request.assigneeId && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-blue-500" />
+                      <span className="text-sm text-dark-blue-night">Assigned</span>
+                      {request.assignedAt && (
+                        <span className="text-xs text-dark-gray ml-auto">
+                          {format(new Date(request.assignedAt), "MMM dd, h:mm a")}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {request.deliveredAt && request.status === "delivered" && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500" />
+                      <span className="text-sm text-dark-blue-night">Delivered</span>
+                      <span className="text-xs text-dark-gray ml-auto">
+                        {format(new Date(request.deliveredAt), "MMM dd, h:mm a")}
+                      </span>
+                    </div>
+                  )}
+                  {request.status === "change-request" && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                      <span className="text-sm text-dark-blue-night">Change Requested</span>
+                      <Badge variant="outline" className="text-xs ml-auto">Current</Badge>
+                    </div>
+                  )}
+                  {request.status === "in-progress" && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                      <span className="text-sm text-dark-blue-night">In Progress</span>
+                      <Badge variant="outline" className="text-xs ml-auto">Current</Badge>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Current User</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-3">
+                  <Avatar>
+                    <AvatarFallback className="bg-sky-blue-accent text-white">
+                      {currentUser?.username?.slice(0, 2).toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-sm font-medium text-dark-blue-night">
+                      {currentUser?.username || "Guest"}
+                    </p>
+                    <Badge variant="outline" className="text-xs capitalize">
+                      {currentUser?.role || "client"}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
