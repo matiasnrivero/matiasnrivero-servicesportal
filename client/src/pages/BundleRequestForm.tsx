@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
+import { queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -134,11 +135,12 @@ export default function BundleRequestForm() {
       return request;
     },
     onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] });
       toast({
         title: "Request Submitted",
         description: "Your bundle request has been submitted successfully.",
       });
-      setLocation("/service-requests");
+      setLocation("/service-requests?tab=bundle");
     },
     onError: (error: Error) => {
       toast({
