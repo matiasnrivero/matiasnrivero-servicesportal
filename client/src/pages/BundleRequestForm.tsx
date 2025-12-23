@@ -526,26 +526,6 @@ export default function BundleRequestForm() {
                 onUploadComplete={handleFileUpload}
                 onFileRemove={handleFileRemove}
               />
-              {uploadedFiles.length > 0 && (
-                <div className="mt-2 space-y-1">
-                  {uploadedFiles.map((file) => (
-                    <div
-                      key={file.fileName}
-                      className="flex items-center justify-between text-sm p-2 bg-muted rounded"
-                    >
-                      <span className="truncate">{file.fileName}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleFileRemove(file.fileName)}
-                        data-testid={`button-remove-file-${file.fileName}`}
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
