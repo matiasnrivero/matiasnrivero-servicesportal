@@ -2979,8 +2979,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             serviceFields.map(async (sf) => {
               const inputField = await storage.getInputField(sf.inputFieldId);
               // Get value from formData if provided, otherwise use default
-              const formData = request.formData as Record<string, any> | null;
-              const formValue = formData?.[`${item.serviceId}_${sf.id}`];
+              // Frontend saves with key: ${serviceId}_${inputField.fieldKey}
+              const formValue = formData?.[`${item.serviceId}_${inputField?.fieldKey}`];
               return {
                 ...sf,
                 inputField,
