@@ -272,7 +272,9 @@ export default function BundleRequestDetail() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {serviceData.fields.map((field) => (
+                    {serviceData.fields
+                      .filter((field) => field.inputField?.showOnBundleForm !== false)
+                      .map((field) => (
                       <div key={field.id} className="flex flex-col gap-1">
                         <Label className="text-sm font-medium text-muted-foreground">
                           {field.displayLabelOverride || field.inputField?.label || "Field"}
