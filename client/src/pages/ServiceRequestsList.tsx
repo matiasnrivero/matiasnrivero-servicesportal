@@ -54,15 +54,20 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
 export default function ServiceRequestsList() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [bundleStatusFilter, setBundleStatusFilter] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState<"adhoc" | "bundle">("adhoc");
   
-  const urlParams = new URLSearchParams(window.location.search);
-  const tabFromUrl = urlParams.get("tab");
-  const activeTab: "adhoc" | "bundle" = tabFromUrl === "bundle" ? "bundle" : "adhoc";
+  // Sync tab state with URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabFromUrl = urlParams.get("tab");
+    setActiveTab(tabFromUrl === "bundle" ? "bundle" : "adhoc");
+  }, [location]);
   
   const handleTabChange = (tab: "adhoc" | "bundle") => {
+    setActiveTab(tab);
     if (tab === "adhoc") {
       navigate("/service-requests");
     } else {
