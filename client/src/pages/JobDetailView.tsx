@@ -493,10 +493,10 @@ export default function JobDetailView() {
                 </Badge>
               </div>
               <p className="text-sm text-dark-gray mt-1" data-testid="text-created-date">
-                Created on {format(new Date(request.createdAt), "MMMM do, yyyy")}
+                Created on {format(new Date(request.createdAt), "MMMM do, yyyy")} at {format(new Date(request.createdAt), "h:mm a")}
                 {request.deliveredAt && (
                   <span className="ml-2">
-                    • Delivered on {format(new Date(request.deliveredAt), "MMMM do, yyyy")}
+                    • Delivered on {format(new Date(request.deliveredAt), "MMMM do, yyyy")} at {format(new Date(request.deliveredAt), "h:mm a")}
                   </span>
                 )}
               </p>
@@ -524,7 +524,7 @@ export default function JobDetailView() {
               </>
             )}
 
-            {request.status === "in-progress" && isAssignee && (
+            {request.status === "in-progress" && (isAssignee || currentUser?.role === "admin") && (
               <>
                 <Button 
                   variant="outline" 
@@ -555,7 +555,7 @@ export default function JobDetailView() {
               </Button>
             )}
 
-            {request.status === "change-request" && isAssignee && (
+            {request.status === "change-request" && (isAssignee || currentUser?.role === "admin") && (
               <>
                 <Button 
                   variant="outline" 
@@ -1595,7 +1595,7 @@ export default function JobDetailView() {
                     <div className="w-2 h-2 rounded-full bg-green-500" />
                     <span className="text-sm text-dark-blue-night">Created</span>
                     <span className="text-xs text-dark-gray ml-auto">
-                      {format(new Date(request.createdAt), "MMM dd")}
+                      {format(new Date(request.createdAt), "MMM dd, h:mm a")}
                     </span>
                   </div>
                   {request.assigneeId && (
@@ -1614,7 +1614,7 @@ export default function JobDetailView() {
                           <div className="w-2 h-2 rounded-full bg-green-500" />
                           <span className="text-sm text-dark-blue-night">Delivered</span>
                           <span className="text-xs text-dark-gray ml-auto">
-                            {format(changeDate, "MMM dd")}
+                            {format(changeDate, "MMM dd, h:mm a")}
                           </span>
                         </div>
                         {/* Change Request */}
@@ -1622,7 +1622,7 @@ export default function JobDetailView() {
                           <div className="w-2 h-2 rounded-full bg-orange-500" />
                           <span className="text-sm text-dark-blue-night">Change Request</span>
                           <span className="text-xs text-dark-gray ml-auto">
-                            {format(changeDate, "MMM dd")}
+                            {format(changeDate, "MMM dd, h:mm a")}
                           </span>
                         </div>
                       </div>
@@ -1634,7 +1634,7 @@ export default function JobDetailView() {
                       <div className="w-2 h-2 rounded-full bg-green-500" />
                       <span className="text-sm text-dark-blue-night">Delivered</span>
                       <span className="text-xs text-dark-gray ml-auto">
-                        {format(new Date(request.deliveredAt), "MMM dd")}
+                        {format(new Date(request.deliveredAt), "MMM dd, h:mm a")}
                       </span>
                     </div>
                   )}

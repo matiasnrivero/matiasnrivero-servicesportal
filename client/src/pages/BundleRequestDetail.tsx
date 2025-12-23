@@ -85,11 +85,12 @@ async function fetchBundleRequestDetail(id: string): Promise<BundleRequestFullDe
 }
 
 async function fetchDesigners(): Promise<UserType[]> {
-  const response = await fetch("/api/users?role=internal_designer,vendor_designer");
+  const response = await fetch("/api/users");
   if (!response.ok) {
     throw new Error("Failed to fetch designers");
   }
-  return response.json();
+  const allUsers: UserType[] = await response.json();
+  return allUsers.filter(user => ["admin", "internal_designer", "designer", "vendor_designer"].includes(user.role));
 }
 
 async function getDefaultUser(): Promise<CurrentUser> {
@@ -115,6 +116,7 @@ export default function BundleRequestDetail() {
   const { toast } = useToast();
 
   const [selectedAssignee, setSelectedAssignee] = useState<string>("");
+  const [deliverableUrls, setDeliverableUrls] = useState<{ url: string; name: string }[]>([]);
 
   const { data: requestDetail, isLoading, error } = useQuery({
     queryKey: ["/api/bundle-requests", requestId, "full-detail"],
@@ -171,6 +173,31 @@ export default function BundleRequestDetail() {
     },
   });
 
+  const addAttachmentMutation = useMutation({
+    mutationFn: async (data: { fileUrl: string; fileName: string; kind: string }) => {
+      const response = await fetch(`/api/bundle-requests/${requestId}/attachments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: data.fileName,
+          fileUrl: data.fileUrl,
+          fileType: data.fileName.split(".").pop(),
+          kind: data.kind,
+        }),
+      });
+      if (!response.ok) throw new Error("Failed to add attachment");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests", requestId, "full-detail"] });
+    },
+  });
+
+  const handleDeliverableUpload = async (fileUrl: string, fileName: string) => {
+    setDeliverableUrls(prev => [...prev, { url: fileUrl, name: fileName }]);
+    await addAttachmentMutation.mutateAsync({ fileUrl, fileName, kind: "deliverable" });
+  };
+
 
   if (isLoading) {
     return (
@@ -209,6 +236,10 @@ export default function BundleRequestDetail() {
   const canManageJobs = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(currentUser?.role || "");
   const canTakeJob = ["admin", "internal_designer", "designer", "vendor_designer"].includes(currentUser?.role || "") && request.status === "pending" && !request.assigneeId;
   const canDeliver = canManageJobs && request.status !== "delivered";
+  
+  const requestAttachments = attachments.filter(a => a.kind === "request" || !a.kind);
+  const deliverableAttachments = attachments.filter(a => a.kind === "deliverable");
+  const showDeliverablesAtTop = request.status === "delivered" || request.status === "change-request";
 
   const renderFieldValue = (value: any): React.ReactNode => {
     if (value === null || value === undefined) return "Not provided";
@@ -476,16 +507,23 @@ export default function BundleRequestDetail() {
               </Card>
             )}
 
-            {attachments.length > 0 && (
+            {requestAttachments.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Attachments</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {attachments.map((att) => (
+                    {requestAttachments.map((att) => (
                       <div key={att.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                        <span className="text-sm truncate flex-1">{att.fileName}</span>
+                        <div className="flex items-center gap-3 flex-1">
+                          <ImagePreviewTooltip
+                            fileUrl={att.fileUrl}
+                            fileName={att.fileName}
+                            thumbnailSize="sm"
+                          />
+                          <span className="text-sm truncate flex-1">{att.fileName}</span>
+                        </div>
                         <a href={att.fileUrl} target="_blank" rel="noopener noreferrer">
                           <Button size="sm" variant="default" data-testid={`button-download-attachment-${att.id}`}>
                             <Download className="h-3 w-3 mr-1" />
@@ -495,6 +533,56 @@ export default function BundleRequestDetail() {
                       </div>
                     ))}
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {(canManageJobs || deliverableAttachments.length > 0) && (
+              <Card className={showDeliverablesAtTop ? "border-green-200 bg-green-50/30" : ""}>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    {showDeliverablesAtTop && <CheckCircle2 className="h-5 w-5 text-green-600" />}
+                    Deliverables
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {deliverableAttachments.length > 0 && (
+                    <div className="space-y-2">
+                      {deliverableAttachments.map((att) => (
+                        <div 
+                          key={att.id}
+                          className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
+                        >
+                          <div className="flex items-center gap-3">
+                            <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+                            <ImagePreviewTooltip
+                              fileUrl={att.fileUrl}
+                              fileName={att.fileName}
+                              thumbnailSize="sm"
+                            />
+                            <span className="text-sm text-dark-blue-night flex-1 truncate">{att.fileName}</span>
+                          </div>
+                          <a href={att.fileUrl} target="_blank" rel="noopener noreferrer">
+                            <Button size="sm" variant="default" data-testid={`button-download-deliverable-${att.id}`}>
+                              <Download className="h-3 w-3 mr-1" />
+                              Download
+                            </Button>
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {deliverableAttachments.length === 0 && !canManageJobs && (
+                    <p className="text-sm text-dark-gray">No deliverables uploaded yet</p>
+                  )}
+
+                  {canManageJobs && (request.status === "in-progress" || request.status === "change-request") && (
+                    <div>
+                      <p className="text-sm font-medium text-dark-blue-night mb-2">Upload File*</p>
+                      <FileUploader onUploadComplete={handleDeliverableUpload} />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -573,31 +661,6 @@ export default function BundleRequestDetail() {
         </div>
       </div>
 
-      {/* Sticky footer with Deliver button */}
-      {canDeliver && request.status !== "delivered" && (
-        <div className="sticky bottom-0 left-0 right-0 bg-off-white-cream border-t p-4 z-50">
-          <div className="max-w-6xl mx-auto flex justify-end">
-            <Button
-              onClick={() => deliverMutation.mutate()}
-              disabled={deliverMutation.isPending}
-              className="bg-sky-blue-accent hover:bg-sky-blue-accent/90"
-              data-testid="button-deliver-footer"
-            >
-              {deliverMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Delivering...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Deliver
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
