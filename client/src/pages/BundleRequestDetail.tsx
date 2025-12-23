@@ -33,6 +33,15 @@ interface EnrichedField {
   helpTextOverride?: string | null;
 }
 
+interface EnrichedBundleField {
+  id: string;
+  inputFieldId: string;
+  inputField: InputField | null;
+  defaultValue: any;
+  value: any;
+  displayLabelOverride?: string | null;
+}
+
 interface LineItemField {
   id: string;
   inputFieldId: string;
@@ -52,6 +61,7 @@ interface ServiceWithFields {
 interface BundleRequestFullDetail {
   request: BundleRequest;
   bundle: Bundle;
+  bundleFields: EnrichedBundleField[];
   services: ServiceWithFields[];
   attachments: Array<{ id: string; fileName: string; fileUrl: string; kind: string }>;
   comments: Array<{ id: string; body: string; authorId: string; createdAt: string }>;
@@ -190,7 +200,7 @@ export default function BundleRequestDetail() {
     );
   }
 
-  const { request, bundle, services, attachments, requester, assignee } = requestDetail;
+  const { request, bundle, bundleFields, services, attachments, requester, assignee } = requestDetail;
   const canAssign = ["admin", "internal_designer", "vendor", "vendor_designer"].includes(currentUser?.role || "");
   const canDeliver = canAssign && request.status !== "delivered";
 
@@ -230,6 +240,28 @@ export default function BundleRequestDetail() {
                 </Badge>
               </CardHeader>
             </Card>
+
+            {bundleFields && bundleFields.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">General Information</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {bundleFields.map((bf) => (
+                      <div key={bf.id} className="flex flex-col gap-1">
+                        <Label className="text-sm font-medium text-muted-foreground">
+                          {bf.displayLabelOverride || bf.inputField?.label || "Field"}
+                        </Label>
+                        <p className="text-sm" data-testid={`text-bundle-field-${bf.id}`}>
+                          {renderFieldValue(bf.value)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {services.map((serviceData) => (
               <Card key={serviceData.serviceId}>
@@ -331,7 +363,7 @@ export default function BundleRequestDetail() {
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">
-                    Created: {request.createdAt ? format(new Date(request.createdAt), "MMM d, yyyy") : "N/A"}
+                    Created: {request.createdAt ? format(new Date(request.createdAt), "MMM d, yyyy 'at' h:mm a") : "N/A"}
                   </span>
                 </div>
                 {assignee && (
