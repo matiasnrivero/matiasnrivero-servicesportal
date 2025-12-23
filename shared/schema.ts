@@ -19,6 +19,10 @@ export type PricingStructure = typeof pricingStructures[number];
 export const serviceHierarchyTypes = ["father", "son"] as const;
 export type ServiceHierarchy = typeof serviceHierarchyTypes[number];
 
+// Input field usage context - request fields are client-facing, delivery fields are for internal users
+export const inputForTypes = ["request", "delivery"] as const;
+export type InputForType = typeof inputForTypes[number];
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
@@ -260,6 +264,7 @@ export const inputFields = pgTable("input_fields", {
   inputType: text("input_type").notNull(),
   valueMode: text("value_mode").notNull().default("single"),
   assignTo: text("assign_to").notNull().default("service"),
+  inputFor: text("input_for").notNull().default("request"),
   showOnBundleForm: boolean("show_on_bundle_form").notNull().default(true),
   validation: jsonb("validation"),
   globalDefaultValue: jsonb("global_default_value"),
