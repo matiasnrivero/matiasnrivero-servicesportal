@@ -1602,6 +1602,11 @@ export default function JobDetailView() {
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-blue-500" />
                       <span className="text-sm text-dark-blue-night">Assigned</span>
+                      {request.assignedAt && (
+                        <span className="text-xs text-dark-gray ml-auto">
+                          {format(new Date(request.assignedAt), "MMM dd, h:mm a")}
+                        </span>
+                      )}
                     </div>
                   )}
                   {/* Show change request history from comments */}

@@ -91,6 +91,7 @@ export const serviceRequests = pgTable("service_requests", {
   userId: varchar("user_id").notNull().references(() => users.id),
   serviceId: varchar("service_id").notNull().references(() => services.id),
   assigneeId: varchar("assignee_id").references(() => users.id),
+  assignedAt: timestamp("assigned_at"),
   status: text("status").notNull().default("pending"),
   orderNumber: text("order_number"),
   customerName: text("customer_name"),
@@ -336,6 +337,7 @@ export const bundleRequests = pgTable("bundle_requests", {
   userId: varchar("user_id").notNull().references(() => users.id),
   bundleId: varchar("bundle_id").notNull().references(() => bundles.id),
   assigneeId: varchar("assignee_id").references(() => users.id),
+  assignedAt: timestamp("assigned_at"),
   status: text("status").notNull().default("pending"),
   // Client input values for service fields (keyed by serviceId + inputFieldId)
   formData: jsonb("form_data"),

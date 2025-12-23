@@ -430,7 +430,8 @@ export class DbStorage implements IStorage {
   async assignDesigner(requestId: string, assigneeId: string): Promise<ServiceRequest | undefined> {
     const result = await db.update(serviceRequests)
       .set({ 
-        assigneeId, 
+        assigneeId,
+        assignedAt: new Date(),
         status: "in-progress",
         updatedAt: new Date() 
       })
@@ -872,7 +873,7 @@ export class DbStorage implements IStorage {
 
   async assignBundleDesigner(requestId: string, assigneeId: string): Promise<BundleRequest | undefined> {
     const result = await db.update(bundleRequests)
-      .set({ assigneeId, status: "in-progress", updatedAt: new Date() })
+      .set({ assigneeId, assignedAt: new Date(), status: "in-progress", updatedAt: new Date() })
       .where(eq(bundleRequests.id, requestId))
       .returning();
     return result[0];
