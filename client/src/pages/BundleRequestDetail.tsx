@@ -18,6 +18,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/Header";
 import { FileUploader } from "@/components/FileUploader";
+import { ImagePreviewTooltip } from "@/components/ImagePreviewTooltip";
 import { ArrowLeft, Package, Loader2, User, Calendar, CheckCircle, Clock, AlertCircle, Download, Users, RefreshCw, XCircle, CheckCircle2 } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
@@ -216,8 +217,13 @@ export default function BundleRequestDetail() {
         return (
           <div className="flex flex-col gap-2">
             {value.map((file: { url: string; fileName: string }, idx: number) => (
-              <div key={idx} className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                <span className="text-sm flex-1 truncate">{file.fileName}</span>
+              <div key={idx} className="flex items-center gap-3 p-3 bg-blue-lavender/30 rounded-lg w-full">
+                <ImagePreviewTooltip
+                  fileUrl={file.url}
+                  fileName={file.fileName}
+                  thumbnailSize="sm"
+                />
+                <span className="text-sm text-dark-blue-night flex-1 truncate">{file.fileName}</span>
                 <a href={file.url} target="_blank" rel="noopener noreferrer">
                   <Button size="sm" variant="default" data-testid={`button-download-file-${idx}`}>
                     <Download className="h-3 w-3 mr-1" />
@@ -277,6 +283,48 @@ export default function BundleRequestDetail() {
               </p>
             </div>
           </div>
+
+          <div className="flex items-center gap-3">
+            {request.status === "in-progress" && request.assigneeId === currentUser?.userId && (
+              <>
+                <Button 
+                  variant="outline" 
+                  className="border-red-300 text-red-600"
+                  data-testid="button-cancel"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={() => deliverMutation.mutate()}
+                  disabled={deliverMutation.isPending}
+                  className="bg-sky-blue-accent hover:bg-sky-blue-accent/90"
+                  data-testid="button-deliver-top"
+                >
+                  {deliverMutation.isPending ? "Delivering..." : "Deliver"}
+                </Button>
+              </>
+            )}
+            
+            {request.status === "change-request" && request.assigneeId === currentUser?.userId && (
+              <>
+                <Button 
+                  variant="outline" 
+                  className="border-red-300 text-red-600"
+                  data-testid="button-cancel"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={() => deliverMutation.mutate()}
+                  disabled={deliverMutation.isPending}
+                  className="bg-sky-blue-accent hover:bg-sky-blue-accent/90"
+                  data-testid="button-deliver-top"
+                >
+                  {deliverMutation.isPending ? "Delivering..." : "Deliver"}
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -294,9 +342,9 @@ export default function BundleRequestDetail() {
                         <Label className="text-sm font-medium text-muted-foreground">
                           {bf.displayLabelOverride || bf.inputField?.label || "Field"}
                         </Label>
-                        <p className="text-sm" data-testid={`text-bundle-field-${bf.id}`}>
+                        <div className="text-sm" data-testid={`text-bundle-field-${bf.id}`}>
                           {renderFieldValue(bf.value)}
-                        </p>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -320,10 +368,10 @@ export default function BundleRequestDetail() {
                         <Label className="text-sm font-medium text-muted-foreground">
                           {field.displayLabelOverride || field.inputField?.label || "Field"}
                         </Label>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm" data-testid={`text-field-${field.id}`}>
+                        <div className="flex items-start gap-2 flex-wrap">
+                          <div className="text-sm flex-1" data-testid={`text-field-${field.id}`}>
                             {renderFieldValue(field.value)}
-                          </span>
+                          </div>
                           {field.defaultValue !== undefined && field.defaultValue !== null && (
                             <Badge variant="secondary" className="text-xs">
                               Default
@@ -344,7 +392,7 @@ export default function BundleRequestDetail() {
                             <Label className="text-sm font-medium text-muted-foreground">
                               {lif.lineItem.name} - {lif.inputField?.label || "Field"}
                             </Label>
-                            <p className="text-sm">{renderFieldValue(lif.value)}</p>
+                            <div className="text-sm">{renderFieldValue(lif.value)}</div>
                           </div>
                         ))}
                       </div>
