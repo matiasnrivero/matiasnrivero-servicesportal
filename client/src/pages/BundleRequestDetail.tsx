@@ -274,7 +274,7 @@ export default function BundleRequestDetail() {
                 </Badge>
               </div>
               <p className="text-sm text-dark-gray mt-1" data-testid="text-created-date">
-                Created on {request.createdAt ? format(new Date(request.createdAt), "MMMM do, yyyy") : "N/A"}
+                Created on {request.createdAt ? format(new Date(request.createdAt), "MMMM do, yyyy 'at' h:mm a") : "N/A"}
                 {request.deliveredAt && (
                   <span className="ml-2">
                     • Delivered on {format(new Date(request.deliveredAt), "MMMM do, yyyy")}
@@ -330,14 +330,75 @@ export default function BundleRequestDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
 
-            {bundleFields && bundleFields.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">General Info</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-4">
+                {/* Row 1: Client (left) / Due Date (right) */}
+                <div className="p-3 bg-blue-lavender/30 rounded-lg">
+                  <p className="text-xs text-dark-gray mb-1">Client</p>
+                  <p className="text-sm font-medium text-dark-blue-night" data-testid="text-client">
+                    {requester?.username || "N/A"}
+                  </p>
+                </div>
+
+                <div className="p-3 bg-blue-lavender/30 rounded-lg flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-dark-gray" />
+                  <div>
+                    <p className="text-xs text-dark-gray">Due Date</p>
+                    <p className="text-sm font-medium text-dark-blue-night" data-testid="text-due-date">
+                      {request.dueDate ? format(new Date(request.dueDate), "MM/dd/yyyy") : "Not set"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Row 2: Order Reference (left) / Assignee (right) */}
+                <div className="p-3 bg-blue-lavender/30 rounded-lg">
+                  <p className="text-xs text-dark-gray mb-1">Order Reference</p>
+                  <p className="text-sm font-medium text-dark-blue-night" data-testid="text-order-ref">
+                    {(() => {
+                      const orderRefField = (bundleFields ?? []).find(bf => 
+                        bf.inputField?.fieldKey === "order_project_reference" || 
+                        bf.inputField?.label?.toLowerCase().includes("order") ||
+                        bf.inputField?.label?.toLowerCase().includes("reference")
+                      );
+                      return orderRefField?.value || "N/A";
+                    })()}
+                  </p>
+                </div>
+
+                {canManageJobs && (
+                  <div className="p-3 bg-blue-lavender/30 rounded-lg">
+                    <p className="text-xs text-dark-gray mb-1">Assignee</p>
+                    <p className="text-sm font-medium text-dark-blue-night" data-testid="text-assignee">
+                      {assignee?.username || "Unassigned"}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {(bundleFields ?? []).filter(bf => 
+              bf.inputField?.fieldKey !== "order_project_reference" && 
+              bf.inputField?.fieldKey !== "due_date" &&
+              !bf.inputField?.label?.toLowerCase().includes("order") &&
+              !bf.inputField?.label?.toLowerCase().includes("reference")
+            ).length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">General Information</CardTitle>
+                  <CardTitle className="text-lg">Artwork Composition</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {bundleFields.map((bf) => (
+                    {(bundleFields ?? [])
+                      .filter(bf => 
+                        bf.inputField?.fieldKey !== "order_project_reference" && 
+                        bf.inputField?.fieldKey !== "due_date" &&
+                        !bf.inputField?.label?.toLowerCase().includes("order") &&
+                        !bf.inputField?.label?.toLowerCase().includes("reference")
+                      )
+                      .map((bf) => (
                       <div key={bf.id} className="flex flex-col gap-1">
                         <Label className="text-sm font-medium text-muted-foreground">
                           {bf.displayLabelOverride || bf.inputField?.label || "Field"}
@@ -440,50 +501,6 @@ export default function BundleRequestDetail() {
           </div>
 
           <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Request Info</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">
-                    Requested by: <strong>{requester?.username || "Unknown"}</strong>
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">
-                    Created: {request.createdAt ? format(new Date(request.createdAt), "MMM d, yyyy 'at' h:mm a") : "N/A"}
-                  </span>
-                </div>
-                {assignee && (
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">
-                      Assigned to: <strong>{assignee.username}</strong>
-                    </span>
-                  </div>
-                )}
-                {request.dueDate && (
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">
-                      Due: {format(new Date(request.dueDate), "MMM d, yyyy")}
-                    </span>
-                  </div>
-                )}
-                {request.deliveredAt && (
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">
-                      Delivered: {format(new Date(request.deliveredAt), "MMM d, yyyy")}
-                    </span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
             {canManageJobs && (
               <Card>
                 <CardHeader>
@@ -549,32 +566,38 @@ export default function BundleRequestDetail() {
                     </div>
                   )}
 
-                  {canDeliver && (
-                    <Button
-                      onClick={() => deliverMutation.mutate()}
-                      disabled={deliverMutation.isPending}
-                      className="w-full"
-                      data-testid="button-deliver"
-                    >
-                      {deliverMutation.isPending ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Delivering...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          Mark as Delivered
-                        </>
-                      )}
-                    </Button>
-                  )}
                 </CardContent>
               </Card>
             )}
           </div>
         </div>
       </div>
+
+      {/* Sticky footer with Deliver button */}
+      {canDeliver && request.status !== "delivered" && (
+        <div className="sticky bottom-0 left-0 right-0 bg-off-white-cream border-t p-4 z-50">
+          <div className="max-w-6xl mx-auto flex justify-end">
+            <Button
+              onClick={() => deliverMutation.mutate()}
+              disabled={deliverMutation.isPending}
+              className="bg-sky-blue-accent hover:bg-sky-blue-accent/90"
+              data-testid="button-deliver-footer"
+            >
+              {deliverMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Delivering...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Deliver
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
