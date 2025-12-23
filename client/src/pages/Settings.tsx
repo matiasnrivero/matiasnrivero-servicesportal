@@ -48,7 +48,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List } from "lucide-react";
 import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem, InputField, ServiceField, BundleField, ServicePricingTier, LineItemField } from "@shared/schema";
-import { insertBundleLineItemSchema, inputFieldTypes, valueModes, pricingStructures, assignToModes } from "@shared/schema";
+import { insertBundleLineItemSchema, inputFieldTypes, valueModes, pricingStructures, assignToModes, inputForTypes } from "@shared/schema";
 
 async function getDefaultUser(): Promise<User | null> {
   const res = await fetch("/api/default-user");
@@ -930,6 +930,7 @@ const inputFieldFormSchema = z.object({
   inputType: z.enum(inputFieldTypes),
   valueMode: z.enum(valueModes),
   assignTo: z.enum(assignToModes),
+  inputFor: z.enum(inputForTypes),
   showOnBundleForm: z.boolean().default(true),
   description: z.string().optional(),
   globalDefaultValue: z.any().optional(),
@@ -1020,6 +1021,7 @@ function InputFieldsTabContent() {
       inputType: "text",
       valueMode: "single",
       assignTo: "service",
+      inputFor: "request",
       showOnBundleForm: true,
       description: "",
       sortOrder: 0,
@@ -1035,6 +1037,7 @@ function InputFieldsTabContent() {
       inputType: "text",
       valueMode: "single",
       assignTo: "service",
+      inputFor: "request",
       showOnBundleForm: true,
       description: "",
       sortOrder: 0,
@@ -1050,6 +1053,7 @@ function InputFieldsTabContent() {
         inputType: editingField.inputType as any,
         valueMode: editingField.valueMode as any,
         assignTo: (editingField.assignTo as any) || "service",
+        inputFor: (editingField.inputFor as any) || "request",
         showOnBundleForm: editingField.showOnBundleForm ?? true,
         description: editingField.description || "",
         sortOrder: editingField.sortOrder ?? 0,
@@ -1217,29 +1221,52 @@ function InputFieldsTabContent() {
                       )}
                     />
                   </div>
-                  <FormField
-                    control={form.control}
-                    name="assignTo"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Assign To</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-assign-to">
-                              <SelectValue placeholder="Select assignment" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="service">Service</SelectItem>
-                            <SelectItem value="line_item">Line Item</SelectItem>
-                            <SelectItem value="bundle">Bundle</SelectItem>
-                            <SelectItem value="all">All</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="assignTo"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Assign To</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-assign-to">
+                                <SelectValue placeholder="Select assignment" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="service">Service</SelectItem>
+                              <SelectItem value="line_item">Line Item</SelectItem>
+                              <SelectItem value="bundle">Bundle</SelectItem>
+                              <SelectItem value="all">All</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="inputFor"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Input For</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-input-for">
+                                <SelectValue placeholder="Select usage" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="request">Request</SelectItem>
+                              <SelectItem value="delivery">Delivery</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <FormField
                     control={form.control}
                     name="description"
@@ -1339,6 +1366,7 @@ function InputFieldsTabContent() {
                 <TableHead>Type</TableHead>
                 <TableHead>Mode</TableHead>
                 <TableHead>Assign To</TableHead>
+                <TableHead>Input For</TableHead>
                 <TableHead className="text-center">Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -1356,6 +1384,11 @@ function InputFieldsTabContent() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" data-testid={`badge-assign-to-${field.id}`}>{getAssignToLabel(field.assignTo || "service")}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={field.inputFor === "delivery" ? "secondary" : "outline"} data-testid={`badge-input-for-${field.id}`}>
+                      {field.inputFor === "delivery" ? "Delivery" : "Request"}
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-center">
                     {field.isActive ? (
@@ -1477,29 +1510,52 @@ function InputFieldsTabContent() {
                   )}
                 />
               </div>
-              <FormField
-                control={editForm.control}
-                name="assignTo"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Assign To</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-edit-assign-to">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="service">Service</SelectItem>
-                        <SelectItem value="line_item">Line Item</SelectItem>
-                        <SelectItem value="bundle">Bundle</SelectItem>
-                        <SelectItem value="all">All</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="assignTo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Assign To</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-edit-assign-to">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="service">Service</SelectItem>
+                          <SelectItem value="line_item">Line Item</SelectItem>
+                          <SelectItem value="bundle">Bundle</SelectItem>
+                          <SelectItem value="all">All</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="inputFor"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Input For</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-edit-input-for">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="request">Request</SelectItem>
+                          <SelectItem value="delivery">Delivery</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <FormField
                 control={editForm.control}
                 name="description"
