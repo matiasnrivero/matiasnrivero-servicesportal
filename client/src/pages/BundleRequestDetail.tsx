@@ -18,7 +18,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/Header";
 import { FileUploader } from "@/components/FileUploader";
-import { ArrowLeft, Package, Loader2, User, Calendar, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { ArrowLeft, Package, Loader2, User, Calendar, CheckCircle, Clock, AlertCircle, Download, Users, RefreshCw, XCircle, CheckCircle2 } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import type { Bundle, BundleRequest, User as UserType, Service, InputField } from "@shared/schema";
@@ -99,11 +99,12 @@ async function getDefaultUser(): Promise<CurrentUser> {
   return response.json();
 }
 
-const statusColors: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  "in-progress": "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  delivered: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  "change-request": "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
+  "pending": { label: "Pending", color: "bg-yellow-100 text-yellow-800 border-yellow-200", icon: Clock },
+  "in-progress": { label: "In Progress", color: "bg-blue-100 text-blue-800 border-blue-200", icon: RefreshCw },
+  "delivered": { label: "Delivered", color: "bg-green-100 text-green-800 border-green-200", icon: CheckCircle2 },
+  "change-request": { label: "Change Request", color: "bg-orange-100 text-orange-800 border-orange-200", icon: AlertCircle },
+  "canceled": { label: "Canceled", color: "bg-gray-100 text-gray-800 border-gray-200", icon: XCircle },
 };
 
 export default function BundleRequestDetail() {
@@ -143,6 +144,7 @@ export default function BundleRequestDetail() {
     onSuccess: () => {
       toast({ title: "Designer Assigned", description: "The request has been assigned." });
       queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests", requestId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to assign designer.", variant: "destructive" });
@@ -161,11 +163,13 @@ export default function BundleRequestDetail() {
     onSuccess: () => {
       toast({ title: "Request Delivered", description: "The request has been marked as delivered." });
       queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests", requestId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to deliver request.", variant: "destructive" });
     },
   });
+
 
   if (isLoading) {
     return (
@@ -201,26 +205,26 @@ export default function BundleRequestDetail() {
   }
 
   const { request, bundle, bundleFields, services, attachments, requester, assignee } = requestDetail;
-  const canAssign = ["admin", "internal_designer", "vendor", "vendor_designer"].includes(currentUser?.role || "");
-  const canDeliver = canAssign && request.status !== "delivered";
+  const canManageJobs = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(currentUser?.role || "");
+  const canTakeJob = ["admin", "internal_designer", "designer", "vendor_designer"].includes(currentUser?.role || "") && request.status === "pending" && !request.assigneeId;
+  const canDeliver = canManageJobs && request.status !== "delivered";
 
   const renderFieldValue = (value: any): React.ReactNode => {
     if (value === null || value === undefined) return "Not provided";
     if (Array.isArray(value)) {
-      // Check if it's an array of file objects
       if (value.length > 0 && value[0]?.url && value[0]?.fileName) {
         return (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-2">
             {value.map((file: { url: string; fileName: string }, idx: number) => (
-              <a
-                key={idx}
-                href={file.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                {file.fileName}
-              </a>
+              <div key={idx} className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                <span className="text-sm flex-1 truncate">{file.fileName}</span>
+                <a href={file.url} target="_blank" rel="noopener noreferrer">
+                  <Button size="sm" variant="default" data-testid={`button-download-file-${idx}`}>
+                    <Download className="h-3 w-3 mr-1" />
+                    Download
+                  </Button>
+                </a>
+              </div>
             ))}
           </div>
         );
@@ -232,34 +236,51 @@ export default function BundleRequestDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-off-white-cream">
       <Header />
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        <div className="mb-6">
-          <Link href="/service-requests">
-            <Button variant="ghost" size="sm" data-testid="button-back">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Requests
-            </Button>
-          </Link>
+      <div className="max-w-6xl mx-auto p-6 space-y-6">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <Link href="/service-requests">
+              <Button variant="outline" data-testid="button-back">
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back
+              </Button>
+            </Link>
+            <div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-2xl font-bold text-dark-blue-night" data-testid="text-bundle-name">
+                  {bundle.name}
+                </h1>
+                <Badge variant="outline" className="text-sm" data-testid="text-job-id">
+                  B-{request.id.slice(0, 5).toUpperCase()}
+                </Badge>
+                <Badge className={`${statusConfig[request.status]?.color || ""}`} data-testid="badge-status">
+                  {(() => {
+                    const StatusIcon = statusConfig[request.status]?.icon || Clock;
+                    return (
+                      <>
+                        <StatusIcon className="h-3 w-3 mr-1" />
+                        {statusConfig[request.status]?.label || request.status}
+                      </>
+                    );
+                  })()}
+                </Badge>
+              </div>
+              <p className="text-sm text-dark-gray mt-1" data-testid="text-created-date">
+                Created on {request.createdAt ? format(new Date(request.createdAt), "MMMM do, yyyy") : "N/A"}
+                {request.deliveredAt && (
+                  <span className="ml-2">
+                    • Delivered on {format(new Date(request.deliveredAt), "MMMM do, yyyy")}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
-                  <Package className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <CardTitle data-testid="text-bundle-name">{bundle.name}</CardTitle>
-                  <p className="text-sm text-muted-foreground">Bundle Request</p>
-                </div>
-                <Badge className={statusColors[request.status] || ""} data-testid="badge-status">
-                  {request.status}
-                </Badge>
-              </CardHeader>
-            </Card>
 
             {bundleFields && bundleFields.length > 0 && (
               <Card>
@@ -299,14 +320,16 @@ export default function BundleRequestDetail() {
                         <Label className="text-sm font-medium text-muted-foreground">
                           {field.displayLabelOverride || field.inputField?.label || "Field"}
                         </Label>
-                        <p className="text-sm" data-testid={`text-field-${field.id}`}>
-                          {renderFieldValue(field.value)}
-                        </p>
-                        {field.defaultValue !== undefined && field.defaultValue !== null && (
-                          <Badge variant="secondary" className="w-fit text-xs">
-                            Default
-                          </Badge>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm" data-testid={`text-field-${field.id}`}>
+                            {renderFieldValue(field.value)}
+                          </span>
+                          {field.defaultValue !== undefined && field.defaultValue !== null && (
+                            <Badge variant="secondary" className="text-xs">
+                              Default
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -352,15 +375,13 @@ export default function BundleRequestDetail() {
                 <CardContent>
                   <div className="space-y-2">
                     {attachments.map((att) => (
-                      <div key={att.id} className="flex items-center justify-between p-2 bg-muted rounded">
-                        <span className="text-sm truncate">{att.fileName}</span>
-                        <a
-                          href={att.fileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary text-sm hover:underline"
-                        >
-                          View
+                      <div key={att.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <span className="text-sm truncate flex-1">{att.fileName}</span>
+                        <a href={att.fileUrl} target="_blank" rel="noopener noreferrer">
+                          <Button size="sm" variant="default" data-testid={`button-download-attachment-${att.id}`}>
+                            <Download className="h-3 w-3 mr-1" />
+                            Download
+                          </Button>
                         </a>
                       </div>
                     ))}
@@ -415,33 +436,70 @@ export default function BundleRequestDetail() {
               </CardContent>
             </Card>
 
-            {canAssign && (
+            {canManageJobs && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Actions</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Assign Designer</Label>
-                    <Select
-                      value={selectedAssignee || assignee?.id || ""}
-                      onValueChange={(value) => {
-                        setSelectedAssignee(value);
-                        assignMutation.mutate(value);
-                      }}
+                <CardContent className="space-y-3">
+                  {canTakeJob && (
+                    <Button
+                      onClick={() => assignMutation.mutate(currentUser?.userId || "")}
+                      disabled={assignMutation.isPending}
+                      className="w-full bg-sky-blue-accent hover:bg-sky-blue-accent/90"
+                      data-testid="button-take-job"
                     >
-                      <SelectTrigger data-testid="select-assignee">
-                        <SelectValue placeholder="Select designer" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {designers?.map((d) => (
-                          <SelectItem key={d.id} value={d.id}>
-                            {d.username}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      {assignMutation.isPending ? "Taking job..." : "Take This Job"}
+                    </Button>
+                  )}
+
+                  {(request.status === "pending" || request.status === "in-progress") && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Assign to Designer</span>
+                      </div>
+                      <Select
+                        value={selectedAssignee || assignee?.id || ""}
+                        onValueChange={setSelectedAssignee}
+                      >
+                        <SelectTrigger data-testid="select-designer">
+                          <SelectValue placeholder="Select a designer..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {designers?.map((d) => {
+                            const roleLabel = d.role === "internal_designer" ? "Internal Designer" 
+                              : d.role === "vendor_designer" ? "Vendor Designer"
+                              : d.role.charAt(0).toUpperCase() + d.role.slice(1);
+                            return (
+                              <SelectItem key={d.id} value={d.id} data-testid={`select-designer-${d.id}`}>
+                                <span className="flex items-center gap-2">
+                                  {d.username}
+                                  {d.id === currentUser?.userId && " (You)"}
+                                  <Badge variant="secondary" className="text-xs">
+                                    {roleLabel}
+                                  </Badge>
+                                </span>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        onClick={() => {
+                          if (selectedAssignee) {
+                            assignMutation.mutate(selectedAssignee);
+                          }
+                        }}
+                        disabled={!selectedAssignee || assignMutation.isPending}
+                        variant="outline"
+                        className="w-full"
+                        data-testid="button-assign-designer"
+                      >
+                        {assignMutation.isPending ? "Assigning..." : "Assign Selected Designer"}
+                      </Button>
+                    </div>
+                  )}
 
                   {canDeliver && (
                     <Button
