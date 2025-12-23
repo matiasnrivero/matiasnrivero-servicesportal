@@ -38,6 +38,7 @@ function Router() {
       <Route path="/settings/packs/:id/edit" component={PackEditor} />
       <Route path="/bundle-request/:bundleId" component={BundleRequestForm} />
       <Route path="/bundle-requests/:id" component={BundleRequestDetail} />
+      <Route path="/bundle-jobs/:id" component={BundleRequestDetail} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>
