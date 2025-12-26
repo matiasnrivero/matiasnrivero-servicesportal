@@ -541,8 +541,16 @@ export default function ServicesProfitReport() {
         if (row.vendorId !== vendorFilter) return false;
       }
       
-      if (serviceFilter !== "all" && row.serviceName !== services.find(s => s.id === serviceFilter)?.title) {
-        return false;
+      if (serviceFilter !== "all") {
+        if (serviceFilter.startsWith("service:")) {
+          const serviceId = serviceFilter.replace("service:", "");
+          const service = services.find(s => s.id === serviceId);
+          if (row.serviceName !== service?.title) return false;
+        } else if (serviceFilter.startsWith("bundle:")) {
+          const bundleId = serviceFilter.replace("bundle:", "");
+          const bundle = bundles.find(b => b.id === bundleId);
+          if (row.serviceName !== bundle?.name) return false;
+        }
       }
 
       if (serviceMethodFilter !== "all") {
@@ -567,7 +575,7 @@ export default function ServicesProfitReport() {
       
       return true;
     });
-  }, [reportData, vendorFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId, services]);
+  }, [reportData, vendorFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId, services, bundles]);
 
   const totals = useMemo(() => {
     return filteredData.reduce(
@@ -721,9 +729,20 @@ export default function ServicesProfitReport() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Services</SelectItem>
-                    {services.filter(s => s.isActive === 1).map(service => (
-                      <SelectItem key={service.id} value={service.id}>
+                    {services.filter(s => s.isActive === 1 && !s.parentServiceId).length > 0 && (
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Ad-hoc Services</div>
+                    )}
+                    {services.filter(s => s.isActive === 1 && !s.parentServiceId).map(service => (
+                      <SelectItem key={`service-${service.id}`} value={`service:${service.id}`}>
                         {service.title}
+                      </SelectItem>
+                    ))}
+                    {bundles.filter(b => b.isActive).length > 0 && (
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1 pt-1">Bundle Services</div>
+                    )}
+                    {bundles.filter(b => b.isActive).map(bundle => (
+                      <SelectItem key={`bundle-${bundle.id}`} value={`bundle:${bundle.id}`}>
+                        {bundle.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -877,12 +896,12 @@ export default function ServicesProfitReport() {
                       </TableCell>
                       <TableCell>{row.clientName}</TableCell>
                       <TableCell>{row.serviceName}</TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <Badge variant="outline" className="text-xs">
                           {row.serviceMethod === "ad_hoc" ? "Ad-hoc" : "Bundle"}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">
                         {(() => {
                           const config = statusConfig[row.status] || { label: row.status, color: "bg-gray-100 text-gray-800 border-gray-200", icon: Clock };
                           const StatusIcon = config.icon;
