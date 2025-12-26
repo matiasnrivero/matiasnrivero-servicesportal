@@ -372,6 +372,9 @@ export default function BundleRequestForm() {
               onChange={(e) => handleBundleHeaderFieldChange(bf.id, e.target.value)}
               data-testid={`input-bundle-${inputField.fieldKey}`}
             />
+            {helpText && (
+              <p className="text-xs text-muted-foreground">{helpText}</p>
+            )}
           </div>
         );
     }
