@@ -30,7 +30,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { ChevronLeft, CalendarIcon, Search, DollarSign, TrendingUp, BarChart3, X, ChevronDown } from "lucide-react";
+import { ChevronLeft, CalendarIcon, Search, DollarSign, TrendingUp, BarChart3, X, ChevronDown, Clock, RefreshCw, CheckCircle2, AlertCircle, XCircle } from "lucide-react";
 import { calculateServicePrice } from "@/lib/pricing";
 import type { ServiceRequest, Service, User, VendorProfile, ServicePricingTier, BundleRequest, Bundle, VendorBundleCost } from "@shared/schema";
 
@@ -41,6 +41,16 @@ interface CurrentUser {
 }
 
 type ServiceMethod = "ad_hoc" | "bundle";
+
+const PIXELS_HIVE_VENDOR_ID = "9903d7f7-2754-41a0-872f-62863489b22c";
+
+const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
+  "pending": { label: "Pending", color: "bg-yellow-100 text-yellow-800 border-yellow-200", icon: Clock },
+  "in-progress": { label: "In Progress", color: "bg-blue-100 text-blue-800 border-blue-200", icon: RefreshCw },
+  "delivered": { label: "Delivered", color: "bg-green-100 text-green-800 border-green-200", icon: CheckCircle2 },
+  "change-request": { label: "Change Request", color: "bg-orange-100 text-orange-800 border-orange-200", icon: AlertCircle },
+  "canceled": { label: "Canceled", color: "bg-gray-100 text-gray-800 border-gray-200", icon: XCircle },
+};
 
 interface ReportRow {
   requestId: string;
@@ -402,19 +412,9 @@ export default function ServicesProfitReport() {
   };
 
   const calculateBundleVendorCost = (
-    bundleRequest: BundleRequest,
-    assignee: User | undefined
+    bundleRequest: BundleRequest
   ): number => {
-    if (!assignee) return 0;
-    
-    if (assignee.role === "internal_designer") {
-      return 0;
-    }
-    
-    const vendorUserId = assignee.role === "vendor" ? assignee.id : assignee.vendorId;
-    if (!vendorUserId) return 0;
-    
-    const vendorCosts = vendorBundleCostMap[vendorUserId];
+    const vendorCosts = vendorBundleCostMap[PIXELS_HIVE_VENDOR_ID];
     if (!vendorCosts) return 0;
     
     return vendorCosts[bundleRequest.bundleId] || 0;
@@ -492,7 +492,6 @@ export default function ServicesProfitReport() {
     bundleRequests.forEach(bundleRequest => {
       const bundle = bundleMap[bundleRequest.bundleId];
       const client = userMap[bundleRequest.userId];
-      const assignee = bundleRequest.assigneeId ? userMap[bundleRequest.assigneeId] : undefined;
       const createdBy = userMap[bundleRequest.userId];
       
       let retailPrice = 0;
@@ -502,23 +501,13 @@ export default function ServicesProfitReport() {
         retailPrice = parseFloat(String(bundle.finalPrice));
       }
       
-      const vendorCost = calculateBundleVendorCost(bundleRequest, assignee);
+      const vendorCost = calculateBundleVendorCost(bundleRequest);
       const discount = 0;
       const profit = retailPrice - vendorCost - discount;
       
-      let vendorId: string | null = null;
-      let vendorName: string | null = null;
-      if (assignee) {
-        if (assignee.role === "vendor") {
-          vendorId = assignee.id;
-          const vp = vendorProfileMap[assignee.id];
-          vendorName = vp?.companyName || assignee.username;
-        } else if (assignee.role === "vendor_designer" && assignee.vendorId) {
-          vendorId = assignee.vendorId;
-          const vp = vendorProfileMap[assignee.vendorId];
-          vendorName = vp?.companyName || null;
-        }
-      }
+      const vendorId = PIXELS_HIVE_VENDOR_ID;
+      const vp = vendorProfileMap[PIXELS_HIVE_VENDOR_ID];
+      const vendorName = vp?.companyName || "Pixel's Hive";
       
       const idPart = bundleRequest.id.slice(-6).toUpperCase();
       const jobNumber = `BND-${idPart}`;
@@ -531,8 +520,8 @@ export default function ServicesProfitReport() {
         serviceName: bundle?.name || "Unknown Bundle",
         serviceMethod: "bundle",
         status: bundleRequest.status,
-        assigneeName: assignee?.username || "Unassigned",
-        assigneeRole: assignee?.role || "",
+        assigneeName: "Unassigned",
+        assigneeRole: "",
         vendorId,
         vendorName,
         retailPrice,
@@ -868,7 +857,6 @@ export default function ServicesProfitReport() {
                     <TableHead>Service</TableHead>
                     <TableHead>Method</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Assignee</TableHead>
                     <TableHead>Vendor</TableHead>
                     <TableHead className="text-right">Retail Price</TableHead>
                     <TableHead className="text-right">Vendor Cost</TableHead>
@@ -895,15 +883,16 @@ export default function ServicesProfitReport() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs capitalize">
-                          {row.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {row.assigneeName}
-                        {row.assigneeRole === "internal_designer" && (
-                          <span className="text-xs text-dark-gray ml-1">(Internal)</span>
-                        )}
+                        {(() => {
+                          const config = statusConfig[row.status] || { label: row.status, color: "bg-gray-100 text-gray-800 border-gray-200", icon: Clock };
+                          const StatusIcon = config.icon;
+                          return (
+                            <Badge variant="outline" className={`text-xs border ${config.color}`}>
+                              <StatusIcon className="w-3 h-3 mr-1" />
+                              {config.label}
+                            </Badge>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>{row.vendorName || "-"}</TableCell>
                       <TableCell className="text-right">
