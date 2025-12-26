@@ -143,14 +143,18 @@ export default function ServiceRequestsList() {
   };
 
   const getServicePrice = (request: ServiceRequest) => {
-    // Check if the request has a calculated price in formData (for Store Creation)
+    // First check the dedicated finalPrice column (most accurate)
+    if (request.finalPrice) {
+      return `$${parseFloat(request.finalPrice).toFixed(2)}`;
+    }
+    // Fallback: Check if the request has a calculated price in formData (legacy data)
     const formData = request.formData as Record<string, any> | null;
     if (formData?.calculatedPrice) {
       return `$${formData.calculatedPrice}`;
     }
-    // Otherwise use the service's price range
+    // Last fallback: use the service's base price
     const service = services.find(s => s.id === request.serviceId);
-    return service?.priceRange || "N/A";
+    return service?.basePrice ? `$${parseFloat(service.basePrice).toFixed(2)}` : "N/A";
   };
 
   const getBundleName = (bundleId: string) => {
