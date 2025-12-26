@@ -269,9 +269,10 @@ export default function BundleRequestForm() {
     const fieldKey = `bundle_${bf.id}`;
     const value = bundleHeaderData[fieldKey] ?? bf.defaultValue ?? "";
 
-    // Use description from inputField as fallback help text
-    const helpText = bf.helpTextOverride || inputField.description || "";
-    const placeholder = bf.placeholderOverride || "";
+    // For text/url/textarea fields, use description as placeholder inside the input
+    // For dropdowns and quantity fields, show description as caption below
+    const description = bf.helpTextOverride || inputField.description || "";
+    const placeholderText = bf.placeholderOverride || description;
 
     switch (inputField.inputType) {
       case "text":
@@ -283,14 +284,11 @@ export default function BundleRequestForm() {
             </Label>
             <Input
               id={fieldKey}
-              placeholder={placeholder}
+              placeholder={placeholderText}
               value={value}
               onChange={(e) => handleBundleHeaderFieldChange(bf.id, e.target.value)}
               data-testid={`input-bundle-${inputField.fieldKey}`}
             />
-            {helpText && (
-              <p className="text-xs text-muted-foreground">{helpText}</p>
-            )}
           </div>
         );
       case "date":
@@ -307,9 +305,6 @@ export default function BundleRequestForm() {
               onChange={(e) => handleBundleHeaderFieldChange(bf.id, e.target.value)}
               data-testid={`input-bundle-${inputField.fieldKey}`}
             />
-            {helpText && (
-              <p className="text-xs text-muted-foreground">{helpText}</p>
-            )}
           </div>
         );
       case "textarea":
@@ -321,15 +316,12 @@ export default function BundleRequestForm() {
             </Label>
             <Textarea
               id={fieldKey}
-              placeholder={placeholder}
+              placeholder={placeholderText}
               value={value}
               onChange={(e) => handleBundleHeaderFieldChange(bf.id, e.target.value)}
               rows={3}
               data-testid={`input-bundle-${inputField.fieldKey}`}
             />
-            {helpText && (
-              <p className="text-xs text-muted-foreground">{helpText}</p>
-            )}
           </div>
         );
       case "dropdown":
@@ -353,8 +345,8 @@ export default function BundleRequestForm() {
                 ))}
               </SelectContent>
             </Select>
-            {helpText && (
-              <p className="text-xs text-muted-foreground">{helpText}</p>
+            {description && (
+              <p className="text-xs text-muted-foreground">{description}</p>
             )}
           </div>
         );
@@ -367,14 +359,11 @@ export default function BundleRequestForm() {
             </Label>
             <Input
               id={fieldKey}
-              placeholder={placeholder}
+              placeholder={placeholderText}
               value={value}
               onChange={(e) => handleBundleHeaderFieldChange(bf.id, e.target.value)}
               data-testid={`input-bundle-${inputField.fieldKey}`}
             />
-            {helpText && (
-              <p className="text-xs text-muted-foreground">{helpText}</p>
-            )}
           </div>
         );
     }
