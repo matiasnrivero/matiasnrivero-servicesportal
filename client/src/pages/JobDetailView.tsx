@@ -137,6 +137,12 @@ export default function JobDetailView() {
     queryKey: ["/api/users"],
   });
 
+  // Get users that the current user can assign to (role-based filtering)
+  const { data: assignableUsers = [] } = useQuery<UserType[]>({
+    queryKey: ["/api/assignable-users"],
+    enabled: !!currentUser,
+  });
+
   const requestAttachments = attachments.filter(a => a.kind === "request");
   const deliverableAttachments = attachments.filter(a => a.kind === "deliverable");
   // Pending deliverables are unversioned attachments (not yet linked to a delivery)
@@ -293,7 +299,8 @@ export default function JobDetailView() {
     assignMutation.mutate(designerId);
   };
 
-  const designers = allUsers.filter(user => ["admin", "internal_designer", "designer", "vendor_designer"].includes(user.role));
+  // Use role-based filtered assignable users from backend
+  const designers = assignableUsers;
   const isAssignee = currentUser?.userId === request?.assigneeId;
 
   const handleDeliver = () => {

@@ -88,13 +88,12 @@ async function fetchBundleRequestDetail(id: string): Promise<BundleRequestFullDe
   return response.json();
 }
 
-async function fetchDesigners(): Promise<UserType[]> {
-  const response = await fetch("/api/users");
+async function fetchAssignableUsers(): Promise<UserType[]> {
+  const response = await fetch("/api/assignable-users");
   if (!response.ok) {
-    throw new Error("Failed to fetch designers");
+    throw new Error("Failed to fetch assignable users");
   }
-  const allUsers: UserType[] = await response.json();
-  return allUsers.filter(user => ["admin", "internal_designer", "designer", "vendor_designer"].includes(user.role));
+  return response.json();
 }
 
 async function getDefaultUser(): Promise<CurrentUser> {
@@ -130,8 +129,8 @@ export default function BundleRequestDetail() {
   });
 
   const { data: designers } = useQuery({
-    queryKey: ["/api/users", "designers"],
-    queryFn: fetchDesigners,
+    queryKey: ["/api/assignable-users"],
+    queryFn: fetchAssignableUsers,
   });
 
   const { data: currentUser } = useQuery<CurrentUser>({

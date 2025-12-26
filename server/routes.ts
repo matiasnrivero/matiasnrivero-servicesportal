@@ -2,6 +2,98 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import type { User } from "@shared/schema";
+
+/**
+ * Role-based assignment permissions:
+ * - Admin → can assign to Vendor, Internal Designer, Vendor Designer
+ * - Internal Designer → can assign to Vendor, Vendor Designer, other Internal Designers
+ * - Vendor → can assign to Vendor Designer, other Vendors (same Vendor Profile)
+ * - Vendor Designer → can assign to other Vendor Designers
+ */
+function getAssignableRoles(assignerRole: string): string[] {
+  switch (assignerRole) {
+    case "admin":
+      return ["vendor", "internal_designer", "vendor_designer"];
+    case "internal_designer":
+      return ["vendor", "vendor_designer", "internal_designer"];
+    case "vendor":
+      return ["vendor_designer", "vendor"];
+    case "vendor_designer":
+      return ["vendor_designer"];
+    default:
+      return [];
+  }
+}
+
+/**
+ * Check if assigner can assign to target user based on role permissions
+ * Also handles vendor profile restrictions for vendor/vendor_designer roles
+ */
+async function canAssignTo(assigner: User, target: User): Promise<{ allowed: boolean; reason?: string }> {
+  const assignableRoles = getAssignableRoles(assigner.role);
+  
+  // Check if target role is in the list of assignable roles
+  if (!assignableRoles.includes(target.role)) {
+    return { 
+      allowed: false, 
+      reason: `${assigner.role} cannot assign to ${target.role}` 
+    };
+  }
+  
+  // Admin can assign to anyone in their assignable roles without restriction
+  if (assigner.role === "admin") {
+    return { allowed: true };
+  }
+  
+  // Internal Designer can assign to anyone in their assignable roles without vendor profile restriction
+  // EXCEPT vendor_designer - must respect vendor profile isolation for security
+  if (assigner.role === "internal_designer") {
+    // Internal designers can assign to vendors and other internal designers freely
+    if (target.role === "vendor" || target.role === "internal_designer") {
+      return { allowed: true };
+    }
+    // For vendor_designer targets, internal designers can still assign them
+    // but this is an elevated permission - they can cross vendor profiles
+    return { allowed: true };
+  }
+  
+  // Special case: Vendor can only assign to users in the same Vendor Profile
+  if (assigner.role === "vendor" && target.role === "vendor") {
+    // Both are vendors - they must belong to the same vendor profile
+    const assignerVendorId = assigner.vendorId || assigner.id;
+    const targetVendorId = target.vendorId || target.id;
+    if (assignerVendorId !== targetVendorId) {
+      return { 
+        allowed: false, 
+        reason: "Vendors can only assign to other vendors in the same vendor profile" 
+      };
+    }
+  }
+  
+  // Special case: Vendor assigning to vendor_designer must be in same vendor profile
+  if (assigner.role === "vendor" && target.role === "vendor_designer") {
+    const assignerVendorId = assigner.vendorId || assigner.id;
+    if (target.vendorId !== assignerVendorId) {
+      return { 
+        allowed: false, 
+        reason: "Vendors can only assign to vendor designers in their own profile" 
+      };
+    }
+  }
+  
+  // Special case: Vendor Designer can only assign to other Vendor Designers in same vendor profile
+  if (assigner.role === "vendor_designer" && target.role === "vendor_designer") {
+    if (assigner.vendorId !== target.vendorId) {
+      return { 
+        allowed: false, 
+        reason: "Vendor designers can only assign to other vendor designers in the same profile" 
+      };
+    }
+  }
+  
+  return { allowed: true };
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Users routes
@@ -30,6 +122,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(user);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
+  // Get users that the current session user can assign work to
+  // Returns filtered list based on role-based assignment permissions
+  // Note: Internal designers can assign vendor_designers across any vendor profile (elevated permission)
+  // Vendors/vendor_designers are restricted to their own vendor profile only
+  app.get("/api/assignable-users", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      // Get roles this user can assign to
+      const assignableRoles = getAssignableRoles(sessionUser.role);
+      if (assignableRoles.length === 0) {
+        return res.json([]);
+      }
+
+      // Get all users and filter by assignable roles
+      const allUsers = await storage.getAllUsers();
+      const assignableUsers: User[] = [];
+      
+      // For vendor/vendor_designer callers, pre-filter by vendor profile for efficiency
+      // This ensures they only see users in their own vendor profile
+      const callerVendorId = sessionUser.vendorId || (sessionUser.role === "vendor" ? sessionUser.id : null);
+      const isVendorCaller = sessionUser.role === "vendor" || sessionUser.role === "vendor_designer";
+
+      for (const user of allUsers) {
+        // Skip inactive users
+        if (!user.isActive) continue;
+        
+        // Early filter: For vendor/vendor_designer callers, only consider same-profile users
+        if (isVendorCaller && callerVendorId) {
+          const userVendorId = user.vendorId || (user.role === "vendor" ? user.id : null);
+          if (userVendorId !== callerVendorId) {
+            continue; // Skip users outside caller's vendor profile
+          }
+        }
+        
+        // Check if this user can be assigned by the session user
+        const check = await canAssignTo(sessionUser, user);
+        if (check.allowed) {
+          assignableUsers.push(user);
+        }
+      }
+
+      res.json(assignableUsers);
+    } catch (error) {
+      console.error("Error fetching assignable users:", error);
+      res.status(500).json({ error: "Failed to fetch assignable users" });
     }
   });
 
@@ -410,7 +559,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Assign designer to request (admins, internal designers, vendors, vendor designers can assign)
+  // Assign designer to request with role-based permissions
+  // Admin → Vendor, Internal Designer, Vendor Designer
+  // Internal Designer → Vendor, Vendor Designer, other Internal Designers
+  // Vendor → Vendor Designer, other Vendors (same Vendor Profile)
+  // Vendor Designer → other Vendor Designers (same profile)
   app.post("/api/service-requests/:id/assign", async (req, res) => {
     try {
       // Use session user for authorization
@@ -424,7 +577,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!sessionUser) {
         return res.status(401).json({ error: "User not found" });
       }
-      const canManageJobs = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(sessionUser.role);
+      
+      // Check if user has a role that can assign at all
+      const canManageJobs = ["admin", "internal_designer", "vendor", "vendor_designer"].includes(sessionUser.role);
       if (!canManageJobs) {
         return res.status(403).json({ error: "You don't have permission to assign jobs" });
       }
@@ -439,17 +594,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Can only assign designers to pending or in-progress requests" });
       }
 
-      // Get the target designer ID (from body or default to session user)
+      // Get the target designer ID
+      // If not provided, default to session user (self-assignment / "Take Job")
       const targetDesignerId = req.body.designerId || sessionUserId;
+      
+      // Ensure we have a valid target ID
+      if (!targetDesignerId) {
+        return res.status(400).json({ error: "designerId is required" });
+      }
 
-      // Verify target designer exists and can be assigned work
+      // Verify target designer exists
       const targetDesigner = await storage.getUser(targetDesignerId);
       if (!targetDesigner) {
         return res.status(404).json({ error: "Target designer not found" });
       }
-      const canBeAssigned = ["admin", "internal_designer", "designer", "vendor_designer"].includes(targetDesigner.role);
-      if (!canBeAssigned) {
-        return res.status(400).json({ error: "Can only assign to admin, internal designers, designers, or vendor designers" });
+      
+      // Check role-based assignment permissions (including self-assignment)
+      const assignmentCheck = await canAssignTo(sessionUser, targetDesigner);
+      if (!assignmentCheck.allowed) {
+        return res.status(403).json({ error: assignmentCheck.reason || "You cannot assign to this user" });
       }
 
       // Assign the target designer
@@ -2865,7 +3028,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Assign designer to bundle request
+  // Assign designer to bundle request with role-based permissions
+  // Admin → Vendor, Internal Designer, Vendor Designer
+  // Internal Designer → Vendor, Vendor Designer, other Internal Designers
+  // Vendor → Vendor Designer, other Vendors (same Vendor Profile)
+  // Vendor Designer → other Vendor Designers (same profile)
   app.post("/api/bundle-requests/:id/assign", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2878,14 +3045,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "User not found" });
       }
 
-      // Only admins, internal_designers, vendors, vendor_designers can assign
+      // Check if user has a role that can assign at all
       if (!["admin", "internal_designer", "vendor", "vendor_designer"].includes(sessionUser.role)) {
-        return res.status(403).json({ error: "Access denied" });
+        return res.status(403).json({ error: "You don't have permission to assign jobs" });
       }
 
       const { assigneeId } = req.body;
       if (!assigneeId) {
         return res.status(400).json({ error: "assigneeId is required" });
+      }
+
+      // Verify target user exists
+      const targetUser = await storage.getUser(assigneeId);
+      if (!targetUser) {
+        return res.status(404).json({ error: "Target user not found" });
+      }
+
+      // Check role-based assignment permissions
+      const assignmentCheck = await canAssignTo(sessionUser, targetUser);
+      if (!assignmentCheck.allowed) {
+        return res.status(403).json({ error: assignmentCheck.reason || "You cannot assign to this user" });
       }
 
       const request = await storage.assignBundleDesigner(req.params.id, assigneeId);
