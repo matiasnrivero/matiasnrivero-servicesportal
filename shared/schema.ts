@@ -109,6 +109,8 @@ export const serviceRequests = pgTable("service_requests", {
   changeRequestNote: text("change_request_note"),
   completedAt: timestamp("completed_at"),
   formData: jsonb("form_data"),
+  // Final calculated price for the client - stored at submission time
+  finalPrice: decimal("final_price", { precision: 10, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
