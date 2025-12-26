@@ -308,23 +308,34 @@ export default function ServiceRequestForm() {
       setThreadColorInput("");
       setThreadColorChips([]);
       setFormData(prev => ({ ...prev, threadColors: [] }));
+      setCalculatedPrice(0); // Reset price when switching services
     }
     prevServiceIdRef.current = selectedServiceId;
   }, [selectedServiceId]);
-
-  useEffect(() => {
-    if (formData.amountOfProducts) {
-      const price = calculateStoreCreationPrice(parseInt(formData.amountOfProducts));
-      setCalculatedPrice(price);
-    }
-  }, [formData.amountOfProducts]);
 
   const selectedService = services.find((s) => s.id === selectedServiceId);
   // Pricing visible only for Clients and Admins
   const showPricing = currentUser && (currentUser.role === "client" || currentUser.role === "admin");
 
-  // Calculate total price including base price and selected add-ons
+  // Store Creation has special tiered pricing based on product count
   useEffect(() => {
+    if (selectedService?.title !== "Store Creation") return;
+    
+    // Handle both camelCase (legacy) and snake_case (dynamic fields) versions
+    const productCount = formData.amountOfProducts || formData.amount_of_products;
+    if (productCount && parseInt(productCount) > 0) {
+      const price = calculateStoreCreationPrice(parseInt(productCount));
+      setCalculatedPrice(price);
+    } else {
+      setCalculatedPrice(0);
+    }
+  }, [formData.amountOfProducts, formData.amount_of_products, selectedService]);
+
+  // Calculate total price including base price and selected add-ons (NOT for Store Creation)
+  useEffect(() => {
+    // Skip for Store Creation - it uses tiered pricing based on product count
+    if (selectedService?.title === "Store Creation") return;
+    
     if (selectedService) {
       let total = parseFloat(selectedService.basePrice) || 0;
       
@@ -796,6 +807,27 @@ export default function ServiceRequestForm() {
               </button>
             }
           />
+        </div>
+      );
+    }
+    
+    // Special case: Amount of Products for Store Creation - show calculated price
+    if (selectedService?.title === "Store Creation" && fieldKey === "amount_of_products") {
+      return (
+        <div key={field.id} className="space-y-2">
+          <DynamicFormField
+            field={field}
+            value={formData[fieldKey]}
+            onChange={handleFormDataChange}
+            showPricing={showPricing || false}
+            onFileUpload={handleFileUpload}
+            onFileRemove={handleFileRemove}
+          />
+          {showPricing && calculatedPrice > 0 && (
+            <p className="text-sm text-sky-blue-accent font-semibold" data-testid="text-calculated-price">
+              Calculated Price: ${calculatedPrice.toFixed(2)}
+            </p>
+          )}
         </div>
       );
     }
