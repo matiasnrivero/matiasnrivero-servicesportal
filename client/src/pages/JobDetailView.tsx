@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { FileUploader } from "@/components/FileUploader";
 import { ImagePreviewTooltip } from "@/components/ImagePreviewTooltip";
 import { apiRequest } from "@/lib/queryClient";
+import { calculateServicePrice } from "@/lib/pricing";
 import { 
   ArrowLeft, 
   Download, 
@@ -31,7 +32,8 @@ import {
   X,
   XCircle,
   Upload,
-  Trash2
+  Trash2,
+  DollarSign
 } from "lucide-react";
 import type { ServiceRequest, Service, User as UserType, ServiceAttachment, Comment } from "@shared/schema";
 
@@ -704,6 +706,23 @@ export default function JobDetailView() {
                 <h1 className="text-2xl font-bold text-dark-blue-night" data-testid="text-job-title">
                   {service?.title || "Service Request"}
                 </h1>
+                {(() => {
+                  if (currentUser?.role !== "admin" && currentUser?.role !== "client") return null;
+                  const price = calculateServicePrice({
+                    serviceTitle: service?.title,
+                    pricingStructure: service?.pricingStructure,
+                    basePrice: service?.basePrice,
+                    formData: request.formData as Record<string, any> | null,
+                    finalPrice: request.finalPrice,
+                  });
+                  if (!price || price === "N/A") return null;
+                  return (
+                    <Badge variant="outline" className="text-sm bg-green-50 text-green-700 border-green-200" data-testid="text-job-price">
+                      <DollarSign className="h-3 w-3 mr-0.5" />
+                      {price.replace('$', '')}
+                    </Badge>
+                  );
+                })()}
                 <Badge variant="outline" className="text-sm" data-testid="text-job-id">
                   A-{request.id.slice(0, 5).toUpperCase()}
                 </Badge>
@@ -1457,7 +1476,6 @@ export default function JobDetailView() {
                     colorPreference: "Color Preference",
                     existingBrandColors: "Existing Brand Colors",
                     brandName: "Brand Name",
-                    calculatedPrice: "Estimated Price",
                     numberOfProducts: "Number of Products",
                     resolutionDPI: "Resolution (DPI)",
                     mockupType: "Mockup Type",
