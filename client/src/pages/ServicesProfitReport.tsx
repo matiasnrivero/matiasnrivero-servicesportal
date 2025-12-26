@@ -1,0 +1,641 @@
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
+import { format } from "date-fns";
+import { Header } from "@/components/Header";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { ChevronLeft, CalendarIcon, Search, DollarSign, TrendingUp, BarChart3 } from "lucide-react";
+import { calculateServicePrice } from "@/lib/pricing";
+import type { ServiceRequest, Service, User, VendorProfile, ServicePricingTier } from "@shared/schema";
+
+interface CurrentUser {
+  userId: string;
+  role: string;
+  username: string;
+}
+
+interface ReportRow {
+  requestId: string;
+  jobNumber: string;
+  clientName: string;
+  serviceName: string;
+  status: string;
+  assigneeName: string;
+  assigneeRole: string;
+  vendorId: string | null;
+  vendorName: string | null;
+  retailPrice: number;
+  vendorCost: number;
+  discount: number;
+  profit: number;
+  createdAt: Date;
+}
+
+export default function ServicesProfitReport() {
+  const [vendorFilter, setVendorFilter] = useState<string>("all");
+  const [serviceFilter, setServiceFilter] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [searchClient, setSearchClient] = useState("");
+  const [searchJobId, setSearchJobId] = useState("");
+
+  const { data: currentUser } = useQuery<CurrentUser>({
+    queryKey: ["/api/default-user"],
+  });
+
+  const { data: requests = [], isLoading: loadingRequests } = useQuery<ServiceRequest[]>({
+    queryKey: ["/api/service-requests"],
+  });
+
+  const { data: services = [] } = useQuery<Service[]>({
+    queryKey: ["/api/services"],
+  });
+
+  const { data: users = [] } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+  });
+
+  const { data: vendorProfiles = [] } = useQuery<VendorProfile[]>({
+    queryKey: ["/api/vendor-profiles"],
+  });
+
+  const { data: allTiers = [] } = useQuery<ServicePricingTier[]>({
+    queryKey: ["/api/service-pricing-tiers"],
+  });
+
+  const isAdmin = currentUser?.role === "admin";
+
+  const serviceMap = useMemo(() => {
+    const map: Record<string, Service> = {};
+    services.forEach(s => { map[s.id] = s; });
+    return map;
+  }, [services]);
+
+  const userMap = useMemo(() => {
+    const map: Record<string, User> = {};
+    users.forEach(u => { map[u.id] = u; });
+    return map;
+  }, [users]);
+
+  const vendorProfileMap = useMemo(() => {
+    const map: Record<string, VendorProfile> = {};
+    vendorProfiles.forEach(vp => { map[vp.userId] = vp; });
+    return map;
+  }, [vendorProfiles]);
+
+  const tiersByService = useMemo(() => {
+    const map: Record<string, ServicePricingTier[]> = {};
+    allTiers.forEach(tier => {
+      if (!map[tier.serviceId]) map[tier.serviceId] = [];
+      map[tier.serviceId].push(tier);
+    });
+    for (const serviceId in map) {
+      map[serviceId].sort((a, b) => a.sortOrder - b.sortOrder);
+    }
+    return map;
+  }, [allTiers]);
+
+  const vendors = useMemo(() => {
+    return users.filter(u => u.role === "vendor" || u.role === "vendor_designer");
+  }, [users]);
+
+  const calculateVendorCost = (
+    request: ServiceRequest,
+    service: Service | undefined,
+    assignee: User | undefined
+  ): number => {
+    if (!service || !assignee) return 0;
+    
+    if (assignee.role === "internal_designer") {
+      return 0;
+    }
+    
+    const vendorUserId = assignee.role === "vendor" ? assignee.id : assignee.vendorId;
+    if (!vendorUserId) return 0;
+    
+    const vendorProfile = vendorProfileMap[vendorUserId];
+    if (!vendorProfile) return 0;
+    
+    const pricingAgreements = vendorProfile.pricingAgreements as Record<string, {
+      basePrice?: number;
+      complexity?: Record<string, number>;
+      quantity?: Record<string, number>;
+    }> | null;
+    
+    if (!pricingAgreements) return 0;
+    
+    const servicePricing = pricingAgreements[service.title];
+    if (!servicePricing) return 0;
+    
+    const formData = request.formData as Record<string, unknown> | null;
+    const pricingStructure = service.pricingStructure || "single";
+    
+    if (pricingStructure === "complexity" && servicePricing.complexity) {
+      const complexity = (formData?.complexity || formData?.designComplexity) as string | undefined;
+      if (complexity) {
+        const tierKey = complexity.toLowerCase();
+        const price = servicePricing.complexity[tierKey];
+        if (price !== undefined) return price;
+      }
+    }
+    
+    if (pricingStructure === "quantity" && servicePricing.quantity) {
+      const quantity = parseInt(String(formData?.amount_of_products || formData?.amountOfProducts || formData?.quantity || 0));
+      if (quantity > 0) {
+        const tiers = tiersByService[service.id] || [];
+        for (const tier of tiers) {
+          const tierPrice = servicePricing.quantity[tier.label];
+          if (tierPrice !== undefined) {
+            const match = tier.label.match(/(\d+)\s*-\s*(\d+)/);
+            if (match) {
+              const min = parseInt(match[1]);
+              const max = parseInt(match[2]);
+              if (quantity >= min && quantity <= max) {
+                return quantity * tierPrice;
+              }
+            }
+            if (tier.label.includes("+")) {
+              const minMatch = tier.label.match(/(\d+)\+/);
+              if (minMatch) {
+                const min = parseInt(minMatch[1]);
+                if (quantity >= min) {
+                  return quantity * tierPrice;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    return servicePricing.basePrice || 0;
+  };
+
+  const reportData = useMemo((): ReportRow[] => {
+    return requests.map(request => {
+      const service = serviceMap[request.serviceId];
+      const client = userMap[request.userId];
+      const assignee = request.assigneeId ? userMap[request.assigneeId] : undefined;
+      const createdBy = userMap[request.userId];
+      
+      let retailPrice = 0;
+      if (createdBy?.role === "admin") {
+        retailPrice = 0;
+      } else if (request.finalPrice) {
+        retailPrice = parseFloat(String(request.finalPrice));
+      } else if (service) {
+        const formData = request.formData as Record<string, unknown> | null;
+        const priceStr = calculateServicePrice({
+          serviceTitle: service.title,
+          pricingStructure: service.pricingStructure || "single",
+          basePrice: service.basePrice,
+          formData: formData as Record<string, any> | null,
+          finalPrice: null,
+        });
+        if (priceStr !== "N/A") {
+          retailPrice = parseFloat(priceStr.replace("$", ""));
+        }
+      }
+      
+      const vendorCost = calculateVendorCost(request, service, assignee);
+      const discount = 0;
+      const profit = retailPrice - vendorCost - discount;
+      
+      let vendorId: string | null = null;
+      let vendorName: string | null = null;
+      if (assignee) {
+        if (assignee.role === "vendor") {
+          vendorId = assignee.id;
+          const vp = vendorProfileMap[assignee.id];
+          vendorName = vp?.companyName || assignee.username;
+        } else if (assignee.role === "vendor_designer" && assignee.vendorId) {
+          vendorId = assignee.vendorId;
+          const vp = vendorProfileMap[assignee.vendorId];
+          vendorName = vp?.companyName || null;
+        }
+      }
+      
+      const idPart = request.id.slice(-6).toUpperCase();
+      const jobNumber = `JOB-${idPart}`;
+      
+      return {
+        requestId: request.id,
+        jobNumber,
+        clientName: client?.username || "Unknown",
+        serviceName: service?.title || "Unknown Service",
+        status: request.status,
+        assigneeName: assignee?.username || "Unassigned",
+        assigneeRole: assignee?.role || "",
+        vendorId,
+        vendorName,
+        retailPrice,
+        vendorCost,
+        discount,
+        profit,
+        createdAt: new Date(request.createdAt),
+      };
+    });
+  }, [requests, serviceMap, userMap, vendorProfileMap, tiersByService]);
+
+  const filteredData = useMemo(() => {
+    return reportData.filter(row => {
+      if (vendorFilter !== "all") {
+        if (row.vendorId !== vendorFilter) return false;
+      }
+      
+      if (serviceFilter !== "all" && row.serviceName !== services.find(s => s.id === serviceFilter)?.title) {
+        return false;
+      }
+      
+      if (dateFrom && row.createdAt < dateFrom) return false;
+      if (dateTo) {
+        const endOfDay = new Date(dateTo);
+        endOfDay.setHours(23, 59, 59, 999);
+        if (row.createdAt > endOfDay) return false;
+      }
+      
+      if (searchClient && !row.clientName.toLowerCase().includes(searchClient.toLowerCase())) {
+        return false;
+      }
+      
+      if (searchJobId && !row.jobNumber.toLowerCase().includes(searchJobId.toLowerCase()) && 
+          !row.requestId.toLowerCase().includes(searchJobId.toLowerCase())) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [reportData, vendorFilter, serviceFilter, dateFrom, dateTo, searchClient, searchJobId, services]);
+
+  const totals = useMemo(() => {
+    return filteredData.reduce(
+      (acc, row) => ({
+        retailPrice: acc.retailPrice + row.retailPrice,
+        vendorCost: acc.vendorCost + row.vendorCost,
+        discount: acc.discount + row.discount,
+        profit: acc.profit + row.profit,
+      }),
+      { retailPrice: 0, vendorCost: 0, discount: 0, profit: 0 }
+    );
+  }, [filteredData]);
+
+  const profitMargin = totals.retailPrice > 0 
+    ? ((totals.profit / totals.retailPrice) * 100).toFixed(1) 
+    : "0.0";
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 py-8">
+          <Card>
+            <CardContent className="py-12 text-center">
+              <p className="text-dark-gray">
+                You don't have permission to view this report.
+              </p>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+      <main className="container mx-auto px-4 py-8">
+        <div className="flex items-center gap-4 mb-6">
+          <Link href="/reports">
+            <Button variant="ghost" size="icon" data-testid="button-back-reports">
+              <ChevronLeft className="w-5 h-5" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-dark-blue-night" data-testid="text-report-title">
+              Services Profit Report
+            </h1>
+            <p className="text-dark-gray text-sm mt-1">
+              Analyze retail prices, vendor costs, and profit margins
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-md bg-green-100">
+                  <DollarSign className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-dark-gray">Total Revenue</p>
+                  <p className="text-xl font-bold text-dark-blue-night" data-testid="text-total-revenue">
+                    ${totals.retailPrice.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-md bg-orange-100">
+                  <BarChart3 className="w-5 h-5 text-orange-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-dark-gray">Vendor Costs</p>
+                  <p className="text-xl font-bold text-dark-blue-night" data-testid="text-total-vendor-cost">
+                    ${totals.vendorCost.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-md bg-purple-100">
+                  <TrendingUp className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-dark-gray">Net Profit</p>
+                  <p className="text-xl font-bold text-dark-blue-night" data-testid="text-total-profit">
+                    ${totals.profit.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-md bg-blue-100">
+                  <BarChart3 className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-dark-gray">Profit Margin</p>
+                  <p className="text-xl font-bold text-dark-blue-night" data-testid="text-profit-margin">
+                    {profitMargin}%
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="mb-6">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base">Filters</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm">Vendor</Label>
+                <Select value={vendorFilter} onValueChange={setVendorFilter}>
+                  <SelectTrigger data-testid="select-vendor-filter">
+                    <SelectValue placeholder="All Vendors" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Vendors</SelectItem>
+                    {vendors.filter(v => v.role === "vendor").map(vendor => {
+                      const vp = vendorProfileMap[vendor.id];
+                      return (
+                        <SelectItem key={vendor.id} value={vendor.id}>
+                          {vp?.companyName || vendor.username}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">Service Type</Label>
+                <Select value={serviceFilter} onValueChange={setServiceFilter}>
+                  <SelectTrigger data-testid="select-service-filter">
+                    <SelectValue placeholder="All Services" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Services</SelectItem>
+                    {services.filter(s => s.isActive === 1).map(service => (
+                      <SelectItem key={service.id} value={service.id}>
+                        {service.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">Date From</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                      data-testid="button-date-from"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateFrom ? format(dateFrom, "MMM d, yyyy") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateFrom}
+                      onSelect={setDateFrom}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">Date To</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                      data-testid="button-date-to"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateTo ? format(dateTo, "MMM d, yyyy") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateTo}
+                      onSelect={setDateTo}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">Search Client</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-gray" />
+                  <Input
+                    placeholder="Client name..."
+                    value={searchClient}
+                    onChange={(e) => setSearchClient(e.target.value)}
+                    className="pl-9"
+                    data-testid="input-search-client"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">Search Job ID</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-gray" />
+                  <Input
+                    placeholder="Job ID..."
+                    value={searchJobId}
+                    onChange={(e) => setSearchJobId(e.target.value)}
+                    className="pl-9"
+                    data-testid="input-search-job-id"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {(vendorFilter !== "all" || serviceFilter !== "all" || dateFrom || dateTo || searchClient || searchJobId) && (
+              <div className="mt-4 flex items-center gap-2">
+                <span className="text-sm text-dark-gray">Active filters:</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setVendorFilter("all");
+                    setServiceFilter("all");
+                    setDateFrom(undefined);
+                    setDateTo(undefined);
+                    setSearchClient("");
+                    setSearchJobId("");
+                  }}
+                  data-testid="button-clear-filters"
+                >
+                  Clear all
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base flex items-center justify-between gap-2">
+              <span>Report Data ({filteredData.length} jobs)</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            {loadingRequests ? (
+              <div className="py-8 text-center text-dark-gray">Loading...</div>
+            ) : filteredData.length === 0 ? (
+              <div className="py-8 text-center text-dark-gray">No data matches your filters.</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Job ID</TableHead>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Service</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Assignee</TableHead>
+                    <TableHead>Vendor</TableHead>
+                    <TableHead className="text-right">Retail Price</TableHead>
+                    <TableHead className="text-right">Vendor Cost</TableHead>
+                    <TableHead className="text-right">Discount</TableHead>
+                    <TableHead className="text-right">Profit</TableHead>
+                    <TableHead>Created</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredData.map((row) => (
+                    <TableRow key={row.requestId} data-testid={`row-job-${row.requestId}`}>
+                      <TableCell>
+                        <Link href={`/jobs/${row.requestId}`}>
+                          <Button variant="link" className="p-0 h-auto text-sky-blue-accent" data-testid={`link-job-${row.requestId}`}>
+                            {row.jobNumber}
+                          </Button>
+                        </Link>
+                      </TableCell>
+                      <TableCell>{row.clientName}</TableCell>
+                      <TableCell>{row.serviceName}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs capitalize">
+                          {row.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {row.assigneeName}
+                        {row.assigneeRole === "internal_designer" && (
+                          <span className="text-xs text-dark-gray ml-1">(Internal)</span>
+                        )}
+                      </TableCell>
+                      <TableCell>{row.vendorName || "-"}</TableCell>
+                      <TableCell className="text-right">
+                        {row.retailPrice === 0 && row.assigneeRole !== "internal_designer" ? (
+                          <span className="text-dark-gray">$0.00</span>
+                        ) : (
+                          <span className="text-green-600">${row.retailPrice.toFixed(2)}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {row.vendorCost === 0 ? (
+                          <span className="text-dark-gray">$0.00</span>
+                        ) : (
+                          <span className="text-orange-600">${row.vendorCost.toFixed(2)}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right text-dark-gray">
+                        ${row.discount.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className={row.profit >= 0 ? "text-purple-600 font-medium" : "text-red-600 font-medium"}>
+                          ${row.profit.toFixed(2)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-sm text-dark-gray">
+                        {format(row.createdAt, "MMM d, yyyy")}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </main>
+    </div>
+  );
+}

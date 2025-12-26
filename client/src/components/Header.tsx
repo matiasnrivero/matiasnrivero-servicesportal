@@ -74,11 +74,14 @@ export function Header() {
   const isInternalDesigner = currentUser?.role === "internal_designer";
   const isVendor = currentUser?.role === "vendor";
   const isVendorDesigner = currentUser?.role === "vendor_designer";
+  const isClient = currentUser?.role === "client";
   const canManageUsers = isAdmin || isInternalDesigner;
   const canViewVendorProfile = isVendor;
   const canViewVendorsList = isAdmin;
   // Vendor and Vendor Designer should not see Services menu (they can't create new requests)
   const canViewServices = !isVendor && !isVendorDesigner;
+  // Reports visible to Admin, Client, Vendor (not Internal Designer or Vendor Designer for now)
+  const canViewReports = isAdmin || isClient || isVendor;
 
   return (
     <>
@@ -168,6 +171,17 @@ export function Header() {
                 data-testid="nav-settings"
               >
                 Settings
+              </Button>
+            </Link>
+          )}
+          {canViewReports && (
+            <Link href="/reports">
+              <Button
+                variant={location.startsWith("/reports") ? "default" : "ghost"}
+                className={location.startsWith("/reports") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
+                data-testid="nav-reports"
+              >
+                Reports
               </Button>
             </Link>
           )}
