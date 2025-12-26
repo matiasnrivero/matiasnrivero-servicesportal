@@ -380,6 +380,7 @@ export default function BundleRequestForm() {
   // Check if we have bundle-level fields to show
   const hasBundleFields = bundleFields && bundleFields.length > 0;
   const showAssigneeSelector = currentUser?.role !== "client";
+  const showPricing = currentUser?.role === "client" || currentUser?.role === "admin";
 
   return (
     <div className="min-h-screen bg-background">
@@ -404,20 +405,22 @@ export default function BundleRequestForm() {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <Card className="mb-6">
-          <CardHeader className="flex flex-row items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
-              <Package className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <CardTitle data-testid="text-bundle-name">{bundle.name}</CardTitle>
-              {bundle.description && (
-                <p className="text-sm text-muted-foreground mt-1">{bundle.description}</p>
+      <div className="p-8">
+        <div className="max-w-4xl mx-auto">
+          {/* Bundle Header - matching ad-hoc service form style */}
+          <div className="mb-6">
+            <h1 className="font-title-semibold text-dark-blue-night text-2xl flex items-center gap-3" data-testid="text-bundle-name">
+              {bundle.name}
+              {showPricing && bundle.finalPrice && (
+                <span className="text-sky-blue-accent font-body-2-semibold">
+                  ${parseFloat(bundle.finalPrice).toFixed(2)}
+                </span>
               )}
-            </div>
-          </CardHeader>
-        </Card>
+            </h1>
+            {bundle.description && (
+              <p className="font-body-reg text-dark-gray mt-1">{bundle.description}</p>
+            )}
+          </div>
 
         {/* Bundle Header Section - General Info */}
         {(hasBundleFields || showAssigneeSelector) && (
@@ -560,6 +563,7 @@ export default function BundleRequestForm() {
               "Submit Request"
             )}
           </Button>
+        </div>
         </div>
       </div>
     </div>
