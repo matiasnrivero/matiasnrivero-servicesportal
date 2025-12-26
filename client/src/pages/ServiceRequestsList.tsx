@@ -35,16 +35,6 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, UserCog, XCircle, Package, Boxes, LayoutGrid, List, Trash2 } from "lucide-react";
 import { BoardView } from "@/components/BoardView";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { calculateServicePrice } from "@/lib/pricing";
 import type { ServiceRequest, Service, User, BundleRequest, Bundle } from "@shared/schema";
 
@@ -78,8 +68,6 @@ export default function ServiceRequestsList() {
     const saved = localStorage.getItem("serviceRequestsViewMode");
     return (saved as "list" | "board") || "list";
   });
-  const [deleteRequestId, setDeleteRequestId] = useState<string | null>(null);
-  const [deleteJobNumber, setDeleteJobNumber] = useState<string>("");
 
   useEffect(() => {
     localStorage.setItem("serviceRequestsViewMode", viewMode);
@@ -154,8 +142,6 @@ export default function ServiceRequestsList() {
         title: "Job deleted", 
         description: "The service request has been permanently deleted." 
       });
-      setDeleteRequestId(null);
-      setDeleteJobNumber("");
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to delete service request", variant: "destructive" });
@@ -402,15 +388,16 @@ export default function ServiceRequestsList() {
                                 </Link>
                                 {currentUser?.role === "admin" && (
                                   <Button 
-                                    size="sm" 
-                                    variant="destructive"
+                                    size="icon" 
+                                    variant="ghost"
                                     onClick={() => {
-                                      setDeleteRequestId(request.id);
-                                      setDeleteJobNumber(`A-${request.id.slice(0, 5).toUpperCase()}`);
+                                      if (confirm(`Are you sure you want to delete job A-${request.id.slice(0, 5).toUpperCase()}?`)) {
+                                        deleteRequestMutation.mutate(request.id);
+                                      }
                                     }}
                                     data-testid={`button-delete-${request.id}`}
                                   >
-                                    <Trash2 className="h-4 w-4" />
+                                    <Trash2 className="h-4 w-4 text-destructive" />
                                   </Button>
                                 )}
                               </div>
@@ -527,28 +514,6 @@ export default function ServiceRequestsList() {
         </Card>
       </div>
 
-      <AlertDialog open={!!deleteRequestId} onOpenChange={(open) => !open && setDeleteRequestId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Service Request</AlertDialogTitle>
-            <AlertDialogDescription>
-              You are about to permanently delete job <span className="font-semibold">{deleteJobNumber}</span>. 
-              This action cannot be undone. All associated files, comments, and deliveries will also be removed.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteRequestId && deleteRequestMutation.mutate(deleteRequestId)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={deleteRequestMutation.isPending}
-              data-testid="button-confirm-delete"
-            >
-              {deleteRequestMutation.isPending ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </main>
   );
 }
