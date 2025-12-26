@@ -29,7 +29,8 @@ import {
   Users,
   Reply,
   X,
-  XCircle
+  XCircle,
+  Upload
 } from "lucide-react";
 import type { ServiceRequest, Service, User as UserType, ServiceAttachment, Comment } from "@shared/schema";
 
@@ -137,6 +138,8 @@ export default function JobDetailView() {
 
   const requestAttachments = attachments.filter(a => a.kind === "request");
   const deliverableAttachments = attachments.filter(a => a.kind === "deliverable");
+  // Pending deliverables are unversioned attachments (not yet linked to a delivery)
+  const pendingDeliverables = deliverableAttachments.filter(a => !a.deliveryId);
 
   const isDesigner = currentUser?.role === "designer";
   const isClient = currentUser?.role === "client" || currentUser?.role === "distributor";
@@ -498,8 +501,46 @@ export default function JobDetailView() {
           </div>
         )}
 
-        {/* Fallback: Show unversioned deliverable attachments for backwards compatibility */}
-        {deliveryVersions.length === 0 && deliverableAttachments.length > 0 && (
+        {/* Show pending uploads (unversioned attachments waiting for next delivery) */}
+        {pendingDeliverables.length > 0 && (
+          <div className="p-4 rounded-lg border bg-blue-50 border-blue-200" data-testid="pending-deliverables">
+            <div className="flex items-center gap-2 mb-3">
+              <Badge variant="outline" className="text-blue-600 border-blue-300">
+                Pending v{deliveryVersions.length > 0 ? deliveryVersions[0].version + 1 : 1}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                {pendingDeliverables.length} file{pendingDeliverables.length !== 1 ? 's' : ''} ready for delivery
+              </span>
+            </div>
+            <div className="space-y-2">
+              {pendingDeliverables.map((attachment) => (
+                <div 
+                  key={attachment.id}
+                  className="flex items-center justify-between p-2 bg-background rounded border"
+                >
+                  <div className="flex items-center gap-3">
+                    <Upload className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                    <ImagePreviewTooltip
+                      fileUrl={attachment.fileUrl}
+                      fileName={attachment.fileName}
+                      thumbnailSize="sm"
+                    />
+                    <span className="text-sm text-dark-blue-night truncate">{attachment.fileName}</span>
+                  </div>
+                  <a href={attachment.fileUrl} target="_blank" rel="noopener noreferrer">
+                    <Button size="sm" variant="outline" data-testid={`button-download-pending-${attachment.id}`}>
+                      <Download className="h-3 w-3 mr-1" />
+                      Preview
+                    </Button>
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Fallback: Show unversioned deliverable attachments for backwards compatibility (only when no versions exist) */}
+        {deliveryVersions.length === 0 && pendingDeliverables.length === 0 && deliverableAttachments.length > 0 && (
           <div className="space-y-2">
             {deliverableAttachments.map((attachment) => (
               <div 
