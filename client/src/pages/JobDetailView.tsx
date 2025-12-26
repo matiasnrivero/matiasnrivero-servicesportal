@@ -663,29 +663,11 @@ export default function JobDetailView() {
                 <CardTitle className="text-lg">General Info</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
-                {/* Row 1: Client (left) / Due Date (right) */}
+                {/* System fields: Client and Assignee */}
                 <div className="p-3 bg-blue-lavender/30 rounded-lg">
                   <p className="text-xs text-dark-gray mb-1">Client</p>
                   <p className="text-sm font-medium text-dark-blue-night" data-testid="text-client">
                     {request.customerName || "N/A"}
-                  </p>
-                </div>
-
-                <div className="p-3 bg-blue-lavender/30 rounded-lg flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-dark-gray" />
-                  <div>
-                    <p className="text-xs text-dark-gray">Due Date</p>
-                    <p className="text-sm font-medium text-dark-blue-night" data-testid="text-due-date">
-                      {request.dueDate ? format(new Date(request.dueDate), "MM/dd/yyyy") : "Not set"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Row 2: Order Reference (left) / Assignee (right - designer only) */}
-                <div className="p-3 bg-blue-lavender/30 rounded-lg">
-                  <p className="text-xs text-dark-gray mb-1">Order Reference</p>
-                  <p className="text-sm font-medium text-dark-blue-night" data-testid="text-order-ref">
-                    {request.orderNumber || "N/A"}
                   </p>
                 </div>
 
@@ -1390,7 +1372,7 @@ export default function JobDetailView() {
                   // Only skip general_info and delivery fields when we have actual serviceFields data
                   // This ensures legacy requests without metadata still show all their fields in Info Details
                   if (serviceFields.length > 0) {
-                    skipFields = [...skipFields, ...generalInfoFieldKeys, ...deliveryFieldKeys];
+                    skipFields = [...skipFields, ...Array.from(generalInfoFieldKeys), ...Array.from(deliveryFieldKeys)];
                   }
                   
                   // Define preferred field order with paired fields (left, right) for side-by-side display

@@ -43,6 +43,8 @@ interface EnrichedBundleField {
   defaultValue: any;
   value: any;
   displayLabelOverride?: string | null;
+  uiGroup?: string | null;
+  sortOrder?: number;
 }
 
 interface LineItemField {
@@ -400,36 +402,11 @@ export default function BundleRequestDetail() {
                 <CardTitle className="text-lg">General Info</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
-                {/* Row 1: Client (left) / Due Date (right) */}
+                {/* System fields: Client and Assignee */}
                 <div className="p-3 bg-blue-lavender/30 rounded-lg">
                   <p className="text-xs text-dark-gray mb-1">Client</p>
                   <p className="text-sm font-medium text-dark-blue-night" data-testid="text-client">
                     {requester?.username || "N/A"}
-                  </p>
-                </div>
-
-                <div className="p-3 bg-blue-lavender/30 rounded-lg flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-dark-gray" />
-                  <div>
-                    <p className="text-xs text-dark-gray">Due Date</p>
-                    <p className="text-sm font-medium text-dark-blue-night" data-testid="text-due-date">
-                      {request.dueDate ? format(new Date(request.dueDate), "MM/dd/yyyy") : "Not set"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Row 2: Order Reference (left) / Assignee (right) */}
-                <div className="p-3 bg-blue-lavender/30 rounded-lg">
-                  <p className="text-xs text-dark-gray mb-1">Order Reference</p>
-                  <p className="text-sm font-medium text-dark-blue-night" data-testid="text-order-ref">
-                    {(() => {
-                      const orderRefField = (bundleFields ?? []).find(bf => 
-                        bf.inputField?.fieldKey === "order_project_reference" || 
-                        bf.inputField?.label?.toLowerCase().includes("order") ||
-                        bf.inputField?.label?.toLowerCase().includes("reference")
-                      );
-                      return orderRefField?.value || "N/A";
-                    })()}
                   </p>
                 </div>
 
@@ -441,40 +418,76 @@ export default function BundleRequestDetail() {
                     </p>
                   </div>
                 )}
+                
+                {/* Render dynamic general_info fields from bundleFields */}
+                {(bundleFields ?? [])
+                  .filter(bf => bf.uiGroup === "general_info" && bf.inputField?.inputFor !== "delivery")
+                  .sort((a, b) => (a.sortOrder ?? 9999) - (b.sortOrder ?? 9999))
+                  .map((bf) => {
+                    const value = bf.value;
+                    if (value === null || value === undefined || value === "") return null;
+                    
+                    let displayValue: string;
+                    if (typeof value === "boolean") {
+                      displayValue = value ? "Yes" : "No";
+                    } else if (Array.isArray(value)) {
+                      displayValue = value.join(", ");
+                    } else {
+                      displayValue = String(value);
+                    }
+                    
+                    return (
+                      <div key={bf.id} className="p-3 bg-blue-lavender/30 rounded-lg">
+                        <p className="text-xs text-dark-gray mb-1">
+                          {bf.displayLabelOverride || bf.inputField?.label || "Field"}
+                        </p>
+                        <p className="text-sm font-medium text-dark-blue-night" data-testid={`text-bundle-field-${bf.id}`}>
+                          {displayValue}
+                        </p>
+                      </div>
+                    );
+                  })}
               </CardContent>
             </Card>
 
+            {/* Render non-general_info bundle fields in a separate section */}
             {(bundleFields ?? []).filter(bf => 
-              bf.inputField?.fieldKey !== "order_project_reference" && 
-              bf.inputField?.fieldKey !== "due_date" &&
-              !bf.inputField?.label?.toLowerCase().includes("order") &&
-              !bf.inputField?.label?.toLowerCase().includes("reference") &&
+              bf.uiGroup !== "general_info" && 
               bf.inputField?.inputFor !== "delivery"
             ).length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Artwork Composition</CardTitle>
+                  <CardTitle className="text-lg">Bundle Details</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     {(bundleFields ?? [])
-                      .filter(bf => 
-                        bf.inputField?.fieldKey !== "order_project_reference" && 
-                        bf.inputField?.fieldKey !== "due_date" &&
-                        !bf.inputField?.label?.toLowerCase().includes("order") &&
-                        !bf.inputField?.label?.toLowerCase().includes("reference") &&
-                        bf.inputField?.inputFor !== "delivery"
-                      )
-                      .map((bf) => (
-                      <div key={bf.id} className="flex flex-col gap-1">
-                        <Label className="text-sm font-medium text-muted-foreground">
-                          {bf.displayLabelOverride || bf.inputField?.label || "Field"}
-                        </Label>
-                        <div className="text-sm" data-testid={`text-bundle-field-${bf.id}`}>
-                          {renderFieldValue(bf.value)}
-                        </div>
-                      </div>
-                    ))}
+                      .filter(bf => bf.uiGroup !== "general_info" && bf.inputField?.inputFor !== "delivery")
+                      .sort((a, b) => (a.sortOrder ?? 9999) - (b.sortOrder ?? 9999))
+                      .map((bf) => {
+                        const value = bf.value;
+                        if (value === null || value === undefined || value === "") return null;
+                        
+                        let displayValue: string;
+                        if (typeof value === "boolean") {
+                          displayValue = value ? "Yes" : "No";
+                        } else if (Array.isArray(value)) {
+                          displayValue = value.join(", ");
+                        } else {
+                          displayValue = String(value);
+                        }
+                        
+                        return (
+                          <div key={bf.id} className="flex flex-col gap-1">
+                            <Label className="text-sm font-medium text-muted-foreground">
+                              {bf.displayLabelOverride || bf.inputField?.label || "Field"}
+                            </Label>
+                            <div className="text-sm" data-testid={`text-bundle-field-${bf.id}`}>
+                              {displayValue}
+                            </div>
+                          </div>
+                        );
+                      })}
                   </div>
                 </CardContent>
               </Card>
