@@ -2809,6 +2809,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== VENDOR BUNDLE/PACK COSTS ====================
 
+  // Get all vendor bundle costs (for reports - admin only)
+  app.get("/api/vendor-bundle-costs", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const costs = await storage.getAllVendorBundleCosts();
+      res.json(costs);
+    } catch (error) {
+      console.error("Error fetching all vendor bundle costs:", error);
+      res.status(500).json({ error: "Failed to fetch vendor bundle costs" });
+    }
+  });
+
   // Get vendor bundle costs for a specific vendor
   app.get("/api/vendors/:vendorId/bundle-costs", async (req, res) => {
     try {

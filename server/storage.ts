@@ -212,6 +212,7 @@ export interface IStorage {
   deleteBundleField(id: string): Promise<void>;
 
   // Vendor Bundle Cost methods
+  getAllVendorBundleCosts(): Promise<VendorBundleCost[]>;
   getVendorBundleCosts(vendorId: string): Promise<VendorBundleCost[]>;
   getVendorBundleCost(vendorId: string, bundleId: string): Promise<VendorBundleCost | undefined>;
   upsertVendorBundleCost(vendorId: string, bundleId: string, cost: string): Promise<VendorBundleCost>;
@@ -821,6 +822,10 @@ export class DbStorage implements IStorage {
   }
 
   // Vendor Bundle Cost methods
+  async getAllVendorBundleCosts(): Promise<VendorBundleCost[]> {
+    return await db.select().from(vendorBundleCosts);
+  }
+
   async getVendorBundleCosts(vendorId: string): Promise<VendorBundleCost[]> {
     return await db.select().from(vendorBundleCosts).where(eq(vendorBundleCosts.vendorId, vendorId));
   }
