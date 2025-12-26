@@ -124,6 +124,7 @@ export default function JobDetailView() {
 
   const isDesigner = currentUser?.role === "designer";
   const isClient = currentUser?.role === "client" || currentUser?.role === "distributor";
+  const canSeePricing = ["admin", "client"].includes(currentUser?.role || "");
   const canManageJobs = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(currentUser?.role || "");
   const canTakeJob = ["admin", "internal_designer", "designer", "vendor_designer"].includes(currentUser?.role || "");
 
@@ -1334,8 +1335,9 @@ export default function JobDetailView() {
                   const fieldLabels: Record<string, string> = { ...fallbackLabels, ...dynamicLabels };
                   
                   // Fields to skip (already shown elsewhere or internal)
-                  // Base skip fields for all form types (calculatedPrice hidden from designers)
-                  const baseSkipFields = ['uploadedFiles', 'artworkFile', 'notes', 'calculatedPrice'];
+                  // Base skip fields for all form types
+                  // calculatedPrice only visible to admin/client/distributor roles
+                  const baseSkipFields = ['uploadedFiles', 'artworkFile', 'notes', ...(canSeePricing ? [] : ['calculatedPrice'])];
                   
                   // Check if this is Store Creation form (has storeName field)
                   const isStoreCreationForm = formData?.storeName !== undefined;

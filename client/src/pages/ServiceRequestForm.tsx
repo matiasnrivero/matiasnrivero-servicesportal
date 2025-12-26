@@ -198,10 +198,10 @@ const orientationOptions = ["Horizontal", "Vertical"];
 const supplierOptions = ["SanMar", "S&S Activewear", "alphabroder", "Augusta Sportswear", "Other"];
 
 const storeCreationPricing = [
-  { minProducts: 1, maxProducts: 50, pricePerItem: 1.50 },
-  { minProducts: 51, maxProducts: 75, pricePerItem: 1.30 },
-  { minProducts: 76, maxProducts: 100, pricePerItem: 1.10 },
-  { minProducts: 101, maxProducts: 999999, pricePerItem: 1.00 },
+  { minProducts: 1, maxProducts: 50, pricePerItem: 2.00 },
+  { minProducts: 51, maxProducts: 75, pricePerItem: 1.80 },
+  { minProducts: 76, maxProducts: 100, pricePerItem: 1.50 },
+  { minProducts: 101, maxProducts: 999999, pricePerItem: 1.10 },
 ];
 
 function calculateStoreCreationPrice(productCount: number): number {
