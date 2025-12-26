@@ -20,11 +20,11 @@ interface BoardViewProps {
 }
 
 const statusColumns = [
-  { id: "pending", label: "Pending", icon: Clock, color: "bg-yellow-500" },
-  { id: "in-progress", label: "In Progress", icon: RefreshCw, color: "bg-blue-500" },
-  { id: "change-request", label: "Change Request", icon: AlertCircle, color: "bg-orange-500" },
-  { id: "delivered", label: "Delivered", icon: CheckCircle2, color: "bg-green-500" },
-  { id: "canceled", label: "Canceled", icon: XCircle, color: "bg-gray-500" },
+  { id: "pending", label: "Pending", icon: Clock, bgColor: "bg-yellow-100 dark:bg-yellow-900/30", textColor: "text-yellow-700 dark:text-yellow-400", borderColor: "border-yellow-300 dark:border-yellow-700" },
+  { id: "in-progress", label: "In Progress", icon: RefreshCw, bgColor: "bg-blue-100 dark:bg-blue-900/30", textColor: "text-blue-700 dark:text-blue-400", borderColor: "border-blue-300 dark:border-blue-700" },
+  { id: "change-request", label: "Change Request", icon: AlertCircle, bgColor: "bg-orange-100 dark:bg-orange-900/30", textColor: "text-orange-700 dark:text-orange-400", borderColor: "border-orange-300 dark:border-orange-700" },
+  { id: "delivered", label: "Delivered", icon: CheckCircle2, bgColor: "bg-green-100 dark:bg-green-900/30", textColor: "text-green-700 dark:text-green-400", borderColor: "border-green-300 dark:border-green-700" },
+  { id: "canceled", label: "Canceled", icon: XCircle, bgColor: "bg-gray-100 dark:bg-gray-800/30", textColor: "text-gray-600 dark:text-gray-400", borderColor: "border-gray-300 dark:border-gray-600" },
 ];
 
 function isDistributor(role: string | undefined): boolean {
@@ -66,13 +66,22 @@ export function BoardView({
   };
 
   const getPrice = (request: ServiceRequest | BundleRequest) => {
+    // For adhoc requests, check dedicated finalPrice column first
+    if (type === "adhoc") {
+      const serviceRequest = request as ServiceRequest;
+      if (serviceRequest.finalPrice) {
+        return `$${parseFloat(serviceRequest.finalPrice).toFixed(2)}`;
+      }
+    }
+    // Fallback: check formData.calculatedPrice (legacy)
     const formData = request.formData as Record<string, any> | null;
     if (formData?.calculatedPrice) {
       return `$${formData.calculatedPrice}`;
     }
+    // Last fallback: use base price / bundle price
     if (type === "adhoc") {
       const service = services.find((s) => s.id === (request as ServiceRequest).serviceId);
-      return service?.priceRange || "N/A";
+      return service?.basePrice ? `$${parseFloat(service.basePrice).toFixed(2)}` : "N/A";
     } else {
       const bundle = bundles.find((b) => b.id === (request as BundleRequest).bundleId);
       return bundle?.finalPrice ? `$${bundle.finalPrice}` : "N/A";
@@ -133,8 +142,10 @@ export function BoardView({
               data-testid={`column-${column.id}`}
             >
               <div className="flex items-center gap-2 p-3 border-b">
-                <div className={`w-2 h-2 rounded-full ${column.color}`} />
-                <span className="font-medium text-sm">{column.label}</span>
+                <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md border ${column.bgColor} ${column.textColor} ${column.borderColor}`}>
+                  <StatusIcon className="h-3.5 w-3.5" />
+                  <span className="font-medium text-xs uppercase tracking-wide">{column.label}</span>
+                </div>
                 <Badge variant="secondary" className="ml-auto text-xs">
                   {columnRequests.length}
                 </Badge>
