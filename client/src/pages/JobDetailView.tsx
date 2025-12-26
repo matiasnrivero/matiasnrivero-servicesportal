@@ -1497,7 +1497,8 @@ export default function JobDetailView() {
                   // Fields to skip (already shown elsewhere or internal)
                   // Base skip fields for all form types
                   // calculatedPrice is now shown in the top bar, so skip it from Info Details for all users
-                  const baseSkipFields = ['uploadedFiles', 'artworkFile', 'notes', 'calculatedPrice'];
+                  // selectedAddOns is only configured for Embroidery Digitizing, skip it for all other services
+                  const baseSkipFields = ['uploadedFiles', 'artworkFile', 'notes', 'calculatedPrice', 'selectedAddOns'];
                   
                   // Check if this is Store Creation form (has storeName field)
                   const isStoreCreationForm = formData?.storeName !== undefined;
