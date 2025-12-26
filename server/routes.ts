@@ -782,6 +782,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete an attachment (only pending/unversioned attachments can be deleted)
+  app.delete("/api/attachments/:attachmentId", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const attachment = await storage.getAttachment(req.params.attachmentId);
+      if (!attachment) {
+        return res.status(404).json({ error: "Attachment not found" });
+      }
+
+      // Only allow deleting unversioned (pending) attachments
+      if (attachment.deliveryId) {
+        return res.status(400).json({ error: "Cannot delete delivered attachments" });
+      }
+
+      // Check permissions: only the uploader, admin, or request assignee can delete
+      const request = await storage.getServiceRequest(attachment.requestId);
+      const canDelete = 
+        sessionUser.role === "admin" ||
+        attachment.uploadedBy === sessionUserId ||
+        (request && request.assigneeId === sessionUserId);
+
+      if (!canDelete) {
+        return res.status(403).json({ error: "You don't have permission to delete this attachment" });
+      }
+
+      await storage.deleteAttachment(req.params.attachmentId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting attachment:", error);
+      res.status(500).json({ error: "Failed to delete attachment" });
+    }
+  });
+
   // Get delivery versions for a service request (file deliverables only)
   app.get("/api/service-requests/:requestId/deliveries", async (req, res) => {
     try {

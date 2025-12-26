@@ -141,6 +141,8 @@ export interface IStorage {
   getAttachmentsByRequest(requestId: string): Promise<ServiceAttachment[]>;
   getAttachmentsByKind(requestId: string, kind: string): Promise<ServiceAttachment[]>;
   createAttachment(attachment: InsertAttachment): Promise<ServiceAttachment>;
+  getAttachment(id: string): Promise<ServiceAttachment | undefined>;
+  deleteAttachment(id: string): Promise<void>;
 
   // Comment methods
   getCommentsByRequest(requestId: string, visibility?: string): Promise<Comment[]>;
@@ -524,6 +526,17 @@ export class DbStorage implements IStorage {
   async createAttachment(attachment: InsertAttachment): Promise<ServiceAttachment> {
     const result = await db.insert(serviceAttachments).values(attachment).returning();
     return result[0];
+  }
+
+  async getAttachment(id: string): Promise<ServiceAttachment | undefined> {
+    const result = await db.select().from(serviceAttachments)
+      .where(eq(serviceAttachments.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async deleteAttachment(id: string): Promise<void> {
+    await db.delete(serviceAttachments).where(eq(serviceAttachments.id, id));
   }
 
   // Comment methods

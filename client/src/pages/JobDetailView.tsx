@@ -30,7 +30,8 @@ import {
   Reply,
   X,
   XCircle,
-  Upload
+  Upload,
+  Trash2
 } from "lucide-react";
 import type { ServiceRequest, Service, User as UserType, ServiceAttachment, Comment } from "@shared/schema";
 
@@ -186,6 +187,19 @@ export default function JobDetailView() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to submit deliverables.", variant: "destructive" });
+    },
+  });
+
+  const deleteAttachmentMutation = useMutation({
+    mutationFn: async (attachmentId: string) => {
+      return apiRequest("DELETE", `/api/attachments/${attachmentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests", requestId, "attachments"] });
+      toast({ title: "File removed", description: "The pending file has been deleted." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete file.", variant: "destructive" });
     },
   });
 
@@ -527,12 +541,24 @@ export default function JobDetailView() {
                     />
                     <span className="text-sm text-dark-blue-night truncate">{attachment.fileName}</span>
                   </div>
-                  <a href={attachment.fileUrl} target="_blank" rel="noopener noreferrer">
-                    <Button size="sm" variant="outline" data-testid={`button-download-pending-${attachment.id}`}>
-                      <Download className="h-3 w-3 mr-1" />
-                      Preview
+                  <div className="flex items-center gap-2">
+                    <a href={attachment.fileUrl} target="_blank" rel="noopener noreferrer">
+                      <Button size="sm" variant="outline" data-testid={`button-download-pending-${attachment.id}`}>
+                        <Download className="h-3 w-3 mr-1" />
+                        Preview
+                      </Button>
+                    </a>
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => deleteAttachmentMutation.mutate(attachment.id)}
+                      disabled={deleteAttachmentMutation.isPending}
+                      data-testid={`button-delete-pending-${attachment.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
-                  </a>
+                  </div>
                 </div>
               ))}
             </div>
