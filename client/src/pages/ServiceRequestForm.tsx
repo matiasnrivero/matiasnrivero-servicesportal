@@ -1745,9 +1745,22 @@ export default function ServiceRequestForm() {
                       </div>
                     ))}
                   </div>
-                  {showPricing && selectedAddOns.size > 0 && (
-                    <div className="flex justify-end text-lg font-semibold text-dark-blue-night">
-                      Total: ${calculatedPrice.toFixed(2)}
+                  {showPricing && (
+                    <div className="flex flex-col items-end gap-1 pt-2 border-t mt-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">Base Price:</span>
+                        <span className="text-sky-blue-accent font-semibold">
+                          ${parseFloat(selectedService?.basePrice || "0").toFixed(2)}
+                        </span>
+                      </div>
+                      {selectedAddOns.size > 0 && (
+                        <div className="flex items-center gap-2 text-lg font-semibold">
+                          <span className="text-muted-foreground">Total:</span>
+                          <span className="text-sky-blue-accent">
+                            ${calculatedPrice.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

@@ -1590,8 +1590,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      // Allow admin, vendor, and vendor_designer to read bundle line items
-      if (!sessionUser || !["admin", "vendor", "vendor_designer"].includes(sessionUser.role)) {
+      // Allow admin, internal_designer, vendor, and vendor_designer to read bundle line items
+      if (!sessionUser || !["admin", "internal_designer", "vendor", "vendor_designer"].includes(sessionUser.role)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const items = await storage.getAllBundleLineItems();
@@ -1733,8 +1733,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      // Allow admin, vendor, and vendor_designer to read bundles
-      if (!sessionUser || !["admin", "vendor", "vendor_designer"].includes(sessionUser.role)) {
+      // Allow admin, internal_designer, vendor, and vendor_designer to read bundles
+      if (!sessionUser || !["admin", "internal_designer", "vendor", "vendor_designer"].includes(sessionUser.role)) {
         return res.status(403).json({ error: "Access denied" });
       }
       const bundlesList = await storage.getAllBundles();
@@ -2035,7 +2035,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== INPUT FIELDS ROUTES ====================
 
-  // Get all input fields (admin only)
+  // Get all input fields (admin and internal_designer)
   app.get("/api/input-fields", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2043,8 +2043,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      // Allow admin and internal_designer to view input fields
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       const fields = await storage.getAllInputFields();
       res.json(fields);
@@ -2054,7 +2055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get single input field (admin only)
+  // Get single input field (admin and internal_designer)
   app.get("/api/input-fields/:id", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2062,8 +2063,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      // Allow admin and internal_designer to view input field details
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       const field = await storage.getInputField(req.params.id);
       if (!field) {
@@ -2136,7 +2138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get input field with service usage info (admin only)
+  // Get input field with service usage info (admin and internal_designer)
   app.get("/api/input-fields/:id/usage", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2144,8 +2146,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      // Allow admin and internal_designer to view input field usage
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       const serviceFieldsList = await storage.getServiceFieldsByInputField(req.params.id);
       const allServices = await storage.getAllServices();
@@ -2169,7 +2172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== SERVICE FIELDS ROUTES ====================
 
-  // Get service fields for a service (admin only)
+  // Get service fields for a service (admin and internal_designer)
   app.get("/api/services/:serviceId/fields", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2177,8 +2180,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      // Allow admin and internal_designer to view service fields
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       const fields = await storage.getServiceFields(req.params.serviceId);
       res.json(fields);
@@ -2250,7 +2254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== LINE ITEM FIELDS ROUTES ====================
 
-  // Get line item fields for a line item (admin only)
+  // Get line item fields for a line item (admin and internal_designer)
   app.get("/api/line-items/:lineItemId/fields", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2258,8 +2262,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      // Allow admin and internal_designer to view line item fields
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       const fields = await storage.getLineItemFields(req.params.lineItemId);
       res.json(fields);
@@ -2329,7 +2334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get line item field usage by input field (admin only)
+  // Get line item field usage by input field (admin and internal_designer)
   app.get("/api/input-fields/:id/line-item-usage", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2337,8 +2342,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      // Allow admin and internal_designer to view line item field usage
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       const lineItemFieldsList = await storage.getLineItemFieldsByInputField(req.params.id);
       const allLineItems = await storage.getAllBundleLineItems();
@@ -2362,7 +2368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== BUNDLE FIELDS ROUTES ====================
 
-  // Get bundle fields for a bundle (admin only)
+  // Get bundle fields for a bundle (admin and internal_designer)
   app.get("/api/bundles/:bundleId/fields", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2370,8 +2376,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      // Allow admin and internal_designer to view bundle fields
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       const bundleFields = await storage.getBundleFields(req.params.bundleId);
       res.json(bundleFields);
@@ -2441,7 +2448,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get bundle field usage for an input field (admin only)
+  // Get bundle field usage for an input field (admin and internal_designer)
   app.get("/api/input-fields/:id/bundle-usage", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2449,8 +2456,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      // Allow admin and internal_designer to view bundle field usage
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       const bundleFieldsList = await storage.getBundleFieldsByInputField(req.params.id);
       const allBundles = await storage.getAllBundles();
