@@ -35,6 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, UserCog, XCircle, Package, Boxes, LayoutGrid, List } from "lucide-react";
 import { BoardView } from "@/components/BoardView";
+import { calculateServicePrice } from "@/lib/pricing";
 import type { ServiceRequest, Service, User, BundleRequest, Bundle } from "@shared/schema";
 
 interface CurrentUser {
@@ -143,18 +144,16 @@ export default function ServiceRequestsList() {
   };
 
   const getServicePrice = (request: ServiceRequest) => {
-    // First check the dedicated finalPrice column (most accurate)
-    if (request.finalPrice) {
-      return `$${parseFloat(request.finalPrice).toFixed(2)}`;
-    }
-    // Fallback: Check if the request has a calculated price in formData (legacy data)
-    const formData = request.formData as Record<string, any> | null;
-    if (formData?.calculatedPrice) {
-      return `$${formData.calculatedPrice}`;
-    }
-    // Last fallback: use the service's base price
     const service = services.find(s => s.id === request.serviceId);
-    return service?.basePrice ? `$${parseFloat(service.basePrice).toFixed(2)}` : "N/A";
+    const formData = request.formData as Record<string, any> | null;
+    
+    return calculateServicePrice({
+      serviceTitle: service?.title,
+      pricingStructure: service?.pricingStructure,
+      basePrice: service?.basePrice,
+      formData,
+      finalPrice: request.finalPrice,
+    });
   };
 
   const getBundleName = (bundleId: string) => {

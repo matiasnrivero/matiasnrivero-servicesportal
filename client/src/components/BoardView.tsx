@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Clock, RefreshCw, CheckCircle2, AlertCircle, XCircle, Calendar, User } from "lucide-react";
+import { calculateServicePrice } from "@/lib/pricing";
 import type { ServiceRequest, Service, User as UserType, BundleRequest, Bundle } from "@shared/schema";
 
 type RequestType = "adhoc" | "bundle";
@@ -66,22 +67,19 @@ export function BoardView({
   };
 
   const getPrice = (request: ServiceRequest | BundleRequest) => {
-    // For adhoc requests, check dedicated finalPrice column first
+    const formData = request.formData as Record<string, any> | null;
+    
     if (type === "adhoc") {
       const serviceRequest = request as ServiceRequest;
-      if (serviceRequest.finalPrice) {
-        return `$${parseFloat(serviceRequest.finalPrice).toFixed(2)}`;
-      }
-    }
-    // Fallback: check formData.calculatedPrice (legacy)
-    const formData = request.formData as Record<string, any> | null;
-    if (formData?.calculatedPrice) {
-      return `$${formData.calculatedPrice}`;
-    }
-    // Last fallback: use base price / bundle price
-    if (type === "adhoc") {
-      const service = services.find((s) => s.id === (request as ServiceRequest).serviceId);
-      return service?.basePrice ? `$${parseFloat(service.basePrice).toFixed(2)}` : "N/A";
+      const service = services.find((s) => s.id === serviceRequest.serviceId);
+      
+      return calculateServicePrice({
+        serviceTitle: service?.title,
+        pricingStructure: service?.pricingStructure,
+        basePrice: service?.basePrice,
+        formData,
+        finalPrice: serviceRequest.finalPrice,
+      });
     } else {
       const bundle = bundles.find((b) => b.id === (request as BundleRequest).bundleId);
       return bundle?.finalPrice ? `$${bundle.finalPrice}` : "N/A";
