@@ -281,6 +281,18 @@ export default function ServiceRequestForm() {
     enabled: !!selectedServiceId,
   });
 
+  // Fetch pricing tiers for the selected service (for complexity/quantity-based pricing)
+  const { data: pricingTiers = [] } = useQuery<{ id: string; label: string; price: string | null; sortOrder: number }[]>({
+    queryKey: ["/api/services", selectedServiceId, "tiers"],
+    queryFn: async () => {
+      if (!selectedServiceId) return [];
+      const response = await fetch(`/api/services/${selectedServiceId}/tiers`);
+      if (!response.ok) throw new Error("Failed to fetch pricing tiers");
+      return response.json();
+    },
+    enabled: !!selectedServiceId,
+  });
+
   // Track selected add-on services
   const [selectedAddOns, setSelectedAddOns] = useState<Set<string>>(new Set());
 
@@ -347,13 +359,31 @@ export default function ServiceRequestForm() {
     }
   }, [formData.amountOfProducts, formData.amount_of_products, selectedService]);
 
-  // Calculate total price including base price and selected add-ons (NOT for Store Creation)
+  // Calculate total price including base price and selected add-ons
+  // Handles complexity-based pricing for services like Creative Art
   useEffect(() => {
-    // Skip for Store Creation - it uses tiered pricing based on product count
+    // Skip for Store Creation - it uses quantity-based tiered pricing
     if (selectedService?.title === "Store Creation") return;
     
     if (selectedService) {
-      let total = parseFloat(selectedService.basePrice) || 0;
+      let total = 0;
+      
+      // Check if service has complexity-based pricing
+      if (selectedService.pricingStructure === "complexity" && pricingTiers.length > 0) {
+        // Look up price based on selected complexity
+        const selectedComplexity = formData.complexity;
+        if (selectedComplexity) {
+          const tier = pricingTiers.find(t => 
+            t.label.toLowerCase() === selectedComplexity.toLowerCase()
+          );
+          if (tier && tier.price) {
+            total = parseFloat(tier.price);
+          }
+        }
+      } else {
+        // Use base price for single-price services
+        total = parseFloat(selectedService.basePrice) || 0;
+      }
       
       // Add prices of selected add-on services
       childServices.forEach((addon) => {
@@ -364,7 +394,7 @@ export default function ServiceRequestForm() {
       
       setCalculatedPrice(total);
     }
-  }, [selectedService, childServices, selectedAddOns]);
+  }, [selectedService, childServices, selectedAddOns, pricingTiers, formData.complexity]);
 
   const mutation = useMutation({
     mutationFn: createServiceRequest,
