@@ -466,8 +466,8 @@ export default function ServicesProfitReport() {
         }
       }
       
-      const idPart = request.id.slice(-6).toUpperCase();
-      const jobNumber = `JOB-${idPart}`;
+      const idPart = request.id.slice(0, 5).toUpperCase();
+      const jobNumber = `A-${idPart}`;
       
       rows.push({
         requestId: request.id,
@@ -509,8 +509,8 @@ export default function ServicesProfitReport() {
       const vp = vendorProfileMap[PIXELS_HIVE_VENDOR_ID];
       const vendorName = vp?.companyName || "Pixel's Hive";
       
-      const idPart = bundleRequest.id.slice(-6).toUpperCase();
-      const jobNumber = `BND-${idPart}`;
+      const idPart = bundleRequest.id.slice(0, 5).toUpperCase();
+      const jobNumber = `B-${idPart}`;
       
       rows.push({
         requestId: bundleRequest.id,
