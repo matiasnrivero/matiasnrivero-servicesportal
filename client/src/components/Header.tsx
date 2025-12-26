@@ -77,6 +77,8 @@ export function Header() {
   const canManageUsers = isAdmin || isInternalDesigner;
   const canViewVendorProfile = isVendor;
   const canViewVendorsList = isAdmin;
+  // Vendor and Vendor Designer should not see Services menu (they can't create new requests)
+  const canViewServices = !isVendor && !isVendorDesigner;
 
   return (
     <>
@@ -105,15 +107,17 @@ export function Header() {
           </h1>
         </Link>
         <nav className="flex items-center gap-4">
-          <Link href="/">
-            <Button
-              variant={location === "/" ? "default" : "ghost"}
-              className={location === "/" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
-              data-testid="nav-services"
-            >
-              Services
-            </Button>
-          </Link>
+          {canViewServices && (
+            <Link href="/">
+              <Button
+                variant={location === "/" ? "default" : "ghost"}
+                className={location === "/" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
+                data-testid="nav-services"
+              >
+                Services
+              </Button>
+            </Link>
+          )}
           <Link href="/service-requests">
             <Button
               variant={location.startsWith("/service-requests") && location !== "/service-requests/new" ? "default" : "ghost"}

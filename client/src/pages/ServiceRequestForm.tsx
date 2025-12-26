@@ -35,7 +35,8 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import type { Service, InsertServiceRequest, Bundle, BundleItem, ServicePack, ServicePackItem, InputField, ServiceField } from "@shared/schema";
+import type { Service, InsertServiceRequest, Bundle, BundleItem, ServicePack, ServicePackItem, InputField, ServiceField, User } from "@shared/schema";
+import { User as UserIcon } from "lucide-react";
 import { Header } from "@/components/Header";
 import { FileUploader } from "@/components/FileUploader";
 import { DynamicFormField, type ServiceFieldWithInput } from "@/components/DynamicFormField";
@@ -239,6 +240,20 @@ export default function ServiceRequestForm() {
     queryFn: getDefaultUser,
   });
 
+  // Fetch designers for assignment (Admin and Internal Designer only)
+  const { data: designers = [] } = useQuery<User[]>({
+    queryKey: ["/api/users/assignable-designers"],
+    queryFn: async () => {
+      const [admins, internalDesigners, vendorDesigners] = await Promise.all([
+        fetch("/api/users?role=admin").then(r => r.json()),
+        fetch("/api/users?role=internal_designer").then(r => r.json()),
+        fetch("/api/users?role=vendor_designer").then(r => r.json()),
+      ]);
+      return [...admins, ...internalDesigners, ...vendorDesigners].filter((u: User) => u.isActive);
+    },
+    enabled: currentUser?.role === "admin" || currentUser?.role === "internal_designer",
+  });
+
   const urlParams = new URLSearchParams(window.location.search);
   const preSelectedServiceIdFromUrl = urlParams.get("serviceId") || "";
   const preSelectedServiceId = preSelectedServiceIdFromUrl;
@@ -280,6 +295,7 @@ export default function ServiceRequestForm() {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, Array<{ url: string; name: string }>>>({});
   const [calculatedPrice, setCalculatedPrice] = useState<number>(0);
+  const [selectedAssignee, setSelectedAssignee] = useState<string>("");
   
   const { register, handleSubmit, reset, setValue, watch } = useForm();
 
@@ -451,6 +467,7 @@ export default function ServiceRequestForm() {
         quantity: data.quantity ? parseInt(data.quantity) : null,
         dueDate,
         formData: allFormData,
+        assigneeId: selectedAssignee || null,
       });
     } catch (error) {
       toast({
@@ -899,16 +916,43 @@ export default function ServiceRequestForm() {
     );
   };
 
+  // Check if current user can see the Assign To field
+  const showAssigneeSelector = currentUser?.role === "admin" || currentUser?.role === "internal_designer";
+
   // Render General Info section fields from database (excluding fixed fields that are hardcoded)
   const renderGeneralInfoFromDatabase = () => {
     const { generalInfoFields } = groupFieldsBySection(serviceFormFields);
     
-    if (generalInfoFields.length === 0) return null;
+    const hasContent = generalInfoFields.length > 0 || showAssigneeSelector;
+    if (!hasContent) return null;
     
     return (
       <>
         <h3 className="font-body-2-semibold text-dark-blue-night">General Info</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Assignee Selector (Admin and Internal Designer only) */}
+          {showAssigneeSelector && (
+            <div className="space-y-2">
+              <Label htmlFor="assignee">
+                <span className="flex items-center gap-2">
+                  <UserIcon className="h-4 w-4" />
+                  Assign To
+                </span>
+              </Label>
+              <Select value={selectedAssignee} onValueChange={setSelectedAssignee}>
+                <SelectTrigger data-testid="select-service-assignee">
+                  <SelectValue placeholder="Select a designer (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {designers?.map((designer) => (
+                    <SelectItem key={designer.id} value={designer.id}>
+                      {designer.username} ({designer.role.replace(/_/g, " ")})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           {generalInfoFields.map(field => renderDynamicField(field))}
         </div>
       </>

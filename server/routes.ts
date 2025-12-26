@@ -342,12 +342,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
 
+      // Get session user to check role for assigneeId permission
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
       console.log("Creating service request with data:", req.body);
       const requestData = {
         ...req.body,
         userId: sessionUserId, // Use session user instead of client-provided
         dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
       };
+
+      // Only admin and internal_designer can set assigneeId during creation
+      if (!["admin", "internal_designer"].includes(sessionUser.role)) {
+        delete requestData.assigneeId;
+      }
+
       const request = await storage.createServiceRequest(requestData);
       res.status(201).json(request);
     } catch (error) {
@@ -2078,7 +2090,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create input field (admin only)
+  // Create input field (admin and internal_designer)
   app.post("/api/input-fields", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2086,8 +2098,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       const field = await storage.createInputField(req.body);
       res.status(201).json(field);
@@ -2097,7 +2109,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update input field (admin only)
+  // Update input field (admin and internal_designer)
   app.patch("/api/input-fields/:id", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2105,8 +2117,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       const field = await storage.updateInputField(req.params.id, req.body);
       if (!field) {
@@ -2119,7 +2131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete input field (admin only)
+  // Delete input field (admin and internal_designer)
   app.delete("/api/input-fields/:id", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2127,8 +2139,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       await storage.deleteInputField(req.params.id);
       res.status(204).send();
@@ -2192,7 +2204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add field to service (admin only)
+  // Add field to service (admin and internal_designer)
   app.post("/api/services/:serviceId/fields", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2200,8 +2212,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       const field = await storage.createServiceField({ ...req.body, serviceId: req.params.serviceId });
       res.status(201).json(field);
@@ -2211,7 +2223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update service field (admin only)
+  // Update service field (admin and internal_designer)
   app.patch("/api/service-fields/:id", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2219,8 +2231,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       const field = await storage.updateServiceField(req.params.id, req.body);
       if (!field) {
@@ -2233,7 +2245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete service field (admin only)
+  // Delete service field (admin and internal_designer)
   app.delete("/api/service-fields/:id", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2241,8 +2253,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       await storage.deleteServiceField(req.params.id);
       res.status(204).send();
@@ -2274,7 +2286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add field to line item (admin only)
+  // Add field to line item (admin and internal_designer)
   app.post("/api/line-items/:lineItemId/fields", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2282,8 +2294,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       const field = await storage.createLineItemField({ ...req.body, lineItemId: req.params.lineItemId });
       res.status(201).json(field);
@@ -2293,7 +2305,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update line item field (admin only)
+  // Update line item field (admin and internal_designer)
   app.patch("/api/line-item-fields/:id", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2301,8 +2313,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       const field = await storage.updateLineItemField(req.params.id, req.body);
       if (!field) {
@@ -2315,7 +2327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete line item field (admin only)
+  // Delete line item field (admin and internal_designer)
   app.delete("/api/line-item-fields/:id", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2323,8 +2335,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       await storage.deleteLineItemField(req.params.id);
       res.status(204).send();
@@ -2388,7 +2400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create bundle field (admin only)
+  // Create bundle field (admin and internal_designer)
   app.post("/api/bundles/:bundleId/fields", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2396,8 +2408,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       const bundleField = await storage.createBundleField({ ...req.body, bundleId: req.params.bundleId });
       res.status(201).json(bundleField);
@@ -2407,7 +2419,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update bundle field (admin only)
+  // Update bundle field (admin and internal_designer)
   app.patch("/api/bundle-fields/:id", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2415,8 +2427,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       const bundleField = await storage.updateBundleField(req.params.id, req.body);
       if (!bundleField) {
@@ -2429,7 +2441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete bundle field (admin only)
+  // Delete bundle field (admin and internal_designer)
   app.delete("/api/bundle-fields/:id", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -2437,8 +2449,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
       await storage.deleteBundleField(req.params.id);
       res.status(204).send();
@@ -2635,11 +2647,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
 
+      // Get session user to check role for assigneeId permission
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
       const requestData = {
         ...req.body,
         userId: sessionUserId,
         dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
       };
+
+      // Only admin and internal_designer can set assigneeId during creation
+      if (!["admin", "internal_designer"].includes(sessionUser.role)) {
+        delete requestData.assigneeId;
+      }
+
       const request = await storage.createBundleRequest(requestData);
       res.status(201).json(request);
     } catch (error) {

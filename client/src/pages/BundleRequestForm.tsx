@@ -371,7 +371,8 @@ export default function BundleRequestForm() {
 
   // Check if we have bundle-level fields to show
   const hasBundleFields = bundleFields && bundleFields.length > 0;
-  const showAssigneeSelector = currentUser?.role !== "client";
+  // Only Admin and Internal Designer can see the Assign To field
+  const showAssigneeSelector = currentUser?.role === "admin" || currentUser?.role === "internal_designer";
   const showPricing = currentUser?.role === "client" || currentUser?.role === "admin";
 
   return (
@@ -450,9 +451,6 @@ export default function BundleRequestForm() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Optionally assign this request to a designer
-                  </p>
                 </div>
               )}
 
