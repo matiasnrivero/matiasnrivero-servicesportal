@@ -162,9 +162,14 @@ export default function VendorProfile() {
     }
   }, [vendorStructureId, refetchTeam]);
 
-  // Fetch all services from database
+  // Fetch all services from database (including line items/add-ons)
   const { data: allServices = [] } = useQuery<Service[]>({
-    queryKey: ["/api/services"],
+    queryKey: ["/api/services", "includeAll"],
+    queryFn: async () => {
+      const res = await fetch("/api/services?excludeSons=false");
+      if (!res.ok) throw new Error("Failed to fetch services");
+      return res.json();
+    },
   });
 
   const [serviceTiers, setServiceTiers] = useState<Record<string, ServicePricingTier[]>>({});
