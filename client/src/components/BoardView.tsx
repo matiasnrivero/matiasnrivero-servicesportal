@@ -150,7 +150,7 @@ export function BoardView({
                     columnRequests.map((request) => (
                       <Card
                         key={request.id}
-                        className="p-3 cursor-pointer hover-elevate transition-all"
+                        className="p-3 cursor-pointer hover-elevate transition-all bg-white dark:bg-card"
                         onClick={() => handleCardClick(request)}
                         data-testid={`card-request-${request.id}`}
                       >
