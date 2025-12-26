@@ -991,27 +991,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: `role must be one of: ${validRoles.join(", ")}` });
       }
 
-      // For vendor role, use Pixel's Hive vendor (Javier Rubiantes) for testing
-      const username = role === "vendor" ? "Javier Rubiantes" : `${role}-user`;
-      let user = await storage.getUserByUsername(username);
+      let user;
       
+      // For client role, keep the same user but update their role
+      // This allows users to see their own requests when switching to client view
+      if (role === "client" && req.session.userId) {
+        const currentUser = await storage.getUser(req.session.userId);
+        if (currentUser) {
+          // Update the current user's role to client
+          user = await storage.updateUser(currentUser.id, { role: "client" });
+        }
+      }
+      
+      // For other roles, switch to the dedicated demo user
       if (!user) {
-        user = await storage.createUser({
-          username,
-          password: "not-used",
-          email: `${username}@example.com`,
-          role,
-        });
+        // For vendor role, use Pixel's Hive vendor (Javier Rubiantes) for testing
+        const username = role === "vendor" ? "Javier Rubiantes" : `${role}-user`;
+        user = await storage.getUserByUsername(username);
+        
+        if (!user) {
+          user = await storage.createUser({
+            username,
+            password: "not-used",
+            email: `${username}@example.com`,
+            role,
+          });
+        }
       }
       
       // Clear impersonation when switching roles
       req.session.impersonatorId = undefined;
       
       // Update session with new user
-      req.session.userId = user.id;
-      req.session.userRole = user.role;
+      req.session.userId = user!.id;
+      req.session.userRole = user!.role;
       
-      console.log(`[switch-role] Switched to ${role}: userId=${user.id}, username=${user.username}`);
+      console.log(`[switch-role] Switched to ${role}: userId=${user!.id}, username=${user!.username}`);
       
       // Update lastLoginAt
       await storage.updateUser(user.id, { lastLoginAt: new Date() });
