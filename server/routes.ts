@@ -1035,13 +1035,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let user;
       
-      // For client role, keep the same user but update their role
-      // This allows users to see their own requests when switching to client view
-      if (role === "client" && req.session.userId) {
-        const currentUser = await storage.getUser(req.session.userId);
-        if (currentUser) {
-          // Update the current user's role to client
-          user = await storage.updateUser(currentUser.id, { role: "client" });
+      // For client role, switch to the default-user who owns the original requests
+      // This allows testing the client experience with their own requests
+      if (role === "client") {
+        user = await storage.getUserByUsername("default-user");
+        if (!user) {
+          user = await storage.createUser({
+            username: "default-user",
+            password: "not-used",
+            email: "default@example.com",
+            role: "client",
+          });
+        }
+        // Ensure the default-user has client role
+        if (user.role !== "client") {
+          user = await storage.updateUser(user.id, { role: "client" });
         }
       }
       
