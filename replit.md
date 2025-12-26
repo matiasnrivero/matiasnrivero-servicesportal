@@ -162,6 +162,31 @@ The ACL system is extensible to support different group types for fine-grained a
 
 **Layout Pattern**: Common Header component with navigation, with page-specific content rendered through Wouter routing.
 
+## Reports Module
+
+**Role-Based Access**: Reports are visible to Admin, Client, and Vendor roles only (not Internal Designer or Vendor Designer).
+
+**Reports Hub** (`/reports`): Central landing page showing role-specific report cards:
+- Admin sees: Services Profit Report
+- Client sees: Stripe Billing, Services Consumption (placeholders for future)
+- Vendor sees: Vendor Earnings (placeholder for future)
+
+**Services Profit Report** (`/reports/services-profit`): Admin-only comprehensive financial report featuring:
+- Summary cards: Total Revenue, Vendor Costs, Net Profit, Profit Margin percentage
+- Filters: Vendor dropdown, Service Type, Date From/To
+- Search: By Client name, By Job ID
+- Data table with columns: Job ID, Client, Service, Status, Assignee, Vendor, Retail Price, Vendor Cost, Discount (placeholder), Profit, Created Date
+
+**Pricing Calculations**:
+- Retail Price: Calculated using service pricing tiers and form data (complexity, quantity)
+- Vendor Cost: Uses vendor-specific pricingAgreements from vendorProfiles table
+- Exception Rules:
+  - Admin-created jobs: $0 retail revenue (internal/comped jobs)
+  - Internal Designer assignments: $0 vendor cost (no external vendor involved)
+  - Vendor Designer assignments: Costs attributed to parent vendor via vendorId field
+
+**Technical Implementation**: Report data computed client-side using existing API endpoints (`/api/service-requests`, `/api/services`, `/api/users`, `/api/vendor-profiles`) for efficiency.
+
 # External Dependencies
 
 ## Cloud Services
