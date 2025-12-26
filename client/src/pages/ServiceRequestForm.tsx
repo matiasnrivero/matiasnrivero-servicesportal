@@ -851,6 +851,11 @@ export default function ServiceRequestForm() {
     
     // Special case: Vectorization checkbox for Embroidery Digitization
     if (selectedService?.title === "Embroidery Digitization" && fieldKey === "vectorizationNeeded") {
+      // Find the Add Vectorization child service to get its price dynamically
+      const vectorizationService = childServices.find(s => s.title === "Add Vectorization");
+      const vectorizationPrice = vectorizationService ? parseFloat(vectorizationService.basePrice) : 0;
+      const baseServicePrice = parseFloat(selectedService.basePrice) || 0;
+      
       return (
         <div key={field.id}>
           <div className="flex items-center gap-2">
@@ -861,13 +866,13 @@ export default function ServiceRequestForm() {
             />
             <Label htmlFor="vectorizationNeeded" className="flex items-center gap-1">
               Vectorization Needed
-              {showPricing && (
+              {showPricing && vectorizationPrice > 0 && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <HelpCircle className="h-4 w-4 text-dark-gray cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent className="bg-dark-blue-night text-white max-w-[200px]">
-                    <p>By Requiring Vectorization $5 are gonna be added to the final price.</p>
+                    <p>By Requiring Vectorization ${vectorizationPrice.toFixed(2)} will be added to the final price.</p>
                   </TooltipContent>
                 </Tooltip>
               )}
@@ -877,9 +882,9 @@ export default function ServiceRequestForm() {
             <div className="p-3 bg-blue-lavender/30 rounded-md mt-2">
               <p className="text-sm font-semibold text-dark-blue-night">
                 Service Price: ${calculatedPrice}
-                {formData.vectorizationNeeded && (
+                {formData.vectorizationNeeded && vectorizationPrice > 0 && (
                   <span className="font-normal text-dark-gray ml-2">
-                    ($15 base + $5 vectorization)
+                    (${baseServicePrice.toFixed(2)} base + ${vectorizationPrice.toFixed(2)} vectorization)
                   </span>
                 )}
               </p>
@@ -1365,38 +1370,49 @@ export default function ServiceRequestForm() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="vectorizationNeeded"
-              onCheckedChange={(checked) => handleFormDataChange("vectorizationNeeded", checked)}
-              data-testid="checkbox-vectorization-needed"
-            />
-            <Label htmlFor="vectorizationNeeded" className="flex items-center gap-1">
-              Vectorization Needed
-              {showPricing && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <HelpCircle className="h-4 w-4 text-dark-gray cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="bg-dark-blue-night text-white max-w-[200px]">
-                    <p>By Requiring Vectorization $5 are gonna be added to the final price.</p>
-                  </TooltipContent>
-                </Tooltip>
-              )}
-            </Label>
-          </div>
-          {showPricing && calculatedPrice > 0 && (
-            <div className="p-3 bg-blue-lavender/30 rounded-md">
-              <p className="text-sm font-semibold text-dark-blue-night">
-                Service Price: ${calculatedPrice}
-                {formData.vectorizationNeeded && (
-                  <span className="font-normal text-dark-gray ml-2">
-                    ($15 base + $5 vectorization)
-                  </span>
+          {(() => {
+            // Find the Add Vectorization child service to get its price dynamically
+            const vectorizationService = childServices.find(s => s.title === "Add Vectorization");
+            const vectorizationPrice = vectorizationService ? parseFloat(vectorizationService.basePrice) : 0;
+            const baseServicePrice = parseFloat(selectedService?.basePrice || "0");
+            
+            return (
+              <>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="vectorizationNeeded"
+                    onCheckedChange={(checked) => handleFormDataChange("vectorizationNeeded", checked)}
+                    data-testid="checkbox-vectorization-needed"
+                  />
+                  <Label htmlFor="vectorizationNeeded" className="flex items-center gap-1">
+                    Vectorization Needed
+                    {showPricing && vectorizationPrice > 0 && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-4 w-4 text-dark-gray cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-dark-blue-night text-white max-w-[200px]">
+                          <p>By Requiring Vectorization ${vectorizationPrice.toFixed(2)} will be added to the final price.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </Label>
+                </div>
+                {showPricing && calculatedPrice > 0 && (
+                  <div className="p-3 bg-blue-lavender/30 rounded-md">
+                    <p className="text-sm font-semibold text-dark-blue-night">
+                      Service Price: ${calculatedPrice}
+                      {formData.vectorizationNeeded && vectorizationPrice > 0 && (
+                        <span className="font-normal text-dark-gray ml-2">
+                          (${baseServicePrice.toFixed(2)} base + ${vectorizationPrice.toFixed(2)} vectorization)
+                        </span>
+                      )}
+                    </p>
+                  </div>
                 )}
-              </p>
-            </div>
-          )}
+              </>
+            );
+          })()}
         </>
       );
     }

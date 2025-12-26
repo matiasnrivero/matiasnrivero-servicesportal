@@ -74,13 +74,66 @@ function PricingTabContent({
   handleSavePricing: () => void;
   isPending: boolean;
 }) {
+  const { toast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+  
   // Fetch all services and their tiers from the database (including son services for admin)
   const { data: services = [] } = useQuery<Service[]>({
     queryKey: ["/api/services", { excludeSons: false }],
     queryFn: fetchAllServices,
   });
 
+  // Save pricing to both system-settings AND update service basePrices
+  const handleSaveAllPricing = async () => {
+    setIsSaving(true);
+    try {
+      // Update each service's basePrice for single-price services
+      const singlePriceServices = services.filter((s) => s.pricingStructure === "single" || !s.pricingStructure);
+      const updatePromises = singlePriceServices.map(async (service) => {
+        const newPrice = pricingData[service.title]?.basePrice;
+        if (newPrice !== undefined && newPrice !== null) {
+          await apiRequest("PATCH", `/api/services/${service.id}`, {
+            basePrice: String(newPrice),
+          });
+        }
+      });
+      
+      await Promise.all(updatePromises);
+      
+      // Also save to system-settings for backward compatibility
+      handleSavePricing();
+      
+      // Invalidate services cache to reflect updated prices
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      
+      toast({ title: "Pricing saved successfully" });
+    } catch (error) {
+      toast({ title: "Error saving pricing", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const [serviceTiers, setServiceTiers] = useState<Record<string, ServicePricingTier[]>>({});
+
+  // Initialize pricingData with current service basePrices when services load
+  useEffect(() => {
+    if (services.length > 0) {
+      setPricingData((prev) => {
+        const updated = { ...prev };
+        services.forEach((service) => {
+          // Only initialize if not already set in pricingData
+          if (!updated[service.title]?.basePrice && service.basePrice) {
+            updated[service.title] = {
+              ...(updated[service.title] || {}),
+              basePrice: parseFloat(service.basePrice) || 0,
+            };
+          }
+        });
+        return updated;
+      });
+    }
+  }, [services, setPricingData]);
 
   // Fetch tiers for each service with multi-price structure
   useEffect(() => {
@@ -165,9 +218,9 @@ function PricingTabContent({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle>Service Pricing</CardTitle>
-        <Button onClick={handleSavePricing} disabled={isPending} data-testid="button-save-pricing">
+        <Button onClick={handleSaveAllPricing} disabled={isPending || isSaving} data-testid="button-save-pricing">
           <Save className="h-4 w-4 mr-2" />
-          {isPending ? "Saving..." : "Save Pricing"}
+          {isPending || isSaving ? "Saving..." : "Save Pricing"}
         </Button>
       </CardHeader>
       <CardContent>
