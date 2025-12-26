@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -118,6 +119,7 @@ export default function BundleRequestDetail() {
 
   const [selectedAssignee, setSelectedAssignee] = useState<string>("");
   const [deliverableUrls, setDeliverableUrls] = useState<{ url: string; name: string }[]>([]);
+  const [finalStoreUrl, setFinalStoreUrl] = useState<string>("");
 
   const { data: requestDetail, isLoading, error } = useQuery({
     queryKey: ["/api/bundle-requests", requestId, "full-detail"],
@@ -156,16 +158,18 @@ export default function BundleRequestDetail() {
   });
 
   const deliverMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (data: { finalStoreUrl?: string }) => {
       const response = await fetch(`/api/bundle-requests/${requestId}/deliver`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ finalStoreUrl: data.finalStoreUrl || undefined }),
       });
       if (!response.ok) throw new Error("Failed to deliver request");
       return response.json();
     },
     onSuccess: () => {
       toast({ title: "Request Delivered", description: "The request has been marked as delivered." });
+      setFinalStoreUrl("");
       queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests", requestId] });
       queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] });
     },
@@ -242,6 +246,27 @@ export default function BundleRequestDetail() {
   const deliverableAttachments = attachments.filter(a => a.kind === "deliverable");
   const showDeliverablesAtTop = request.status === "delivered" || request.status === "change-request";
 
+  // Identify delivery fields from bundle, service, and line item fields
+  const bundleDeliveryFields = (bundleFields ?? []).filter(bf => bf.inputField?.inputFor === "delivery");
+  const serviceDeliveryFields = services.flatMap(s => s.fields.filter(f => f.inputField?.inputFor === "delivery"));
+  const lineItemDeliveryFields = services.flatMap(s => s.lineItemFields.filter(lif => lif.inputField?.inputFor === "delivery"));
+  
+  // Check if there are file upload or URL delivery fields configured
+  const hasDeliveryFilesField = [...bundleDeliveryFields, ...serviceDeliveryFields, ...lineItemDeliveryFields]
+    .some(f => f.inputField?.fieldKey === "delivery_files");
+  const hasFinalStoreUrlField = [...bundleDeliveryFields, ...serviceDeliveryFields, ...lineItemDeliveryFields]
+    .some(f => f.inputField?.fieldKey === "final_store_url");
+  
+  // Get the label for delivery fields
+  const deliveryFilesLabel = [...bundleDeliveryFields, ...serviceDeliveryFields, ...lineItemDeliveryFields]
+    .find(f => f.inputField?.fieldKey === "delivery_files")?.inputField?.label || "Upload Delivery Files";
+  const finalStoreUrlLabel = [...bundleDeliveryFields, ...serviceDeliveryFields, ...lineItemDeliveryFields]
+    .find(f => f.inputField?.fieldKey === "final_store_url")?.inputField?.label || "Final Store URL";
+
+  // Get stored final_store_url from bundle request formData
+  const formData = (request.formData as Record<string, any>) || {};
+  const storedFinalStoreUrl = formData.final_store_url as string | undefined;
+
   const renderFieldValue = (value: any): React.ReactNode => {
     if (value === null || value === undefined) return "Not provided";
     if (Array.isArray(value)) {
@@ -317,7 +342,11 @@ export default function BundleRequestDetail() {
           </div>
 
           <div className="flex items-center gap-3">
-            {request.status === "in-progress" && request.assigneeId === currentUser?.userId && (
+            {request.status === "in-progress" && (
+              currentUser?.role === "admin" || 
+              currentUser?.role === "internal_designer" || 
+              request.assigneeId === currentUser?.userId
+            ) && (
               <>
                 <Button 
                   variant="outline" 
@@ -327,7 +356,7 @@ export default function BundleRequestDetail() {
                   Cancel
                 </Button>
                 <Button 
-                  onClick={() => deliverMutation.mutate()}
+                  onClick={() => deliverMutation.mutate({ finalStoreUrl })}
                   disabled={deliverMutation.isPending}
                   className="bg-sky-blue-accent hover:bg-sky-blue-accent/90"
                   data-testid="button-deliver-top"
@@ -337,7 +366,11 @@ export default function BundleRequestDetail() {
               </>
             )}
             
-            {request.status === "change-request" && request.assigneeId === currentUser?.userId && (
+            {request.status === "change-request" && (
+              currentUser?.role === "admin" || 
+              currentUser?.role === "internal_designer" || 
+              request.assigneeId === currentUser?.userId
+            ) && (
               <>
                 <Button 
                   variant="outline" 
@@ -347,7 +380,7 @@ export default function BundleRequestDetail() {
                   Cancel
                 </Button>
                 <Button 
-                  onClick={() => deliverMutation.mutate()}
+                  onClick={() => deliverMutation.mutate({ finalStoreUrl })}
                   disabled={deliverMutation.isPending}
                   className="bg-sky-blue-accent hover:bg-sky-blue-accent/90"
                   data-testid="button-deliver-top"
@@ -415,7 +448,8 @@ export default function BundleRequestDetail() {
               bf.inputField?.fieldKey !== "order_project_reference" && 
               bf.inputField?.fieldKey !== "due_date" &&
               !bf.inputField?.label?.toLowerCase().includes("order") &&
-              !bf.inputField?.label?.toLowerCase().includes("reference")
+              !bf.inputField?.label?.toLowerCase().includes("reference") &&
+              bf.inputField?.inputFor !== "delivery"
             ).length > 0 && (
               <Card>
                 <CardHeader>
@@ -428,7 +462,8 @@ export default function BundleRequestDetail() {
                         bf.inputField?.fieldKey !== "order_project_reference" && 
                         bf.inputField?.fieldKey !== "due_date" &&
                         !bf.inputField?.label?.toLowerCase().includes("order") &&
-                        !bf.inputField?.label?.toLowerCase().includes("reference")
+                        !bf.inputField?.label?.toLowerCase().includes("reference") &&
+                        bf.inputField?.inputFor !== "delivery"
                       )
                       .map((bf) => (
                       <div key={bf.id} className="flex flex-col gap-1">
@@ -455,7 +490,7 @@ export default function BundleRequestDetail() {
                 <CardContent>
                   <div className="space-y-4">
                     {serviceData.fields
-                      .filter((field) => field.inputField?.showOnBundleForm !== false)
+                      .filter((field) => field.inputField?.showOnBundleForm !== false && field.inputField?.inputFor !== "delivery")
                       .map((field) => (
                       <div key={field.id} className="flex flex-col gap-1">
                         <Label className="text-sm font-medium text-muted-foreground">
@@ -475,12 +510,14 @@ export default function BundleRequestDetail() {
                     ))}
                   </div>
 
-                  {serviceData.lineItemFields.length > 0 && (
+                  {serviceData.lineItemFields.filter(lif => lif.inputField?.inputFor !== "delivery").length > 0 && (
                     <>
                       <Separator className="my-4" />
                       <div className="space-y-4">
                         <h4 className="font-medium text-sm">Line Item Fields</h4>
-                        {serviceData.lineItemFields.map((lif) => (
+                        {serviceData.lineItemFields
+                          .filter(lif => lif.inputField?.inputFor !== "delivery")
+                          .map((lif) => (
                           <div key={lif.id} className="flex flex-col gap-1">
                             <Label className="text-sm font-medium text-muted-foreground">
                               {lif.lineItem.name} - {lif.inputField?.label || "Field"}
@@ -538,7 +575,7 @@ export default function BundleRequestDetail() {
               </Card>
             )}
 
-            {(canManageJobs || deliverableAttachments.length > 0) && (
+            {(canManageJobs || deliverableAttachments.length > 0 || storedFinalStoreUrl) && (
               <Card className={showDeliverablesAtTop ? "border-green-200 bg-green-50/30" : ""}>
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -547,6 +584,22 @@ export default function BundleRequestDetail() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* Display stored final store URL if delivered */}
+                  {storedFinalStoreUrl && (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-sm font-medium text-dark-blue-night mb-1">{finalStoreUrlLabel}</p>
+                      <a 
+                        href={storedFinalStoreUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:underline break-all"
+                        data-testid="link-final-store-url"
+                      >
+                        {storedFinalStoreUrl}
+                      </a>
+                    </div>
+                  )}
+
                   {deliverableAttachments.length > 0 && (
                     <div className="space-y-2">
                       {deliverableAttachments.map((att) => (
@@ -574,14 +627,43 @@ export default function BundleRequestDetail() {
                     </div>
                   )}
 
-                  {deliverableAttachments.length === 0 && !canManageJobs && (
+                  {deliverableAttachments.length === 0 && !storedFinalStoreUrl && !canManageJobs && (
                     <p className="text-sm text-dark-gray">No deliverables uploaded yet</p>
                   )}
 
+                  {/* Dynamic delivery field inputs for designers */}
                   {canManageJobs && (request.status === "in-progress" || request.status === "change-request") && (
-                    <div>
-                      <p className="text-sm font-medium text-dark-blue-night mb-2">Upload File*</p>
-                      <FileUploader onUploadComplete={handleDeliverableUpload} />
+                    <div className="space-y-4">
+                      {/* File upload field - only if delivery_files is configured */}
+                      {hasDeliveryFilesField && (
+                        <div>
+                          <p className="text-sm font-medium text-dark-blue-night mb-2">{deliveryFilesLabel}</p>
+                          <FileUploader onUploadComplete={handleDeliverableUpload} />
+                        </div>
+                      )}
+
+                      {/* URL input field - only if final_store_url is configured */}
+                      {hasFinalStoreUrlField && (
+                        <div>
+                          <Label className="text-sm font-medium text-dark-blue-night">{finalStoreUrlLabel}</Label>
+                          <Input
+                            type="url"
+                            placeholder="https://example.com/store/..."
+                            value={finalStoreUrl}
+                            onChange={(e) => setFinalStoreUrl(e.target.value)}
+                            className="mt-1"
+                            data-testid="input-final-store-url"
+                          />
+                        </div>
+                      )}
+
+                      {/* Fallback if no delivery fields are configured */}
+                      {!hasDeliveryFilesField && !hasFinalStoreUrlField && (
+                        <div>
+                          <p className="text-sm font-medium text-dark-blue-night mb-2">Upload File*</p>
+                          <FileUploader onUploadComplete={handleDeliverableUpload} />
+                        </div>
+                      )}
                     </div>
                   )}
                 </CardContent>

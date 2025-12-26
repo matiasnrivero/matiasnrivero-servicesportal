@@ -219,7 +219,7 @@ export interface IStorage {
   createBundleRequest(request: InsertBundleRequest): Promise<BundleRequest>;
   updateBundleRequest(id: string, request: UpdateBundleRequest): Promise<BundleRequest | undefined>;
   assignBundleDesigner(requestId: string, assigneeId: string): Promise<BundleRequest | undefined>;
-  deliverBundleRequest(requestId: string, deliveredBy: string): Promise<BundleRequest | undefined>;
+  deliverBundleRequest(requestId: string, deliveredBy: string, finalStoreUrl?: string): Promise<BundleRequest | undefined>;
   requestBundleChange(requestId: string, changeNote: string): Promise<BundleRequest | undefined>;
 
   // Bundle Request Attachment methods
@@ -879,14 +879,24 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async deliverBundleRequest(requestId: string, deliveredBy: string): Promise<BundleRequest | undefined> {
+  async deliverBundleRequest(requestId: string, deliveredBy: string, finalStoreUrl?: string): Promise<BundleRequest | undefined> {
+    // If finalStoreUrl is provided, merge it into formData
+    let updateData: Record<string, any> = {
+      status: "delivered",
+      deliveredAt: new Date(),
+      deliveredBy,
+      updatedAt: new Date()
+    };
+
+    if (finalStoreUrl) {
+      // Get existing formData and merge with new final_store_url
+      const existing = await this.getBundleRequest(requestId);
+      const existingFormData = (existing?.formData as Record<string, any>) || {};
+      updateData.formData = { ...existingFormData, final_store_url: finalStoreUrl };
+    }
+
     const result = await db.update(bundleRequests)
-      .set({
-        status: "delivered",
-        deliveredAt: new Date(),
-        deliveredBy,
-        updatedAt: new Date()
-      })
+      .set(updateData)
       .where(eq(bundleRequests.id, requestId))
       .returning();
     return result[0];

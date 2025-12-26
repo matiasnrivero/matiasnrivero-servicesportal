@@ -452,6 +452,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mark request as delivered
   app.post("/api/service-requests/:id/deliver", async (req, res) => {
     try {
+      const { finalStoreUrl } = req.body;
+      
       // Use session user for authorization
       const sessionUserId = req.session.userId;
       if (!sessionUserId) {
@@ -477,9 +479,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Request must be in-progress or change-request to deliver" });
       }
 
-      // Verify the user is the assignee
-      if (existingRequest.assigneeId !== sessionUserId) {
+      // Verify the user is the assignee (admins can bypass this check)
+      if (user.role !== "admin" && existingRequest.assigneeId !== sessionUserId) {
         return res.status(403).json({ error: "Only the assigned designer can deliver this request" });
+      }
+
+      // If finalStoreUrl is provided, save it to formData
+      if (finalStoreUrl) {
+        const currentFormData = existingRequest.formData as Record<string, unknown> || {};
+        await storage.updateServiceRequest(req.params.id, {
+          formData: { ...currentFormData, final_store_url: finalStoreUrl }
+        });
       }
 
       const request = await storage.deliverRequest(req.params.id, sessionUserId);
@@ -2733,7 +2743,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Access denied" });
       }
 
-      const request = await storage.deliverBundleRequest(req.params.id, sessionUserId);
+      const { finalStoreUrl } = req.body || {};
+      const request = await storage.deliverBundleRequest(req.params.id, sessionUserId, finalStoreUrl);
       res.json(request);
     } catch (error) {
       console.error("Error delivering bundle request:", error);

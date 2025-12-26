@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -55,6 +57,7 @@ export default function JobDetailView() {
   const [commentText, setCommentText] = useState("");
   const [commentTab, setCommentTab] = useState<"public" | "internal">("public");
   const [deliverableUrls, setDeliverableUrls] = useState<{ url: string; name: string }[]>([]);
+  const [finalStoreUrl, setFinalStoreUrl] = useState<string>("");
   const [selectedDesignerId, setSelectedDesignerId] = useState<string>("");
   const [changeRequestModalOpen, setChangeRequestModalOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -79,6 +82,26 @@ export default function JobDetailView() {
     enabled: !!request?.serviceId,
   });
 
+  // Fetch service fields with input field details to identify delivery fields
+  interface ServiceFieldWithInput {
+    id: string;
+    inputFieldId: string;
+    inputField: {
+      id: string;
+      fieldKey: string;
+      label: string;
+      inputType: string;
+      inputFor: string;
+    } | null;
+  }
+  
+  const { data: serviceFields = [] } = useQuery<ServiceFieldWithInput[]>({
+    queryKey: ["/api/services", request?.serviceId, "form-fields"],
+    enabled: !!request?.serviceId,
+  });
+
+  // Get delivery fields for this service
+  const deliveryFields = serviceFields.filter(sf => sf.inputField?.inputFor === "delivery");
 
   const { data: attachments = [] } = useQuery<ServiceAttachment[]>({
     queryKey: ["/api/service-requests", requestId, "attachments"],
@@ -127,12 +150,15 @@ export default function JobDetailView() {
   });
 
   const deliverMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", `/api/service-requests/${requestId}/deliver`, {});
+    mutationFn: async (data: { finalStoreUrl?: string }) => {
+      return apiRequest("POST", `/api/service-requests/${requestId}/deliver`, {
+        finalStoreUrl: data.finalStoreUrl || undefined
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/service-requests", requestId] });
       queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+      setFinalStoreUrl("");
       toast({ title: "Deliverables submitted", description: "The job has been marked as delivered." });
     },
     onError: () => {
@@ -234,7 +260,7 @@ export default function JobDetailView() {
   const isAssignee = currentUser?.userId === request?.assigneeId;
 
   const handleDeliver = () => {
-    deliverMutation.mutate();
+    deliverMutation.mutate({ finalStoreUrl });
   };
 
   const handleRequestChange = () => {
@@ -384,6 +410,14 @@ export default function JobDetailView() {
     );
   };
 
+  // Check if this service has specific delivery fields configured
+  const hasDeliveryFilesField = deliveryFields.some(df => df.inputField?.fieldKey === "delivery_files");
+  const hasFinalStoreUrlField = deliveryFields.some(df => df.inputField?.fieldKey === "final_store_url");
+
+  // Get stored final_store_url from formData if it was already saved
+  const formData = request?.formData as Record<string, unknown> | null;
+  const storedFinalStoreUrl = formData?.final_store_url as string | undefined;
+
   const DeliverablesSection = () => (
     <Card className={showDeliverablesAtTop ? "border-green-200 bg-green-50/30" : ""}>
       <CardHeader>
@@ -393,6 +427,7 @@ export default function JobDetailView() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Show delivered files */}
         {deliverableAttachments.length > 0 && (
           <div className="space-y-2">
             {deliverableAttachments.map((attachment) => (
@@ -420,14 +455,54 @@ export default function JobDetailView() {
           </div>
         )}
 
-        {deliverableAttachments.length === 0 && !canManageJobs && (
+        {/* Show stored final store URL if delivered */}
+        {storedFinalStoreUrl && (
+          <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+            <Label className="text-sm font-medium text-dark-gray mb-1">Final Store URL</Label>
+            <a 
+              href={storedFinalStoreUrl} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-sm text-sky-blue-accent hover:underline block"
+              data-testid="link-final-store-url"
+            >
+              {storedFinalStoreUrl}
+            </a>
+          </div>
+        )}
+
+        {deliverableAttachments.length === 0 && !storedFinalStoreUrl && !canManageJobs && (
           <p className="text-sm text-dark-gray">No deliverables uploaded yet</p>
         )}
 
+        {/* Show delivery field inputs for designers when job is in-progress or change-request */}
         {canManageJobs && (request.status === "in-progress" || request.status === "change-request") && (
-          <div>
-            <p className="text-sm font-medium text-dark-blue-night mb-2">Upload File*</p>
-            <FileUploader onUploadComplete={handleDeliverableUpload} />
+          <div className="space-y-4">
+            {/* Render file upload field if delivery_files is configured for this service */}
+            {(hasDeliveryFilesField || deliveryFields.length === 0) && (
+              <div>
+                <Label className="text-sm font-medium text-dark-blue-night mb-2 block">
+                  {deliveryFields.find(df => df.inputField?.fieldKey === "delivery_files")?.inputField?.label || "Upload Delivery Files"}
+                </Label>
+                <FileUploader onUploadComplete={handleDeliverableUpload} />
+              </div>
+            )}
+
+            {/* Render URL input if final_store_url is configured for this service */}
+            {hasFinalStoreUrlField && (
+              <div>
+                <Label className="text-sm font-medium text-dark-blue-night mb-2 block">
+                  {deliveryFields.find(df => df.inputField?.fieldKey === "final_store_url")?.inputField?.label || "Final Store URL"}
+                </Label>
+                <Input
+                  type="url"
+                  placeholder="https://..."
+                  value={finalStoreUrl}
+                  onChange={(e) => setFinalStoreUrl(e.target.value)}
+                  data-testid="input-final-store-url"
+                />
+              </div>
+            )}
           </div>
         )}
       </CardContent>
