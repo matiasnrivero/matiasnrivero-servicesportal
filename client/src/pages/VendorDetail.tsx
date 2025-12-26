@@ -147,9 +147,14 @@ export default function VendorDetail() {
     enabled: !!vendorId,
   });
 
-  // Fetch all services from the database
+  // Fetch all services from the database (including line items/add-ons)
   const { data: allServices = [] } = useQuery<Service[]>({
-    queryKey: ["/api/services"],
+    queryKey: ["/api/services", "includeAll"],
+    queryFn: async () => {
+      const res = await fetch("/api/services?excludeSons=false");
+      if (!res.ok) throw new Error("Failed to fetch services");
+      return res.json();
+    },
   });
 
   // Fetch service pricing tiers for services with multi-price structures

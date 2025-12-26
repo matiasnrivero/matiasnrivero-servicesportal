@@ -73,7 +73,12 @@ export default function ServicesProfitReport() {
   });
 
   const { data: services = [] } = useQuery<Service[]>({
-    queryKey: ["/api/services"],
+    queryKey: ["/api/services", "includeAll"],
+    queryFn: async () => {
+      const res = await fetch("/api/services?excludeSons=false");
+      if (!res.ok) throw new Error("Failed to fetch services");
+      return res.json();
+    },
   });
 
   const { data: users = [] } = useQuery<User[]>({
