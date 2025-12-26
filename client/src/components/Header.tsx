@@ -156,7 +156,7 @@ export function Header() {
               </Button>
             </Link>
           )}
-          {isAdmin && (
+          {(isAdmin || isInternalDesigner) && (
             <Link href="/settings">
               <Button
                 variant={location.startsWith("/settings") ? "default" : "ghost"}

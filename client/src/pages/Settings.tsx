@@ -3908,14 +3908,18 @@ export default function Settings() {
     updatePricingMutation.mutate(pricingData);
   };
 
-  if (currentUser?.role !== "admin") {
+  const isAdmin = currentUser?.role === "admin";
+  const isInternalDesigner = currentUser?.role === "internal_designer";
+  const canAccessSettings = isAdmin || isInternalDesigner;
+
+  if (!canAccessSettings) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
         <main className="p-8">
           <Card>
             <CardContent className="py-8 text-center">
-              <p className="text-dark-gray">Only administrators can access settings.</p>
+              <p className="text-dark-gray">Only administrators and internal designers can access settings.</p>
             </CardContent>
           </Card>
         </main>
@@ -3948,58 +3952,70 @@ export default function Settings() {
             <h1 className="text-2xl font-semibold text-dark-blue-night">Settings</h1>
           </div>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <Tabs value={isInternalDesigner ? "input-fields" : activeTab} onValueChange={(tab) => {
+            // Internal designers can only access input-fields tab
+            if (isInternalDesigner && tab !== "input-fields") return;
+            setActiveTab(tab);
+          }} className="space-y-6">
             <TabsList>
-              <TabsTrigger value="services" data-testid="tab-services">
-                <Layers className="h-4 w-4 mr-1" />
-                Services
-              </TabsTrigger>
-              <TabsTrigger value="pricing" data-testid="tab-pricing">
-                <DollarSign className="h-4 w-4 mr-1" />
-                Pricing
-              </TabsTrigger>
-              <TabsTrigger value="line-items" data-testid="tab-line-items">
-                <Package className="h-4 w-4 mr-1" />
-                Line Items
-              </TabsTrigger>
-              <TabsTrigger value="bundles" data-testid="tab-bundles">
-                <Boxes className="h-4 w-4 mr-1" />
-                Bundles
-              </TabsTrigger>
-              <TabsTrigger value="packs" data-testid="tab-packs">
-                <CalendarRange className="h-4 w-4 mr-1" />
-                Packs
-              </TabsTrigger>
+              {isAdmin && (
+                <>
+                  <TabsTrigger value="services" data-testid="tab-services">
+                    <Layers className="h-4 w-4 mr-1" />
+                    Services
+                  </TabsTrigger>
+                  <TabsTrigger value="pricing" data-testid="tab-pricing">
+                    <DollarSign className="h-4 w-4 mr-1" />
+                    Pricing
+                  </TabsTrigger>
+                  <TabsTrigger value="line-items" data-testid="tab-line-items">
+                    <Package className="h-4 w-4 mr-1" />
+                    Line Items
+                  </TabsTrigger>
+                  <TabsTrigger value="bundles" data-testid="tab-bundles">
+                    <Boxes className="h-4 w-4 mr-1" />
+                    Bundles
+                  </TabsTrigger>
+                  <TabsTrigger value="packs" data-testid="tab-packs">
+                    <CalendarRange className="h-4 w-4 mr-1" />
+                    Packs
+                  </TabsTrigger>
+                </>
+              )}
               <TabsTrigger value="input-fields" data-testid="tab-input-fields">
                 <FormInput className="h-4 w-4 mr-1" />
                 Input Fields
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="services">
-              <ServiceManagementTabContent onNavigateToServiceFields={handleNavigateToServiceFields} />
-            </TabsContent>
+            {isAdmin && (
+              <>
+                <TabsContent value="services">
+                  <ServiceManagementTabContent onNavigateToServiceFields={handleNavigateToServiceFields} />
+                </TabsContent>
 
-            <TabsContent value="pricing">
-              <PricingTabContent
-                pricingData={pricingData}
-                setPricingData={setPricingData}
-                handleSavePricing={handleSavePricing}
-                isPending={updatePricingMutation.isPending}
-              />
-            </TabsContent>
+                <TabsContent value="pricing">
+                  <PricingTabContent
+                    pricingData={pricingData}
+                    setPricingData={setPricingData}
+                    handleSavePricing={handleSavePricing}
+                    isPending={updatePricingMutation.isPending}
+                  />
+                </TabsContent>
 
-            <TabsContent value="line-items">
-              <LineItemsTabContent />
-            </TabsContent>
+                <TabsContent value="line-items">
+                  <LineItemsTabContent />
+                </TabsContent>
 
-            <TabsContent value="bundles">
-              <BundlesTabContent />
-            </TabsContent>
+                <TabsContent value="bundles">
+                  <BundlesTabContent />
+                </TabsContent>
 
-            <TabsContent value="packs">
-              <PacksTabContent />
-            </TabsContent>
+                <TabsContent value="packs">
+                  <PacksTabContent />
+                </TabsContent>
+              </>
+            )}
 
             <TabsContent value="input-fields">
               <InputFieldsTabContent />
