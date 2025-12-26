@@ -1496,8 +1496,8 @@ export default function JobDetailView() {
                   
                   // Fields to skip (already shown elsewhere or internal)
                   // Base skip fields for all form types
-                  // calculatedPrice only visible to admin/client/distributor roles
-                  const baseSkipFields = ['uploadedFiles', 'artworkFile', 'notes', ...(canSeePricing ? [] : ['calculatedPrice'])];
+                  // calculatedPrice is now shown in the top bar, so skip it from Info Details for all users
+                  const baseSkipFields = ['uploadedFiles', 'artworkFile', 'notes', 'calculatedPrice'];
                   
                   // Check if this is Store Creation form (has storeName field)
                   const isStoreCreationForm = formData?.storeName !== undefined;
@@ -1578,8 +1578,6 @@ export default function JobDetailView() {
                       displayValue = value ? 'Yes' : 'No';
                     } else if (Array.isArray(value)) {
                       displayValue = value.join(', ');
-                    } else if (key === 'calculatedPrice') {
-                      displayValue = `$${value}`;
                     } else {
                       displayValue = String(value);
                     }
