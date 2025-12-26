@@ -27,9 +27,14 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, UserCog, XCircle, Package, Boxes } from "lucide-react";
+import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, UserCog, XCircle, Package, Boxes, LayoutGrid, List } from "lucide-react";
+import { BoardView } from "@/components/BoardView";
 import type { ServiceRequest, Service, User, BundleRequest, Bundle } from "@shared/schema";
 
 interface CurrentUser {
@@ -58,6 +63,14 @@ export default function ServiceRequestsList() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [bundleStatusFilter, setBundleStatusFilter] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<"adhoc" | "bundle">("adhoc");
+  const [viewMode, setViewMode] = useState<"list" | "board">(() => {
+    const saved = localStorage.getItem("serviceRequestsViewMode");
+    return (saved as "list" | "board") || "list";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("serviceRequestsViewMode", viewMode);
+  }, [viewMode]);
   
   // Sync tab state with URL
   useEffect(() => {
@@ -189,34 +202,59 @@ export default function ServiceRequestsList() {
                 Service Requests
               </CardTitle>
               <div className="flex items-center gap-4">
-                {activeTab === "adhoc" ? (
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
-                      <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="in-progress">In Progress</SelectItem>
-                      <SelectItem value="delivered">Delivered</SelectItem>
-                      <SelectItem value="change-request">Change Request</SelectItem>
-                      <SelectItem value="canceled">Canceled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Select value={bundleStatusFilter} onValueChange={setBundleStatusFilter}>
-                    <SelectTrigger className="w-[180px]" data-testid="select-bundle-status-filter">
-                      <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="in-progress">In Progress</SelectItem>
-                      <SelectItem value="delivered">Delivered</SelectItem>
-                      <SelectItem value="change-request">Change Request</SelectItem>
-                      <SelectItem value="canceled">Canceled</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <ToggleGroup
+                  type="single"
+                  value={viewMode}
+                  onValueChange={(value) => value && setViewMode(value as "list" | "board")}
+                  className="border rounded-md"
+                >
+                  <ToggleGroupItem
+                    value="list"
+                    aria-label="List view"
+                    data-testid="toggle-list-view"
+                    className="px-3"
+                  >
+                    <List className="h-4 w-4" />
+                  </ToggleGroupItem>
+                  <ToggleGroupItem
+                    value="board"
+                    aria-label="Board view"
+                    data-testid="toggle-board-view"
+                    className="px-3"
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                {viewMode === "list" && (
+                  activeTab === "adhoc" ? (
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="in-progress">In Progress</SelectItem>
+                        <SelectItem value="delivered">Delivered</SelectItem>
+                        <SelectItem value="change-request">Change Request</SelectItem>
+                        <SelectItem value="canceled">Canceled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Select value={bundleStatusFilter} onValueChange={setBundleStatusFilter}>
+                      <SelectTrigger className="w-[180px]" data-testid="select-bundle-status-filter">
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="in-progress">In Progress</SelectItem>
+                        <SelectItem value="delivered">Delivered</SelectItem>
+                        <SelectItem value="change-request">Change Request</SelectItem>
+                        <SelectItem value="canceled">Canceled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )
                 )}
                 <Link href="/">
                   <Button data-testid="button-new-request">New Request</Button>
@@ -238,7 +276,16 @@ export default function ServiceRequestsList() {
               </TabsList>
 
               <TabsContent value="adhoc">
-                {loadingRequests ? (
+                {viewMode === "board" ? (
+                  <BoardView
+                    requests={requests}
+                    type="adhoc"
+                    services={services}
+                    users={users}
+                    currentUserRole={currentUser?.role}
+                    isLoading={loadingRequests}
+                  />
+                ) : loadingRequests ? (
                   <div className="text-center py-8">
                     <p className="font-body-reg text-dark-gray">Loading requests...</p>
                   </div>
@@ -329,7 +376,16 @@ export default function ServiceRequestsList() {
               </TabsContent>
 
               <TabsContent value="bundle">
-                {loadingBundleRequests ? (
+                {viewMode === "board" ? (
+                  <BoardView
+                    requests={bundleRequests}
+                    type="bundle"
+                    bundles={bundles}
+                    users={users}
+                    currentUserRole={currentUser?.role}
+                    isLoading={loadingBundleRequests}
+                  />
+                ) : loadingBundleRequests ? (
                   <div className="text-center py-8">
                     <p className="font-body-reg text-dark-gray">Loading bundle requests...</p>
                   </div>
