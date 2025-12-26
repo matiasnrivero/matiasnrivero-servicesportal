@@ -86,6 +86,8 @@ export default function JobDetailView() {
   interface ServiceFieldWithInput {
     id: string;
     inputFieldId: string;
+    uiGroup: string | null;
+    sortOrder: number;
     inputField: {
       id: string;
       fieldKey: string;
@@ -695,6 +697,47 @@ export default function JobDetailView() {
                     </p>
                   </div>
                 )}
+                
+                {/* Render dynamic general_info fields from formData */}
+                {(() => {
+                  const formData = request.formData as Record<string, unknown> | null;
+                  if (!formData || serviceFields.length === 0) return null;
+                  
+                  // Get general_info fields from serviceFields, sorted by sortOrder
+                  const generalInfoFields = serviceFields
+                    .filter(sf => sf.uiGroup === "general_info" && sf.inputField)
+                    .sort((a, b) => (a.sortOrder ?? 9999) - (b.sortOrder ?? 9999));
+                  
+                  if (generalInfoFields.length === 0) return null;
+                  
+                  return generalInfoFields.map(sf => {
+                    const fieldKey = sf.inputField!.fieldKey;
+                    const value = formData[fieldKey];
+                    
+                    // Skip empty values
+                    if (value === null || value === undefined || value === "") return null;
+                    
+                    let displayValue: string;
+                    if (typeof value === "boolean") {
+                      displayValue = value ? "Yes" : "No";
+                    } else if (Array.isArray(value)) {
+                      displayValue = value.join(", ");
+                    } else if (typeof value === "number" && value === 0) {
+                      displayValue = "0";
+                    } else {
+                      displayValue = String(value);
+                    }
+                    
+                    return (
+                      <div key={fieldKey} className="p-3 bg-blue-lavender/30 rounded-lg">
+                        <p className="text-xs text-dark-gray mb-1">{sf.inputField!.label || fieldKey}</p>
+                        <p className="text-sm font-medium text-dark-blue-night" data-testid={`text-${fieldKey}`}>
+                          {displayValue}
+                        </p>
+                      </div>
+                    );
+                  });
+                })()}
               </CardContent>
             </Card>
 
@@ -1243,8 +1286,28 @@ export default function JobDetailView() {
                   const formData = request.formData as Record<string, unknown> | null;
                   if (!formData) return null;
                   
-                  // Define field display names
-                  const fieldLabels: Record<string, string> = {
+                  // Build dynamic field labels from serviceFields (from database)
+                  const dynamicLabels: Record<string, string> = {};
+                  const generalInfoFieldKeys = new Set<string>();
+                  const deliveryFieldKeys = new Set<string>();
+                  
+                  for (const sf of serviceFields) {
+                    if (sf.inputField) {
+                      // Only override if we have a valid label
+                      if (sf.inputField.label) {
+                        dynamicLabels[sf.inputField.fieldKey] = sf.inputField.label;
+                      }
+                      if (sf.uiGroup === "general_info") {
+                        generalInfoFieldKeys.add(sf.inputField.fieldKey);
+                      }
+                      if (sf.inputField.inputFor === "delivery") {
+                        deliveryFieldKeys.add(sf.inputField.fieldKey);
+                      }
+                    }
+                  }
+                  
+                  // Define fallback field display names (for fields not in database)
+                  const fallbackLabels: Record<string, string> = {
                     outputFormats: "Output Formats",
                     outputFormat: "Output Format",
                     widthInches: "Width (inches)",
@@ -1285,6 +1348,9 @@ export default function JobDetailView() {
                     quantity: "Quantity",
                   };
                   
+                  // Merge: prefer dynamic labels, then fallbacks
+                  const fieldLabels: Record<string, string> = { ...fallbackLabels, ...dynamicLabels };
+                  
                   // Fields to skip (already shown elsewhere or internal)
                   // Base skip fields for all form types (calculatedPrice hidden from designers)
                   const baseSkipFields = ['uploadedFiles', 'artworkFile', 'notes', 'calculatedPrice'];
@@ -1319,6 +1385,12 @@ export default function JobDetailView() {
                   } else if (isArtworkCompositionForm) {
                     // Artwork Composition: skip fields already rendered in custom layout
                     skipFields = [...baseSkipFields, 'brandGuidelines', 'uploadAssets', 'artworkFile', 'inspirationFile', 'textContent', 'complexity', 'outputFormat', 'widthInches', 'heightInches'];
+                  }
+                  
+                  // Only skip general_info and delivery fields when we have actual serviceFields data
+                  // This ensures legacy requests without metadata still show all their fields in Info Details
+                  if (serviceFields.length > 0) {
+                    skipFields = [...skipFields, ...generalInfoFieldKeys, ...deliveryFieldKeys];
                   }
                   
                   // Define preferred field order with paired fields (left, right) for side-by-side display
