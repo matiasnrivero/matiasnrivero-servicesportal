@@ -158,37 +158,52 @@ export default function ServicesProfitReport() {
     if (pricingStructure === "complexity" && servicePricing.complexity) {
       const complexity = (formData?.complexity || formData?.designComplexity) as string | undefined;
       if (complexity) {
-        const tierKey = complexity.toLowerCase();
-        const price = servicePricing.complexity[tierKey];
-        if (price !== undefined) return price;
+        const complexityLower = complexity.toLowerCase();
+        for (const [tierKey, price] of Object.entries(servicePricing.complexity)) {
+          if (tierKey.toLowerCase() === complexityLower) {
+            return price;
+          }
+        }
       }
     }
     
     if (pricingStructure === "quantity" && servicePricing.quantity) {
       const quantity = parseInt(String(formData?.amount_of_products || formData?.amountOfProducts || formData?.quantity || 0));
       if (quantity > 0) {
-        const tiers = tiersByService[service.id] || [];
-        for (const tier of tiers) {
-          const tierPrice = servicePricing.quantity[tier.label];
-          if (tierPrice !== undefined) {
-            const match = tier.label.match(/(\d+)\s*-\s*(\d+)/);
-            if (match) {
-              const min = parseInt(match[1]);
-              const max = parseInt(match[2]);
-              if (quantity >= min && quantity <= max) {
-                return quantity * tierPrice;
-              }
-            }
-            if (tier.label.includes("+")) {
-              const minMatch = tier.label.match(/(\d+)\+/);
-              if (minMatch) {
-                const min = parseInt(minMatch[1]);
-                if (quantity >= min) {
-                  return quantity * tierPrice;
-                }
-              }
+        let matchedPrice: number | null = null;
+        let matchedMinForUnbounded = -1;
+        
+        for (const [tierLabel, tierPrice] of Object.entries(servicePricing.quantity)) {
+          const rangeMatch = tierLabel.match(/(\d+)\s*-\s*(\d+)/);
+          if (rangeMatch) {
+            const min = parseInt(rangeMatch[1]);
+            const max = parseInt(rangeMatch[2]);
+            if (quantity >= min && quantity <= max) {
+              return quantity * tierPrice;
             }
           }
+          
+          const plusMatch = tierLabel.match(/(\d+)\+/);
+          if (plusMatch) {
+            const min = parseInt(plusMatch[1]);
+            if (quantity >= min && min > matchedMinForUnbounded) {
+              matchedMinForUnbounded = min;
+              matchedPrice = tierPrice;
+            }
+          }
+          
+          const greaterMatch = tierLabel.match(/>(\d+)/);
+          if (greaterMatch) {
+            const min = parseInt(greaterMatch[1]);
+            if (quantity > min && min > matchedMinForUnbounded) {
+              matchedMinForUnbounded = min;
+              matchedPrice = tierPrice;
+            }
+          }
+        }
+        
+        if (matchedPrice !== null) {
+          return quantity * matchedPrice;
         }
       }
     }
