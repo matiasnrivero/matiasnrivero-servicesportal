@@ -752,6 +752,11 @@ export default function ServiceRequestForm() {
     const infoDetailsFields: ServiceFieldWithInput[] = [];
     
     fields.forEach(field => {
+      // Filter out delivery fields - they should only be shown to designers
+      if (field.inputField?.inputFor === "delivery") {
+        return;
+      }
+      
       if (field.uiGroup === "general_info") {
         generalInfoFields.push(field);
       } else {

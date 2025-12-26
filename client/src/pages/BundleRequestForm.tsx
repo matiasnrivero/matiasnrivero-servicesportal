@@ -250,9 +250,17 @@ export default function BundleRequestForm() {
   }
 
   const { bundle, bundleFields: rawBundleFields, services } = bundleStructure;
-  // Sort bundle fields by sortOrder to ensure correct display order
-  const bundleFields = [...(rawBundleFields || [])].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-  const servicesWithFields = services.filter((s) => s.fields.length > 0);
+  // Sort bundle fields by sortOrder and filter out delivery fields (only shown to designers)
+  const bundleFields = [...(rawBundleFields || [])]
+    .filter(bf => bf.inputField?.inputFor !== "delivery")
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  // Filter out services whose fields are all delivery fields
+  const servicesWithFields = services
+    .map(s => ({
+      ...s,
+      fields: s.fields.filter(f => f.inputField?.inputFor !== "delivery")
+    }))
+    .filter((s) => s.fields.length > 0);
 
   // Helper to render bundle header field input
   const renderBundleHeaderField = (bf: EnrichedBundleField) => {
