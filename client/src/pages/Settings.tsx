@@ -3410,7 +3410,7 @@ function BundleFieldsAssignmentsManager() {
   });
 
   const addBundleFieldMutation = useMutation({
-    mutationFn: async (data: { inputFieldId: string; optionsJson?: string[]; defaultValue?: unknown; required: boolean; sortOrder: number }) => {
+    mutationFn: async (data: { inputFieldId: string; optionsJson?: string[]; defaultValue?: unknown; required: boolean; sortOrder: number; uiGroup?: string }) => {
       return apiRequest("POST", `/api/bundles/${selectedBundleId}/fields`, data);
     },
     onSuccess: () => {
@@ -3425,7 +3425,7 @@ function BundleFieldsAssignmentsManager() {
   });
 
   const updateBundleFieldMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { optionsJson?: string[] | null; defaultValue?: unknown; required?: boolean; sortOrder?: number } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: { optionsJson?: string[] | null; defaultValue?: unknown; required?: boolean; sortOrder?: number; uiGroup?: string } }) => {
       return apiRequest("PATCH", `/api/bundle-fields/${id}`, data);
     },
     onSuccess: () => {
@@ -3458,6 +3458,7 @@ function BundleFieldsAssignmentsManager() {
       defaultValue: "",
       isRequired: false,
       sortOrder: 0,
+      uiGroup: "general_info",
     },
   });
 
@@ -3467,6 +3468,7 @@ function BundleFieldsAssignmentsManager() {
       defaultValue: "",
       isRequired: false,
       sortOrder: 0,
+      uiGroup: "general_info",
     },
   });
 
@@ -3479,6 +3481,7 @@ function BundleFieldsAssignmentsManager() {
           : (editingBundleField.defaultValue ? JSON.stringify(editingBundleField.defaultValue) : ""),
         isRequired: editingBundleField.required,
         sortOrder: editingBundleField.sortOrder,
+        uiGroup: editingBundleField.uiGroup || "general_info",
       });
     }
   }, [editingBundleField, editFieldForm]);
@@ -3509,17 +3512,18 @@ function BundleFieldsAssignmentsManager() {
     return trimmed;
   };
 
-  const handleAddField = (data: { inputFieldId: string; optionsJson: string; defaultValue: string; isRequired: boolean; sortOrder: number }) => {
+  const handleAddField = (data: { inputFieldId: string; optionsJson: string; defaultValue: string; isRequired: boolean; sortOrder: number; uiGroup: string }) => {
     addBundleFieldMutation.mutate({
       inputFieldId: data.inputFieldId,
       optionsJson: parseOptionsInput(data.optionsJson) || undefined,
       defaultValue: parseDefaultValue(data.defaultValue),
       required: data.isRequired,
       sortOrder: data.sortOrder,
+      uiGroup: data.uiGroup,
     });
   };
 
-  const handleUpdateField = (data: { optionsJson: string; defaultValue: string; isRequired: boolean; sortOrder: number }) => {
+  const handleUpdateField = (data: { optionsJson: string; defaultValue: string; isRequired: boolean; sortOrder: number; uiGroup: string }) => {
     if (!editingBundleField) return;
     updateBundleFieldMutation.mutate({
       id: editingBundleField.id,
@@ -3528,6 +3532,7 @@ function BundleFieldsAssignmentsManager() {
         defaultValue: parseDefaultValue(data.defaultValue) ?? null,
         required: data.isRequired,
         sortOrder: data.sortOrder,
+        uiGroup: data.uiGroup,
       },
     });
   };
@@ -3650,6 +3655,28 @@ function BundleFieldsAssignmentsManager() {
                           </FormItem>
                         )}
                       />
+                      <FormField
+                        control={addFieldForm.control}
+                        name="uiGroup"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Section</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-add-bundle-section">
+                                  <SelectValue placeholder="Choose section..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="general_info">General Info</SelectItem>
+                                <SelectItem value="info_details">Info Details</SelectItem>
+                                <SelectItem value="additional_info">Additional Info</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                       <div className="grid grid-cols-2 gap-4">
                         <FormField
                           control={addFieldForm.control}
@@ -3715,6 +3742,7 @@ function BundleFieldsAssignmentsManager() {
                   <TableRow>
                     <TableHead>Field Name</TableHead>
                     <TableHead>Type</TableHead>
+                    <TableHead>Section</TableHead>
                     <TableHead>Bundle Options</TableHead>
                     <TableHead>Default Value</TableHead>
                     <TableHead>Required</TableHead>
@@ -3728,6 +3756,9 @@ function BundleFieldsAssignmentsManager() {
                       <TableCell className="font-medium">{getInputFieldName(bf.inputFieldId)}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{getInputFieldType(bf.inputFieldId)}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {bf.uiGroup === "additional_info" ? "Additional Info" : bf.uiGroup === "info_details" ? "Info Details" : "General Info"}
                       </TableCell>
                       <TableCell className="max-w-[200px] truncate">
                         {bf.optionsJson ? JSON.stringify(bf.optionsJson) : "-"}
@@ -3802,6 +3833,28 @@ function BundleFieldsAssignmentsManager() {
                     <FormControl>
                       <Input {...field} data-testid="input-edit-bundle-default" />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editFieldForm.control}
+                name="uiGroup"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Section</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-bundle-section">
+                          <SelectValue placeholder="Choose section..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="general_info">General Info</SelectItem>
+                        <SelectItem value="info_details">Info Details</SelectItem>
+                        <SelectItem value="additional_info">Additional Info</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

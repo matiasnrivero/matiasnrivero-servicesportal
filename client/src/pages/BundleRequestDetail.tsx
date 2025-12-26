@@ -450,9 +450,9 @@ export default function BundleRequestDetail() {
               </CardContent>
             </Card>
 
-            {/* Render non-general_info bundle fields in a separate section */}
+            {/* Render info_details bundle fields in a separate section */}
             {(bundleFields ?? []).filter(bf => 
-              bf.uiGroup !== "general_info" && 
+              bf.uiGroup === "info_details" && 
               bf.inputField?.inputFor !== "delivery"
             ).length > 0 && (
               <Card>
@@ -462,20 +462,11 @@ export default function BundleRequestDetail() {
                 <CardContent>
                   <div className="space-y-4">
                     {(bundleFields ?? [])
-                      .filter(bf => bf.uiGroup !== "general_info" && bf.inputField?.inputFor !== "delivery")
+                      .filter(bf => bf.uiGroup === "info_details" && bf.inputField?.inputFor !== "delivery")
                       .sort((a, b) => (a.sortOrder ?? 9999) - (b.sortOrder ?? 9999))
                       .map((bf) => {
                         const value = bf.value;
                         if (value === null || value === undefined || value === "") return null;
-                        
-                        let displayValue: string;
-                        if (typeof value === "boolean") {
-                          displayValue = value ? "Yes" : "No";
-                        } else if (Array.isArray(value)) {
-                          displayValue = value.join(", ");
-                        } else {
-                          displayValue = String(value);
-                        }
                         
                         return (
                           <div key={bf.id} className="flex flex-col gap-1">
@@ -483,7 +474,41 @@ export default function BundleRequestDetail() {
                               {bf.displayLabelOverride || bf.inputField?.label || "Field"}
                             </Label>
                             <div className="text-sm" data-testid={`text-bundle-field-${bf.id}`}>
-                              {displayValue}
+                              {renderFieldValue(value)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            
+            {/* Render additional_info bundle fields in Additional Information section */}
+            {(bundleFields ?? []).filter(bf => 
+              bf.uiGroup === "additional_info" && 
+              bf.inputField?.inputFor !== "delivery"
+            ).length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Additional Information</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {(bundleFields ?? [])
+                      .filter(bf => bf.uiGroup === "additional_info" && bf.inputField?.inputFor !== "delivery")
+                      .sort((a, b) => (a.sortOrder ?? 9999) - (b.sortOrder ?? 9999))
+                      .map((bf) => {
+                        const value = bf.value;
+                        if (value === null || value === undefined || value === "") return null;
+                        
+                        return (
+                          <div key={bf.id} className="flex flex-col gap-1">
+                            <Label className="text-sm font-medium text-muted-foreground">
+                              {bf.displayLabelOverride || bf.inputField?.label || "Field"}
+                            </Label>
+                            <div className="text-sm" data-testid={`text-bundle-field-${bf.id}`}>
+                              {renderFieldValue(value)}
                             </div>
                           </div>
                         );

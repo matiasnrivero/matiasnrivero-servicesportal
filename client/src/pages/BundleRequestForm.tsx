@@ -84,8 +84,6 @@ export default function BundleRequestForm() {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [bundleHeaderData, setBundleHeaderData] = useState<Record<string, any>>({});
   const [selectedAssignee, setSelectedAssignee] = useState<string>("");
-  const [notes, setNotes] = useState("");
-  const [uploadedFiles, setUploadedFiles] = useState<Array<{ url: string; fileName: string }>>([]);
 
   const { data: bundleStructure, isLoading: isLoadingStructure, error: structureError } = useQuery({
     queryKey: ["/api/bundles", bundleId, "form-structure"],
@@ -114,25 +112,7 @@ export default function BundleRequestForm() {
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertBundleRequest) => {
-      const request = await createBundleRequest(data);
-      
-      if (uploadedFiles.length > 0) {
-        await Promise.all(
-          uploadedFiles.map((file) =>
-            fetch(`/api/bundle-requests/${request.id}/attachments`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                fileName: file.fileName,
-                fileUrl: file.url,
-                kind: "request",
-              }),
-            })
-          )
-        );
-      }
-      
-      return request;
+      return await createBundleRequest(data);
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] });
@@ -164,14 +144,6 @@ export default function BundleRequestForm() {
       ...prev,
       [`bundle_${fieldId}`]: value,
     }));
-  };
-
-  const handleFileUpload = (url: string, fileName: string) => {
-    setUploadedFiles((prev) => [...prev, { url, fileName }]);
-  };
-
-  const handleFileRemove = (fileName: string) => {
-    setUploadedFiles((prev) => prev.filter((f) => f.fileName !== fileName));
   };
 
   const handleServiceFileUpload = (serviceId: string, fieldKey: string, url: string, fileName: string) => {
@@ -209,7 +181,6 @@ export default function BundleRequestForm() {
     const requestData = {
       bundleId,
       formData: combinedFormData,
-      notes: notes || null,
       assigneeId: selectedAssignee || null,
     };
 
@@ -251,9 +222,13 @@ export default function BundleRequestForm() {
 
   const { bundle, bundleFields: rawBundleFields, services } = bundleStructure;
   // Sort bundle fields by sortOrder and filter out delivery fields (only shown to designers)
-  const bundleFields = [...(rawBundleFields || [])]
+  const allBundleFields = [...(rawBundleFields || [])]
     .filter(bf => bf.inputField?.inputFor !== "delivery")
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  
+  // Separate bundle fields by section
+  const bundleFields = allBundleFields.filter(bf => bf.uiGroup !== "additional_info");
+  const additionalInfoFields = allBundleFields.filter(bf => bf.uiGroup === "additional_info");
   // Filter out services whose fields are all delivery fields
   const servicesWithFields = services
     .map(s => ({
@@ -345,6 +320,37 @@ export default function BundleRequestForm() {
                 ))}
               </SelectContent>
             </Select>
+            {description && (
+              <p className="text-xs text-muted-foreground">{description}</p>
+            )}
+          </div>
+        );
+      case "file":
+        const fileValue = bundleHeaderData[fieldKey] || [];
+        const files = Array.isArray(fileValue) ? fileValue : [];
+        return (
+          <div key={bf.id} className="space-y-2">
+            <Label>
+              {bf.displayLabelOverride || inputField.label}
+              {bf.required && <span className="text-destructive ml-1">*</span>}
+            </Label>
+            <FileUploader
+              onUploadComplete={(url, fileName) => {
+                const newFiles = [...files, { url, fileName }];
+                setBundleHeaderData((prev) => ({
+                  ...prev,
+                  [fieldKey]: newFiles,
+                }));
+              }}
+              onFileRemove={(fileName) => {
+                const newFiles = files.filter((f: { fileName: string }) => f.fileName !== fileName);
+                setBundleHeaderData((prev) => ({
+                  ...prev,
+                  [fieldKey]: newFiles,
+                }));
+              }}
+              existingFiles={files}
+            />
             {description && (
               <p className="text-xs text-muted-foreground">{description}</p>
             )}
@@ -504,32 +510,17 @@ export default function BundleRequestForm() {
           </Card>
         )}
 
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle className="text-lg">Additional Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes (optional)</Label>
-              <Textarea
-                id="notes"
-                placeholder="Any additional notes or special instructions for your request..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={4}
-                data-testid="textarea-notes"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Attachments (optional)</Label>
-              <FileUploader
-                onUploadComplete={handleFileUpload}
-                onFileRemove={handleFileRemove}
-              />
-            </div>
-          </CardContent>
-        </Card>
+        {/* Additional Information Section - only show if there are fields assigned */}
+        {additionalInfoFields.length > 0 && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="text-lg">Additional Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {additionalInfoFields.map((bf) => renderBundleHeaderField(bf))}
+            </CardContent>
+          </Card>
+        )}
 
         <Separator className="my-6" />
 
