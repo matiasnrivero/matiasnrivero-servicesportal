@@ -838,6 +838,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete service request (admin only)
+  app.delete("/api/service-requests/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const existingRequest = await storage.getServiceRequest(req.params.id);
+      if (!existingRequest) {
+        return res.status(404).json({ error: "Service request not found" });
+      }
+
+      await storage.deleteServiceRequest(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting service request:", error);
+      res.status(500).json({ error: "Failed to delete service request" });
+    }
+  });
+
   // Attachments routes - requires authentication and ownership/assignment check
   app.get("/api/service-requests/:requestId/attachments", async (req, res) => {
     try {

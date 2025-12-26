@@ -130,6 +130,7 @@ export interface IStorage {
   assignDesigner(requestId: string, assigneeId: string): Promise<ServiceRequest | undefined>;
   deliverRequest(requestId: string, deliveredBy: string): Promise<ServiceRequest | undefined>;
   requestChange(requestId: string, changeNote: string): Promise<ServiceRequest | undefined>;
+  deleteServiceRequest(id: string): Promise<void>;
 
   // Service Delivery methods (file versioning)
   getDeliveriesByRequest(requestId: string): Promise<ServiceDelivery[]>;
@@ -476,6 +477,10 @@ export class DbStorage implements IStorage {
       .where(eq(serviceRequests.id, requestId))
       .returning();
     return result[0];
+  }
+
+  async deleteServiceRequest(id: string): Promise<void> {
+    await db.delete(serviceRequests).where(eq(serviceRequests.id, id));
   }
 
   // Service Delivery methods (file versioning)

@@ -33,8 +33,18 @@ import {
 } from "@/components/ui/toggle-group";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, UserCog, XCircle, Package, Boxes, LayoutGrid, List } from "lucide-react";
+import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, UserCog, XCircle, Package, Boxes, LayoutGrid, List, Trash2 } from "lucide-react";
 import { BoardView } from "@/components/BoardView";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { calculateServicePrice } from "@/lib/pricing";
 import type { ServiceRequest, Service, User, BundleRequest, Bundle } from "@shared/schema";
 
@@ -59,7 +69,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
 
 export default function ServiceRequestsList() {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const localQueryClient = useQueryClient();
   const [location, navigate] = useLocation();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [bundleStatusFilter, setBundleStatusFilter] = useState<string>("all");
@@ -68,6 +78,8 @@ export default function ServiceRequestsList() {
     const saved = localStorage.getItem("serviceRequestsViewMode");
     return (saved as "list" | "board") || "list";
   });
+  const [deleteRequestId, setDeleteRequestId] = useState<string | null>(null);
+  const [deleteJobNumber, setDeleteJobNumber] = useState<string>("");
 
   useEffect(() => {
     localStorage.setItem("serviceRequestsViewMode", viewMode);
@@ -120,8 +132,8 @@ export default function ServiceRequestsList() {
     onSuccess: async () => {
       await refetchUser();
       // Invalidate all relevant queries so they refetch with new session
-      queryClient.invalidateQueries({ queryKey: ["/api/default-user"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+      localQueryClient.invalidateQueries({ queryKey: ["/api/default-user"] });
+      localQueryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
       toast({ 
         title: "Role switched", 
         description: `You are now viewing as ${currentUser?.role === "designer" ? "Client" : "Designer"}` 
@@ -129,6 +141,24 @@ export default function ServiceRequestsList() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to switch role", variant: "destructive" });
+    },
+  });
+
+  const deleteRequestMutation = useMutation({
+    mutationFn: async (requestId: string) => {
+      return apiRequest("DELETE", `/api/service-requests/${requestId}`);
+    },
+    onSuccess: () => {
+      localQueryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+      toast({ 
+        title: "Job deleted", 
+        description: "The service request has been permanently deleted." 
+      });
+      setDeleteRequestId(null);
+      setDeleteJobNumber("");
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete service request", variant: "destructive" });
     },
   });
 
@@ -359,16 +389,31 @@ export default function ServiceRequestsList() {
                               {format(new Date(request.createdAt), "MMM dd, yyyy")}
                             </TableCell>
                             <TableCell>
-                              <Link href={`/jobs/${request.id}`}>
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  data-testid={`button-view-${request.id}`}
-                                >
-                                  <Eye className="h-4 w-4 mr-1" />
-                                  View
-                                </Button>
-                              </Link>
+                              <div className="flex items-center gap-2">
+                                <Link href={`/jobs/${request.id}`}>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    data-testid={`button-view-${request.id}`}
+                                  >
+                                    <Eye className="h-4 w-4 mr-1" />
+                                    View
+                                  </Button>
+                                </Link>
+                                {currentUser?.role === "admin" && (
+                                  <Button 
+                                    size="sm" 
+                                    variant="destructive"
+                                    onClick={() => {
+                                      setDeleteRequestId(request.id);
+                                      setDeleteJobNumber(`A-${request.id.slice(0, 5).toUpperCase()}`);
+                                    }}
+                                    data-testid={`button-delete-${request.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -481,6 +526,29 @@ export default function ServiceRequestsList() {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={!!deleteRequestId} onOpenChange={(open) => !open && setDeleteRequestId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Service Request</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to permanently delete job <span className="font-semibold">{deleteJobNumber}</span>. 
+              This action cannot be undone. All associated files, comments, and deliveries will also be removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteRequestId && deleteRequestMutation.mutate(deleteRequestId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteRequestMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteRequestMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }
