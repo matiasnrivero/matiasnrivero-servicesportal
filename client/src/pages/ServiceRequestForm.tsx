@@ -498,6 +498,8 @@ export default function ServiceRequestForm() {
         dueDate,
         formData: allFormData,
         assigneeId: selectedAssignee || null,
+        // Store final calculated price as dedicated column for accurate display
+        finalPrice: calculatedPrice > 0 ? calculatedPrice.toFixed(2) : null,
       });
     } catch (error) {
       toast({
