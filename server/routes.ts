@@ -1066,6 +1066,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             email: `${username}@example.com`,
             role,
           });
+        } else if (user.role !== role) {
+          // Ensure the user's role matches the target role
+          user = await storage.updateUser(user.id, { role });
         }
       }
       
@@ -1079,11 +1082,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[switch-role] Switched to ${role}: userId=${user!.id}, username=${user!.username}`);
       
       // Update lastLoginAt
-      await storage.updateUser(user.id, { lastLoginAt: new Date() });
+      await storage.updateUser(user!.id, { lastLoginAt: new Date() });
       
       // Prevent caching
       res.set('Cache-Control', 'no-store');
-      res.json({ userId: user.id, role: user.role, username: user.username, email: user.email, phone: user.phone });
+      res.json({ userId: user!.id, role: user!.role, username: user!.username, email: user!.email, phone: user!.phone });
     } catch (error) {
       console.error("Error switching role:", error);
       res.status(500).json({ error: "Failed to switch role" });
