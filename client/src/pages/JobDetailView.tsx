@@ -39,6 +39,16 @@ interface CurrentUser {
   username: string;
 }
 
+interface DeliveryVersion {
+  id: string;
+  requestId: string;
+  version: number;
+  deliveredBy: string;
+  deliveredAt: string;
+  files: Array<{ url: string; fileName: string }>;
+  deliverer: { id: string; username: string; role: string } | null;
+}
+
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   "pending": { label: "Pending", color: "bg-yellow-100 text-yellow-800 border-yellow-200", icon: Clock },
   "in-progress": { label: "In Progress", color: "bg-blue-100 text-blue-800 border-blue-200", icon: RefreshCw },
@@ -115,6 +125,12 @@ export default function JobDetailView() {
     enabled: !!requestId && !!currentUser,
   });
 
+  // Fetch delivery versions (for file deliverables versioning)
+  const { data: deliveryVersions = [] } = useQuery<DeliveryVersion[]>({
+    queryKey: ["/api/service-requests", requestId, "deliveries"],
+    enabled: !!requestId,
+  });
+
   const { data: allUsers = [] } = useQuery<UserType[]>({
     queryKey: ["/api/users"],
   });
@@ -161,6 +177,7 @@ export default function JobDetailView() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/service-requests", requestId] });
       queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests", requestId, "deliveries"] });
       setFinalStoreUrl("");
       toast({ title: "Deliverables submitted", description: "The job has been marked as delivered." });
     },
@@ -430,8 +447,59 @@ export default function JobDetailView() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Show delivered files */}
-        {deliverableAttachments.length > 0 && (
+        {/* Show versioned file deliveries (newest to oldest) */}
+        {deliveryVersions.length > 0 && (
+          <div className="space-y-4">
+            {deliveryVersions.map((delivery) => (
+              <div 
+                key={delivery.id}
+                className={`p-4 rounded-lg border ${delivery.version === deliveryVersions[0]?.version ? 'bg-green-50 border-green-200' : 'bg-muted/30 border-muted'}`}
+                data-testid={`delivery-version-${delivery.version}`}
+              >
+                <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={delivery.version === deliveryVersions[0]?.version ? "default" : "secondary"}>
+                      v{delivery.version}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      Delivered by {delivery.deliverer?.username || "Unknown"} on {format(new Date(delivery.deliveredAt), "MMM dd, yyyy 'at' h:mm a")}
+                    </span>
+                  </div>
+                  {delivery.version === deliveryVersions[0]?.version && (
+                    <Badge variant="outline" className="text-green-600 border-green-300">Latest</Badge>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {(delivery.files as Array<{ url: string; fileName: string }>).map((file, fileIndex) => (
+                    <div 
+                      key={`${delivery.id}-${fileIndex}`}
+                      className="flex items-center justify-between p-2 bg-background rounded border"
+                    >
+                      <div className="flex items-center gap-3">
+                        <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                        <ImagePreviewTooltip
+                          fileUrl={file.url}
+                          fileName={file.fileName}
+                          thumbnailSize="sm"
+                        />
+                        <span className="text-sm text-dark-blue-night truncate">{file.fileName}</span>
+                      </div>
+                      <a href={file.url} target="_blank" rel="noopener noreferrer">
+                        <Button size="sm" variant="default" data-testid={`button-download-v${delivery.version}-file-${fileIndex}`}>
+                          <Download className="h-3 w-3 mr-1" />
+                          Download
+                        </Button>
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Fallback: Show unversioned deliverable attachments for backwards compatibility */}
+        {deliveryVersions.length === 0 && deliverableAttachments.length > 0 && (
           <div className="space-y-2">
             {deliverableAttachments.map((attachment) => (
               <div 
@@ -458,7 +526,7 @@ export default function JobDetailView() {
           </div>
         )}
 
-        {/* Show stored final store URL if delivered */}
+        {/* Show stored final store URL if delivered (Final Store URL is NOT versioned) */}
         {storedFinalStoreUrl && (
           <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
             <Label className="text-sm font-medium text-dark-gray mb-1">Final Store URL</Label>
@@ -474,7 +542,7 @@ export default function JobDetailView() {
           </div>
         )}
 
-        {deliverableAttachments.length === 0 && !storedFinalStoreUrl && !canManageJobs && (
+        {deliveryVersions.length === 0 && deliverableAttachments.length === 0 && !storedFinalStoreUrl && !canManageJobs && (
           <p className="text-sm text-dark-gray">No deliverables uploaded yet</p>
         )}
 

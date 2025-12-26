@@ -13,6 +13,8 @@ import {
   type ServiceRequest,
   type InsertServiceRequest,
   type UpdateServiceRequest,
+  type ServiceDelivery,
+  type InsertServiceDelivery,
   type ServiceAttachment,
   type InsertAttachment,
   type Comment,
@@ -58,6 +60,7 @@ import {
   services,
   servicePricingTiers,
   serviceRequests,
+  serviceDeliveries,
   serviceAttachments,
   comments,
   vendorProfiles,
@@ -127,6 +130,12 @@ export interface IStorage {
   assignDesigner(requestId: string, assigneeId: string): Promise<ServiceRequest | undefined>;
   deliverRequest(requestId: string, deliveredBy: string): Promise<ServiceRequest | undefined>;
   requestChange(requestId: string, changeNote: string): Promise<ServiceRequest | undefined>;
+
+  // Service Delivery methods (file versioning)
+  getDeliveriesByRequest(requestId: string): Promise<ServiceDelivery[]>;
+  getLatestDeliveryVersion(requestId: string): Promise<number>;
+  createDelivery(delivery: InsertServiceDelivery): Promise<ServiceDelivery>;
+  linkAttachmentsToDelivery(attachmentIds: string[], deliveryId: string): Promise<void>;
 
   // Attachment methods
   getAttachmentsByRequest(requestId: string): Promise<ServiceAttachment[]>;
@@ -464,6 +473,36 @@ export class DbStorage implements IStorage {
       .where(eq(serviceRequests.id, requestId))
       .returning();
     return result[0];
+  }
+
+  // Service Delivery methods (file versioning)
+  async getDeliveriesByRequest(requestId: string): Promise<ServiceDelivery[]> {
+    return await db.select().from(serviceDeliveries)
+      .where(eq(serviceDeliveries.requestId, requestId))
+      .orderBy(desc(serviceDeliveries.version));
+  }
+
+  async getLatestDeliveryVersion(requestId: string): Promise<number> {
+    const result = await db.select().from(serviceDeliveries)
+      .where(eq(serviceDeliveries.requestId, requestId))
+      .orderBy(desc(serviceDeliveries.version))
+      .limit(1);
+    return result.length > 0 ? result[0].version : 0;
+  }
+
+  async createDelivery(delivery: InsertServiceDelivery): Promise<ServiceDelivery> {
+    const result = await db.insert(serviceDeliveries).values(delivery).returning();
+    return result[0];
+  }
+
+  async linkAttachmentsToDelivery(attachmentIds: string[], deliveryId: string): Promise<void> {
+    if (attachmentIds.length === 0) return;
+    
+    for (const attachmentId of attachmentIds) {
+      await db.update(serviceAttachments)
+        .set({ deliveryId })
+        .where(eq(serviceAttachments.id, attachmentId));
+    }
   }
 
   // Attachment methods

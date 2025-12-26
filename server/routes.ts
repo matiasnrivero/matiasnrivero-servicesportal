@@ -464,7 +464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mark request as delivered
   app.post("/api/service-requests/:id/deliver", async (req, res) => {
     try {
-      const { finalStoreUrl } = req.body;
+      const { finalStoreUrl, deliverableFiles } = req.body;
       
       // Use session user for authorization
       const sessionUserId = req.session.userId;
@@ -502,6 +502,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateServiceRequest(req.params.id, {
           formData: { ...currentFormData, final_store_url: finalStoreUrl }
         });
+      }
+
+      // Create file delivery version record if there are file deliverables
+      // Files can come from: a) deliverableFiles in request body, or b) recent deliverable attachments
+      const allDeliverableAttachments = await storage.getAttachmentsByKind(req.params.id, "deliverable");
+      
+      // Get attachments that don't have a deliveryId yet (unversioned files)
+      const unversionedAttachments = allDeliverableAttachments.filter(a => !a.deliveryId);
+      
+      // Combine with any files passed directly in the request
+      const filesToDeliver: Array<{ url: string; fileName: string }> = [];
+      
+      // Add files from request body
+      if (deliverableFiles && Array.isArray(deliverableFiles)) {
+        filesToDeliver.push(...deliverableFiles);
+      }
+      
+      // Add unversioned attachment files
+      unversionedAttachments.forEach(attachment => {
+        filesToDeliver.push({
+          url: attachment.fileUrl,
+          fileName: attachment.fileName
+        });
+      });
+
+      // If there are files to deliver, create a delivery version record
+      if (filesToDeliver.length > 0) {
+        const latestVersion = await storage.getLatestDeliveryVersion(req.params.id);
+        const newVersion = latestVersion + 1;
+        
+        const newDelivery = await storage.createDelivery({
+          requestId: req.params.id,
+          version: newVersion,
+          deliveredBy: sessionUserId,
+          files: filesToDeliver
+        });
+
+        // Link unversioned attachments to this delivery so they don't resurface in future versions
+        const unversionedAttachmentIds = unversionedAttachments.map(a => a.id);
+        await storage.linkAttachmentsToDelivery(unversionedAttachmentIds, newDelivery.id);
       }
 
       const request = await storage.deliverRequest(req.params.id, sessionUserId);
@@ -739,6 +779,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating attachment:", error);
       res.status(500).json({ error: "Failed to create attachment" });
+    }
+  });
+
+  // Get delivery versions for a service request (file deliverables only)
+  app.get("/api/service-requests/:requestId/deliveries", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const existingRequest = await storage.getServiceRequest(req.params.requestId);
+      if (!existingRequest) {
+        return res.status(404).json({ error: "Service request not found" });
+      }
+
+      // Clients/Distributors can only view deliveries for their own requests
+      if ((sessionUser.role === "client" || sessionUser.role === "distributor") && existingRequest.userId !== sessionUserId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Get all delivery versions ordered by version DESC (newest first)
+      const deliveries = await storage.getDeliveriesByRequest(req.params.requestId);
+      
+      // Enrich with deliverer info
+      const enrichedDeliveries = await Promise.all(
+        deliveries.map(async (delivery) => {
+          const deliverer = await storage.getUser(delivery.deliveredBy);
+          return {
+            ...delivery,
+            deliverer: deliverer ? { id: deliverer.id, username: deliverer.username, role: deliverer.role } : null
+          };
+        })
+      );
+
+      res.json(enrichedDeliveries);
+    } catch (error) {
+      console.error("Error fetching deliveries:", error);
+      res.status(500).json({ error: "Failed to fetch deliveries" });
     }
   });
 

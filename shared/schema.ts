@@ -113,6 +113,17 @@ export const serviceRequests = pgTable("service_requests", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Service deliveries - tracks each delivery version for change request cycles
+export const serviceDeliveries = pgTable("service_deliveries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  requestId: varchar("request_id").notNull().references(() => serviceRequests.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  deliveredBy: varchar("delivered_by").notNull().references(() => users.id),
+  deliveredAt: timestamp("delivered_at").defaultNow().notNull(),
+  // Files stored as JSON array: [{ url: string, fileName: string }]
+  files: jsonb("files").notNull().default([]),
+});
+
 export const serviceAttachments = pgTable("service_attachments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   requestId: varchar("request_id").notNull().references(() => serviceRequests.id, { onDelete: "cascade" }),
@@ -122,6 +133,8 @@ export const serviceAttachments = pgTable("service_attachments", {
   kind: text("kind").notNull().default("request"),
   uploadedBy: varchar("uploaded_by").references(() => users.id),
   uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+  // Link to delivery version (for kind="deliverable" attachments)
+  deliveryId: varchar("delivery_id").references(() => serviceDeliveries.id, { onDelete: "set null" }),
 });
 
 export const comments = pgTable("comments", {
@@ -443,6 +456,14 @@ export const insertAttachmentSchema = createInsertSchema(serviceAttachments).omi
   id: true,
   uploadedAt: true,
 });
+
+// Service delivery schemas
+export const insertServiceDeliverySchema = createInsertSchema(serviceDeliveries).omit({
+  id: true,
+  deliveredAt: true,
+});
+export type InsertServiceDelivery = z.infer<typeof insertServiceDeliverySchema>;
+export type ServiceDelivery = typeof serviceDeliveries.$inferSelect;
 
 export const insertCommentSchema = createInsertSchema(comments).omit({
   id: true,
