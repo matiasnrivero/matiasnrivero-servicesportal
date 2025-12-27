@@ -341,6 +341,17 @@ export default function VendorsList() {
                         data-testid={`row-vendor-${vendor.id}`}
                       >
                         <div className="flex items-center gap-6 flex-1">
+                          <Switch
+                            id={`toggle-vendor-${vendor.id}`}
+                            checked={vendor.isActive}
+                            onCheckedChange={(checked) =>
+                              toggleVendorActiveMutation.mutate({
+                                userId: vendor.id,
+                                isActive: checked,
+                              })
+                            }
+                            data-testid={`switch-vendor-active-${vendor.id}`}
+                          />
                           <div className="min-w-[200px]">
                             <p className="font-semibold text-dark-blue-night">
                               {profile?.companyName || "No Company Name"}
@@ -365,25 +376,6 @@ export default function VendorsList() {
                           )}
                         </div>
                         <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2">
-                            <Label
-                              htmlFor={`toggle-vendor-${vendor.id}`}
-                              className="text-sm text-dark-gray"
-                            >
-                              Active
-                            </Label>
-                            <Switch
-                              id={`toggle-vendor-${vendor.id}`}
-                              checked={vendor.isActive}
-                              onCheckedChange={(checked) =>
-                                toggleVendorActiveMutation.mutate({
-                                  userId: vendor.id,
-                                  isActive: checked,
-                                })
-                              }
-                              data-testid={`switch-vendor-active-${vendor.id}`}
-                            />
-                          </div>
                           <Button
                             variant="outline"
                             size="sm"
