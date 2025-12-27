@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { automationEngine } from "./services/automationEngine";
 import type { User } from "@shared/schema";
 
 /**
@@ -531,14 +532,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         userId: sessionUserId, // Use session user instead of client-provided
         dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
+        autoAssignmentStatus: "not_attempted" as const,
       };
 
       // Only admin and internal_designer can set assigneeId during creation
+      const hasManualAssignment = ["admin", "internal_designer"].includes(sessionUser.role) && 
+        (req.body.assigneeId || req.body.vendorAssigneeId);
+      
       if (!["admin", "internal_designer"].includes(sessionUser.role)) {
         delete requestData.assigneeId;
+        delete requestData.vendorAssigneeId;
       }
 
-      const request = await storage.createServiceRequest(requestData);
+      let request = await storage.createServiceRequest(requestData);
+
+      // Trigger auto-assignment if no manual assignment was provided
+      if (!hasManualAssignment && !request.assigneeId && !request.vendorAssigneeId) {
+        try {
+          const automationResult = await automationEngine.processNewServiceRequest(request);
+          if (automationResult.success || automationResult.logs.length > 0) {
+            const updatedRequest = await automationEngine.applyAutomationResult(request.id, automationResult);
+            if (updatedRequest) {
+              request = updatedRequest;
+            }
+          }
+        } catch (automationError) {
+          console.error("Automation engine error:", automationError);
+          // Continue with the original request - automation failure shouldn't block creation
+        }
+      }
+
       res.status(201).json(request);
     } catch (error) {
       console.error("Error creating service request:", error);
