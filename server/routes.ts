@@ -3694,6 +3694,535 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== VENDOR SERVICE CAPACITY ROUTES ====================
+
+  // Get all vendor service capacities (admin/internal_designer only)
+  app.get("/api/vendor-service-capacities", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const capacities = await storage.getAllVendorServiceCapacities();
+      res.json(capacities);
+    } catch (error) {
+      console.error("Error fetching vendor service capacities:", error);
+      res.status(500).json({ error: "Failed to fetch vendor service capacities" });
+    }
+  });
+
+  // Get vendor service capacities for a specific vendor profile
+  app.get("/api/vendor-profiles/:profileId/service-capacities", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      
+      // Vendors can view their own capacities, admin/internal_designer can view all
+      const profile = await storage.getVendorProfileById(req.params.profileId);
+      if (!profile) {
+        return res.status(404).json({ error: "Vendor profile not found" });
+      }
+      
+      if (!["admin", "internal_designer"].includes(sessionUser.role) && profile.userId !== sessionUserId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const capacities = await storage.getVendorServiceCapacities(req.params.profileId);
+      res.json(capacities);
+    } catch (error) {
+      console.error("Error fetching vendor service capacities:", error);
+      res.status(500).json({ error: "Failed to fetch vendor service capacities" });
+    }
+  });
+
+  // Create or update vendor service capacity (upsert)
+  app.post("/api/vendor-profiles/:profileId/service-capacities", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      
+      const profile = await storage.getVendorProfileById(req.params.profileId);
+      if (!profile) {
+        return res.status(404).json({ error: "Vendor profile not found" });
+      }
+      
+      // Admin can edit all; vendors can only edit their own capacities
+      const isAdmin = sessionUser.role === "admin";
+      const isOwner = sessionUser.role === "vendor" && profile.userId === sessionUserId;
+      if (!isAdmin && !isOwner) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const { serviceId, dailyCapacity, autoAssignEnabled, priority, routingStrategy } = req.body;
+      if (!serviceId) {
+        return res.status(400).json({ error: "serviceId is required" });
+      }
+      
+      const capacity = await storage.upsertVendorServiceCapacity({
+        vendorProfileId: req.params.profileId,
+        serviceId,
+        dailyCapacity: dailyCapacity ?? 0,
+        autoAssignEnabled: autoAssignEnabled ?? true,
+        priority: priority ?? 0,
+        routingStrategy: routingStrategy ?? "least_loaded",
+      });
+      
+      res.status(201).json(capacity);
+    } catch (error) {
+      console.error("Error saving vendor service capacity:", error);
+      res.status(500).json({ error: "Failed to save vendor service capacity" });
+    }
+  });
+
+  // Delete vendor service capacity
+  app.delete("/api/vendor-service-capacities/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || !["admin", "vendor"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Verify the capacity exists
+      const capacity = await storage.getVendorServiceCapacityById(req.params.id);
+      if (!capacity) {
+        return res.status(404).json({ error: "Capacity not found" });
+      }
+      
+      // Admin can delete any capacity
+      if (sessionUser.role === "admin") {
+        await storage.deleteVendorServiceCapacity(req.params.id);
+        return res.status(204).send();
+      }
+      
+      // Vendors can only delete their own capacities
+      // vendorProfiles.userId references the vendor user who owns the profile
+      const profile = await storage.getVendorProfileById(capacity.vendorProfileId);
+      if (!profile) {
+        return res.status(404).json({ error: "Vendor profile not found" });
+      }
+      if (profile.userId !== sessionUserId) {
+        return res.status(403).json({ error: "You can only delete your own vendor capacities" });
+      }
+      
+      await storage.deleteVendorServiceCapacity(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting vendor service capacity:", error);
+      res.status(500).json({ error: "Failed to delete vendor service capacity" });
+    }
+  });
+
+  // ==================== VENDOR DESIGNER CAPACITY ROUTES ====================
+
+  // Get all vendor designer capacities (admin/internal_designer/vendor only)
+  app.get("/api/vendor-designer-capacities", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || !["admin", "internal_designer", "vendor"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const capacities = await storage.getAllVendorDesignerCapacities();
+      res.json(capacities);
+    } catch (error) {
+      console.error("Error fetching vendor designer capacities:", error);
+      res.status(500).json({ error: "Failed to fetch vendor designer capacities" });
+    }
+  });
+
+  // Get designer capacities for a specific user
+  app.get("/api/users/:userId/designer-capacities", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      
+      // Users can view their own capacities, admin/vendor can view their team
+      const targetUser = await storage.getUser(req.params.userId);
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const canView = 
+        ["admin", "internal_designer"].includes(sessionUser.role) ||
+        sessionUserId === req.params.userId ||
+        (sessionUser.role === "vendor" && targetUser.vendorId === sessionUserId);
+      
+      if (!canView) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const capacities = await storage.getVendorDesignerCapacities(req.params.userId);
+      res.json(capacities);
+    } catch (error) {
+      console.error("Error fetching designer capacities:", error);
+      res.status(500).json({ error: "Failed to fetch designer capacities" });
+    }
+  });
+
+  // Create or update designer capacity (upsert)
+  app.post("/api/users/:userId/designer-capacities", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      
+      const targetUser = await storage.getUser(req.params.userId);
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Only vendor designers and internal designers can have capacities
+      if (!["vendor_designer", "internal_designer"].includes(targetUser.role)) {
+        return res.status(400).json({ error: "Capacities can only be set for designers" });
+      }
+      
+      // Admin can edit anyone, vendor can edit their designers, user can edit themselves
+      const canEdit = 
+        sessionUser.role === "admin" ||
+        sessionUserId === req.params.userId ||
+        (sessionUser.role === "vendor" && targetUser.vendorId === sessionUserId);
+      
+      if (!canEdit) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const { serviceId, dailyCapacity, isPrimary, autoAssignEnabled, priority } = req.body;
+      if (!serviceId) {
+        return res.status(400).json({ error: "serviceId is required" });
+      }
+      
+      const capacity = await storage.upsertVendorDesignerCapacity({
+        userId: req.params.userId,
+        serviceId,
+        dailyCapacity: dailyCapacity ?? 0,
+        isPrimary: isPrimary ?? false,
+        autoAssignEnabled: autoAssignEnabled ?? true,
+        priority: priority ?? 0,
+      });
+      
+      res.status(201).json(capacity);
+    } catch (error) {
+      console.error("Error saving designer capacity:", error);
+      res.status(500).json({ error: "Failed to save designer capacity" });
+    }
+  });
+
+  // Delete designer capacity
+  app.delete("/api/vendor-designer-capacities/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || !["admin", "vendor", "vendor_designer", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // Verify the capacity exists
+      const capacity = await storage.getVendorDesignerCapacityById(req.params.id);
+      if (!capacity) {
+        return res.status(404).json({ error: "Capacity not found" });
+      }
+      
+      // Admin can delete any capacity
+      if (sessionUser.role === "admin") {
+        await storage.deleteVendorDesignerCapacity(req.params.id);
+        return res.status(204).send();
+      }
+      
+      // Verify ownership based on role
+      if (sessionUser.role === "vendor") {
+        // Vendor can only delete capacities of their team members
+        // Vendor users are identified by their user ID, and vendor_designers have vendorId pointing to the vendor's user ID
+        const targetUser = await storage.getUser(capacity.userId);
+        if (!targetUser) {
+          return res.status(404).json({ error: "Capacity owner not found" });
+        }
+        // Check if target is a vendor_designer belonging to this vendor
+        if (targetUser.role !== "vendor_designer" || targetUser.vendorId !== sessionUserId) {
+          return res.status(403).json({ error: "You can only delete capacities for your team members" });
+        }
+      } else if (sessionUser.role === "vendor_designer" || sessionUser.role === "internal_designer") {
+        // Designers can only delete their own capacities
+        if (capacity.userId !== sessionUserId) {
+          return res.status(403).json({ error: "You can only delete your own capacities" });
+        }
+      }
+      
+      await storage.deleteVendorDesignerCapacity(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting designer capacity:", error);
+      res.status(500).json({ error: "Failed to delete designer capacity" });
+    }
+  });
+
+  // ==================== AUTOMATION RULES ROUTES ====================
+
+  // Get all automation rules (admin only for global, vendor for their own)
+  app.get("/api/automation-rules", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      
+      let rules;
+      if (sessionUser.role === "admin") {
+        // Admin sees all rules
+        rules = await storage.getAllAutomationRules();
+      } else if (sessionUser.role === "vendor") {
+        // Vendor sees only their own rules
+        rules = await storage.getAutomationRulesByOwner(sessionUserId);
+      } else {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      res.json(rules);
+    } catch (error) {
+      console.error("Error fetching automation rules:", error);
+      res.status(500).json({ error: "Failed to fetch automation rules" });
+    }
+  });
+
+  // Get automation rules by scope (admin only)
+  app.get("/api/automation-rules/scope/:scope", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      
+      const rules = await storage.getAutomationRulesByScope(req.params.scope);
+      res.json(rules);
+    } catch (error) {
+      console.error("Error fetching automation rules by scope:", error);
+      res.status(500).json({ error: "Failed to fetch automation rules" });
+    }
+  });
+
+  // Get single automation rule
+  app.get("/api/automation-rules/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      
+      const rule = await storage.getAutomationRule(req.params.id);
+      if (!rule) {
+        return res.status(404).json({ error: "Rule not found" });
+      }
+      
+      // Check access: admin can see all, vendor can see their own
+      if (sessionUser.role !== "admin" && rule.ownerVendorId !== sessionUserId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      res.json(rule);
+    } catch (error) {
+      console.error("Error fetching automation rule:", error);
+      res.status(500).json({ error: "Failed to fetch automation rule" });
+    }
+  });
+
+  // Create automation rule
+  app.post("/api/automation-rules", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      
+      const { scope, name, isActive, priority, serviceIds, routingTarget, routingStrategy, 
+              allowedVendorIds, excludedVendorIds, fallbackAction, matchCriteria, ownerVendorId } = req.body;
+      
+      // Validate access
+      if (scope === "global" && sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Only admin can create global rules" });
+      }
+      
+      if (scope === "vendor" && sessionUser.role !== "admin" && sessionUser.role !== "vendor") {
+        return res.status(403).json({ error: "Only admin or vendor can create vendor rules" });
+      }
+      
+      // For vendor scope, set ownerVendorId appropriately
+      const finalOwnerVendorId = scope === "vendor" 
+        ? (sessionUser.role === "admin" ? ownerVendorId : sessionUserId)
+        : null;
+      
+      const rule = await storage.createAutomationRule({
+        name: name || "New Rule",
+        scope: scope || "global",
+        ownerVendorId: finalOwnerVendorId,
+        isActive: isActive ?? true,
+        priority: priority ?? 0,
+        serviceIds: serviceIds || null,
+        routingTarget: routingTarget || "vendor_only",
+        routingStrategy: routingStrategy || "least_loaded",
+        allowedVendorIds: allowedVendorIds || null,
+        excludedVendorIds: excludedVendorIds || null,
+        fallbackAction: fallbackAction || "leave_pending",
+        matchCriteria: matchCriteria || null,
+        createdBy: sessionUserId,
+      });
+      
+      res.status(201).json(rule);
+    } catch (error) {
+      console.error("Error creating automation rule:", error);
+      res.status(500).json({ error: "Failed to create automation rule" });
+    }
+  });
+
+  // Update automation rule
+  app.patch("/api/automation-rules/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      
+      const existingRule = await storage.getAutomationRule(req.params.id);
+      if (!existingRule) {
+        return res.status(404).json({ error: "Rule not found" });
+      }
+      
+      // Check access
+      if (sessionUser.role !== "admin" && existingRule.ownerVendorId !== sessionUserId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      // For non-admin users, restrict which fields can be updated
+      let allowedUpdate = req.body;
+      if (sessionUser.role !== "admin") {
+        // Vendors cannot change scope, ownerVendorId, createdBy, or global-only fields
+        const { scope, ownerVendorId, createdBy, allowedVendorIds, excludedVendorIds, ...vendorAllowedFields } = req.body;
+        allowedUpdate = vendorAllowedFields;
+        
+        // Prevent vendors from elevating scope
+        if (scope && scope !== existingRule.scope) {
+          return res.status(403).json({ error: "Cannot change rule scope" });
+        }
+        if (ownerVendorId && ownerVendorId !== existingRule.ownerVendorId) {
+          return res.status(403).json({ error: "Cannot change rule owner" });
+        }
+      }
+      
+      const rule = await storage.updateAutomationRule(req.params.id, allowedUpdate);
+      res.json(rule);
+    } catch (error) {
+      console.error("Error updating automation rule:", error);
+      res.status(500).json({ error: "Failed to update automation rule" });
+    }
+  });
+
+  // Delete automation rule
+  app.delete("/api/automation-rules/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      
+      const existingRule = await storage.getAutomationRule(req.params.id);
+      if (!existingRule) {
+        return res.status(404).json({ error: "Rule not found" });
+      }
+      
+      // Check access
+      if (sessionUser.role !== "admin" && existingRule.ownerVendorId !== sessionUserId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      await storage.deleteAutomationRule(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting automation rule:", error);
+      res.status(500).json({ error: "Failed to delete automation rule" });
+    }
+  });
+
+  // ==================== AUTOMATION LOGS ROUTES ====================
+
+  // Get automation logs for a service request
+  app.get("/api/service-requests/:id/automation-logs", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const logs = await storage.getAutomationLogsByRequest(req.params.id);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching automation logs:", error);
+      res.status(500).json({ error: "Failed to fetch automation logs" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

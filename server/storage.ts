@@ -56,6 +56,17 @@ import {
   type InsertBundleRequestAttachment,
   type BundleRequestComment,
   type InsertBundleRequestComment,
+  type VendorServiceCapacity,
+  type InsertVendorServiceCapacity,
+  type UpdateVendorServiceCapacity,
+  type VendorDesignerCapacity,
+  type InsertVendorDesignerCapacity,
+  type UpdateVendorDesignerCapacity,
+  type AutomationRule,
+  type InsertAutomationRule,
+  type UpdateAutomationRule,
+  type AutomationAssignmentLog,
+  type InsertAutomationAssignmentLog,
   users,
   services,
   servicePricingTiers,
@@ -79,6 +90,10 @@ import {
   bundleRequests,
   bundleRequestAttachments,
   bundleRequestComments,
+  vendorServiceCapacities,
+  vendorDesignerCapacities,
+  automationRules,
+  automationAssignmentLogs,
 } from "@shared/schema";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -244,6 +259,39 @@ export interface IStorage {
   // Bundle Request Comment methods
   getBundleRequestComments(requestId: string): Promise<BundleRequestComment[]>;
   createBundleRequestComment(comment: InsertBundleRequestComment): Promise<BundleRequestComment>;
+
+  // Vendor Service Capacity methods
+  getVendorServiceCapacities(vendorProfileId: string): Promise<VendorServiceCapacity[]>;
+  getVendorServiceCapacity(vendorProfileId: string, serviceId: string): Promise<VendorServiceCapacity | undefined>;
+  getVendorServiceCapacityById(id: string): Promise<VendorServiceCapacity | undefined>;
+  getAllVendorServiceCapacities(): Promise<VendorServiceCapacity[]>;
+  createVendorServiceCapacity(data: InsertVendorServiceCapacity): Promise<VendorServiceCapacity>;
+  updateVendorServiceCapacity(id: string, data: UpdateVendorServiceCapacity): Promise<VendorServiceCapacity | undefined>;
+  deleteVendorServiceCapacity(id: string): Promise<void>;
+  upsertVendorServiceCapacity(data: InsertVendorServiceCapacity): Promise<VendorServiceCapacity>;
+
+  // Vendor Designer Capacity methods
+  getVendorDesignerCapacities(userId: string): Promise<VendorDesignerCapacity[]>;
+  getVendorDesignerCapacity(userId: string, serviceId: string): Promise<VendorDesignerCapacity | undefined>;
+  getVendorDesignerCapacityById(id: string): Promise<VendorDesignerCapacity | undefined>;
+  getAllVendorDesignerCapacities(): Promise<VendorDesignerCapacity[]>;
+  createVendorDesignerCapacity(data: InsertVendorDesignerCapacity): Promise<VendorDesignerCapacity>;
+  updateVendorDesignerCapacity(id: string, data: UpdateVendorDesignerCapacity): Promise<VendorDesignerCapacity | undefined>;
+  deleteVendorDesignerCapacity(id: string): Promise<void>;
+  upsertVendorDesignerCapacity(data: InsertVendorDesignerCapacity): Promise<VendorDesignerCapacity>;
+
+  // Automation Rule methods
+  getAllAutomationRules(): Promise<AutomationRule[]>;
+  getAutomationRulesByScope(scope: string): Promise<AutomationRule[]>;
+  getAutomationRulesByOwner(ownerVendorId: string): Promise<AutomationRule[]>;
+  getAutomationRule(id: string): Promise<AutomationRule | undefined>;
+  createAutomationRule(data: InsertAutomationRule): Promise<AutomationRule>;
+  updateAutomationRule(id: string, data: UpdateAutomationRule): Promise<AutomationRule | undefined>;
+  deleteAutomationRule(id: string): Promise<void>;
+
+  // Automation Assignment Log methods
+  getAutomationLogsByRequest(requestId: string): Promise<AutomationAssignmentLog[]>;
+  createAutomationLog(data: InsertAutomationAssignmentLog): Promise<AutomationAssignmentLog>;
 }
 
 export class DbStorage implements IStorage {
@@ -1023,6 +1071,171 @@ export class DbStorage implements IStorage {
 
   async createBundleRequestComment(comment: InsertBundleRequestComment): Promise<BundleRequestComment> {
     const result = await db.insert(bundleRequestComments).values(comment).returning();
+    return result[0];
+  }
+
+  // Vendor Service Capacity methods
+  async getVendorServiceCapacities(vendorProfileId: string): Promise<VendorServiceCapacity[]> {
+    return await db.select().from(vendorServiceCapacities)
+      .where(eq(vendorServiceCapacities.vendorProfileId, vendorProfileId))
+      .orderBy(vendorServiceCapacities.createdAt);
+  }
+
+  async getVendorServiceCapacity(vendorProfileId: string, serviceId: string): Promise<VendorServiceCapacity | undefined> {
+    const result = await db.select().from(vendorServiceCapacities)
+      .where(and(
+        eq(vendorServiceCapacities.vendorProfileId, vendorProfileId),
+        eq(vendorServiceCapacities.serviceId, serviceId)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async getAllVendorServiceCapacities(): Promise<VendorServiceCapacity[]> {
+    return await db.select().from(vendorServiceCapacities).orderBy(vendorServiceCapacities.createdAt);
+  }
+
+  async createVendorServiceCapacity(data: InsertVendorServiceCapacity): Promise<VendorServiceCapacity> {
+    const result = await db.insert(vendorServiceCapacities).values(data).returning();
+    return result[0];
+  }
+
+  async updateVendorServiceCapacity(id: string, data: UpdateVendorServiceCapacity): Promise<VendorServiceCapacity | undefined> {
+    const result = await db.update(vendorServiceCapacities)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(vendorServiceCapacities.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getVendorServiceCapacityById(id: string): Promise<VendorServiceCapacity | undefined> {
+    const result = await db.select().from(vendorServiceCapacities)
+      .where(eq(vendorServiceCapacities.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async deleteVendorServiceCapacity(id: string): Promise<void> {
+    await db.delete(vendorServiceCapacities).where(eq(vendorServiceCapacities.id, id));
+  }
+
+  async upsertVendorServiceCapacity(data: InsertVendorServiceCapacity): Promise<VendorServiceCapacity> {
+    const existing = await this.getVendorServiceCapacity(data.vendorProfileId, data.serviceId);
+    if (existing) {
+      // Only update mutable fields, not the composite key columns
+      const { vendorProfileId, serviceId, ...mutableFields } = data;
+      const result = await this.updateVendorServiceCapacity(existing.id, mutableFields);
+      return result!;
+    }
+    return await this.createVendorServiceCapacity(data);
+  }
+
+  // Vendor Designer Capacity methods
+  async getVendorDesignerCapacities(userId: string): Promise<VendorDesignerCapacity[]> {
+    return await db.select().from(vendorDesignerCapacities)
+      .where(eq(vendorDesignerCapacities.userId, userId))
+      .orderBy(vendorDesignerCapacities.createdAt);
+  }
+
+  async getVendorDesignerCapacity(userId: string, serviceId: string): Promise<VendorDesignerCapacity | undefined> {
+    const result = await db.select().from(vendorDesignerCapacities)
+      .where(and(
+        eq(vendorDesignerCapacities.userId, userId),
+        eq(vendorDesignerCapacities.serviceId, serviceId)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async getAllVendorDesignerCapacities(): Promise<VendorDesignerCapacity[]> {
+    return await db.select().from(vendorDesignerCapacities).orderBy(vendorDesignerCapacities.createdAt);
+  }
+
+  async createVendorDesignerCapacity(data: InsertVendorDesignerCapacity): Promise<VendorDesignerCapacity> {
+    const result = await db.insert(vendorDesignerCapacities).values(data).returning();
+    return result[0];
+  }
+
+  async updateVendorDesignerCapacity(id: string, data: UpdateVendorDesignerCapacity): Promise<VendorDesignerCapacity | undefined> {
+    const result = await db.update(vendorDesignerCapacities)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(vendorDesignerCapacities.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getVendorDesignerCapacityById(id: string): Promise<VendorDesignerCapacity | undefined> {
+    const result = await db.select().from(vendorDesignerCapacities)
+      .where(eq(vendorDesignerCapacities.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async deleteVendorDesignerCapacity(id: string): Promise<void> {
+    await db.delete(vendorDesignerCapacities).where(eq(vendorDesignerCapacities.id, id));
+  }
+
+  async upsertVendorDesignerCapacity(data: InsertVendorDesignerCapacity): Promise<VendorDesignerCapacity> {
+    const existing = await this.getVendorDesignerCapacity(data.userId, data.serviceId);
+    if (existing) {
+      // Only update mutable fields, not the composite key columns
+      const { userId, serviceId, ...mutableFields } = data;
+      const result = await this.updateVendorDesignerCapacity(existing.id, mutableFields);
+      return result!;
+    }
+    return await this.createVendorDesignerCapacity(data);
+  }
+
+  // Automation Rule methods
+  async getAllAutomationRules(): Promise<AutomationRule[]> {
+    return await db.select().from(automationRules).orderBy(desc(automationRules.priority));
+  }
+
+  async getAutomationRulesByScope(scope: string): Promise<AutomationRule[]> {
+    return await db.select().from(automationRules)
+      .where(eq(automationRules.scope, scope))
+      .orderBy(desc(automationRules.priority));
+  }
+
+  async getAutomationRulesByOwner(ownerVendorId: string): Promise<AutomationRule[]> {
+    return await db.select().from(automationRules)
+      .where(eq(automationRules.ownerVendorId, ownerVendorId))
+      .orderBy(desc(automationRules.priority));
+  }
+
+  async getAutomationRule(id: string): Promise<AutomationRule | undefined> {
+    const result = await db.select().from(automationRules)
+      .where(eq(automationRules.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createAutomationRule(data: InsertAutomationRule): Promise<AutomationRule> {
+    const result = await db.insert(automationRules).values(data).returning();
+    return result[0];
+  }
+
+  async updateAutomationRule(id: string, data: UpdateAutomationRule): Promise<AutomationRule | undefined> {
+    const result = await db.update(automationRules)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(automationRules.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAutomationRule(id: string): Promise<void> {
+    await db.delete(automationRules).where(eq(automationRules.id, id));
+  }
+
+  // Automation Assignment Log methods
+  async getAutomationLogsByRequest(requestId: string): Promise<AutomationAssignmentLog[]> {
+    return await db.select().from(automationAssignmentLogs)
+      .where(eq(automationAssignmentLogs.requestId, requestId))
+      .orderBy(desc(automationAssignmentLogs.createdAt));
+  }
+
+  async createAutomationLog(data: InsertAutomationAssignmentLog): Promise<AutomationAssignmentLog> {
+    const result = await db.insert(automationAssignmentLogs).values(data).returning();
     return result[0];
   }
 }

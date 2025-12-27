@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, decimal, integer, jsonb, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, decimal, integer, jsonb, boolean, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -114,6 +114,11 @@ export const serviceRequests = pgTable("service_requests", {
   formData: jsonb("form_data"),
   // Final calculated price for the client - stored at submission time
   finalPrice: decimal("final_price", { precision: 10, scale: 2 }),
+  // Automation fields
+  autoAssignmentStatus: text("auto_assignment_status").default("not_attempted"),
+  lastAutomationRunAt: timestamp("last_automation_run_at"),
+  lastAutomationNote: text("last_automation_note"),
+  lockedAssignment: boolean("locked_assignment").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -404,6 +409,106 @@ export const bundleRequestComments = pgTable("bundle_request_comments", {
 
 // ==================== END PHASE 4 TABLES ====================
 
+// ==================== PHASE 5: AUTOMATION ENGINE ====================
+
+// Auto-assignment status for service requests
+export const autoAssignmentStatuses = [
+  "not_attempted",
+  "assigned",
+  "partial_assigned",
+  "failed_no_vendor",
+  "failed_no_designer", 
+  "failed_capacity"
+] as const;
+export type AutoAssignmentStatus = typeof autoAssignmentStatuses[number];
+
+// Routing strategies for automation
+export const routingStrategies = ["least_loaded", "round_robin", "priority_first"] as const;
+export type RoutingStrategy = typeof routingStrategies[number];
+
+// Automation rule scopes
+export const automationScopes = ["global", "vendor"] as const;
+export type AutomationScope = typeof automationScopes[number];
+
+// Routing targets
+export const routingTargets = ["vendor_only", "vendor_then_designer"] as const;
+export type RoutingTarget = typeof routingTargets[number];
+
+// Fallback actions when automation fails
+export const fallbackActions = ["leave_pending", "notify_only"] as const;
+export type FallbackAction = typeof fallbackActions[number];
+
+// Vendor service capacities - tracks which services a vendor supports and their daily capacity
+export const vendorServiceCapacities = pgTable("vendor_service_capacities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vendorProfileId: varchar("vendor_profile_id").notNull().references(() => vendorProfiles.id, { onDelete: "cascade" }),
+  serviceId: varchar("service_id").notNull().references(() => services.id, { onDelete: "cascade" }),
+  dailyCapacity: integer("daily_capacity").notNull().default(0),
+  autoAssignEnabled: boolean("auto_assign_enabled").notNull().default(true),
+  priority: integer("priority").notNull().default(0),
+  routingStrategy: text("routing_strategy").notNull().default("least_loaded"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique("vendor_service_capacity_unique").on(table.vendorProfileId, table.serviceId),
+]);
+
+// Vendor designer capacities - tracks which services a designer can work on and their daily capacity
+export const vendorDesignerCapacities = pgTable("vendor_designer_capacities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  serviceId: varchar("service_id").notNull().references(() => services.id, { onDelete: "cascade" }),
+  dailyCapacity: integer("daily_capacity").notNull().default(0),
+  isPrimary: boolean("is_primary").notNull().default(false),
+  autoAssignEnabled: boolean("auto_assign_enabled").notNull().default(true),
+  priority: integer("priority").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique("vendor_designer_capacity_unique").on(table.userId, table.serviceId),
+]);
+
+// Automation rules - configurable rules for auto-assignment
+export const automationRules = pgTable("automation_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  scope: text("scope").notNull().default("global"),
+  // For vendor-scoped rules, which vendor owns this rule
+  ownerVendorId: varchar("owner_vendor_id").references(() => users.id, { onDelete: "cascade" }),
+  isActive: boolean("is_active").notNull().default(true),
+  priority: integer("priority").notNull().default(0),
+  // Which service types this rule applies to (null = all services)
+  serviceIds: jsonb("service_ids"),
+  routingTarget: text("routing_target").notNull().default("vendor_only"),
+  routingStrategy: text("routing_strategy").notNull().default("least_loaded"),
+  // Allowlist/blocklist for vendors (global rules only)
+  allowedVendorIds: jsonb("allowed_vendor_ids"),
+  excludedVendorIds: jsonb("excluded_vendor_ids"),
+  fallbackAction: text("fallback_action").notNull().default("leave_pending"),
+  // Match criteria (JSON: { clientId?, rush?, vip?, etc. })
+  matchCriteria: jsonb("match_criteria"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Automation assignment logs - audit trail for auto-assignment decisions
+export const automationAssignmentLogs = pgTable("automation_assignment_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  requestId: varchar("request_id").notNull().references(() => serviceRequests.id, { onDelete: "cascade" }),
+  requestType: text("request_type").notNull().default("service"),
+  ruleId: varchar("rule_id").references(() => automationRules.id, { onDelete: "set null" }),
+  step: text("step").notNull(),
+  candidatesConsidered: jsonb("candidates_considered"),
+  chosenId: varchar("chosen_id"),
+  result: text("result").notNull(),
+  reason: text("reason"),
+  capacitySnapshot: jsonb("capacity_snapshot"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ==================== END PHASE 5 TABLES ====================
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -590,6 +695,49 @@ export const insertBundleRequestCommentSchema = createInsertSchema(bundleRequest
   updatedAt: true,
 });
 
+// Phase 5: Automation Engine schemas
+export const insertVendorServiceCapacitySchema = createInsertSchema(vendorServiceCapacities).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateVendorServiceCapacitySchema = createInsertSchema(vendorServiceCapacities).partial().omit({
+  id: true,
+  vendorProfileId: true,
+  serviceId: true,
+  createdAt: true,
+});
+
+export const insertVendorDesignerCapacitySchema = createInsertSchema(vendorDesignerCapacities).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateVendorDesignerCapacitySchema = createInsertSchema(vendorDesignerCapacities).partial().omit({
+  id: true,
+  userId: true,
+  serviceId: true,
+  createdAt: true,
+});
+
+export const insertAutomationRuleSchema = createInsertSchema(automationRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateAutomationRuleSchema = createInsertSchema(automationRules).partial().omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAutomationAssignmentLogSchema = createInsertSchema(automationAssignmentLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type VendorProfile = typeof vendorProfiles.$inferSelect;
@@ -650,6 +798,19 @@ export type BundleRequestAttachment = typeof bundleRequestAttachments.$inferSele
 export type InsertBundleRequestAttachment = z.infer<typeof insertBundleRequestAttachmentSchema>;
 export type BundleRequestComment = typeof bundleRequestComments.$inferSelect;
 export type InsertBundleRequestComment = z.infer<typeof insertBundleRequestCommentSchema>;
+
+// Phase 5: Automation Engine types
+export type VendorServiceCapacity = typeof vendorServiceCapacities.$inferSelect;
+export type InsertVendorServiceCapacity = z.infer<typeof insertVendorServiceCapacitySchema>;
+export type UpdateVendorServiceCapacity = z.infer<typeof updateVendorServiceCapacitySchema>;
+export type VendorDesignerCapacity = typeof vendorDesignerCapacities.$inferSelect;
+export type InsertVendorDesignerCapacity = z.infer<typeof insertVendorDesignerCapacitySchema>;
+export type UpdateVendorDesignerCapacity = z.infer<typeof updateVendorDesignerCapacitySchema>;
+export type AutomationRule = typeof automationRules.$inferSelect;
+export type InsertAutomationRule = z.infer<typeof insertAutomationRuleSchema>;
+export type UpdateAutomationRule = z.infer<typeof updateAutomationRuleSchema>;
+export type AutomationAssignmentLog = typeof automationAssignmentLogs.$inferSelect;
+export type InsertAutomationAssignmentLog = z.infer<typeof insertAutomationAssignmentLogSchema>;
 
 // Helper type for dropdown options
 export type FieldOption = {
