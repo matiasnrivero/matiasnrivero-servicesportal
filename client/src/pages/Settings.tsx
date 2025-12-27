@@ -3204,13 +3204,13 @@ function ServiceManagementTabContent({ onNavigateToServiceFields }: ServiceManag
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="max-w-[200px] truncate">{service.description}</TableCell>
-                  <TableCell>
+                  <TableCell className="max-w-[150px] truncate">{service.description}</TableCell>
+                  <TableCell className="whitespace-nowrap">
                     <Badge variant={service.serviceHierarchy === "son" ? "secondary" : "outline"}>
                       {service.serviceHierarchy === "son" ? "Add-on" : "Main"}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
                     <Badge variant="outline">
                       {getPricingStructureLabel(service.pricingStructure || "single")}
                     </Badge>
