@@ -584,7 +584,7 @@ function LineItemsTabContent() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[60px]"></TableHead>
+                <TableHead className="w-[60px]">Status</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead className="text-right">Price</TableHead>
@@ -694,7 +694,7 @@ function BundlesTabContent() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[60px]"></TableHead>
+                <TableHead className="w-[60px]">Status</TableHead>
                 <TableHead>Bundle Name</TableHead>
                 <TableHead className="text-right">Full Price</TableHead>
                 <TableHead className="text-right">Bundle Price</TableHead>
@@ -782,32 +782,34 @@ function BundleTableRow({
   const bundlePrice = bundle.finalPrice ? parseFloat(bundle.finalPrice) : fullPrice * (1 - parseFloat(bundle.discountPercent || "0") / 100);
 
   return (
-    <TableRow data-testid={`row-bundle-${bundle.id}`}>
-      <TableCell>
-        <Switch
-          checked={bundle.isActive}
-          onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: bundle.id, isActive: checked })}
-          data-testid={`switch-bundle-active-${bundle.id}`}
-        />
-      </TableCell>
-      <TableCell className="font-medium">{bundle.name}</TableCell>
-      <TableCell className="text-right">${fullPrice.toFixed(2)}</TableCell>
-      <TableCell className="text-right">${bundlePrice.toFixed(2)}</TableCell>
-      <TableCell className="text-right">
-        <div className="flex items-center justify-end gap-1">
-          <Button size="icon" variant="ghost" onClick={onEdit} data-testid={`button-edit-bundle-${bundle.id}`}>
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button 
-            size="icon" 
-            variant="ghost" 
-            onClick={() => setDeleteModalOpen(true)} 
-            data-testid={`button-delete-bundle-${bundle.id}`}
-          >
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
-        </div>
-      </TableCell>
+    <>
+      <TableRow data-testid={`row-bundle-${bundle.id}`}>
+        <TableCell>
+          <Switch
+            checked={bundle.isActive}
+            onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: bundle.id, isActive: checked })}
+            data-testid={`switch-bundle-active-${bundle.id}`}
+          />
+        </TableCell>
+        <TableCell className="font-medium">{bundle.name}</TableCell>
+        <TableCell className="text-right">${fullPrice.toFixed(2)}</TableCell>
+        <TableCell className="text-right">${bundlePrice.toFixed(2)}</TableCell>
+        <TableCell className="text-right">
+          <div className="flex items-center justify-end gap-1">
+            <Button size="icon" variant="ghost" onClick={onEdit} data-testid={`button-edit-bundle-${bundle.id}`}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button 
+              size="icon" 
+              variant="ghost" 
+              onClick={() => setDeleteModalOpen(true)} 
+              data-testid={`button-delete-bundle-${bundle.id}`}
+            >
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          </div>
+        </TableCell>
+      </TableRow>
 
       <AlertDialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
         <AlertDialogContent>
@@ -830,7 +832,7 @@ function BundleTableRow({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </TableRow>
+    </>
   );
 }
 
@@ -875,7 +877,7 @@ function PacksTabContent() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[60px]"></TableHead>
+                <TableHead className="w-[60px]">Status</TableHead>
                 <TableHead>Pack Name</TableHead>
                 <TableHead className="text-right">Full Price</TableHead>
                 <TableHead className="text-right">Pack Price</TableHead>
@@ -3174,7 +3176,7 @@ function ServiceManagementTabContent({ onNavigateToServiceFields }: ServiceManag
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[60px]"></TableHead>
+                <TableHead className="w-[60px]">Status</TableHead>
                 <TableHead>Service Name</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Type</TableHead>
