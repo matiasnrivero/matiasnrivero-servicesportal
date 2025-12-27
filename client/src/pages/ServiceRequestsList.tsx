@@ -556,7 +556,7 @@ export default function ServiceRequestsList() {
       id: r.id,
       type: "bundle" as const,
       serviceName: getBundleName(r.bundleId),
-      method: getBundleName(r.bundleId),
+      method: "Bundle",
       customerName: getBundleCustomerName(r),
       dueDate: r.dueDate,
       assigneeId: r.assigneeId,
