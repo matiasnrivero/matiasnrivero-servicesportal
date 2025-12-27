@@ -4,8 +4,9 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Clock, RefreshCw, CheckCircle2, AlertCircle, XCircle, Calendar, User } from "lucide-react";
+import { Calendar, User } from "lucide-react";
 import { calculateServicePrice } from "@/lib/pricing";
+import { getBoardColumns, getDisplayStatus, statusConfig, type DisplayStatus } from "@/lib/statusUtils";
 import type { ServiceRequest, Service, User as UserType, BundleRequest, Bundle } from "@shared/schema";
 
 type RequestType = "adhoc" | "bundle";
@@ -14,9 +15,11 @@ interface CombinedBoardRequest {
   id: string;
   type: RequestType;
   status: string;
+  displayStatus: DisplayStatus;
   dueDate: Date | null;
   createdAt: Date;
   assigneeId: string | null;
+  vendorAssigneeId: string | null;
   originalRequest: ServiceRequest | BundleRequest;
 }
 
@@ -31,13 +34,6 @@ interface BoardViewProps {
   isLoading?: boolean;
 }
 
-const statusColumns = [
-  { id: "pending", label: "Pending", icon: Clock, bgColor: "bg-yellow-100 dark:bg-yellow-900/30", textColor: "text-yellow-700 dark:text-yellow-400", borderColor: "border-yellow-300 dark:border-yellow-700" },
-  { id: "in-progress", label: "In Progress", icon: RefreshCw, bgColor: "bg-blue-100 dark:bg-blue-900/30", textColor: "text-blue-700 dark:text-blue-400", borderColor: "border-blue-300 dark:border-blue-700" },
-  { id: "change-request", label: "Change Request", icon: AlertCircle, bgColor: "bg-orange-100 dark:bg-orange-900/30", textColor: "text-orange-700 dark:text-orange-400", borderColor: "border-orange-300 dark:border-orange-700" },
-  { id: "delivered", label: "Delivered", icon: CheckCircle2, bgColor: "bg-green-100 dark:bg-green-900/30", textColor: "text-green-700 dark:text-green-400", borderColor: "border-green-300 dark:border-green-700" },
-  { id: "canceled", label: "Canceled", icon: XCircle, bgColor: "bg-gray-100 dark:bg-gray-800/30", textColor: "text-gray-600 dark:text-gray-400", borderColor: "border-gray-300 dark:border-gray-600" },
-];
 
 function isDistributor(role: string | undefined): boolean {
   return role === "client" || role === "distributor";
@@ -54,24 +50,31 @@ export function BoardView({
 }: BoardViewProps) {
   const [, navigate] = useLocation();
 
+  // Get role-based columns
+  const columnStatuses = getBoardColumns(currentUserRole || "client");
+  
   // Combine adhoc and bundle requests
   const combinedRequests: CombinedBoardRequest[] = [
     ...requests.map(r => ({
       id: r.id,
       type: "adhoc" as RequestType,
       status: r.status,
+      displayStatus: getDisplayStatus(r.status, r.assigneeId, r.vendorAssigneeId, currentUserRole),
       dueDate: r.dueDate,
       createdAt: r.createdAt,
       assigneeId: r.assigneeId,
+      vendorAssigneeId: r.vendorAssigneeId ?? null,
       originalRequest: r,
     })),
     ...bundleRequests.map(r => ({
       id: r.id,
       type: "bundle" as RequestType,
       status: r.status,
+      displayStatus: getDisplayStatus(r.status, r.assigneeId, r.vendorAssigneeId, currentUserRole),
       dueDate: r.dueDate,
       createdAt: r.createdAt,
       assigneeId: r.assigneeId,
+      vendorAssigneeId: r.vendorAssigneeId ?? null,
       originalRequest: r,
     })),
   ];
@@ -163,20 +166,21 @@ export function BoardView({
   return (
     <ScrollArea className="w-full">
       <div className="flex gap-4 pb-4 min-w-max">
-        {statusColumns.map((column) => {
-          const StatusIcon = column.icon;
-          const columnRequests = combinedRequests.filter((r) => r.status === column.id);
+        {columnStatuses.map((columnStatus) => {
+          const config = statusConfig[columnStatus];
+          const StatusIcon = config.icon;
+          const columnRequests = combinedRequests.filter((r) => r.displayStatus === columnStatus);
 
           return (
             <div
-              key={column.id}
+              key={columnStatus}
               className="flex flex-col w-[280px] min-w-[280px] bg-muted/30 rounded-lg"
-              data-testid={`column-${column.id}`}
+              data-testid={`column-${columnStatus}`}
             >
               <div className="flex items-center gap-2 p-3 border-b">
-                <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md border ${column.bgColor} ${column.textColor} ${column.borderColor}`}>
+                <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md border ${config.color}`}>
                   <StatusIcon className="h-3.5 w-3.5" />
-                  <span className="font-medium text-xs uppercase tracking-wide">{column.label}</span>
+                  <span className="font-medium text-xs uppercase tracking-wide">{config.label}</span>
                 </div>
                 <Badge variant="secondary" className="ml-auto text-xs">
                   {columnRequests.length}
