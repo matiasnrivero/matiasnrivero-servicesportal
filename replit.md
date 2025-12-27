@@ -68,9 +68,11 @@ Role-based access to reports (Admin, Client, Vendor).
 - **Reports Hub**: Central page for role-specific reports.
 - **Services Profit Report (Admin only)**: Comprehensive financial report with summaries, filters (vendor, service, date), search (client, job ID), and a detailed data table. Pricing calculations consider retail price, vendor cost, and exception rules.
 
-## Job Auto-Assignment Engine (Phase 2 Complete)
+## Job Auto-Assignment Engine (Phase 3 Complete)
 
-Fully functional automation engine for automatic job routing based on vendor/designer capacity and configurable rules.
+Fully functional automation engine for automatic job routing based on vendor/designer capacity and configurable rules, with complete frontend management UI.
+
+### Backend (Phases 1-2)
 - **Database Tables**: `vendorServiceCapacities`, `vendorDesignerCapacities`, `automationRules`, `automationAssignmentLogs`.
 - **Service Request Extensions**: Fields like `autoAssignmentStatus`, `lastAutomationRunAt`, `lastAutomationNote`, `lockedAssignment`.
 - **API Endpoints**: Manage capacities and automation rules.
@@ -79,6 +81,11 @@ Fully functional automation engine for automatic job routing based on vendor/des
 - **Automation Scopes**: `global` (admin) and `vendor` (vendor-managed).
 - **Automation Engine** (`server/services/automationEngine.ts`): Processes new service requests, matches against active rules, selects vendors/designers based on capacity and routing strategy, logs all decisions for audit trail.
 - **Auto-Trigger**: Automatically invoked on service request creation when no manual assignment is provided.
+
+### Frontend (Phase 3)
+- **AutomationSettingsTab** (`client/src/components/AutomationSettings.tsx`): Admin interface for global automation rules CRUD - create, edit, delete rules with vendor selection, service filters, routing strategy, and priority configuration.
+- **Settings.tsx Automation Tab**: Admin-only access to global automation rules management.
+- **VendorProfile.tsx Automation Tab**: Vendors manage their service capacities (daily capacity, priority, routing strategy) and designer capacities (per-designer service assignments with primary flag).
 
 # External Dependencies
 

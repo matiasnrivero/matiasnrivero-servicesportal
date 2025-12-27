@@ -46,7 +46,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List } from "lucide-react";
+import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap } from "lucide-react";
+import { AutomationSettingsTab } from "@/components/AutomationSettings";
 import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem, InputField, ServiceField, BundleField, ServicePricingTier, LineItemField } from "@shared/schema";
 import { insertBundleLineItemSchema, inputFieldTypes, valueModes, pricingStructures, assignToModes, inputForTypes } from "@shared/schema";
 
@@ -4086,6 +4087,10 @@ export default function Settings() {
                     <CalendarRange className="h-4 w-4 mr-1" />
                     Packs
                   </TabsTrigger>
+                  <TabsTrigger value="automation" data-testid="tab-automation">
+                    <Zap className="h-4 w-4 mr-1" />
+                    Automation
+                  </TabsTrigger>
                 </>
               )}
               <TabsTrigger value="input-fields" data-testid="tab-input-fields">
@@ -4119,6 +4124,10 @@ export default function Settings() {
 
                 <TabsContent value="packs">
                   <PacksTabContent />
+                </TabsContent>
+
+                <TabsContent value="automation">
+                  <AutomationSettingsTab />
                 </TabsContent>
               </>
             )}

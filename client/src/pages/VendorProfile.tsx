@@ -31,7 +31,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Building2, Users, DollarSign, Clock, UserPlus, Save, LogIn, Pencil, CalendarDays, Plus, Trash2, Globe, Package, Layers, Eye } from "lucide-react";
+import { Building2, Users, DollarSign, Clock, UserPlus, Save, LogIn, Pencil, CalendarDays, Plus, Trash2, Globe, Package, Layers, Eye, Zap, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import type { User, VendorProfile as VendorProfileType, Service, ServicePricingTier, Bundle, BundleItem, BundleLineItem, ServicePack, ServicePackItem, VendorBundleCost, VendorPackCost } from "@shared/schema";
 
@@ -734,6 +734,10 @@ export default function VendorProfile() {
             <TabsTrigger value="packs" data-testid="tab-packs">
               <Layers className="h-4 w-4 mr-2" />
               Packs
+            </TabsTrigger>
+            <TabsTrigger value="automation" data-testid="tab-automation">
+              <Zap className="h-4 w-4 mr-2" />
+              Automation
             </TabsTrigger>
           </TabsList>
 
@@ -1783,9 +1787,444 @@ export default function VendorProfile() {
               </DialogContent>
             </Dialog>
           </TabsContent>
+
+          <TabsContent value="automation">
+            <VendorAutomationTab 
+              vendorProfile={vendorProfile} 
+              teamMembers={teamMembers}
+              allServices={allServices}
+            />
+          </TabsContent>
           </Tabs>
         </div>
       </div>
     </div>
+  );
+}
+
+interface VendorAutomationTabProps {
+  vendorProfile: VendorProfileType | null;
+  teamMembers: User[];
+  allServices: Service[];
+}
+
+function VendorAutomationTab({ vendorProfile, teamMembers, allServices }: VendorAutomationTabProps) {
+  const { toast } = useToast();
+  const [capacityForm, setCapacityForm] = useState({
+    serviceId: "",
+    dailyCapacity: 5,
+    autoAssignEnabled: true,
+    priority: 0,
+    routingStrategy: "least_loaded",
+  });
+
+  const { data: serviceCapacities = [], isLoading: capacitiesLoading } = useQuery<any[]>({
+    queryKey: ["/api/vendor-profiles", vendorProfile?.id, "service-capacities"],
+    queryFn: async () => {
+      if (!vendorProfile?.id) return [];
+      const res = await fetch(`/api/vendor-profiles/${vendorProfile.id}/service-capacities`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!vendorProfile?.id,
+  });
+
+  const upsertCapacityMutation = useMutation({
+    mutationFn: async (data: typeof capacityForm) => {
+      return apiRequest("POST", `/api/vendor-profiles/${vendorProfile?.id}/service-capacities`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor-profiles", vendorProfile?.id, "service-capacities"] });
+      toast({ title: "Service capacity saved" });
+      setCapacityForm({
+        serviceId: "",
+        dailyCapacity: 5,
+        autoAssignEnabled: true,
+        priority: 0,
+        routingStrategy: "least_loaded",
+      });
+    },
+    onError: () => {
+      toast({ title: "Failed to save capacity", variant: "destructive" });
+    },
+  });
+
+  const deleteCapacityMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/vendor-service-capacities/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vendor-profiles", vendorProfile?.id, "service-capacities"] });
+      toast({ title: "Capacity removed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove capacity", variant: "destructive" });
+    },
+  });
+
+  const parentServices = allServices.filter(s => !s.parentServiceId && s.isActive);
+
+  const getServiceName = (serviceId: string) => {
+    return allServices.find(s => s.id === serviceId)?.title || serviceId;
+  };
+
+  if (!vendorProfile) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center text-muted-foreground">
+          Vendor profile required to configure automation settings.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="h-5 w-5" />
+            Service Capacities
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+              <div className="space-y-2">
+                <Label>Service</Label>
+                <Select
+                  value={capacityForm.serviceId}
+                  onValueChange={(value) => setCapacityForm(prev => ({ ...prev, serviceId: value }))}
+                >
+                  <SelectTrigger data-testid="select-capacity-service">
+                    <SelectValue placeholder="Select service" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {parentServices.map(service => (
+                      <SelectItem key={service.id} value={service.id}>
+                        {service.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Daily Capacity</Label>
+                <Input
+                  type="number"
+                  value={capacityForm.dailyCapacity}
+                  onChange={(e) => setCapacityForm(prev => ({ ...prev, dailyCapacity: parseInt(e.target.value) || 0 }))}
+                  min={0}
+                  data-testid="input-daily-capacity"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Priority</Label>
+                <Input
+                  type="number"
+                  value={capacityForm.priority}
+                  onChange={(e) => setCapacityForm(prev => ({ ...prev, priority: parseInt(e.target.value) || 0 }))}
+                  data-testid="input-capacity-priority"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Routing Strategy</Label>
+                <Select
+                  value={capacityForm.routingStrategy}
+                  onValueChange={(value) => setCapacityForm(prev => ({ ...prev, routingStrategy: value }))}
+                >
+                  <SelectTrigger data-testid="select-routing-strategy">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="least_loaded">Least Loaded</SelectItem>
+                    <SelectItem value="round_robin">Round Robin</SelectItem>
+                    <SelectItem value="priority_first">Priority First</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                onClick={() => upsertCapacityMutation.mutate(capacityForm)}
+                disabled={!capacityForm.serviceId || upsertCapacityMutation.isPending}
+                data-testid="button-add-capacity"
+              >
+                {upsertCapacityMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+                Add
+              </Button>
+            </div>
+
+            {capacitiesLoading ? (
+              <div className="text-center py-4">
+                <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+              </div>
+            ) : serviceCapacities.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Zap className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No service capacities configured yet.</p>
+                <p className="text-sm">Add services above to enable auto-assignment.</p>
+              </div>
+            ) : (
+              <div className="border rounded-md">
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left p-3 font-medium">Service</th>
+                      <th className="text-left p-3 font-medium">Daily Capacity</th>
+                      <th className="text-left p-3 font-medium">Strategy</th>
+                      <th className="text-left p-3 font-medium">Priority</th>
+                      <th className="text-left p-3 font-medium">Auto-Assign</th>
+                      <th className="text-right p-3 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {serviceCapacities.map(cap => (
+                      <tr key={cap.id} className="border-t" data-testid={`row-vendor-capacity-${cap.id}`}>
+                        <td className="p-3">{getServiceName(cap.serviceId)}</td>
+                        <td className="p-3">{cap.dailyCapacity}</td>
+                        <td className="p-3">
+                          <Badge variant="outline">{cap.routingStrategy.replace("_", " ")}</Badge>
+                        </td>
+                        <td className="p-3">{cap.priority || 0}</td>
+                        <td className="p-3">
+                          <Badge variant={cap.autoAssignEnabled ? "default" : "secondary"}>
+                            {cap.autoAssignEnabled ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </td>
+                        <td className="p-3 text-right">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => deleteCapacityMutation.mutate(cap.id)}
+                            disabled={deleteCapacityMutation.isPending}
+                            data-testid={`button-delete-capacity-${cap.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <DesignerCapacitiesCard teamMembers={teamMembers} allServices={allServices} />
+    </div>
+  );
+}
+
+interface DesignerCapacitiesCardProps {
+  teamMembers: User[];
+  allServices: Service[];
+}
+
+function DesignerCapacitiesCard({ teamMembers, allServices }: DesignerCapacitiesCardProps) {
+  const { toast } = useToast();
+  const [selectedDesigner, setSelectedDesigner] = useState<string>("");
+  const [capacityForm, setCapacityForm] = useState({
+    serviceId: "",
+    dailyCapacity: 5,
+    isPrimary: false,
+    autoAssignEnabled: true,
+    priority: 0,
+  });
+
+  const { data: designerCapacities = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/users", selectedDesigner, "designer-capacities"],
+    queryFn: async () => {
+      if (!selectedDesigner) return [];
+      const res = await fetch(`/api/users/${selectedDesigner}/designer-capacities`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedDesigner,
+  });
+
+  const upsertMutation = useMutation({
+    mutationFn: async (data: typeof capacityForm) => {
+      return apiRequest("POST", `/api/users/${selectedDesigner}/designer-capacities`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users", selectedDesigner, "designer-capacities"] });
+      toast({ title: "Designer capacity saved" });
+      setCapacityForm({
+        serviceId: "",
+        dailyCapacity: 5,
+        isPrimary: false,
+        autoAssignEnabled: true,
+        priority: 0,
+      });
+    },
+    onError: () => {
+      toast({ title: "Failed to save capacity", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/vendor-designer-capacities/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users", selectedDesigner, "designer-capacities"] });
+      toast({ title: "Capacity removed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove capacity", variant: "destructive" });
+    },
+  });
+
+  const vendorDesigners = teamMembers.filter(m => m.role === "vendor_designer" && m.isActive);
+  const parentServices = allServices.filter(s => !s.parentServiceId && s.isActive);
+
+  const getServiceName = (serviceId: string) => {
+    return allServices.find(s => s.id === serviceId)?.title || serviceId;
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Users className="h-5 w-5" />
+          Designer Capacities
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Select Designer</Label>
+            <Select value={selectedDesigner} onValueChange={setSelectedDesigner}>
+              <SelectTrigger data-testid="select-designer">
+                <SelectValue placeholder="Choose a team member" />
+              </SelectTrigger>
+              <SelectContent>
+                {vendorDesigners.map(designer => (
+                  <SelectItem key={designer.id} value={designer.id}>
+                    {designer.username}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selectedDesigner && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                <div className="space-y-2">
+                  <Label>Service</Label>
+                  <Select
+                    value={capacityForm.serviceId}
+                    onValueChange={(value) => setCapacityForm(prev => ({ ...prev, serviceId: value }))}
+                  >
+                    <SelectTrigger data-testid="select-designer-service">
+                      <SelectValue placeholder="Select service" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {parentServices.map(service => (
+                        <SelectItem key={service.id} value={service.id}>
+                          {service.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Daily Capacity</Label>
+                  <Input
+                    type="number"
+                    value={capacityForm.dailyCapacity}
+                    onChange={(e) => setCapacityForm(prev => ({ ...prev, dailyCapacity: parseInt(e.target.value) || 0 }))}
+                    min={0}
+                    data-testid="input-designer-capacity"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Priority</Label>
+                  <Input
+                    type="number"
+                    value={capacityForm.priority}
+                    onChange={(e) => setCapacityForm(prev => ({ ...prev, priority: parseInt(e.target.value) || 0 }))}
+                    data-testid="input-designer-priority"
+                  />
+                </div>
+                <div className="flex items-center gap-2 pt-6">
+                  <Switch
+                    checked={capacityForm.isPrimary}
+                    onCheckedChange={(checked) => setCapacityForm(prev => ({ ...prev, isPrimary: checked }))}
+                    data-testid="switch-is-primary"
+                  />
+                  <Label>Primary</Label>
+                </div>
+                <Button
+                  onClick={() => upsertMutation.mutate(capacityForm)}
+                  disabled={!capacityForm.serviceId || upsertMutation.isPending}
+                  data-testid="button-add-designer-capacity"
+                >
+                  {upsertMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+                  Add
+                </Button>
+              </div>
+
+              {isLoading ? (
+                <div className="text-center py-4">
+                  <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                </div>
+              ) : designerCapacities.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>No capacities configured for this designer.</p>
+                </div>
+              ) : (
+                <div className="border rounded-md">
+                  <table className="w-full">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="text-left p-3 font-medium">Service</th>
+                        <th className="text-left p-3 font-medium">Daily Capacity</th>
+                        <th className="text-left p-3 font-medium">Priority</th>
+                        <th className="text-left p-3 font-medium">Primary</th>
+                        <th className="text-left p-3 font-medium">Auto-Assign</th>
+                        <th className="text-right p-3 font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {designerCapacities.map(cap => (
+                        <tr key={cap.id} className="border-t" data-testid={`row-designer-capacity-${cap.id}`}>
+                          <td className="p-3">{getServiceName(cap.serviceId)}</td>
+                          <td className="p-3">{cap.dailyCapacity}</td>
+                          <td className="p-3">{cap.priority || 0}</td>
+                          <td className="p-3">
+                            <Badge variant={cap.isPrimary ? "default" : "secondary"}>
+                              {cap.isPrimary ? "Yes" : "No"}
+                            </Badge>
+                          </td>
+                          <td className="p-3">
+                            <Badge variant={cap.autoAssignEnabled ? "default" : "secondary"}>
+                              {cap.autoAssignEnabled ? "Enabled" : "Disabled"}
+                            </Badge>
+                          </td>
+                          <td className="p-3 text-right">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => deleteMutation.mutate(cap.id)}
+                              disabled={deleteMutation.isPending}
+                              data-testid={`button-delete-designer-capacity-${cap.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
