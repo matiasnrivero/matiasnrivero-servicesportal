@@ -29,6 +29,16 @@ import {
   ToggleGroupItem,
 } from "@/components/ui/toggle-group";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -238,6 +248,8 @@ export default function ServiceRequestsList() {
     const saved = localStorage.getItem("serviceRequestsFiltersOpen");
     return saved === null ? true : saved === "true";
   });
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [jobToDelete, setJobToDelete] = useState<CombinedRequest | null>(null);
 
   useEffect(() => {
     localStorage.setItem("serviceRequestsViewMode", viewMode);
@@ -959,13 +971,8 @@ export default function ServiceRequestsList() {
                                 size="icon" 
                                 variant="ghost"
                                 onClick={() => {
-                                  if (confirm(`Are you sure you want to delete job ${jobPrefix}-${request.id.slice(0, 5).toUpperCase()}?`)) {
-                                    if (request.type === "adhoc") {
-                                      deleteRequestMutation.mutate(request.id);
-                                    } else {
-                                      deleteBundleRequestMutation.mutate(request.id);
-                                    }
-                                  }
+                                  setJobToDelete(request);
+                                  setDeleteModalOpen(true);
                                 }}
                                 data-testid={`button-delete-${request.id}`}
                               >
@@ -983,6 +990,36 @@ export default function ServiceRequestsList() {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Job</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete job {jobToDelete?.type === "adhoc" ? "A" : "B"}-{jobToDelete?.id.slice(0, 5).toUpperCase()}? This action cannot be undone and will permanently remove this service request and all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (jobToDelete) {
+                  if (jobToDelete.type === "adhoc") {
+                    deleteRequestMutation.mutate(jobToDelete.id);
+                  } else {
+                    deleteBundleRequestMutation.mutate(jobToDelete.id);
+                  }
+                }
+                setDeleteModalOpen(false);
+                setJobToDelete(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }
