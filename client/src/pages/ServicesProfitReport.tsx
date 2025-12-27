@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { Header } from "@/components/Header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -624,7 +624,7 @@ export default function ServicesProfitReport() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-dark-blue-night" data-testid="text-report-title">
-              Services Profit Report
+              Services Profit Report ({filteredData.length} jobs)
             </h1>
             <p className="text-dark-gray text-sm mt-1">
               Analyze retail prices, vendor costs, and profit margins
@@ -696,10 +696,7 @@ export default function ServicesProfitReport() {
         </div>
 
         <Card className="mb-6">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-base">Filters</CardTitle>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
               <div className="space-y-2">
                 <Label className="text-sm">Vendor</Label>
@@ -857,12 +854,7 @@ export default function ServicesProfitReport() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="text-base flex items-center justify-between gap-2">
-              <span>Report Data ({filteredData.length} jobs)</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
+          <CardContent className="pt-6 overflow-x-auto">
             {isLoading ? (
               <div className="py-8 text-center text-dark-gray">Loading...</div>
             ) : filteredData.length === 0 ? (

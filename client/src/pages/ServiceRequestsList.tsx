@@ -598,10 +598,7 @@ export default function ServiceRequestsList() {
         </Card>
 
         <Card className="mb-6">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-base">Filters</CardTitle>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
               {isAdmin && (
                 <div className="space-y-2">
