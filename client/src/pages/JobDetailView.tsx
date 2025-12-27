@@ -785,7 +785,7 @@ export default function JobDetailView() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 ml-auto">
             {currentUser?.role === "admin" && (
               <Button 
                 variant="outline" 
