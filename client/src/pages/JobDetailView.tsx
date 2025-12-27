@@ -34,7 +34,8 @@ import {
   XCircle,
   Upload,
   Trash2,
-  DollarSign
+  DollarSign,
+  Building2
 } from "lucide-react";
 import type { ServiceRequest, Service, User as UserType, ServiceAttachment, Comment } from "@shared/schema";
 
@@ -79,6 +80,7 @@ export default function JobDetailView() {
   const [deliverableUrls, setDeliverableUrls] = useState<{ url: string; name: string }[]>([]);
   const [finalStoreUrl, setFinalStoreUrl] = useState<string>("");
   const [selectedDesignerId, setSelectedDesignerId] = useState<string>("");
+  const [selectedVendorId, setSelectedVendorId] = useState<string>("");
   const [changeRequestModalOpen, setChangeRequestModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -152,6 +154,10 @@ export default function JobDetailView() {
     enabled: !!currentUser,
   });
 
+  // Get vendors for vendor assignment (admin/internal_designer only)
+  const canAssignToVendor = ["admin", "internal_designer"].includes(currentUser?.role || "");
+  const vendors = allUsers.filter(u => u.role === "vendor" && u.isActive);
+
   const requestAttachments = attachments.filter(a => a.kind === "request");
   const deliverableAttachments = attachments.filter(a => a.kind === "deliverable");
   // Pending deliverables are unversioned attachments (not yet linked to a delivery)
@@ -184,6 +190,23 @@ export default function JobDetailView() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to assign job.", variant: "destructive" });
+    },
+  });
+
+  const assignVendorMutation = useMutation({
+    mutationFn: async (vendorId: string) => {
+      return apiRequest("POST", `/api/service-requests/${requestId}/assign-vendor`, { 
+        vendorId 
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests", requestId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+      setSelectedVendorId("");
+      toast({ title: "Vendor assigned", description: "The job has been assigned to the vendor organization." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to assign vendor.", variant: "destructive" });
     },
   });
 
@@ -1916,6 +1939,56 @@ export default function JobDetailView() {
                     </div>
                   )}
 
+                  {request.status === "pending" && canAssignToVendor && vendors.length > 0 && (
+                    <div className="space-y-2 pt-3 border-t">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Assign to Vendor Organization</span>
+                      </div>
+                      {request.vendorAssigneeId && (
+                        <div className="text-xs text-muted-foreground pb-1">
+                          Currently assigned to: {vendors.find(v => v.id === request.vendorAssigneeId)?.username || "Unknown Vendor"}
+                        </div>
+                      )}
+                      <Select 
+                        value={selectedVendorId} 
+                        onValueChange={setSelectedVendorId}
+                      >
+                        <SelectTrigger data-testid="select-vendor">
+                          <SelectValue placeholder="Select a vendor..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {vendors.map((vendor) => (
+                            <SelectItem 
+                              key={vendor.id} 
+                              value={vendor.id}
+                              data-testid={`select-vendor-${vendor.id}`}
+                            >
+                              <span className="flex items-center gap-2">
+                                {vendor.username}
+                                {vendor.id === request.vendorAssigneeId && (
+                                  <Badge variant="secondary" className="text-xs">Current</Badge>
+                                )}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        onClick={() => assignVendorMutation.mutate(selectedVendorId)}
+                        disabled={!selectedVendorId || assignVendorMutation.isPending || selectedVendorId === request.vendorAssigneeId}
+                        variant="outline"
+                        className="w-full"
+                        data-testid="button-assign-vendor"
+                      >
+                        {assignVendorMutation.isPending ? "Assigning..." : "Assign to Vendor"}
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        Assigns job to vendor organization. A specific designer can be assigned later.
+                      </p>
+                    </div>
+                  )}
+
                   {request.status === "change-request" && (
                     <Button
                       onClick={handleResume}
@@ -1943,10 +2016,21 @@ export default function JobDetailView() {
                       {format(new Date(request.createdAt), "MMM dd, h:mm a")}
                     </span>
                   </div>
+                  {request.vendorAssigneeId && !request.assigneeId && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                      <span className="text-sm text-dark-blue-night">Assigned to Vendor</span>
+                      {request.vendorAssignedAt && (
+                        <span className="text-xs text-dark-gray ml-auto">
+                          {format(new Date(request.vendorAssignedAt), "MMM dd, h:mm a")}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   {request.assigneeId && (
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-blue-500" />
-                      <span className="text-sm text-dark-blue-night">Assigned</span>
+                      <span className="text-sm text-dark-blue-night">Assigned to Designer</span>
                       {request.assignedAt && (
                         <span className="text-xs text-dark-gray ml-auto">
                           {format(new Date(request.assignedAt), "MMM dd, h:mm a")}

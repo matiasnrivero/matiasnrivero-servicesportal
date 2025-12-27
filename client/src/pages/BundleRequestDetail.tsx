@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/Header";
 import { FileUploader } from "@/components/FileUploader";
 import { ImagePreviewTooltip } from "@/components/ImagePreviewTooltip";
-import { ArrowLeft, Package, Loader2, User, Calendar, CheckCircle, Clock, AlertCircle, Download, Users, RefreshCw, XCircle, CheckCircle2, DollarSign } from "lucide-react";
+import { ArrowLeft, Package, Loader2, User, Calendar, CheckCircle, Clock, AlertCircle, Download, Users, RefreshCw, XCircle, CheckCircle2, DollarSign, Building2 } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import type { Bundle, BundleRequest, User as UserType, Service, InputField } from "@shared/schema";
@@ -124,6 +124,7 @@ export default function BundleRequestDetail() {
   const backUrl = fromPage === "profit-report" ? "/reports/services-profit" : "/service-requests";
 
   const [selectedAssignee, setSelectedAssignee] = useState<string>("");
+  const [selectedVendorId, setSelectedVendorId] = useState<string>("");
   const [deliverableUrls, setDeliverableUrls] = useState<{ url: string; name: string }[]>([]);
   const [finalStoreUrl, setFinalStoreUrl] = useState<string>("");
 
@@ -143,6 +144,13 @@ export default function BundleRequestDetail() {
     queryFn: getDefaultUser,
   });
 
+  const { data: allUsers = [] } = useQuery<UserType[]>({
+    queryKey: ["/api/users"],
+  });
+
+  const canAssignToVendor = ["admin", "internal_designer"].includes(currentUser?.role || "");
+  const vendors = allUsers.filter(u => u.role === "vendor" && u.isActive);
+
   const assignMutation = useMutation({
     mutationFn: async (assigneeId: string) => {
       const response = await fetch(`/api/bundle-requests/${requestId}/assign`, {
@@ -160,6 +168,27 @@ export default function BundleRequestDetail() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to assign designer.", variant: "destructive" });
+    },
+  });
+
+  const assignVendorMutation = useMutation({
+    mutationFn: async (vendorId: string) => {
+      const response = await fetch(`/api/bundle-requests/${requestId}/assign-vendor`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vendorId }),
+      });
+      if (!response.ok) throw new Error("Failed to assign vendor");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Vendor Assigned", description: "The job has been assigned to the vendor organization." });
+      setSelectedVendorId("");
+      queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests", requestId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to assign vendor.", variant: "destructive" });
     },
   });
 
@@ -785,6 +814,56 @@ export default function BundleRequestDetail() {
                     </div>
                   )}
 
+                  {request.status === "pending" && canAssignToVendor && vendors.length > 0 && (
+                    <div className="space-y-2 pt-3 border-t">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Assign to Vendor Organization</span>
+                      </div>
+                      {request.vendorAssigneeId && (
+                        <div className="text-xs text-muted-foreground pb-1">
+                          Currently assigned to: {vendors.find(v => v.id === request.vendorAssigneeId)?.username || "Unknown Vendor"}
+                        </div>
+                      )}
+                      <Select 
+                        value={selectedVendorId} 
+                        onValueChange={setSelectedVendorId}
+                      >
+                        <SelectTrigger data-testid="select-vendor">
+                          <SelectValue placeholder="Select a vendor..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {vendors.map((vendor) => (
+                            <SelectItem 
+                              key={vendor.id} 
+                              value={vendor.id}
+                              data-testid={`select-vendor-${vendor.id}`}
+                            >
+                              <span className="flex items-center gap-2">
+                                {vendor.username}
+                                {vendor.id === request.vendorAssigneeId && (
+                                  <Badge variant="secondary" className="text-xs">Current</Badge>
+                                )}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        onClick={() => assignVendorMutation.mutate(selectedVendorId)}
+                        disabled={!selectedVendorId || assignVendorMutation.isPending || selectedVendorId === request.vendorAssigneeId}
+                        variant="outline"
+                        className="w-full"
+                        data-testid="button-assign-vendor"
+                      >
+                        {assignVendorMutation.isPending ? "Assigning..." : "Assign to Vendor"}
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        Assigns job to vendor organization. A specific designer can be assigned later.
+                      </p>
+                    </div>
+                  )}
+
                 </CardContent>
               </Card>
             )}
@@ -802,10 +881,21 @@ export default function BundleRequestDetail() {
                       {format(new Date(request.createdAt), "MMM dd, h:mm a")}
                     </span>
                   </div>
+                  {request.vendorAssigneeId && !request.assigneeId && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                      <span className="text-sm text-dark-blue-night">Assigned to Vendor</span>
+                      {request.vendorAssignedAt && (
+                        <span className="text-xs text-dark-gray ml-auto">
+                          {format(new Date(request.vendorAssignedAt), "MMM dd, h:mm a")}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   {request.assigneeId && (
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-blue-500" />
-                      <span className="text-sm text-dark-blue-night">Assigned</span>
+                      <span className="text-sm text-dark-blue-night">Assigned to Designer</span>
                       {request.assignedAt && (
                         <span className="text-xs text-dark-gray ml-auto">
                           {format(new Date(request.assignedAt), "MMM dd, h:mm a")}
