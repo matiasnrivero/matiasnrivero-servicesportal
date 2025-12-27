@@ -637,7 +637,7 @@ export default function ServiceRequestsList() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Statuses</SelectItem>
-                      {isInternalRole(currentUser?.role) ? (
+                      {(currentUser?.role === "admin" || currentUser?.role === "internal_designer") ? (
                         <>
                           <SelectItem value="pending-assignment">Pending Assignment</SelectItem>
                           <SelectItem value="assigned-to-vendor">Assigned to Vendor</SelectItem>
