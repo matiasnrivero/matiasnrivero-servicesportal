@@ -42,7 +42,8 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, XCircle, Package, Boxes, LayoutGrid, List, Trash2, CalendarIcon, Search, ChevronDown, X } from "lucide-react";
+import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, XCircle, Package, Boxes, LayoutGrid, List, Trash2, CalendarIcon, Search, ChevronDown, X, SlidersHorizontal } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { BoardView } from "@/components/BoardView";
 import { calculateServicePrice } from "@/lib/pricing";
 import type { ServiceRequest, Service, User, BundleRequest, Bundle, VendorProfile } from "@shared/schema";
@@ -227,10 +228,18 @@ export default function ServiceRequestsList() {
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [searchJobId, setSearchJobId] = useState("");
+  const [isFiltersOpen, setIsFiltersOpen] = useState<boolean>(() => {
+    const saved = localStorage.getItem("serviceRequestsFiltersOpen");
+    return saved === null ? true : saved === "true";
+  });
 
   useEffect(() => {
     localStorage.setItem("serviceRequestsViewMode", viewMode);
   }, [viewMode]);
+
+  useEffect(() => {
+    localStorage.setItem("serviceRequestsFiltersOpen", String(isFiltersOpen));
+  }, [isFiltersOpen]);
   
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -512,6 +521,18 @@ export default function ServiceRequestsList() {
 
   const hasActiveFilters = vendorFilter !== "all" || serviceFilter !== "all" || serviceMethodFilter !== "all" || dateFrom || dateTo || selectedClients.length > 0 || searchJobId;
 
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (vendorFilter !== "all") count++;
+    if (serviceFilter !== "all") count++;
+    if (serviceMethodFilter !== "all") count++;
+    if (dateFrom) count++;
+    if (dateTo) count++;
+    if (selectedClients.length > 0) count++;
+    if (searchJobId) count++;
+    return count;
+  }, [vendorFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId]);
+
   const clearAllFilters = () => {
     setVendorFilter("all");
     setServiceFilter("all");
@@ -597,31 +618,62 @@ export default function ServiceRequestsList() {
           </CardHeader>
         </Card>
 
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            {(() => {
-              // Calculate visible filter count based on role
-              const hasVendorFilter = isAdmin || currentUser?.role === "internal_designer";
-              const hasClientFilter = isInternalRole(currentUser?.role);
-              // Base filters: Service Type, Service Method, Date From, Date To, Search Job ID = 5
-              const filterCount = 5 + (hasVendorFilter ? 1 : 0) + (hasClientFilter ? 1 : 0);
-              
-              return (
-                <div 
-                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-                  style={{ 
-                    gridTemplateColumns: `repeat(1, minmax(0, 1fr))`,
-                  }}
-                  data-filter-count={filterCount}
+        <Collapsible open={isFiltersOpen} onOpenChange={setIsFiltersOpen} className="mb-6">
+          <Card>
+            <div className="flex items-center justify-between px-6 py-4">
+              <CollapsibleTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="flex items-center gap-2 p-0 h-auto hover:bg-transparent"
+                  data-testid="button-toggle-filters"
                 >
-                  <style>{`
-                    @media (min-width: 768px) {
-                      [data-filter-count="${filterCount}"] {
-                        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-                      }
-                    }
-                    @media (min-width: 1024px) {
-                      [data-filter-count="${filterCount}"] {
+                  <SlidersHorizontal className="h-4 w-4" />
+                  <span className="font-medium">Filters</span>
+                  {activeFilterCount > 0 && (
+                    <Badge variant="secondary" className="ml-1 text-xs">
+                      {activeFilterCount}
+                    </Badge>
+                  )}
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isFiltersOpen ? "rotate-180" : ""}`} />
+                </Button>
+              </CollapsibleTrigger>
+              {hasActiveFilters && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearAllFilters}
+                  className="text-dark-gray"
+                  data-testid="button-clear-filters"
+                >
+                  Clear all
+                </Button>
+              )}
+            </div>
+            <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+              <CardContent className="pt-0 pb-6">
+                {(() => {
+                  // Calculate visible filter count based on role
+                  const hasVendorFilter = isAdmin || currentUser?.role === "internal_designer";
+                  const hasClientFilter = isInternalRole(currentUser?.role);
+                  // Base filters: Service Type, Service Method, Date From, Date To, Search Job ID = 5
+                  const filterCount = 5 + (hasVendorFilter ? 1 : 0) + (hasClientFilter ? 1 : 0);
+                  
+                  return (
+                    <div 
+                      className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                      style={{ 
+                        gridTemplateColumns: `repeat(1, minmax(0, 1fr))`,
+                      }}
+                      data-filter-count={filterCount}
+                    >
+                      <style>{`
+                        @media (min-width: 768px) {
+                          [data-filter-count="${filterCount}"] {
+                            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                          }
+                        }
+                        @media (min-width: 1024px) {
+                          [data-filter-count="${filterCount}"] {
                         grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
                       }
                     }
@@ -764,25 +816,13 @@ export default function ServiceRequestsList() {
                   />
                 </div>
               </div>
-                </div>
-              );
-            })()}
-
-            {hasActiveFilters && (
-              <div className="mt-4 flex items-center gap-2">
-                <span className="text-sm text-dark-gray">Active filters:</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearAllFilters}
-                  data-testid="button-clear-filters"
-                >
-                  Clear all
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         <Card>
           <CardContent className="pt-6">
