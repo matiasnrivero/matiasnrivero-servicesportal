@@ -147,13 +147,19 @@ export default function BundleRequestDetail() {
   });
 
   const canAssignToVendor = ["admin", "internal_designer"].includes(currentUser?.role || "");
-  const vendors = allUsers.filter(u => u.role === "vendor" && u.isActive);
   
   // Helper to get vendor company name from profile
   const getVendorDisplayName = (vendorUser: UserType) => {
     const profile = vendorProfiles.find(p => p.userId === vendorUser.id);
     return profile?.companyName || vendorUser.username;
   };
+  
+  // Only include vendors that have a vendor profile with a company name
+  const vendors = allUsers.filter(u => {
+    if (u.role !== "vendor" || !u.isActive) return false;
+    const profile = vendorProfiles.find(p => p.userId === u.id);
+    return profile?.companyName; // Only include if they have a company name
+  });
 
   const assignMutation = useMutation({
     mutationFn: async (assigneeId: string) => {
