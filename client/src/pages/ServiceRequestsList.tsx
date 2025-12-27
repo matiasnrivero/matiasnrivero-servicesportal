@@ -599,8 +599,39 @@ export default function ServiceRequestsList() {
 
         <Card className="mb-6">
           <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
-              {isAdmin && (
+            {(() => {
+              // Calculate visible filter count based on role
+              const hasVendorFilter = isAdmin || currentUser?.role === "internal_designer";
+              const hasClientFilter = isInternalRole(currentUser?.role);
+              // Base filters: Service Type, Service Method, Date From, Date To, Search Job ID = 5
+              const filterCount = 5 + (hasVendorFilter ? 1 : 0) + (hasClientFilter ? 1 : 0);
+              
+              return (
+                <div 
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                  style={{ 
+                    gridTemplateColumns: `repeat(1, minmax(0, 1fr))`,
+                  }}
+                  data-filter-count={filterCount}
+                >
+                  <style>{`
+                    @media (min-width: 768px) {
+                      [data-filter-count="${filterCount}"] {
+                        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                      }
+                    }
+                    @media (min-width: 1024px) {
+                      [data-filter-count="${filterCount}"] {
+                        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+                      }
+                    }
+                    @media (min-width: 1280px) {
+                      [data-filter-count="${filterCount}"] {
+                        grid-template-columns: repeat(${filterCount}, minmax(0, 1fr)) !important;
+                      }
+                    }
+                  `}</style>
+              {(isAdmin || currentUser?.role === "internal_designer") && (
                 <div className="space-y-2">
                   <Label className="text-sm">Vendor</Label>
                   <Select value={vendorFilter} onValueChange={setVendorFilter}>
@@ -733,7 +764,9 @@ export default function ServiceRequestsList() {
                   />
                 </div>
               </div>
-            </div>
+                </div>
+              );
+            })()}
 
             {hasActiveFilters && (
               <div className="mt-4 flex items-center gap-2">
