@@ -128,6 +128,7 @@ export interface IStorage {
   createServiceRequest(request: InsertServiceRequest): Promise<ServiceRequest>;
   updateServiceRequest(id: string, request: UpdateServiceRequest): Promise<ServiceRequest | undefined>;
   assignDesigner(requestId: string, assigneeId: string): Promise<ServiceRequest | undefined>;
+  assignVendor(requestId: string, vendorId: string): Promise<ServiceRequest | undefined>;
   deliverRequest(requestId: string, deliveredBy: string): Promise<ServiceRequest | undefined>;
   requestChange(requestId: string, changeNote: string): Promise<ServiceRequest | undefined>;
   deleteServiceRequest(id: string): Promise<void>;
@@ -232,6 +233,7 @@ export interface IStorage {
   createBundleRequest(request: InsertBundleRequest): Promise<BundleRequest>;
   updateBundleRequest(id: string, request: UpdateBundleRequest): Promise<BundleRequest | undefined>;
   assignBundleDesigner(requestId: string, assigneeId: string): Promise<BundleRequest | undefined>;
+  assignBundleVendor(requestId: string, vendorId: string): Promise<BundleRequest | undefined>;
   deliverBundleRequest(requestId: string, deliveredBy: string, finalStoreUrl?: string): Promise<BundleRequest | undefined>;
   requestBundleChange(requestId: string, changeNote: string): Promise<BundleRequest | undefined>;
 
@@ -446,6 +448,18 @@ export class DbStorage implements IStorage {
         assigneeId,
         assignedAt: new Date(),
         status: "in-progress",
+        updatedAt: new Date() 
+      })
+      .where(eq(serviceRequests.id, requestId))
+      .returning();
+    return result[0];
+  }
+
+  async assignVendor(requestId: string, vendorId: string): Promise<ServiceRequest | undefined> {
+    const result = await db.update(serviceRequests)
+      .set({ 
+        vendorAssigneeId: vendorId,
+        vendorAssignedAt: new Date(),
         updatedAt: new Date() 
       })
       .where(eq(serviceRequests.id, requestId))
@@ -936,6 +950,18 @@ export class DbStorage implements IStorage {
   async assignBundleDesigner(requestId: string, assigneeId: string): Promise<BundleRequest | undefined> {
     const result = await db.update(bundleRequests)
       .set({ assigneeId, assignedAt: new Date(), status: "in-progress", updatedAt: new Date() })
+      .where(eq(bundleRequests.id, requestId))
+      .returning();
+    return result[0];
+  }
+
+  async assignBundleVendor(requestId: string, vendorId: string): Promise<BundleRequest | undefined> {
+    const result = await db.update(bundleRequests)
+      .set({ 
+        vendorAssigneeId: vendorId,
+        vendorAssignedAt: new Date(),
+        updatedAt: new Date() 
+      })
       .where(eq(bundleRequests.id, requestId))
       .returning();
     return result[0];

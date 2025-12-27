@@ -624,6 +624,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Assign request to vendor (without specific designer - keeps status as pending)
+  app.post("/api/service-requests/:id/assign-vendor", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      
+      // Only admin and internal_designer can assign to vendors
+      if (!["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Only admins and internal designers can assign jobs to vendors" });
+      }
+
+      const existingRequest = await storage.getServiceRequest(req.params.id);
+      if (!existingRequest) {
+        return res.status(404).json({ error: "Service request not found" });
+      }
+
+      // Only allow vendor assignment when status is pending
+      if (existingRequest.status !== "pending") {
+        return res.status(400).json({ error: "Can only assign vendors to pending requests" });
+      }
+
+      const { vendorId } = req.body;
+      if (!vendorId) {
+        return res.status(400).json({ error: "vendorId is required" });
+      }
+
+      // Verify target vendor exists and is a vendor role
+      const targetVendor = await storage.getUser(vendorId);
+      if (!targetVendor) {
+        return res.status(404).json({ error: "Vendor not found" });
+      }
+      if (targetVendor.role !== "vendor") {
+        return res.status(400).json({ error: "Target user must be a vendor" });
+      }
+
+      // Assign to vendor (keeps status as pending, doesn't assign a specific designer)
+      const request = await storage.assignVendor(req.params.id, vendorId);
+      res.json(request);
+    } catch (error) {
+      console.error("Error assigning vendor:", error);
+      res.status(500).json({ error: "Failed to assign vendor" });
+    }
+  });
+
   // Mark request as delivered
   app.post("/api/service-requests/:id/deliver", async (req, res) => {
     try {
@@ -3121,6 +3172,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error assigning designer to bundle request:", error);
       res.status(500).json({ error: "Failed to assign designer" });
+    }
+  });
+
+  // Assign bundle request to vendor (without specific designer - keeps status as pending)
+  app.post("/api/bundle-requests/:id/assign-vendor", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      
+      // Only admin and internal_designer can assign to vendors
+      if (!["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Only admins and internal designers can assign jobs to vendors" });
+      }
+
+      const existingRequest = await storage.getBundleRequest(req.params.id);
+      if (!existingRequest) {
+        return res.status(404).json({ error: "Bundle request not found" });
+      }
+
+      // Only allow vendor assignment when status is pending
+      if (existingRequest.status !== "pending") {
+        return res.status(400).json({ error: "Can only assign vendors to pending requests" });
+      }
+
+      const { vendorId } = req.body;
+      if (!vendorId) {
+        return res.status(400).json({ error: "vendorId is required" });
+      }
+
+      // Verify target vendor exists and is a vendor role
+      const targetVendor = await storage.getUser(vendorId);
+      if (!targetVendor) {
+        return res.status(404).json({ error: "Vendor not found" });
+      }
+      if (targetVendor.role !== "vendor") {
+        return res.status(400).json({ error: "Target user must be a vendor" });
+      }
+
+      // Assign to vendor (keeps status as pending, doesn't assign a specific designer)
+      const request = await storage.assignBundleVendor(req.params.id, vendorId);
+      res.json(request);
+    } catch (error) {
+      console.error("Error assigning vendor to bundle request:", error);
+      res.status(500).json({ error: "Failed to assign vendor" });
     }
   });
 
