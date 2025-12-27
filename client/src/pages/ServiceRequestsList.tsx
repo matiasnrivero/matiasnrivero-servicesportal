@@ -25,12 +25,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/components/ui/toggle-group";
@@ -42,7 +36,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, XCircle, Package, Boxes, LayoutGrid, List, Trash2, CalendarIcon, Search, ChevronDown, X, SlidersHorizontal } from "lucide-react";
+import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, XCircle, LayoutGrid, List, Trash2, CalendarIcon, Search, ChevronDown, X, SlidersHorizontal } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { BoardView } from "@/components/BoardView";
 import { calculateServicePrice } from "@/lib/pricing";
@@ -69,6 +63,21 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
   "change-request": { label: "Change Request", color: "bg-orange-100 text-orange-800 border-orange-200", icon: AlertCircle },
   "canceled": { label: "Canceled", color: "bg-gray-100 text-gray-800 border-gray-200", icon: XCircle },
 };
+
+interface CombinedRequest {
+  id: string;
+  type: "adhoc" | "bundle";
+  serviceName: string;
+  method: string;
+  customerName: string;
+  dueDate: Date | null;
+  assigneeId: string | null;
+  status: string;
+  createdAt: Date;
+  userId: string;
+  originalRequest: ServiceRequest | BundleRequest;
+  price: string;
+}
 
 interface MultiSelectClientFilterProps {
   options: { id: string; name: string }[];
@@ -212,10 +221,7 @@ function MultiSelectClientFilter({ options, selected, onChange }: MultiSelectCli
 export default function ServiceRequestsList() {
   const { toast } = useToast();
   const localQueryClient = useQueryClient();
-  const [location, navigate] = useLocation();
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [bundleStatusFilter, setBundleStatusFilter] = useState<string>("all");
-  const [activeTab, setActiveTab] = useState<"adhoc" | "bundle">("adhoc");
   const [viewMode, setViewMode] = useState<"list" | "board">(() => {
     const saved = localStorage.getItem("serviceRequestsViewMode");
     return (saved as "list" | "board") || "list";
@@ -240,21 +246,6 @@ export default function ServiceRequestsList() {
   useEffect(() => {
     localStorage.setItem("serviceRequestsFiltersOpen", String(isFiltersOpen));
   }, [isFiltersOpen]);
-  
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tabFromUrl = urlParams.get("tab");
-    setActiveTab(tabFromUrl === "bundle" ? "bundle" : "adhoc");
-  }, [location]);
-  
-  const handleTabChange = (tab: "adhoc" | "bundle") => {
-    setActiveTab(tab);
-    if (tab === "adhoc") {
-      navigate("/service-requests");
-    } else {
-      navigate("/service-requests?tab=bundle");
-    }
-  };
 
   const { data: currentUser, refetch: refetchUser } = useQuery<CurrentUser>({
     queryKey: ["/api/default-user"],
@@ -472,7 +463,7 @@ export default function ServiceRequestsList() {
 
   const filteredBundleRequests = useMemo(() => {
     return bundleRequests.filter(r => {
-      if (bundleStatusFilter !== "all" && r.status !== bundleStatusFilter) return false;
+      if (statusFilter !== "all" && r.status !== statusFilter) return false;
 
       if (vendorFilter !== "all") {
         const assigneeVendorId = getVendorIdFromAssignee(r.assigneeId);
@@ -517,7 +508,7 @@ export default function ServiceRequestsList() {
 
       return true;
     });
-  }, [bundleRequests, bundleStatusFilter, vendorFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId]);
+  }, [bundleRequests, statusFilter, vendorFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId]);
 
   const hasActiveFilters = vendorFilter !== "all" || serviceFilter !== "all" || serviceMethodFilter !== "all" || dateFrom || dateTo || selectedClients.length > 0 || searchJobId;
 
@@ -542,8 +533,44 @@ export default function ServiceRequestsList() {
     setSelectedClients([]);
     setSearchJobId("");
     setStatusFilter("all");
-    setBundleStatusFilter("all");
   };
+
+  // Create combined request list
+  const combinedFilteredRequests = useMemo((): CombinedRequest[] => {
+    const adhocItems: CombinedRequest[] = filteredRequests.map(r => ({
+      id: r.id,
+      type: "adhoc" as const,
+      serviceName: getServiceTitle(r.serviceId),
+      method: "Ad-hoc",
+      customerName: r.customerName || "N/A",
+      dueDate: r.dueDate,
+      assigneeId: r.assigneeId,
+      status: r.status,
+      createdAt: r.createdAt,
+      userId: r.userId,
+      originalRequest: r,
+      price: getServicePrice(r),
+    }));
+
+    const bundleItems: CombinedRequest[] = filteredBundleRequests.map(r => ({
+      id: r.id,
+      type: "bundle" as const,
+      serviceName: getBundleName(r.bundleId),
+      method: getBundleName(r.bundleId),
+      customerName: getBundleCustomerName(r),
+      dueDate: r.dueDate,
+      assigneeId: r.assigneeId,
+      status: r.status,
+      createdAt: r.createdAt,
+      userId: r.userId,
+      originalRequest: r,
+      price: getBundlePrice(r),
+    }));
+
+    return [...adhocItems, ...bundleItems].sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }, [filteredRequests, filteredBundleRequests]);
 
   return (
     <main className="flex flex-col w-full min-h-screen bg-light-grey">
@@ -553,7 +580,7 @@ export default function ServiceRequestsList() {
           <CardHeader>
             <div className="flex items-center justify-between flex-wrap gap-4">
               <CardTitle className="font-title-semibold text-dark-blue-night text-2xl">
-                Service Requests
+                Service Requests <span className="text-sky-blue-accent">({combinedFilteredRequests.length})</span>
               </CardTitle>
               <div className="flex items-center gap-4">
                 <ToggleGroup
@@ -580,35 +607,19 @@ export default function ServiceRequestsList() {
                   </ToggleGroupItem>
                 </ToggleGroup>
                 {viewMode === "list" && (
-                  activeTab === "adhoc" ? (
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
-                        <SelectValue placeholder="Filter by status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="in-progress">In Progress</SelectItem>
-                        <SelectItem value="delivered">Delivered</SelectItem>
-                        <SelectItem value="change-request">Change Request</SelectItem>
-                        <SelectItem value="canceled">Canceled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Select value={bundleStatusFilter} onValueChange={setBundleStatusFilter}>
-                      <SelectTrigger className="w-[180px]" data-testid="select-bundle-status-filter">
-                        <SelectValue placeholder="Filter by status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="in-progress">In Progress</SelectItem>
-                        <SelectItem value="delivered">Delivered</SelectItem>
-                        <SelectItem value="change-request">Change Request</SelectItem>
-                        <SelectItem value="canceled">Canceled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
+                      <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="in-progress">In Progress</SelectItem>
+                      <SelectItem value="delivered">Delivered</SelectItem>
+                      <SelectItem value="change-request">Change Request</SelectItem>
+                      <SelectItem value="canceled">Canceled</SelectItem>
+                    </SelectContent>
+                  </Select>
                 )}
                 <Link href="/">
                   <Button data-testid="button-new-request">New Request</Button>
@@ -840,250 +851,135 @@ export default function ServiceRequestsList() {
 
         <Card>
           <CardContent className="pt-6">
-            <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as "adhoc" | "bundle")}>
-              <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="adhoc" data-testid="tab-adhoc-requests" className="gap-2">
-                  <Package className="h-4 w-4" />
-                  Ad-hoc Service Requests ({filteredRequests.length})
-                </TabsTrigger>
-                <TabsTrigger value="bundle" data-testid="tab-bundle-requests" className="gap-2">
-                  <Boxes className="h-4 w-4" />
-                  Bundle Requests ({filteredBundleRequests.length})
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="adhoc">
-                {viewMode === "board" ? (
-                  <BoardView
-                    requests={filteredRequests}
-                    type="adhoc"
-                    services={services}
-                    users={users}
-                    currentUserRole={currentUser?.role}
-                    isLoading={loadingRequests}
-                  />
-                ) : loadingRequests ? (
-                  <div className="text-center py-8">
-                    <p className="font-body-reg text-dark-gray">Loading requests...</p>
-                  </div>
-                ) : filteredRequests.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="font-body-reg text-dark-gray">No service requests found</p>
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Job ID</TableHead>
-                        <TableHead>Service</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Due Date</TableHead>
+            {viewMode === "board" ? (
+              <BoardView
+                requests={filteredRequests}
+                bundleRequests={filteredBundleRequests}
+                services={services}
+                bundles={bundles}
+                users={users}
+                currentUserRole={currentUser?.role}
+                isLoading={loadingRequests || loadingBundleRequests}
+              />
+            ) : (loadingRequests || loadingBundleRequests) ? (
+              <div className="text-center py-8">
+                <p className="font-body-reg text-dark-gray">Loading requests...</p>
+              </div>
+            ) : combinedFilteredRequests.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="font-body-reg text-dark-gray">No service requests found</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Job ID</TableHead>
+                    <TableHead>Service</TableHead>
+                    <TableHead>Method</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Due Date</TableHead>
+                    {isDistributor(currentUser?.role) ? (
+                      <TableHead>Price</TableHead>
+                    ) : (
+                      <TableHead>Assignee</TableHead>
+                    )}
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {combinedFilteredRequests.map((request) => {
+                    const StatusIcon = statusConfig[request.status]?.icon || Clock;
+                    const jobPrefix = request.type === "adhoc" ? "A" : "B";
+                    const detailLink = request.type === "adhoc" 
+                      ? `/jobs/${request.id}` 
+                      : `/bundle-jobs/${request.id}`;
+                    
+                    return (
+                      <TableRow key={`${request.type}-${request.id}`} data-testid={`row-request-${request.id}`}>
+                        <TableCell className="font-medium">
+                          <Link href={detailLink}>
+                            <span className="text-sky-blue-accent hover:underline cursor-pointer" data-testid={`link-job-id-${request.id}`}>
+                              {jobPrefix}-{request.id.slice(0, 5).toUpperCase()}
+                            </span>
+                          </Link>
+                        </TableCell>
+                        <TableCell data-testid={`text-service-${request.id}`}>
+                          {request.serviceName}
+                        </TableCell>
+                        <TableCell data-testid={`text-method-${request.id}`}>
+                          <Badge variant="outline" className="text-xs">
+                            {request.method}
+                          </Badge>
+                        </TableCell>
+                        <TableCell data-testid={`text-customer-${request.id}`}>
+                          {request.customerName}
+                        </TableCell>
+                        <TableCell data-testid={`text-due-date-${request.id}`}>
+                          {request.dueDate
+                            ? format(new Date(request.dueDate), "MM/dd/yyyy")
+                            : "Not set"}
+                        </TableCell>
                         {isDistributor(currentUser?.role) ? (
-                          <TableHead>Price</TableHead>
+                          <TableCell data-testid={`text-price-${request.id}`}>
+                            <span className="text-dark-blue-night font-medium">{request.price}</span>
+                          </TableCell>
                         ) : (
-                          <TableHead>Assignee</TableHead>
+                          <TableCell data-testid={`text-assignee-${request.id}`}>
+                            {getAssigneeName(request.assigneeId)}
+                          </TableCell>
                         )}
-                        <TableHead>Status</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredRequests.map((request) => {
-                        const StatusIcon = statusConfig[request.status]?.icon || Clock;
-                        return (
-                          <TableRow key={request.id} data-testid={`row-request-${request.id}`}>
-                            <TableCell className="font-medium">
-                              <Link href={`/jobs/${request.id}`}>
-                                <span className="text-sky-blue-accent hover:underline cursor-pointer" data-testid={`link-job-id-${request.id}`}>
-                                  A-{request.id.slice(0, 5).toUpperCase()}
-                                </span>
-                              </Link>
-                            </TableCell>
-                            <TableCell data-testid={`text-service-${request.id}`}>
-                              {getServiceTitle(request.serviceId)}
-                            </TableCell>
-                            <TableCell data-testid={`text-customer-${request.id}`}>
-                              {request.customerName || "N/A"}
-                            </TableCell>
-                            <TableCell data-testid={`text-due-date-${request.id}`}>
-                              {request.dueDate
-                                ? format(new Date(request.dueDate), "MM/dd/yyyy")
-                                : "Not set"}
-                            </TableCell>
-                            {isDistributor(currentUser?.role) ? (
-                              <TableCell data-testid={`text-price-${request.id}`}>
-                                <span className="text-dark-blue-night font-medium">{getServicePrice(request)}</span>
-                              </TableCell>
-                            ) : (
-                              <TableCell data-testid={`text-assignee-${request.id}`}>
-                                {getAssigneeName(request.assigneeId)}
-                              </TableCell>
-                            )}
-                            <TableCell>
-                              <Badge 
-                                className={statusConfig[request.status]?.color || "bg-gray-100 text-gray-800"}
-                                data-testid={`badge-status-${request.id}`}
+                        <TableCell>
+                          <Badge 
+                            className={statusConfig[request.status]?.color || "bg-gray-100 text-gray-800"}
+                            data-testid={`badge-status-${request.id}`}
+                          >
+                            <StatusIcon className="h-3 w-3 mr-1" />
+                            {statusConfig[request.status]?.label || request.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell data-testid={`text-created-${request.id}`}>
+                          {format(new Date(request.createdAt), "MMM dd, yyyy")}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Link href={detailLink}>
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                data-testid={`button-view-${request.id}`}
                               >
-                                <StatusIcon className="h-3 w-3 mr-1" />
-                                {statusConfig[request.status]?.label || request.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell data-testid={`text-created-${request.id}`}>
-                              {format(new Date(request.createdAt), "MMM dd, yyyy")}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Link href={`/jobs/${request.id}`}>
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    data-testid={`button-view-${request.id}`}
-                                  >
-                                    <Eye className="h-4 w-4 mr-1" />
-                                    View
-                                  </Button>
-                                </Link>
-                                {currentUser?.role === "admin" && (
-                                  <Button 
-                                    size="icon" 
-                                    variant="ghost"
-                                    onClick={() => {
-                                      if (confirm(`Are you sure you want to delete job A-${request.id.slice(0, 5).toUpperCase()}?`)) {
-                                        deleteRequestMutation.mutate(request.id);
-                                      }
-                                    }}
-                                    data-testid={`button-delete-${request.id}`}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                )}
-              </TabsContent>
-
-              <TabsContent value="bundle">
-                {viewMode === "board" ? (
-                  <BoardView
-                    requests={filteredBundleRequests}
-                    type="bundle"
-                    bundles={bundles}
-                    users={users}
-                    currentUserRole={currentUser?.role}
-                    isLoading={loadingBundleRequests}
-                  />
-                ) : loadingBundleRequests ? (
-                  <div className="text-center py-8">
-                    <p className="font-body-reg text-dark-gray">Loading bundle requests...</p>
-                  </div>
-                ) : filteredBundleRequests.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="font-body-reg text-dark-gray">No bundle requests found</p>
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Job ID</TableHead>
-                        <TableHead>Bundle</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Due Date</TableHead>
-                        {isDistributor(currentUser?.role) ? (
-                          <TableHead>Price</TableHead>
-                        ) : (
-                          <TableHead>Assignee</TableHead>
-                        )}
-                        <TableHead>Status</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredBundleRequests.map((request) => {
-                        const StatusIcon = statusConfig[request.status]?.icon || Clock;
-                        return (
-                          <TableRow key={request.id} data-testid={`row-bundle-request-${request.id}`}>
-                            <TableCell className="font-medium">
-                              <Link href={`/bundle-jobs/${request.id}`}>
-                                <span className="text-sky-blue-accent hover:underline cursor-pointer" data-testid={`link-bundle-job-id-${request.id}`}>
-                                  B-{request.id.slice(0, 5).toUpperCase()}
-                                </span>
-                              </Link>
-                            </TableCell>
-                            <TableCell data-testid={`text-bundle-${request.id}`}>
-                              {getBundleName(request.bundleId)}
-                            </TableCell>
-                            <TableCell data-testid={`text-bundle-customer-${request.id}`}>
-                              {getBundleCustomerName(request)}
-                            </TableCell>
-                            <TableCell data-testid={`text-bundle-due-date-${request.id}`}>
-                              {request.dueDate
-                                ? format(new Date(request.dueDate), "MM/dd/yyyy")
-                                : "Not set"}
-                            </TableCell>
-                            {isDistributor(currentUser?.role) ? (
-                              <TableCell data-testid={`text-bundle-price-${request.id}`}>
-                                <span className="text-dark-blue-night font-medium">{getBundlePrice(request)}</span>
-                              </TableCell>
-                            ) : (
-                              <TableCell data-testid={`text-bundle-assignee-${request.id}`}>
-                                {getAssigneeName(request.assigneeId)}
-                              </TableCell>
-                            )}
-                            <TableCell>
-                              <Badge 
-                                className={statusConfig[request.status]?.color || "bg-gray-100 text-gray-800"}
-                                data-testid={`badge-bundle-status-${request.id}`}
+                                <Eye className="h-4 w-4 mr-1" />
+                                View
+                              </Button>
+                            </Link>
+                            {currentUser?.role === "admin" && (
+                              <Button 
+                                size="icon" 
+                                variant="ghost"
+                                onClick={() => {
+                                  if (confirm(`Are you sure you want to delete job ${jobPrefix}-${request.id.slice(0, 5).toUpperCase()}?`)) {
+                                    if (request.type === "adhoc") {
+                                      deleteRequestMutation.mutate(request.id);
+                                    } else {
+                                      deleteBundleRequestMutation.mutate(request.id);
+                                    }
+                                  }
+                                }}
+                                data-testid={`button-delete-${request.id}`}
                               >
-                                <StatusIcon className="h-3 w-3 mr-1" />
-                                {statusConfig[request.status]?.label || request.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell data-testid={`text-bundle-created-${request.id}`}>
-                              {format(new Date(request.createdAt), "MMM dd, yyyy")}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Link href={`/bundle-jobs/${request.id}`}>
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    data-testid={`button-view-bundle-${request.id}`}
-                                  >
-                                    <Eye className="h-4 w-4 mr-1" />
-                                    View
-                                  </Button>
-                                </Link>
-                                {currentUser?.role === "admin" && (
-                                  <Button 
-                                    size="icon" 
-                                    variant="ghost"
-                                    onClick={() => {
-                                      if (confirm(`Are you sure you want to delete job B-${request.id.slice(0, 5).toUpperCase()}?`)) {
-                                        deleteBundleRequestMutation.mutate(request.id);
-                                      }
-                                    }}
-                                    data-testid={`button-delete-bundle-${request.id}`}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                )}
-              </TabsContent>
-            </Tabs>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>

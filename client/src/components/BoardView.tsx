@@ -10,9 +10,20 @@ import type { ServiceRequest, Service, User as UserType, BundleRequest, Bundle }
 
 type RequestType = "adhoc" | "bundle";
 
-interface BoardViewProps {
-  requests: ServiceRequest[] | BundleRequest[];
+interface CombinedBoardRequest {
+  id: string;
   type: RequestType;
+  status: string;
+  dueDate: Date | null;
+  createdAt: Date;
+  assigneeId: string | null;
+  originalRequest: ServiceRequest | BundleRequest;
+}
+
+interface BoardViewProps {
+  requests: ServiceRequest[];
+  bundleRequests?: BundleRequest[];
+  type?: RequestType;
   services?: Service[];
   bundles?: Bundle[];
   users: UserType[];
@@ -34,7 +45,7 @@ function isDistributor(role: string | undefined): boolean {
 
 export function BoardView({
   requests,
-  type,
+  bundleRequests = [],
   services = [],
   bundles = [],
   users,
@@ -42,6 +53,28 @@ export function BoardView({
   isLoading,
 }: BoardViewProps) {
   const [, navigate] = useLocation();
+
+  // Combine adhoc and bundle requests
+  const combinedRequests: CombinedBoardRequest[] = [
+    ...requests.map(r => ({
+      id: r.id,
+      type: "adhoc" as RequestType,
+      status: r.status,
+      dueDate: r.dueDate,
+      createdAt: r.createdAt,
+      assigneeId: r.assigneeId,
+      originalRequest: r,
+    })),
+    ...bundleRequests.map(r => ({
+      id: r.id,
+      type: "bundle" as RequestType,
+      status: r.status,
+      dueDate: r.dueDate,
+      createdAt: r.createdAt,
+      assigneeId: r.assigneeId,
+      originalRequest: r,
+    })),
+  ];
 
   const getServiceTitle = (serviceId: string) => {
     const service = services.find((s) => s.id === serviceId);
@@ -66,11 +99,11 @@ export function BoardView({
     return user.username.slice(0, 2).toUpperCase();
   };
 
-  const getPrice = (request: ServiceRequest | BundleRequest) => {
-    const formData = request.formData as Record<string, any> | null;
+  const getPrice = (item: CombinedBoardRequest) => {
+    const formData = item.originalRequest.formData as Record<string, any> | null;
     
-    if (type === "adhoc") {
-      const serviceRequest = request as ServiceRequest;
+    if (item.type === "adhoc") {
+      const serviceRequest = item.originalRequest as ServiceRequest;
       const service = services.find((s) => s.id === serviceRequest.serviceId);
       
       return calculateServicePrice({
@@ -81,41 +114,42 @@ export function BoardView({
         finalPrice: serviceRequest.finalPrice,
       });
     } else {
-      const bundle = bundles.find((b) => b.id === (request as BundleRequest).bundleId);
+      const bundleRequest = item.originalRequest as BundleRequest;
+      const bundle = bundles.find((b) => b.id === bundleRequest.bundleId);
       return bundle?.finalPrice ? `$${bundle.finalPrice}` : "N/A";
     }
   };
 
-  const getCustomerName = (request: ServiceRequest | BundleRequest) => {
-    if (type === "adhoc") {
-      return (request as ServiceRequest).customerName || "N/A";
+  const getCustomerName = (item: CombinedBoardRequest) => {
+    if (item.type === "adhoc") {
+      return (item.originalRequest as ServiceRequest).customerName || "N/A";
     }
-    const formData = request.formData as Record<string, any> | null;
+    const formData = item.originalRequest.formData as Record<string, any> | null;
     if (formData?.customerName) {
       return formData.customerName;
     }
-    const user = users.find((u) => u.id === request.userId);
+    const user = users.find((u) => u.id === item.originalRequest.userId);
     return user?.username || "Unknown";
   };
 
-  const handleCardClick = (request: ServiceRequest | BundleRequest) => {
-    if (type === "adhoc") {
-      navigate(`/jobs/${request.id}`);
+  const handleCardClick = (item: CombinedBoardRequest) => {
+    if (item.type === "adhoc") {
+      navigate(`/jobs/${item.id}`);
     } else {
-      navigate(`/bundle-jobs/${request.id}`);
+      navigate(`/bundle-jobs/${item.id}`);
     }
   };
 
-  const getJobId = (request: ServiceRequest | BundleRequest) => {
-    const prefix = type === "adhoc" ? "A" : "B";
-    return `${prefix}-${request.id.slice(0, 5).toUpperCase()}`;
+  const getJobId = (item: CombinedBoardRequest) => {
+    const prefix = item.type === "adhoc" ? "A" : "B";
+    return `${prefix}-${item.id.slice(0, 5).toUpperCase()}`;
   };
 
-  const getTitle = (request: ServiceRequest | BundleRequest) => {
-    if (type === "adhoc") {
-      return getServiceTitle((request as ServiceRequest).serviceId);
+  const getTitle = (item: CombinedBoardRequest) => {
+    if (item.type === "adhoc") {
+      return getServiceTitle((item.originalRequest as ServiceRequest).serviceId);
     }
-    return getBundleName((request as BundleRequest).bundleId);
+    return getBundleName((item.originalRequest as BundleRequest).bundleId);
   };
 
   if (isLoading) {
@@ -131,7 +165,7 @@ export function BoardView({
       <div className="flex gap-4 pb-4 min-w-max">
         {statusColumns.map((column) => {
           const StatusIcon = column.icon;
-          const columnRequests = requests.filter((r) => r.status === column.id);
+          const columnRequests = combinedRequests.filter((r) => r.status === column.id);
 
           return (
             <div
@@ -156,57 +190,60 @@ export function BoardView({
                       No requests
                     </div>
                   ) : (
-                    columnRequests.map((request) => (
+                    columnRequests.map((item) => (
                       <Card
-                        key={request.id}
+                        key={`${item.type}-${item.id}`}
                         className="p-3 cursor-pointer hover-elevate transition-all bg-white dark:bg-card"
-                        onClick={() => handleCardClick(request)}
-                        data-testid={`card-request-${request.id}`}
+                        onClick={() => handleCardClick(item)}
+                        data-testid={`card-request-${item.id}`}
                       >
                         <div className="flex flex-col gap-2">
                           <div className="flex items-start justify-between gap-2">
                             <span className="text-xs font-medium text-sky-blue-accent">
-                              {getJobId(request)}
+                              {getJobId(item)}
                             </span>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                              {item.type === "adhoc" ? "Ad-hoc" : "Bundle"}
+                            </Badge>
                           </div>
 
                           <h4 className="font-medium text-sm line-clamp-2">
-                            {getTitle(request)}
+                            {getTitle(item)}
                           </h4>
 
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <User className="h-3 w-3" />
-                            <span className="truncate">{getCustomerName(request)}</span>
+                            <span className="truncate">{getCustomerName(item)}</span>
                           </div>
 
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <div className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
                               <span>
-                                {request.dueDate
-                                  ? format(new Date(request.dueDate), "MMM dd")
+                                {item.dueDate
+                                  ? format(new Date(item.dueDate), "MMM dd")
                                   : "No due date"}
                               </span>
                             </div>
                             <span className="text-muted-foreground/70">
-                              {format(new Date(request.createdAt), "MMM dd")}
+                              {format(new Date(item.createdAt), "MMM dd")}
                             </span>
                           </div>
 
                           <div className="flex items-center justify-between pt-1 border-t">
                             {isDistributor(currentUserRole) ? (
                               <span className="text-sm font-medium text-dark-blue-night">
-                                {getPrice(request)}
+                                {getPrice(item)}
                               </span>
                             ) : (
                               <div className="flex items-center gap-2">
                                 <Avatar className="h-6 w-6">
                                   <AvatarFallback className="text-xs bg-muted">
-                                    {getAssigneeInitials(request.assigneeId)}
+                                    {getAssigneeInitials(item.assigneeId)}
                                   </AvatarFallback>
                                 </Avatar>
                                 <span className="text-xs text-muted-foreground truncate max-w-[120px]">
-                                  {getAssigneeName(request.assigneeId) || "Unassigned"}
+                                  {getAssigneeName(item.assigneeId) || "Unassigned"}
                                 </span>
                               </div>
                             )}
