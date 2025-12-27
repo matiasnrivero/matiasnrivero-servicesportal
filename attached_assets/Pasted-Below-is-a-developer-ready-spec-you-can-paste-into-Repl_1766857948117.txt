@@ -1,0 +1,406 @@
+Below is a **developer-ready spec** you can paste into Replit as the “build this” prompt. It’s written to match your exact hierarchy/status model and to implement **best-practice auto-routing** (skills + capacity + fairness + fallbacks + auditability).
+
+---
+
+## Replit Build Prompt — Tri-POD Services Portal: Auto-Assignment Engine (Vendor + Vendor Designer)
+
+### 1) Goal
+
+Build an **Automation Feature** that automatically routes new Jobs to:
+
+1. a **Vendor Company** (first-level assignment), and optionally
+2. a **Vendor Designer** (second-level assignment within that Vendor),
+
+based on:
+
+* **Service Type compatibility** (skills/services supported)
+* **Daily capacity** (by vendor, and by designer, per service type)
+* **Fairness** (avoid starving vendors / distribute load)
+* **Rules & priorities** (manual overrides, VIP clients, SLA)
+* **Failover logic** (when all are full, hold the job and notify)
+
+This automation must preserve the existing workflow:
+
+* Client submits job → internal sees **“Pending Assignment”** (client sees **“Pending”**)
+* When assigned to vendor → internal sees **“Assigned to Vendor”** (client still sees **“Pending”**)
+* When a designer takes it (internal or vendor designer) → job becomes **“In Progress”** (client sees **“In Progress”**)
+
+Automation should run **immediately on job creation** and also via **scheduled rebalancing** (e.g., every 5–10 minutes) for jobs that weren’t assigned due to capacity.
+
+---
+
+### 2) Key Concepts & Best Practices (must implement)
+
+* **Separation of concerns**
+
+  * Vendor-level routing chooses *company*, not person.
+  * Vendor-designer routing chooses *person* inside that company.
+* **Deterministic + auditable**
+
+  * Every auto-assignment decision must be logged with the rule used and “why”.
+* **Capacity is enforced**
+
+  * Capacity is **per day** and **per service type**.
+  * Capacity resets daily by vendor timezone (configurable; default Tri-POD timezone).
+* **Fair distribution**
+
+  * Support at least one algorithm: **Weighted Round Robin** or **Least Loaded**.
+  * Include tie-breakers to avoid always picking the same vendor.
+* **Manual overrides always win**
+
+  * If an internal user manually assigns vendor/designer, automation does not change it unless explicitly “Re-run automation”.
+* **Safe fallbacks**
+
+  * If no eligible vendor/designer found: keep job at **Pending Assignment** (or “Assigned to Vendor” if vendor found but no designer) and create an internal alert.
+
+---
+
+### 3) Data Model Changes
+
+#### 3.1 Vendor Company Profile
+
+Add:
+
+* `services_supported`: list of service type IDs (skills at vendor level)
+* `capacity_daily_by_service`: map `{serviceTypeId: maxJobsPerDay}`
+* `capacity_used_today_by_service`: map `{serviceTypeId: usedCount}` (derived + cached)
+* `priority`: integer (default 0; higher means prefer)
+* `is_active`: boolean
+* `accepts_automation`: boolean (vendor can opt-in/out)
+* `timezone`: string (optional; default platform timezone)
+* `routing_strategy`: enum `LEAST_LOADED | WEIGHTED_ROUND_ROBIN | PRIORITY_THEN_LEAST_LOADED`
+* `cooldown_minutes_between_assignments`: integer (optional; prevents burst load)
+* `max_concurrent_in_progress_by_service`: optional map (advanced; can be v2)
+
+#### 3.2 Vendor Designer User Profile
+
+Add:
+
+* `vendor_company_id`
+* `services_supported`: list of service type IDs
+* `capacity_daily_by_service`: map `{serviceTypeId: maxJobsPerDay}`
+* `capacity_used_today_by_service`: map `{serviceTypeId: usedCount}`
+* `is_active`: boolean
+* `accepts_automation`: boolean
+* `priority`: integer (optional)
+* `cooldown_minutes_between_assignments`: integer (optional)
+
+#### 3.3 Job Entity
+
+Add fields:
+
+* `service_type_id`
+* `assignment_mode`: enum `MANUAL | AUTO_VENDOR | AUTO_VENDOR_AND_DESIGNER`
+* `assigned_vendor_company_id` (nullable)
+* `assigned_vendor_designer_id` (nullable)
+* `auto_assignment_status`: enum `NOT_ATTEMPTED | ASSIGNED | PARTIAL_ASSIGNED | FAILED_NO_VENDOR | FAILED_NO_DESIGNER | FAILED_CAPACITY`
+* `automation_run_id` (nullable, last run)
+* `locked_assignment`: boolean (true when manually assigned OR internal “lock”)
+* `status_internal`: existing internal statuses
+* `status_client`: derived mapping (Pending/ In Progress / Delivered etc.)
+
+#### 3.4 Automation Rules
+
+Create an `AutomationRule` table:
+
+* `name`
+* `is_enabled`
+* `scope`: enum `GLOBAL | WORKSPACE | CLIENT | SERVICE_TYPE`
+* `service_type_id` (nullable)
+* `workspace_id` / `client_id` (nullable)
+* `routing_target`: enum `VENDOR_ONLY | VENDOR_THEN_DESIGNER`
+* `routing_strategy`: enum (overrides vendor setting)
+* `eligible_vendor_company_ids`: optional allowlist
+* `excluded_vendor_company_ids`: optional blocklist
+* `priority_order`: integer (lower = runs first)
+* `conditions_json`: (SLA, VIP flag, rush, language, etc. optional)
+* `fallback_action`: enum `LEAVE_PENDING_ASSIGNMENT | ASSIGN_TO_INTERNAL_QUEUE | NOTIFY_ONLY`
+
+#### 3.5 Audit / Decision Logging
+
+Create `AutoAssignmentLog`:
+
+* `run_id`
+* `job_id`
+* `timestamp`
+* `step`: `VENDOR_SELECTION | DESIGNER_SELECTION | FINAL`
+* `candidates_considered`: JSON (ids + scores + reasons)
+* `chosen_id`
+* `rule_id`
+* `result`: success/fail + reason codes
+
+---
+
+### 4) Status & Visibility Rules (must preserve current behavior)
+
+**Internal status model** (existing, do not break):
+
+* `Pending Assignment` → internal only
+* `Assigned to Vendor` → internal only
+* `In Progress` → both internal and client
+* (Delivered / Change Request / Canceled etc. as you have)
+
+**Client sees**:
+
+* For internal statuses `Pending Assignment` and `Assigned to Vendor`, client status = `Pending`.
+* For internal status `In Progress`, client status = `In Progress`.
+
+**Visibility**:
+
+* Vendor company sees jobs only when internal status is `Assigned to Vendor` or later.
+* Vendor designer sees jobs assigned to their vendor company in `Assigned to Vendor` bucket, and once auto-assigned to them, it appears in “My Jobs”.
+
+---
+
+### 5) Routing Logic (Algorithm Spec)
+
+#### 5.1 When to run automation
+
+Trigger auto-assignment:
+
+* On **job creation** (after initial save)
+* On **job status changes** back to Pending Assignment (e.g., unassigned)
+* On **capacity reset** (daily)
+* Scheduled job every 5–10 minutes: pick jobs where:
+
+  * `status_internal = Pending Assignment` OR (`Assigned to Vendor` but no designer assigned AND rule says assign designer)
+  * `locked_assignment = false`
+  * `auto_assignment_status in (NOT_ATTEMPTED, FAILED_*, PARTIAL_ASSIGNED)`
+
+#### 5.2 Vendor Selection Eligibility
+
+A vendor is eligible if:
+
+* `is_active = true`
+* `accepts_automation = true`
+* vendor supports the job’s `service_type_id`
+* vendor has remaining daily capacity for that service:
+
+  * `used_today < capacity_daily` (if capacity defined; if not defined treat as 0 unless “unlimited” is enabled)
+* not in excluded list; matches allowlist if provided
+* not in cooldown window (optional)
+
+#### 5.3 Vendor Scoring (pick best candidate)
+
+Implement one of these strategies (configurable):
+
+1. **Least Loaded**
+
+   * Score = `remaining_capacity` (higher better) and/or `used_today` (lower better)
+2. **Weighted Round Robin**
+
+   * Weight = capacity or priority
+   * Keep pointer/state per service type (persist last chosen vendor)
+3. **Priority then Least Loaded**
+
+   * Sort by `priority desc`, then `used_today asc`, then `last_assigned_at asc`
+
+Tie-breakers:
+
+* oldest `last_assigned_at` wins
+* stable random seed by job_id to spread evenly
+
+#### 5.4 Vendor Designer Selection (within chosen vendor)
+
+Eligible designer:
+
+* active, accepts automation
+* supports the service type
+* has remaining daily capacity
+* (optional) language/timezone match if provided later
+
+Designer scoring:
+
+* same as vendor: least-loaded or weighted RR
+* tie-breaker: `last_assigned_at asc`
+
+#### 5.5 Assignment Outcome Paths
+
+* If vendor found and rule = vendor only:
+
+  * Set `assigned_vendor_company_id`
+  * Set `status_internal = Assigned to Vendor`
+  * `auto_assignment_status = ASSIGNED`
+* If vendor found and rule = vendor then designer:
+
+  * If designer found:
+
+    * Assign both vendor + designer
+    * Set `status_internal = In Progress` **only if your current behavior is “designer took it”**.
+
+      * IMPORTANT: Keep your semantics: “In Progress” happens when someone *takes* it.
+      * So by default: **do NOT move to In Progress automatically** unless you explicitly want “auto-take”.
+      * Instead:
+
+        * Keep `status_internal = Assigned to Vendor`
+        * Add `assigned_vendor_designer_id`
+        * Show it in designer’s “Assigned to Me” queue as “Ready to Start”
+    * `auto_assignment_status = ASSIGNED`
+  * If no designer found:
+
+    * Assign vendor only
+    * Keep `status_internal = Assigned to Vendor`
+    * `auto_assignment_status = PARTIAL_ASSIGNED | FAILED_NO_DESIGNER`
+* If no vendor found:
+
+  * Keep `status_internal = Pending Assignment`
+  * `auto_assignment_status = FAILED_NO_VENDOR | FAILED_CAPACITY`
+  * Notify internal users (admin/internal designers)
+
+---
+
+### 6) Capacity Tracking Rules
+
+**Daily capacity definition**
+
+* For each vendor and designer: capacity is defined per service type.
+* Used capacity increments when:
+
+  * Vendor is assigned (vendor capacity)
+  * Designer is assigned (designer capacity)
+* Used capacity decrements only if:
+
+  * Job is canceled *before work starts* AND you decide to “release slot”
+  * Or job is unassigned by internal user
+  * (configurable; default: release slot only if status never reached In Progress)
+
+**Capacity reset**
+
+* Reset daily at 00:00 in the configured timezone.
+* Store `capacity_date` to avoid double resets.
+
+**Important**
+
+* Implement as derived counts from Jobs table for correctness + optionally cached for speed.
+* Must handle high volume safely (transactions/locking).
+
+---
+
+### 7) UI / UX Requirements
+
+#### 7.1 Vendor Profile Screen
+
+Add sections:
+
+* “Automation”
+
+  * Toggle: “Eligible for Auto-Assignment”
+  * Multi-select: Services supported
+  * Table: Daily capacity per service type
+  * Strategy dropdown
+  * Priority number
+  * Cooldown minutes (optional)
+  * Show “Used today / capacity” per service type
+
+#### 7.2 Vendor Designer Profile Screen
+
+Add:
+
+* Services supported (skills)
+* Daily capacity per service type
+* Used today counters
+* Automation opt-in
+* Priority
+
+#### 7.3 Automation Rules Admin Screen
+
+CRUD for `AutomationRule`:
+
+* Rule name, enabled toggle, priority order
+* Scope (global/workspace/client/service type)
+* Service type selector
+* Routing target: vendor only vs vendor+designer
+* Allowlist/blocklist vendor selection
+* Fallback action
+* Dry-run button: “Simulate routing” for a selected job (shows ranked candidates and why)
+
+#### 7.4 Job Detail Page (Internal)
+
+Add:
+
+* “Auto assignment status” badge
+* “Assigned vendor” + “assigned designer”
+* Button: “Re-run Automation” (only if not locked)
+* Button: “Lock assignment” / “Unlock” (admin only)
+* “Routing decision log” panel (read-only list)
+
+---
+
+### 8) Notifications
+
+When auto-assignment fails:
+
+* Create an in-app notification for Admin/Internal Designer:
+
+  * “Job #{id} could not be assigned (no eligible vendor / capacity reached)”
+    When vendor assigned:
+* Notify vendor admins (or vendor dashboard badge)
+  When designer assigned:
+* Notify that designer
+
+---
+
+### 9) Permissions / Security
+
+* Clients: cannot see internal status names or routing logs.
+* Vendor company: can see jobs assigned to their company only.
+* Vendor designer: can see jobs assigned to them or available in their vendor queue depending on your model.
+* Only Admin/Internal Designer can edit vendor capacities and automation rules.
+
+---
+
+### 10) Edge Cases (must handle)
+
+* Vendor becomes inactive mid-day → reroute pending jobs (not locked)
+* Job service type changed → rerun automation automatically (if not locked)
+* Manual assignment after auto → set `locked_assignment = true` and stop automation
+* Job canceled while assigned → release capacity (only if not started, configurable)
+* Multiple jobs created at same time → avoid over-assigning beyond capacity (use transactions/locking)
+* Vendor capacity full but designer capacity available (and vice versa) → handle independently
+* Ensure no infinite loop of reassignment; store `attempt_count` and stop after N attempts/day (e.g., 3)
+
+---
+
+### 11) Implementation Notes (Replit-friendly)
+
+* Create a `RoutingEngine` module with:
+
+  * `findEligibleVendors(job, rule)`
+  * `scoreVendors(vendors, job, strategy)`
+  * `selectVendor(scored)`
+  * same for designers
+  * `applyAssignment(job, vendorId, designerId)`
+  * `writeLog(runId, step, data)`
+* Add a background worker / cron:
+
+  * `processUnassignedJobs()` every 5–10 minutes
+* Add database indexes:
+
+  * Jobs by `status_internal`, `service_type_id`, `assigned_vendor_company_id`, `assigned_vendor_designer_id`, `created_at`
+* Add idempotency:
+
+  * If job already assigned and locked, skip.
+  * If `auto_assignment_status=ASSIGNED`, skip unless “Re-run automation”.
+
+---
+
+### 12) Acceptance Tests (must pass)
+
+1. New job created for service type A → assigned to eligible vendor with remaining capacity.
+2. Vendor capacity for A reached → job remains Pending Assignment and internal notified.
+3. Vendor supports A but no designer supports A → job assigned to vendor only and flagged “No designer”.
+4. Manual assignment locks job; scheduled automation does not move it.
+5. Round robin distributes 10 jobs across 2 vendors according to capacities/priority.
+6. Daily reset clears “used today” counts at midnight timezone and assignments resume.
+
+---
+
+## Suggested Default Behavior (recommended)
+
+* **Auto-assign vendor** immediately.
+* **Auto-assign designer** only if vendor has opted in AND rule says so.
+* Do **not** automatically flip to “In Progress” unless you intentionally want “auto-take”. Keep “In Progress” for the moment a designer clicks “Start”.
+
+---
+
+If you want, paste your current **Service Types list** (Vectorization, Digitizing, etc.) and your existing DB schema (even rough), and I’ll tailor the exact table fields + enums + UI wireframe components to match your current codebase on Replit.
