@@ -432,17 +432,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Filter requests based on user's role hierarchy
-      // admin, internal_designer, vendor, vendor_designer can see all or assigned requests
+      // admin, internal_designer can see all requests
+      // vendor, vendor_designer see jobs assigned to their vendor organization
       // client can only see their own requests
       if (sessionUser.role === "client") {
         // Clients can only see their own requests
         requests = await storage.getServiceRequestsByUser(sessionUserId);
-      } else if (["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(sessionUser.role)) {
-        // Admin, Internal Designers, Vendors, Vendor Designers can see all requests
+      } else if (["admin", "internal_designer", "designer"].includes(sessionUser.role)) {
+        // Admin, Internal Designers can see all requests
         if (status) {
           requests = await storage.getServiceRequestsByStatus(status as string);
         } else {
           requests = await storage.getAllServiceRequests();
+        }
+      } else if (["vendor", "vendor_designer"].includes(sessionUser.role)) {
+        // Vendors and Vendor Designers see jobs assigned to their vendor organization
+        const vendorId = sessionUser.role === "vendor" ? sessionUser.id : sessionUser.vendorId;
+        if (vendorId) {
+          const allRequests = status 
+            ? await storage.getServiceRequestsByStatus(status as string)
+            : await storage.getAllServiceRequests();
+          
+          // Prefetch all users to avoid N+1 queries
+          const allUsers = await storage.getAllUsers();
+          const userMap = new Map(allUsers.map(u => [u.id, u]));
+          
+          // Filter to show jobs assigned to this vendor organization:
+          // 1. vendorAssigneeId matches the vendor
+          // 2. assigneeId is the current user
+          // 3. assigneeId is a vendor_designer belonging to this vendor
+          requests = allRequests.filter(r => {
+            if (r.vendorAssigneeId === vendorId) return true;
+            if (r.assigneeId === sessionUserId) return true;
+            if (r.assigneeId) {
+              const assignee = userMap.get(r.assigneeId);
+              if (assignee?.vendorId === vendorId) return true;
+            }
+            return false;
+          });
+        } else {
+          requests = [];
         }
       } else {
         requests = [];
@@ -3001,15 +3030,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let requests: any[] = [];
 
       // Filter requests based on user's role hierarchy
+      // admin, internal_designer can see all requests
+      // vendor, vendor_designer see jobs assigned to their vendor organization
+      // client can only see their own requests
       if (sessionUser.role === "client") {
         // Clients can only see their own requests
         requests = await storage.getBundleRequestsByUser(sessionUserId);
-      } else if (["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(sessionUser.role)) {
-        // Admin, Internal Designers, Vendors, Vendor Designers can see all requests
+      } else if (["admin", "internal_designer", "designer"].includes(sessionUser.role)) {
+        // Admin, Internal Designers can see all requests
         if (status) {
           requests = await storage.getBundleRequestsByStatus(status as string);
         } else {
           requests = await storage.getAllBundleRequests();
+        }
+      } else if (["vendor", "vendor_designer"].includes(sessionUser.role)) {
+        // Vendors and Vendor Designers see jobs assigned to their vendor organization
+        const vendorId = sessionUser.role === "vendor" ? sessionUser.id : sessionUser.vendorId;
+        if (vendorId) {
+          const allRequests = status 
+            ? await storage.getBundleRequestsByStatus(status as string)
+            : await storage.getAllBundleRequests();
+          
+          // Prefetch all users to avoid N+1 queries
+          const allUsers = await storage.getAllUsers();
+          const userMap = new Map(allUsers.map(u => [u.id, u]));
+          
+          // Filter to show jobs assigned to this vendor organization:
+          // 1. vendorAssigneeId matches the vendor
+          // 2. assigneeId is the current user
+          // 3. assigneeId is a vendor_designer belonging to this vendor
+          requests = allRequests.filter(r => {
+            if (r.vendorAssigneeId === vendorId) return true;
+            if (r.assigneeId === sessionUserId) return true;
+            if (r.assigneeId) {
+              const assignee = userMap.get(r.assigneeId);
+              if (assignee?.vendorId === vendorId) return true;
+            }
+            return false;
+          });
+        } else {
+          requests = [];
         }
       }
 
