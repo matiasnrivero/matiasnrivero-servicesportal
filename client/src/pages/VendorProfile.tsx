@@ -912,18 +912,20 @@ export default function VendorProfile() {
                           Primary
                         </Badge>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleEditMember(currentUser)}
-                        data-testid={`button-edit-member-${currentUser.id}`}
-                      >
-                        <Pencil className="h-4 w-4 mr-1" />
-                        Edit
-                      </Button>
-                      <div className="flex items-center gap-2">
-                        <Label className="text-sm text-dark-gray">Active</Label>
-                        <Switch checked={currentUser.isActive} disabled />
+                      <div className="flex items-center gap-4">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleEditMember(currentUser)}
+                          data-testid={`button-edit-member-${currentUser.id}`}
+                        >
+                          <Pencil className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm text-dark-gray">Active</Label>
+                          <Switch checked={currentUser.isActive} disabled />
+                        </div>
                       </div>
                     </div>
                   )}
@@ -962,15 +964,6 @@ export default function VendorProfile() {
                         <div className="flex items-center gap-4">
                           <Button
                             size="sm"
-                            variant="ghost"
-                            onClick={() => handleEditMember(member)}
-                            data-testid={`button-edit-member-${member.id}`}
-                          >
-                            <Pencil className="h-4 w-4 mr-1" />
-                            Edit
-                          </Button>
-                          <Button
-                            size="sm"
                             variant="outline"
                             onClick={() => impersonateMutation.mutate(member.id)}
                             disabled={!member.isActive || impersonateMutation.isPending}
@@ -978,6 +971,15 @@ export default function VendorProfile() {
                           >
                             <LogIn className="h-4 w-4 mr-1" />
                             Login as
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEditMember(member)}
+                            data-testid={`button-edit-member-${member.id}`}
+                          >
+                            <Pencil className="h-4 w-4 mr-1" />
+                            Edit
                           </Button>
                           <div className="flex items-center gap-2">
                             <Label

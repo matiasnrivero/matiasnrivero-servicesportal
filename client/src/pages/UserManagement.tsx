@@ -718,17 +718,6 @@ export default function UserManagement() {
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
-                      {canEditUser(user) && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleOpenEditDialog(user)}
-                          data-testid={`button-edit-user-${user.id}`}
-                        >
-                          <Pencil className="h-4 w-4 mr-1" />
-                          Edit
-                        </Button>
-                      )}
                       {canImpersonateUser(user) && (
                         <Button
                           size="sm"
@@ -739,6 +728,17 @@ export default function UserManagement() {
                         >
                           <LogIn className="h-4 w-4 mr-1" />
                           Login as
+                        </Button>
+                      )}
+                      {canEditUser(user) && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleOpenEditDialog(user)}
+                          data-testid={`button-edit-user-${user.id}`}
+                        >
+                          <Pencil className="h-4 w-4 mr-1" />
+                          Edit
                         </Button>
                       )}
                       {canToggleUserActive(user) && user.id !== currentUser?.id && (
