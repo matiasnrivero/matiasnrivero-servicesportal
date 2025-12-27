@@ -1,10 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -31,12 +34,18 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/components/ui/toggle-group";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, UserCog, XCircle, Package, Boxes, LayoutGrid, List, Trash2 } from "lucide-react";
+import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, XCircle, Package, Boxes, LayoutGrid, List, Trash2, CalendarIcon, Search, ChevronDown, X } from "lucide-react";
 import { BoardView } from "@/components/BoardView";
 import { calculateServicePrice } from "@/lib/pricing";
-import type { ServiceRequest, Service, User, BundleRequest, Bundle } from "@shared/schema";
+import type { ServiceRequest, Service, User, BundleRequest, Bundle, VendorProfile } from "@shared/schema";
 
 interface CurrentUser {
   userId: string;
@@ -44,9 +53,12 @@ interface CurrentUser {
   username: string;
 }
 
-// Check if user is a distributor/client (not designer)
 function isDistributor(role: string | undefined): boolean {
   return role === "client" || role === "distributor";
+}
+
+function isInternalRole(role: string | undefined): boolean {
+  return ["admin", "internal_designer", "vendor", "vendor_designer"].includes(role || "");
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
@@ -56,6 +68,145 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
   "change-request": { label: "Change Request", color: "bg-orange-100 text-orange-800 border-orange-200", icon: AlertCircle },
   "canceled": { label: "Canceled", color: "bg-gray-100 text-gray-800 border-gray-200", icon: XCircle },
 };
+
+interface MultiSelectClientFilterProps {
+  options: { id: string; name: string }[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+}
+
+function MultiSelectClientFilter({ options, selected, onChange }: MultiSelectClientFilterProps) {
+  const [open, setOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    if (!searchTerm) return options;
+    return options.filter(opt => opt.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [options, searchTerm]);
+
+  const allSelected = selected.length === options.length && options.length > 0;
+  const someSelected = selected.length > 0 && selected.length < options.length;
+
+  const handleSelectAll = () => {
+    if (allSelected) {
+      onChange([]);
+    } else {
+      onChange(options.map(o => o.id));
+    }
+  };
+
+  const handleToggle = (id: string) => {
+    if (selected.includes(id)) {
+      onChange(selected.filter(s => s !== id));
+    } else {
+      onChange([...selected, id]);
+    }
+  };
+
+  const handleRemove = (id: string) => {
+    onChange(selected.filter(s => s !== id));
+  };
+
+  const selectedNames = useMemo(() => {
+    return options.filter(o => selected.includes(o.id));
+  }, [options, selected]);
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-sm">Client Filter</Label>
+      <div ref={containerRef} className="relative">
+        <div
+          className="min-h-9 flex flex-wrap items-center gap-1 p-1.5 border rounded-md cursor-pointer bg-background"
+          onClick={() => setOpen(!open)}
+          data-testid="multiselect-client-trigger"
+        >
+          {selectedNames.length === 0 ? (
+            <span className="text-muted-foreground text-sm px-1">All Clients</span>
+          ) : (
+            <>
+              {selectedNames.slice(0, 3).map(item => (
+                <Badge
+                  key={item.id}
+                  variant="secondary"
+                  className="text-xs flex items-center gap-1"
+                  data-testid={`badge-client-${item.id}`}
+                >
+                  {item.name}
+                  <X
+                    className="w-3 h-3 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemove(item.id);
+                    }}
+                    data-testid={`remove-client-${item.id}`}
+                  />
+                </Badge>
+              ))}
+              {selectedNames.length > 3 && (
+                <Badge variant="secondary" className="text-xs">
+                  +{selectedNames.length - 3} more
+                </Badge>
+              )}
+            </>
+          )}
+          <ChevronDown className="w-4 h-4 ml-auto text-muted-foreground" />
+        </div>
+
+        {open && (
+          <div className="absolute z-50 mt-1 w-full bg-popover border rounded-md shadow-md">
+            <div className="p-2 border-b">
+              <Input
+                placeholder="Filter..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-8"
+                data-testid="input-client-filter-search"
+              />
+            </div>
+            <div className="max-h-60 overflow-y-auto p-2">
+              <div
+                className="flex items-center gap-2 p-2 hover-elevate rounded cursor-pointer"
+                onClick={handleSelectAll}
+                data-testid="checkbox-select-all-clients"
+              >
+                <Checkbox
+                  checked={allSelected}
+                  className={someSelected ? "data-[state=checked]:bg-primary data-[state=checked]:border-primary" : ""}
+                />
+                <span className="text-sm font-medium">Select All</span>
+              </div>
+              {filteredOptions.map(option => (
+                <div
+                  key={option.id}
+                  className="flex items-center gap-2 p-2 hover-elevate rounded cursor-pointer"
+                  onClick={() => handleToggle(option.id)}
+                  data-testid={`checkbox-client-${option.id}`}
+                >
+                  <Checkbox checked={selected.includes(option.id)} />
+                  <span className="text-sm">{option.name}</span>
+                </div>
+              ))}
+              {filteredOptions.length === 0 && (
+                <p className="text-sm text-muted-foreground p-2">No clients found</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function ServiceRequestsList() {
   const { toast } = useToast();
@@ -69,11 +220,18 @@ export default function ServiceRequestsList() {
     return (saved as "list" | "board") || "list";
   });
 
+  const [vendorFilter, setVendorFilter] = useState<string>("all");
+  const [serviceFilter, setServiceFilter] = useState<string>("all");
+  const [serviceMethodFilter, setServiceMethodFilter] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [selectedClients, setSelectedClients] = useState<string[]>([]);
+  const [searchJobId, setSearchJobId] = useState("");
+
   useEffect(() => {
     localStorage.setItem("serviceRequestsViewMode", viewMode);
   }, [viewMode]);
   
-  // Sync tab state with URL
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tabFromUrl = urlParams.get("tab");
@@ -113,13 +271,47 @@ export default function ServiceRequestsList() {
     queryKey: ["/api/users"],
   });
 
+  const { data: vendorProfiles = [] } = useQuery<VendorProfile[]>({
+    queryKey: ["/api/vendor-profiles"],
+  });
+
+  const isAdmin = currentUser?.role === "admin";
+
+  const userMap = useMemo(() => {
+    const map: Record<string, User> = {};
+    users.forEach(u => { map[u.id] = u; });
+    return map;
+  }, [users]);
+
+  const vendorProfileMap = useMemo(() => {
+    const map: Record<string, VendorProfile> = {};
+    vendorProfiles.forEach(vp => { map[vp.userId] = vp; });
+    return map;
+  }, [vendorProfiles]);
+
+  const vendors = useMemo(() => {
+    return users.filter(u => u.role === "vendor" || u.role === "vendor_designer");
+  }, [users]);
+
+  const clientOptions = useMemo(() => {
+    const clientsSet = new Map<string, string>();
+    requests.forEach(r => {
+      const user = userMap[r.userId];
+      if (user) clientsSet.set(user.id, user.username);
+    });
+    bundleRequests.forEach(r => {
+      const user = userMap[r.userId];
+      if (user) clientsSet.set(user.id, user.username);
+    });
+    return Array.from(clientsSet.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [requests, bundleRequests, userMap]);
+
   const switchRoleMutation = useMutation({
     mutationFn: async (role: string) => {
       return apiRequest("POST", "/api/switch-role", { role });
     },
     onSuccess: async () => {
       await refetchUser();
-      // Invalidate all relevant queries so they refetch with new session
       localQueryClient.invalidateQueries({ queryKey: ["/api/default-user"] });
       localQueryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
       toast({ 
@@ -145,6 +337,22 @@ export default function ServiceRequestsList() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to delete service request", variant: "destructive" });
+    },
+  });
+
+  const deleteBundleRequestMutation = useMutation({
+    mutationFn: async (requestId: string) => {
+      return apiRequest("DELETE", `/api/bundle-requests/${requestId}`);
+    },
+    onSuccess: () => {
+      localQueryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] });
+      toast({ 
+        title: "Job deleted", 
+        description: "The bundle request has been permanently deleted." 
+      });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete bundle request", variant: "destructive" });
     },
   });
 
@@ -195,26 +403,132 @@ export default function ServiceRequestsList() {
     return user?.username || "Unknown";
   };
 
-  const filteredRequests = requests.filter(r => {
-    if (statusFilter === "all") return true;
-    return r.status === statusFilter;
-  });
+  const getVendorIdFromAssignee = (assigneeId: string | null): string | null => {
+    if (!assigneeId) return null;
+    const user = userMap[assigneeId];
+    if (!user) return null;
+    if (user.role === "vendor") return user.id;
+    if (user.role === "vendor_designer") return user.vendorId || null;
+    return null;
+  };
 
-  const filteredBundleRequests = bundleRequests.filter(r => {
-    if (bundleStatusFilter === "all") return true;
-    return r.status === bundleStatusFilter;
-  });
+  const filteredRequests = useMemo(() => {
+    return requests.filter(r => {
+      if (statusFilter !== "all" && r.status !== statusFilter) return false;
 
-  const handleSwitchRole = () => {
-    const newRole = currentUser?.role === "designer" ? "client" : "designer";
-    switchRoleMutation.mutate(newRole);
+      if (vendorFilter !== "all") {
+        const assigneeVendorId = getVendorIdFromAssignee(r.assigneeId);
+        if (assigneeVendorId !== vendorFilter) return false;
+      }
+
+      if (serviceFilter !== "all") {
+        if (serviceFilter.startsWith("service:")) {
+          const serviceId = serviceFilter.replace("service:", "");
+          if (r.serviceId !== serviceId) return false;
+        } else if (serviceFilter.startsWith("bundle:")) {
+          return false;
+        }
+      }
+
+      if (serviceMethodFilter !== "all") {
+        if (serviceMethodFilter === "bundle") return false;
+      }
+
+      if (dateFrom) {
+        const createdAt = new Date(r.createdAt);
+        if (createdAt < dateFrom) return false;
+      }
+      if (dateTo) {
+        const endOfDay = new Date(dateTo);
+        endOfDay.setHours(23, 59, 59, 999);
+        const createdAt = new Date(r.createdAt);
+        if (createdAt > endOfDay) return false;
+      }
+
+      if (selectedClients.length > 0 && !selectedClients.includes(r.userId)) {
+        return false;
+      }
+
+      if (searchJobId) {
+        const jobNumber = `A-${r.id.slice(0, 5).toUpperCase()}`;
+        if (!jobNumber.toLowerCase().includes(searchJobId.toLowerCase()) && 
+            !r.id.toLowerCase().includes(searchJobId.toLowerCase())) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [requests, statusFilter, vendorFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId]);
+
+  const filteredBundleRequests = useMemo(() => {
+    return bundleRequests.filter(r => {
+      if (bundleStatusFilter !== "all" && r.status !== bundleStatusFilter) return false;
+
+      if (vendorFilter !== "all") {
+        const assigneeVendorId = getVendorIdFromAssignee(r.assigneeId);
+        if (assigneeVendorId !== vendorFilter) return false;
+      }
+
+      if (serviceFilter !== "all") {
+        if (serviceFilter.startsWith("bundle:")) {
+          const bundleId = serviceFilter.replace("bundle:", "");
+          if (r.bundleId !== bundleId) return false;
+        } else if (serviceFilter.startsWith("service:")) {
+          return false;
+        }
+      }
+
+      if (serviceMethodFilter !== "all") {
+        if (serviceMethodFilter === "ad_hoc") return false;
+      }
+
+      if (dateFrom) {
+        const createdAt = new Date(r.createdAt);
+        if (createdAt < dateFrom) return false;
+      }
+      if (dateTo) {
+        const endOfDay = new Date(dateTo);
+        endOfDay.setHours(23, 59, 59, 999);
+        const createdAt = new Date(r.createdAt);
+        if (createdAt > endOfDay) return false;
+      }
+
+      if (selectedClients.length > 0 && !selectedClients.includes(r.userId)) {
+        return false;
+      }
+
+      if (searchJobId) {
+        const jobNumber = `B-${r.id.slice(0, 5).toUpperCase()}`;
+        if (!jobNumber.toLowerCase().includes(searchJobId.toLowerCase()) && 
+            !r.id.toLowerCase().includes(searchJobId.toLowerCase())) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [bundleRequests, bundleStatusFilter, vendorFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId]);
+
+  const hasActiveFilters = vendorFilter !== "all" || serviceFilter !== "all" || serviceMethodFilter !== "all" || dateFrom || dateTo || selectedClients.length > 0 || searchJobId;
+
+  const clearAllFilters = () => {
+    setVendorFilter("all");
+    setServiceFilter("all");
+    setServiceMethodFilter("all");
+    setDateFrom(undefined);
+    setDateTo(undefined);
+    setSelectedClients([]);
+    setSearchJobId("");
+    setStatusFilter("all");
+    setBundleStatusFilter("all");
   };
 
   return (
     <main className="flex flex-col w-full min-h-screen bg-light-grey">
       <Header />
       <div className="flex-1 p-8">
-        <Card>
+        <Card className="mb-6">
           <CardHeader>
             <div className="flex items-center justify-between flex-wrap gap-4">
               <CardTitle className="font-title-semibold text-dark-blue-night text-2xl">
@@ -281,23 +595,183 @@ export default function ServiceRequestsList() {
               </div>
             </div>
           </CardHeader>
+        </Card>
+
+        <Card className="mb-6">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base">Filters</CardTitle>
+          </CardHeader>
           <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
+              {isAdmin && (
+                <div className="space-y-2">
+                  <Label className="text-sm">Vendor</Label>
+                  <Select value={vendorFilter} onValueChange={setVendorFilter}>
+                    <SelectTrigger data-testid="select-vendor-filter">
+                      <SelectValue placeholder="All Vendors" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Vendors</SelectItem>
+                      {vendors.filter(v => v.role === "vendor").map(vendor => {
+                        const vp = vendorProfileMap[vendor.id];
+                        return (
+                          <SelectItem key={vendor.id} value={vendor.id}>
+                            {vp?.companyName || vendor.username}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label className="text-sm">Service Type</Label>
+                <Select value={serviceFilter} onValueChange={setServiceFilter}>
+                  <SelectTrigger data-testid="select-service-filter">
+                    <SelectValue placeholder="All Services" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Services</SelectItem>
+                    {services.filter(s => s.isActive === 1 && !s.parentServiceId).length > 0 && (
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Ad-hoc Services</div>
+                    )}
+                    {services.filter(s => s.isActive === 1 && !s.parentServiceId).map(service => (
+                      <SelectItem key={`service-${service.id}`} value={`service:${service.id}`}>
+                        {service.title}
+                      </SelectItem>
+                    ))}
+                    {bundles.filter(b => b.isActive).length > 0 && (
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1 pt-1">Bundle Services</div>
+                    )}
+                    {bundles.filter(b => b.isActive).map(bundle => (
+                      <SelectItem key={`bundle-${bundle.id}`} value={`bundle:${bundle.id}`}>
+                        {bundle.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">Service Method</Label>
+                <Select value={serviceMethodFilter} onValueChange={setServiceMethodFilter}>
+                  <SelectTrigger data-testid="select-service-method-filter">
+                    <SelectValue placeholder="All Methods" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Methods</SelectItem>
+                    <SelectItem value="ad_hoc">Ad-hoc Service</SelectItem>
+                    <SelectItem value="bundle">Bundle Service</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">Date From</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                      data-testid="button-date-from"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateFrom ? format(dateFrom, "MMM d, yyyy") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateFrom}
+                      onSelect={setDateFrom}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">Date To</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                      data-testid="button-date-to"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateTo ? format(dateTo, "MMM d, yyyy") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateTo}
+                      onSelect={setDateTo}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {isInternalRole(currentUser?.role) && (
+                <MultiSelectClientFilter
+                  options={clientOptions}
+                  selected={selectedClients}
+                  onChange={setSelectedClients}
+                />
+              )}
+
+              <div className="space-y-2">
+                <Label className="text-sm">Search Job ID</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-gray" />
+                  <Input
+                    placeholder="Job ID..."
+                    value={searchJobId}
+                    onChange={(e) => setSearchJobId(e.target.value)}
+                    className="pl-9"
+                    data-testid="input-search-job-id"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {hasActiveFilters && (
+              <div className="mt-4 flex items-center gap-2">
+                <span className="text-sm text-dark-gray">Active filters:</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearAllFilters}
+                  data-testid="button-clear-filters"
+                >
+                  Clear all
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
             <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as "adhoc" | "bundle")}>
               <TabsList className="grid w-full grid-cols-2 mb-6">
                 <TabsTrigger value="adhoc" data-testid="tab-adhoc-requests" className="gap-2">
                   <Package className="h-4 w-4" />
-                  Ad-hoc Service Requests
+                  Ad-hoc Service Requests ({filteredRequests.length})
                 </TabsTrigger>
                 <TabsTrigger value="bundle" data-testid="tab-bundle-requests" className="gap-2">
                   <Boxes className="h-4 w-4" />
-                  Bundle Requests
+                  Bundle Requests ({filteredBundleRequests.length})
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="adhoc">
                 {viewMode === "board" ? (
                   <BoardView
-                    requests={requests}
+                    requests={filteredRequests}
                     type="adhoc"
                     services={services}
                     users={users}
@@ -413,7 +887,7 @@ export default function ServiceRequestsList() {
               <TabsContent value="bundle">
                 {viewMode === "board" ? (
                   <BoardView
-                    requests={bundleRequests}
+                    requests={filteredBundleRequests}
                     type="bundle"
                     bundles={bundles}
                     users={users}
@@ -491,16 +965,32 @@ export default function ServiceRequestsList() {
                               {format(new Date(request.createdAt), "MMM dd, yyyy")}
                             </TableCell>
                             <TableCell>
-                              <Link href={`/bundle-jobs/${request.id}`}>
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  data-testid={`button-view-bundle-${request.id}`}
-                                >
-                                  <Eye className="h-4 w-4 mr-1" />
-                                  View
-                                </Button>
-                              </Link>
+                              <div className="flex items-center gap-2">
+                                <Link href={`/bundle-jobs/${request.id}`}>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    data-testid={`button-view-bundle-${request.id}`}
+                                  >
+                                    <Eye className="h-4 w-4 mr-1" />
+                                    View
+                                  </Button>
+                                </Link>
+                                {currentUser?.role === "admin" && (
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost"
+                                    onClick={() => {
+                                      if (confirm(`Are you sure you want to delete job B-${request.id.slice(0, 5).toUpperCase()}?`)) {
+                                        deleteBundleRequestMutation.mutate(request.id);
+                                      }
+                                    }}
+                                    data-testid={`button-delete-bundle-${request.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -513,7 +1003,6 @@ export default function ServiceRequestsList() {
           </CardContent>
         </Card>
       </div>
-
     </main>
   );
 }
