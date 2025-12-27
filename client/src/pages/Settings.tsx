@@ -584,29 +584,26 @@ function LineItemsTabContent() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[60px]"></TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead className="text-right">Price</TableHead>
-                <TableHead className="text-center">Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {lineItems.map((item) => (
                 <TableRow key={item.id} data-testid={`row-line-item-${item.id}`}>
+                  <TableCell>
+                    <Switch
+                      checked={item.isActive}
+                      onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: item.id, isActive: checked })}
+                      data-testid={`switch-active-${item.id}`}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{item.name}</TableCell>
                   <TableCell className="text-muted-foreground max-w-xs truncate">{item.description || "-"}</TableCell>
                   <TableCell className="text-right">${parseFloat(item.price).toFixed(2)}</TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <Switch
-                        checked={item.isActive}
-                        onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: item.id, isActive: checked })}
-                        data-testid={`switch-active-${item.id}`}
-                      />
-                      <Badge variant={item.isActive ? "default" : "secondary"}>{item.isActive ? "Active" : "Inactive"}</Badge>
-                    </div>
-                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <Button size="icon" variant="ghost" onClick={() => openEditDialog(item)} data-testid={`button-edit-${item.id}`}>
@@ -697,8 +694,8 @@ function BundlesTabContent() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[60px]"></TableHead>
                 <TableHead>Bundle Name</TableHead>
-                <TableHead className="text-center">Status</TableHead>
                 <TableHead className="text-right">Full Price</TableHead>
                 <TableHead className="text-right">Bundle Price</TableHead>
                 <TableHead className="text-right">Edit</TableHead>
@@ -786,19 +783,14 @@ function BundleTableRow({
 
   return (
     <TableRow data-testid={`row-bundle-${bundle.id}`}>
-      <TableCell className="font-medium">{bundle.name}</TableCell>
-      <TableCell className="text-center">
-        <div className="flex items-center justify-center gap-2">
-          <Switch
-            checked={bundle.isActive}
-            onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: bundle.id, isActive: checked })}
-            data-testid={`switch-bundle-active-${bundle.id}`}
-          />
-          <Badge variant={bundle.isActive ? "default" : "secondary"}>
-            {bundle.isActive ? "Active" : "Inactive"}
-          </Badge>
-        </div>
+      <TableCell>
+        <Switch
+          checked={bundle.isActive}
+          onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: bundle.id, isActive: checked })}
+          data-testid={`switch-bundle-active-${bundle.id}`}
+        />
       </TableCell>
+      <TableCell className="font-medium">{bundle.name}</TableCell>
       <TableCell className="text-right">${fullPrice.toFixed(2)}</TableCell>
       <TableCell className="text-right">${bundlePrice.toFixed(2)}</TableCell>
       <TableCell className="text-right">
@@ -883,8 +875,8 @@ function PacksTabContent() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[60px]"></TableHead>
                 <TableHead>Pack Name</TableHead>
-                <TableHead className="text-center">Status</TableHead>
                 <TableHead className="text-right">Full Price</TableHead>
                 <TableHead className="text-right">Pack Price</TableHead>
                 <TableHead className="text-right">Savings</TableHead>
@@ -965,19 +957,14 @@ function PackTableRow({
 
   return (
     <TableRow data-testid={`row-pack-${pack.id}`}>
-      <TableCell className="font-medium">{pack.name}</TableCell>
-      <TableCell className="text-center">
-        <div className="flex items-center justify-center gap-2">
-          <Switch
-            checked={pack.isActive}
-            onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: pack.id, isActive: checked })}
-            data-testid={`switch-pack-active-${pack.id}`}
-          />
-          <Badge variant={pack.isActive ? "default" : "secondary"}>
-            {pack.isActive ? "Active" : "Inactive"}
-          </Badge>
-        </div>
+      <TableCell>
+        <Switch
+          checked={pack.isActive}
+          onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: pack.id, isActive: checked })}
+          data-testid={`switch-pack-active-${pack.id}`}
+        />
       </TableCell>
+      <TableCell className="font-medium">{pack.name}</TableCell>
       <TableCell className="text-right">${fullPrice.toFixed(2)}</TableCell>
       <TableCell className="text-right">${packPrice.toFixed(2)}</TableCell>
       <TableCell className="text-right text-emerald-600 dark:text-emerald-400 font-medium">
@@ -3187,12 +3174,12 @@ function ServiceManagementTabContent({ onNavigateToServiceFields }: ServiceManag
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[60px]"></TableHead>
                 <TableHead>Service Name</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Pricing Structure</TableHead>
                 <TableHead className="text-center">Order</TableHead>
-                <TableHead className="text-center">Status</TableHead>
                 <TableHead className="text-center">Fields</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -3200,6 +3187,13 @@ function ServiceManagementTabContent({ onNavigateToServiceFields }: ServiceManag
             <TableBody>
               {[...allServices].sort((a, b) => (a.displayOrder || 999) - (b.displayOrder || 999)).map((service) => (
                 <TableRow key={service.id} data-testid={`row-service-${service.id}`}>
+                  <TableCell>
+                    <Switch
+                      checked={service.isActive === 1}
+                      onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: service.id, isActive: checked ? 1 : 0 })}
+                      data-testid={`switch-service-active-${service.id}`}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">
                     {service.title}
                     {service.parentServiceId && (
@@ -3221,18 +3215,6 @@ function ServiceManagementTabContent({ onNavigateToServiceFields }: ServiceManag
                   </TableCell>
                   <TableCell className="text-center">
                     {service.displayOrder || 999}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <Switch
-                        checked={service.isActive === 1}
-                        onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: service.id, isActive: checked ? 1 : 0 })}
-                        data-testid={`switch-service-active-${service.id}`}
-                      />
-                      <Badge variant={service.isActive === 1 ? "default" : "secondary"}>
-                        {service.isActive === 1 ? "Active" : "Inactive"}
-                      </Badge>
-                    </div>
                   </TableCell>
                   <TableCell className="text-center">
                     <Button
