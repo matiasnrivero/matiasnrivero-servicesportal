@@ -23,6 +23,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -724,6 +734,7 @@ function BundleTableRow({
   onEdit: () => void;
 }) {
   const { toast } = useToast();
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const { data: bundleItems = [] } = useQuery<BundleItem[]>({
     queryKey: ["/api/bundles", bundle.id, "items"],
     queryFn: async () => {
@@ -798,17 +809,35 @@ function BundleTableRow({
           <Button 
             size="icon" 
             variant="ghost" 
-            onClick={() => {
-              if (confirm("Are you sure you want to delete this bundle?")) {
-                deleteMutation.mutate(bundle.id);
-              }
-            }} 
+            onClick={() => setDeleteModalOpen(true)} 
             data-testid={`button-delete-bundle-${bundle.id}`}
           >
             <Trash2 className="h-4 w-4 text-destructive" />
           </Button>
         </div>
       </TableCell>
+
+      <AlertDialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Bundle</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{bundle.name}"? This action cannot be undone and will permanently remove this bundle and all associated items.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-bundle">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteMutation.mutate(bundle.id)}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete-bundle"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TableRow>
   );
 }
@@ -2751,6 +2780,8 @@ function ServiceManagementTabContent({ onNavigateToServiceFields }: ServiceManag
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [pricingTiers, setPricingTiers] = useState<{ label: string; price: string }[]>([]);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
 
   const { data: allServices = [], isLoading } = useQuery<Service[]>({
     queryKey: ["/api/services", { excludeSons: false }],
@@ -3228,9 +3259,8 @@ function ServiceManagementTabContent({ onNavigateToServiceFields }: ServiceManag
                         size="icon"
                         variant="ghost"
                         onClick={() => {
-                          if (confirm("Are you sure you want to delete this service? This will also delete all associated field assignments.")) {
-                            deleteServiceMutation.mutate(service.id);
-                          }
+                          setServiceToDelete(service);
+                          setDeleteModalOpen(true);
                         }}
                         data-testid={`button-delete-service-${service.id}`}
                       >
@@ -3433,6 +3463,38 @@ function ServiceManagementTabContent({ onNavigateToServiceFields }: ServiceManag
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Service Confirmation Modal */}
+      <AlertDialog open={deleteModalOpen} onOpenChange={(open) => {
+        setDeleteModalOpen(open);
+        if (!open) setServiceToDelete(null);
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Service</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{serviceToDelete?.title}"? This action cannot be undone and will also delete all associated field assignments.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-service">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (serviceToDelete) {
+                  deleteServiceMutation.mutate(serviceToDelete.id);
+                  setDeleteModalOpen(false);
+                  setServiceToDelete(null);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={deleteServiceMutation.isPending}
+              data-testid="button-confirm-delete-service"
+            >
+              {deleteServiceMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
