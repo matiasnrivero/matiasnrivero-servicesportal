@@ -897,7 +897,7 @@ export default function VendorProfile() {
                       data-testid={`row-team-member-${currentUser.id}`}
                     >
                       <div className="flex items-center gap-4">
-                        <Switch checked={currentUser.isActive} disabled />
+                        <Switch checked={true} disabled />
                         <div>
                           <p className="font-semibold text-dark-blue-night">
                             {currentUser.username}
