@@ -181,7 +181,6 @@ The ACL system is extensible to support different group types for fine-grained a
 - Retail Price: Calculated using service pricing tiers and form data (complexity, quantity)
 - Vendor Cost: Uses vendor-specific pricingAgreements from vendorProfiles table
 - Exception Rules:
-  - Admin-created jobs: $0 retail revenue (internal/comped jobs)
   - Internal Designer assignments: $0 vendor cost (no external vendor involved)
   - Vendor Designer assignments: Costs attributed to parent vendor via vendorId field
 
