@@ -728,6 +728,7 @@ export default function VendorDetail() {
                         data-testid={`row-team-member-${vendorUser.id}`}
                       >
                         <div className="flex items-center gap-4">
+                          <Switch checked={vendorUser.isActive} disabled />
                           <div>
                             <p className="font-semibold text-dark-blue-night">
                               {vendorUser.username}
@@ -743,10 +744,6 @@ export default function VendorDetail() {
                             Primary
                           </Badge>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm text-dark-gray">Active</Label>
-                          <Switch checked={vendorUser.isActive} disabled />
-                        </div>
                       </div>
                     )}
                     {teamMembers.filter(m => m.id !== vendorUser?.id).length === 0 && !vendorUser ? (
@@ -761,6 +758,17 @@ export default function VendorDetail() {
                           data-testid={`row-team-member-${member.id}`}
                         >
                           <div className="flex items-center gap-4">
+                            <Switch
+                              id={`toggle-team-${member.id}`}
+                              checked={member.isActive}
+                              onCheckedChange={(checked) =>
+                                toggleUserActiveMutation.mutate({
+                                  userId: member.id,
+                                  isActive: checked,
+                                })
+                              }
+                              data-testid={`switch-team-active-${member.id}`}
+                            />
                             <div>
                               <p className="font-semibold text-dark-blue-night">
                                 {member.username}
@@ -780,25 +788,6 @@ export default function VendorDetail() {
                                 Inactive
                               </Badge>
                             )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Label
-                              htmlFor={`toggle-team-${member.id}`}
-                              className="text-sm text-dark-gray"
-                            >
-                              Active
-                            </Label>
-                            <Switch
-                              id={`toggle-team-${member.id}`}
-                              checked={member.isActive}
-                              onCheckedChange={(checked) =>
-                                toggleUserActiveMutation.mutate({
-                                  userId: member.id,
-                                  isActive: checked,
-                                })
-                              }
-                              data-testid={`switch-team-active-${member.id}`}
-                            />
                           </div>
                         </div>
                       ))
