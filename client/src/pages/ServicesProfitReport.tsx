@@ -624,7 +624,7 @@ export default function ServicesProfitReport() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-dark-blue-night" data-testid="text-report-title">
-              Services Profit Report ({filteredData.length} jobs)
+              Services Profit Report <span className="text-sky-blue-accent">({filteredData.length})</span>
             </h1>
             <p className="text-dark-gray text-sm mt-1">
               Analyze retail prices, vendor costs, and profit margins
