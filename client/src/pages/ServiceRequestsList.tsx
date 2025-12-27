@@ -649,7 +649,7 @@ export default function ServiceRequestsList() {
                 </Button>
               )}
             </div>
-            <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+            <CollapsibleContent className="data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
               <CardContent className="pt-0 pb-6">
                 {(() => {
                   // Calculate visible filter count based on role
