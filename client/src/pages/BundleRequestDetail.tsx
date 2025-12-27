@@ -118,6 +118,11 @@ export default function BundleRequestDetail() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
+  // Get the "from" query parameter to determine back navigation
+  const urlParams = new URLSearchParams(window.location.search);
+  const fromPage = urlParams.get("from");
+  const backUrl = fromPage === "profit-report" ? "/reports/services-profit" : "/service-requests";
+
   const [selectedAssignee, setSelectedAssignee] = useState<string>("");
   const [deliverableUrls, setDeliverableUrls] = useState<{ url: string; name: string }[]>([]);
   const [finalStoreUrl, setFinalStoreUrl] = useState<string>("");
@@ -227,8 +232,8 @@ export default function BundleRequestDetail() {
                 <p className="text-destructive mb-4">
                   {error?.message || "Request not found"}
                 </p>
-                <Link href="/service-requests">
-                  <Button data-testid="button-back">Back to Requests</Button>
+                <Link href={backUrl}>
+                  <Button data-testid="button-back">Back</Button>
                 </Link>
               </div>
             </CardContent>
@@ -305,7 +310,7 @@ export default function BundleRequestDetail() {
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4 flex-wrap">
-            <Link href="/service-requests">
+            <Link href={backUrl}>
               <Button variant="outline" data-testid="button-back">
                 <ArrowLeft className="h-4 w-4 mr-1" />
                 Back

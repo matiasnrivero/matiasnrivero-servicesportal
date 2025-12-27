@@ -888,7 +888,7 @@ export default function ServicesProfitReport() {
                   {filteredData.map((row) => (
                     <TableRow key={`${row.serviceMethod}-${row.requestId}`} data-testid={`row-job-${row.requestId}`}>
                       <TableCell>
-                        <Link href={row.serviceMethod === "bundle" ? `/bundle-jobs/${row.requestId}` : `/jobs/${row.requestId}`}>
+                        <Link href={row.serviceMethod === "bundle" ? `/bundle-jobs/${row.requestId}?from=profit-report` : `/jobs/${row.requestId}?from=profit-report`}>
                           <Button variant="link" className="p-0 h-auto text-sky-blue-accent" data-testid={`link-job-${row.requestId}`}>
                             {row.jobNumber}
                           </Button>

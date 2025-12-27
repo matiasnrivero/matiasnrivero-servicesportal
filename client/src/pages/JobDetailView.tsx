@@ -67,6 +67,11 @@ export default function JobDetailView() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Get the "from" query parameter to determine back navigation
+  const urlParams = new URLSearchParams(window.location.search);
+  const fromPage = urlParams.get("from");
+  const backUrl = fromPage === "profit-report" ? "/reports/services-profit" : "/service-requests";
+
   const [changeNote, setChangeNote] = useState("");
   const [commentText, setCommentText] = useState("");
   const [commentTab, setCommentTab] = useState<"public" | "internal">("public");
@@ -394,8 +399,8 @@ export default function JobDetailView() {
       <div className="min-h-screen bg-off-white-cream flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-dark-blue-night mb-2">Job not found</h2>
-          <Link href="/service-requests">
-            <Button variant="outline">Back to Requests</Button>
+          <Link href={backUrl}>
+            <Button variant="outline">Back</Button>
           </Link>
         </div>
       </div>
@@ -695,7 +700,7 @@ export default function JobDetailView() {
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4 flex-wrap">
-            <Link href="/service-requests">
+            <Link href={backUrl}>
               <Button variant="outline" data-testid="button-back">
                 <ArrowLeft className="h-4 w-4 mr-1" />
                 Back
