@@ -1324,8 +1324,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // For other roles, switch to the dedicated demo user
       if (!user) {
-        // For vendor role, use Pixel's Hive vendor (Javier Rubiantes) for testing
-        const username = role === "vendor" ? "Javier Rubiantes" : `${role}-user`;
+        // For vendor role, use Pixel's Hive vendor (Javier Rubianes) for testing
+        const username = role === "vendor" ? "Javier Rubianes" : `${role}-user`;
         user = await storage.getUserByUsername(username);
         
         if (!user) {
