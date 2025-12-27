@@ -50,6 +50,7 @@ import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, XCircle, LayoutGrid, 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { BoardView } from "@/components/BoardView";
 import { calculateServicePrice } from "@/lib/pricing";
+import { getDisplayStatus, getStatusInfo, statusConfig as roleAwareStatusConfig } from "@/lib/statusUtils";
 import type { ServiceRequest, Service, User, BundleRequest, Bundle, VendorProfile } from "@shared/schema";
 
 interface CurrentUser {
@@ -66,14 +67,6 @@ function isInternalRole(role: string | undefined): boolean {
   return ["admin", "internal_designer", "vendor", "vendor_designer"].includes(role || "");
 }
 
-const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
-  "pending": { label: "Pending", color: "bg-yellow-100 text-yellow-800 border-yellow-200", icon: Clock },
-  "in-progress": { label: "In Progress", color: "bg-blue-100 text-blue-800 border-blue-200", icon: RefreshCw },
-  "delivered": { label: "Delivered", color: "bg-green-100 text-green-800 border-green-200", icon: CheckCircle2 },
-  "change-request": { label: "Change Request", color: "bg-orange-100 text-orange-800 border-orange-200", icon: AlertCircle },
-  "canceled": { label: "Canceled", color: "bg-gray-100 text-gray-800 border-gray-200", icon: XCircle },
-};
-
 interface CombinedRequest {
   id: string;
   type: "adhoc" | "bundle";
@@ -82,6 +75,7 @@ interface CombinedRequest {
   customerName: string;
   dueDate: Date | null;
   assigneeId: string | null;
+  vendorAssigneeId: string | null;
   status: string;
   createdAt: Date;
   userId: string;
@@ -557,6 +551,7 @@ export default function ServiceRequestsList() {
       customerName: r.customerName || "N/A",
       dueDate: r.dueDate,
       assigneeId: r.assigneeId,
+      vendorAssigneeId: r.vendorAssigneeId ?? null,
       status: r.status,
       createdAt: r.createdAt,
       userId: r.userId,
@@ -572,6 +567,7 @@ export default function ServiceRequestsList() {
       customerName: getBundleCustomerName(r),
       dueDate: r.dueDate,
       assigneeId: r.assigneeId,
+      vendorAssigneeId: r.vendorAssigneeId ?? null,
       status: r.status,
       createdAt: r.createdAt,
       userId: r.userId,
@@ -902,7 +898,14 @@ export default function ServiceRequestsList() {
                 </TableHeader>
                 <TableBody>
                   {combinedFilteredRequests.map((request) => {
-                    const StatusIcon = statusConfig[request.status]?.icon || Clock;
+                    const displayStatus = getDisplayStatus(
+                      request.status,
+                      request.assigneeId,
+                      request.vendorAssigneeId,
+                      currentUser?.role
+                    );
+                    const statusInfo = getStatusInfo(displayStatus);
+                    const StatusIcon = statusInfo.icon;
                     const jobPrefix = request.type === "adhoc" ? "A" : "B";
                     const detailLink = request.type === "adhoc" 
                       ? `/jobs/${request.id}` 
@@ -944,11 +947,11 @@ export default function ServiceRequestsList() {
                         )}
                         <TableCell>
                           <Badge 
-                            className={`${statusConfig[request.status]?.color || "bg-gray-100 text-gray-800"} whitespace-nowrap`}
+                            className={`${statusInfo.color} whitespace-nowrap`}
                             data-testid={`badge-status-${request.id}`}
                           >
                             <StatusIcon className="h-3 w-3 mr-1" />
-                            {statusConfig[request.status]?.label || request.status}
+                            {statusInfo.label}
                           </Badge>
                         </TableCell>
                         <TableCell data-testid={`text-created-${request.id}`}>
