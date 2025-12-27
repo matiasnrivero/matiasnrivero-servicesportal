@@ -898,7 +898,7 @@ export default function ServiceRequestsList() {
                     
                     return (
                       <TableRow key={`${request.type}-${request.id}`} data-testid={`row-request-${request.id}`}>
-                        <TableCell className="font-medium">
+                        <TableCell className="font-medium whitespace-nowrap">
                           <Link href={detailLink}>
                             <span className="text-sky-blue-accent hover:underline cursor-pointer" data-testid={`link-job-id-${request.id}`}>
                               {jobPrefix}-{request.id.slice(0, 5).toUpperCase()}
