@@ -430,7 +430,9 @@ export default function ServicesProfitReport() {
       const createdBy = userMap[request.userId];
       
       let retailPrice = 0;
-      if (request.finalPrice) {
+      if (createdBy?.role === "admin") {
+        retailPrice = 0;
+      } else if (request.finalPrice) {
         retailPrice = parseFloat(String(request.finalPrice));
       } else if (service) {
         const formData = request.formData as Record<string, unknown> | null;
@@ -493,7 +495,9 @@ export default function ServicesProfitReport() {
       const createdBy = userMap[bundleRequest.userId];
       
       let retailPrice = 0;
-      if (bundle?.finalPrice) {
+      if (createdBy?.role === "admin") {
+        retailPrice = 0;
+      } else if (bundle?.finalPrice) {
         retailPrice = parseFloat(String(bundle.finalPrice));
       }
       
