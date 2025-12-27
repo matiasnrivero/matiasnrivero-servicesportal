@@ -912,6 +912,15 @@ export default function VendorProfile() {
                           Primary
                         </Badge>
                       </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEditMember(currentUser)}
+                        data-testid={`button-edit-member-${currentUser.id}`}
+                      >
+                        <Pencil className="h-4 w-4 mr-1" />
+                        Edit
+                      </Button>
                       <div className="flex items-center gap-2">
                         <Label className="text-sm text-dark-gray">Active</Label>
                         <Switch checked={currentUser.isActive} disabled />

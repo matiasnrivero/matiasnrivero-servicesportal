@@ -24,7 +24,7 @@ import { ImagePreviewTooltip } from "@/components/ImagePreviewTooltip";
 import { ArrowLeft, Package, Loader2, User, Calendar, CheckCircle, Clock, AlertCircle, Download, Users, RefreshCw, XCircle, CheckCircle2, DollarSign, Building2 } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import type { Bundle, BundleRequest, User as UserType, Service, InputField } from "@shared/schema";
+import type { Bundle, BundleRequest, User as UserType, Service, InputField, VendorProfile } from "@shared/schema";
 
 interface EnrichedField {
   id: string;
@@ -148,8 +148,18 @@ export default function BundleRequestDetail() {
     queryKey: ["/api/users"],
   });
 
+  const { data: vendorProfiles = [] } = useQuery<VendorProfile[]>({
+    queryKey: ["/api/vendor-profiles"],
+  });
+
   const canAssignToVendor = ["admin", "internal_designer"].includes(currentUser?.role || "");
   const vendors = allUsers.filter(u => u.role === "vendor" && u.isActive);
+  
+  // Helper to get vendor company name from profile
+  const getVendorDisplayName = (vendorUser: UserType) => {
+    const profile = vendorProfiles.find(p => p.userId === vendorUser.id);
+    return profile?.companyName || vendorUser.username;
+  };
 
   const assignMutation = useMutation({
     mutationFn: async (assigneeId: string) => {
@@ -822,7 +832,7 @@ export default function BundleRequestDetail() {
                       </div>
                       {request.vendorAssigneeId && (
                         <div className="text-xs text-muted-foreground pb-1">
-                          Currently assigned to: {vendors.find(v => v.id === request.vendorAssigneeId)?.username || "Unknown Vendor"}
+                          Currently assigned to: {getVendorDisplayName(vendors.find(v => v.id === request.vendorAssigneeId) || { id: '', username: 'Unknown Vendor' } as UserType)}
                         </div>
                       )}
                       <Select 
@@ -840,7 +850,7 @@ export default function BundleRequestDetail() {
                               data-testid={`select-vendor-${vendor.id}`}
                             >
                               <span className="flex items-center gap-2">
-                                {vendor.username}
+                                {getVendorDisplayName(vendor)}
                                 {vendor.id === request.vendorAssigneeId && (
                                   <Badge variant="secondary" className="text-xs">Current</Badge>
                                 )}

@@ -717,27 +717,28 @@ export default function UserManagement() {
                         {user.lastLoginAt ? format(new Date(user.lastLoginAt), "MMM d, yyyy") : "Never"}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {canImpersonateUser(user) && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => impersonateMutation.mutate(user.id)}
-                          disabled={impersonateMutation.isPending}
-                          title="Login as this user"
-                          data-testid={`button-login-as-${user.id}`}
-                        >
-                          <LogIn className="h-4 w-4" />
-                        </Button>
-                      )}
+                    <div className="flex items-center gap-4">
                       {canEditUser(user) && (
                         <Button
+                          size="sm"
                           variant="ghost"
-                          size="icon"
                           onClick={() => handleOpenEditDialog(user)}
                           data-testid={`button-edit-user-${user.id}`}
                         >
-                          <Pencil className="h-4 w-4" />
+                          <Pencil className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                      )}
+                      {canImpersonateUser(user) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => impersonateMutation.mutate(user.id)}
+                          disabled={impersonateMutation.isPending}
+                          data-testid={`button-login-as-${user.id}`}
+                        >
+                          <LogIn className="h-4 w-4 mr-1" />
+                          Login as
                         </Button>
                       )}
                       {canToggleUserActive(user) && user.id !== currentUser?.id && (

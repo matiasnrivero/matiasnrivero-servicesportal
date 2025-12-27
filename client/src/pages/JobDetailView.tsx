@@ -37,7 +37,7 @@ import {
   DollarSign,
   Building2
 } from "lucide-react";
-import type { ServiceRequest, Service, User as UserType, ServiceAttachment, Comment } from "@shared/schema";
+import type { ServiceRequest, Service, User as UserType, ServiceAttachment, Comment, VendorProfile } from "@shared/schema";
 
 interface CurrentUser {
   userId: string;
@@ -148,6 +148,10 @@ export default function JobDetailView() {
     queryKey: ["/api/users"],
   });
 
+  const { data: vendorProfiles = [] } = useQuery<VendorProfile[]>({
+    queryKey: ["/api/vendor-profiles"],
+  });
+
   // Get users that the current user can assign to (role-based filtering)
   const { data: assignableUsers = [] } = useQuery<UserType[]>({
     queryKey: ["/api/assignable-users"],
@@ -157,6 +161,12 @@ export default function JobDetailView() {
   // Get vendors for vendor assignment (admin/internal_designer only)
   const canAssignToVendor = ["admin", "internal_designer"].includes(currentUser?.role || "");
   const vendors = allUsers.filter(u => u.role === "vendor" && u.isActive);
+  
+  // Helper to get vendor company name from profile
+  const getVendorDisplayName = (vendorUser: UserType) => {
+    const profile = vendorProfiles.find(p => p.userId === vendorUser.id);
+    return profile?.companyName || vendorUser.username;
+  };
 
   const requestAttachments = attachments.filter(a => a.kind === "request");
   const deliverableAttachments = attachments.filter(a => a.kind === "deliverable");
@@ -1947,7 +1957,7 @@ export default function JobDetailView() {
                       </div>
                       {request.vendorAssigneeId && (
                         <div className="text-xs text-muted-foreground pb-1">
-                          Currently assigned to: {vendors.find(v => v.id === request.vendorAssigneeId)?.username || "Unknown Vendor"}
+                          Currently assigned to: {getVendorDisplayName(vendors.find(v => v.id === request.vendorAssigneeId) || { id: '', username: 'Unknown Vendor' } as UserType)}
                         </div>
                       )}
                       <Select 
@@ -1965,7 +1975,7 @@ export default function JobDetailView() {
                               data-testid={`select-vendor-${vendor.id}`}
                             >
                               <span className="flex items-center gap-2">
-                                {vendor.username}
+                                {getVendorDisplayName(vendor)}
                                 {vendor.id === request.vendorAssigneeId && (
                                   <Badge variant="secondary" className="text-xs">Current</Badge>
                                 )}
