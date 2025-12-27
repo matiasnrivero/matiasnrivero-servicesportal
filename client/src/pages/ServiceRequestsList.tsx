@@ -420,7 +420,15 @@ export default function ServiceRequestsList() {
 
   const filteredRequests = useMemo(() => {
     return requests.filter(r => {
-      if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (statusFilter !== "all") {
+        // For pending sub-statuses, compare display status
+        if (statusFilter === "pending-assignment" || statusFilter === "assigned-to-vendor") {
+          const displayStatus = getDisplayStatus(r.status, r.assigneeId, r.vendorAssigneeId, currentUser?.role);
+          if (displayStatus !== statusFilter) return false;
+        } else if (r.status !== statusFilter) {
+          return false;
+        }
+      }
 
       if (vendorFilter !== "all") {
         const assigneeVendorId = getVendorIdFromAssignee(r.assigneeId);
@@ -465,11 +473,19 @@ export default function ServiceRequestsList() {
 
       return true;
     });
-  }, [requests, statusFilter, vendorFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId]);
+  }, [requests, statusFilter, vendorFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId, currentUser?.role]);
 
   const filteredBundleRequests = useMemo(() => {
     return bundleRequests.filter(r => {
-      if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (statusFilter !== "all") {
+        // For pending sub-statuses, compare display status
+        if (statusFilter === "pending-assignment" || statusFilter === "assigned-to-vendor") {
+          const displayStatus = getDisplayStatus(r.status, r.assigneeId, r.vendorAssigneeId, currentUser?.role);
+          if (displayStatus !== statusFilter) return false;
+        } else if (r.status !== statusFilter) {
+          return false;
+        }
+      }
 
       if (vendorFilter !== "all") {
         const assigneeVendorId = getVendorIdFromAssignee(r.assigneeId);
@@ -514,7 +530,7 @@ export default function ServiceRequestsList() {
 
       return true;
     });
-  }, [bundleRequests, statusFilter, vendorFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId]);
+  }, [bundleRequests, statusFilter, vendorFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId, currentUser?.role]);
 
   const hasActiveFilters = vendorFilter !== "all" || serviceFilter !== "all" || serviceMethodFilter !== "all" || dateFrom || dateTo || selectedClients.length > 0 || searchJobId;
 
@@ -621,7 +637,14 @@ export default function ServiceRequestsList() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
+                      {isInternalRole(currentUser?.role) ? (
+                        <>
+                          <SelectItem value="pending-assignment">Pending Assignment</SelectItem>
+                          <SelectItem value="assigned-to-vendor">Assigned to Vendor</SelectItem>
+                        </>
+                      ) : (
+                        <SelectItem value="pending">Pending</SelectItem>
+                      )}
                       <SelectItem value="in-progress">In Progress</SelectItem>
                       <SelectItem value="delivered">Delivered</SelectItem>
                       <SelectItem value="change-request">Change Request</SelectItem>
