@@ -18,6 +18,7 @@ import { FileUploader } from "@/components/FileUploader";
 import { ImagePreviewTooltip } from "@/components/ImagePreviewTooltip";
 import { apiRequest } from "@/lib/queryClient";
 import { calculateServicePrice } from "@/lib/pricing";
+import { getDisplayStatus, getStatusInfo } from "@/lib/statusUtils";
 import { 
   ArrowLeft, 
   Download, 
@@ -55,13 +56,6 @@ interface DeliveryVersion {
   deliverer: { id: string; username: string; role: string } | null;
 }
 
-const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
-  "pending": { label: "Pending", color: "bg-yellow-100 text-yellow-800 border-yellow-200", icon: Clock },
-  "in-progress": { label: "In Progress", color: "bg-blue-100 text-blue-800 border-blue-200", icon: RefreshCw },
-  "delivered": { label: "Delivered", color: "bg-green-100 text-green-800 border-green-200", icon: CheckCircle2 },
-  "change-request": { label: "Change Request", color: "bg-orange-100 text-orange-800 border-orange-200", icon: AlertCircle },
-  "canceled": { label: "Canceled", color: "bg-gray-100 text-gray-800 border-gray-200", icon: XCircle },
-};
 
 export default function JobDetailView() {
   const [, params] = useRoute("/jobs/:id");
@@ -456,8 +450,16 @@ export default function JobDetailView() {
     );
   }
 
-  const StatusIcon = statusConfig[request.status]?.icon || Clock;
   const assignedDesigner = getUserById(request.assigneeId);
+  const displayStatus = getDisplayStatus(
+    request.status,
+    request.assigneeId,
+    request.vendorAssigneeId,
+    currentUser?.role,
+    assignedDesigner?.role
+  );
+  const statusInfo = getStatusInfo(displayStatus);
+  const StatusIcon = statusInfo.icon;
   const showDeliverablesAtTop = request.status === "delivered" || request.status === "change-request";
 
   const renderCommentThread = (comment: Comment, isReply = false) => {
@@ -802,9 +804,9 @@ export default function JobDetailView() {
                 <Badge variant="outline" className="text-sm" data-testid="text-job-id">
                   A-{request.id.slice(0, 5).toUpperCase()}
                 </Badge>
-                <Badge className={`${statusConfig[request.status]?.color || ""}`} data-testid="text-job-status">
+                <Badge className={statusInfo.color} data-testid="text-job-status">
                   <StatusIcon className="h-3 w-3 mr-1" />
-                  {statusConfig[request.status]?.label || request.status}
+                  {statusInfo.label}
                 </Badge>
               </div>
               <p className="text-sm text-dark-gray mt-1" data-testid="text-created-date">

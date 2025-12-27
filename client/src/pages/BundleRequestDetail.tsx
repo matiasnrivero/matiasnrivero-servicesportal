@@ -22,6 +22,7 @@ import { Header } from "@/components/Header";
 import { FileUploader } from "@/components/FileUploader";
 import { ImagePreviewTooltip } from "@/components/ImagePreviewTooltip";
 import { ArrowLeft, Package, Loader2, User, Calendar, CheckCircle, Clock, AlertCircle, Download, Users, RefreshCw, XCircle, CheckCircle2, DollarSign, Building2 } from "lucide-react";
+import { getDisplayStatus, getStatusInfo } from "@/lib/statusUtils";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import type { Bundle, BundleRequest, User as UserType, Service, InputField, VendorProfile } from "@shared/schema";
@@ -104,13 +105,6 @@ async function getDefaultUser(): Promise<CurrentUser> {
   return response.json();
 }
 
-const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
-  "pending": { label: "Pending", color: "bg-yellow-100 text-yellow-800 border-yellow-200", icon: Clock },
-  "in-progress": { label: "In Progress", color: "bg-blue-100 text-blue-800 border-blue-200", icon: RefreshCw },
-  "delivered": { label: "Delivered", color: "bg-green-100 text-green-800 border-green-200", icon: CheckCircle2 },
-  "change-request": { label: "Change Request", color: "bg-orange-100 text-orange-800 border-orange-200", icon: AlertCircle },
-  "canceled": { label: "Canceled", color: "bg-gray-100 text-gray-800 border-gray-200", icon: XCircle },
-};
 
 export default function BundleRequestDetail() {
   const params = useParams<{ id: string }>();
@@ -369,17 +363,23 @@ export default function BundleRequestDetail() {
                 <Badge variant="outline" className="text-sm" data-testid="text-job-id">
                   B-{request.id.slice(0, 5).toUpperCase()}
                 </Badge>
-                <Badge className={`${statusConfig[request.status]?.color || ""}`} data-testid="badge-status">
-                  {(() => {
-                    const StatusIcon = statusConfig[request.status]?.icon || Clock;
-                    return (
-                      <>
-                        <StatusIcon className="h-3 w-3 mr-1" />
-                        {statusConfig[request.status]?.label || request.status}
-                      </>
-                    );
-                  })()}
-                </Badge>
+                {(() => {
+                  const displayStatus = getDisplayStatus(
+                    request.status,
+                    request.assigneeId,
+                    request.vendorAssigneeId,
+                    currentUser?.role,
+                    assignee?.role
+                  );
+                  const statusInfo = getStatusInfo(displayStatus);
+                  const StatusIcon = statusInfo.icon;
+                  return (
+                    <Badge className={statusInfo.color} data-testid="badge-status">
+                      <StatusIcon className="h-3 w-3 mr-1" />
+                      {statusInfo.label}
+                    </Badge>
+                  );
+                })()}
               </div>
               <p className="text-sm text-dark-gray mt-1" data-testid="text-created-date">
                 Created on {request.createdAt ? format(new Date(request.createdAt), "MMMM do, yyyy 'at' h:mm a") : "N/A"}
