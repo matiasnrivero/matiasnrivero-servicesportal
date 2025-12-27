@@ -418,12 +418,18 @@ export default function ServiceRequestsList() {
     return null;
   };
 
+  const getAssigneeRole = (assigneeId: string | null | undefined): string | null => {
+    if (!assigneeId) return null;
+    const user = userMap[assigneeId];
+    return user?.role || null;
+  };
+
   const filteredRequests = useMemo(() => {
     return requests.filter(r => {
       if (statusFilter !== "all") {
         // For pending sub-statuses, compare display status
         if (statusFilter === "pending-assignment" || statusFilter === "assigned-to-vendor") {
-          const displayStatus = getDisplayStatus(r.status, r.assigneeId, r.vendorAssigneeId, currentUser?.role);
+          const displayStatus = getDisplayStatus(r.status, r.assigneeId, r.vendorAssigneeId, currentUser?.role, getAssigneeRole(r.assigneeId));
           if (displayStatus !== statusFilter) return false;
         } else if (r.status !== statusFilter) {
           return false;
@@ -480,7 +486,7 @@ export default function ServiceRequestsList() {
       if (statusFilter !== "all") {
         // For pending sub-statuses, compare display status
         if (statusFilter === "pending-assignment" || statusFilter === "assigned-to-vendor") {
-          const displayStatus = getDisplayStatus(r.status, r.assigneeId, r.vendorAssigneeId, currentUser?.role);
+          const displayStatus = getDisplayStatus(r.status, r.assigneeId, r.vendorAssigneeId, currentUser?.role, getAssigneeRole(r.assigneeId));
           if (displayStatus !== statusFilter) return false;
         } else if (r.status !== statusFilter) {
           return false;
@@ -925,7 +931,8 @@ export default function ServiceRequestsList() {
                       request.status,
                       request.assigneeId,
                       request.vendorAssigneeId,
-                      currentUser?.role
+                      currentUser?.role,
+                      getAssigneeRole(request.assigneeId)
                     );
                     const statusInfo = getStatusInfo(displayStatus);
                     const StatusIcon = statusInfo.icon;

@@ -52,6 +52,13 @@ export function BoardView({
 
   // Get role-based columns
   const columnStatuses = getBoardColumns(currentUserRole || "client");
+
+  // Helper to get assignee role from users array
+  const getAssigneeRole = (assigneeId: string | null | undefined): string | null => {
+    if (!assigneeId) return null;
+    const user = users.find(u => u.id === assigneeId);
+    return user?.role || null;
+  };
   
   // Combine adhoc and bundle requests
   const combinedRequests: CombinedBoardRequest[] = [
@@ -59,7 +66,7 @@ export function BoardView({
       id: r.id,
       type: "adhoc" as RequestType,
       status: r.status,
-      displayStatus: getDisplayStatus(r.status, r.assigneeId, r.vendorAssigneeId, currentUserRole),
+      displayStatus: getDisplayStatus(r.status, r.assigneeId, r.vendorAssigneeId, currentUserRole, getAssigneeRole(r.assigneeId)),
       dueDate: r.dueDate,
       createdAt: r.createdAt,
       assigneeId: r.assigneeId,
@@ -70,7 +77,7 @@ export function BoardView({
       id: r.id,
       type: "bundle" as RequestType,
       status: r.status,
-      displayStatus: getDisplayStatus(r.status, r.assigneeId, r.vendorAssigneeId, currentUserRole),
+      displayStatus: getDisplayStatus(r.status, r.assigneeId, r.vendorAssigneeId, currentUserRole, getAssigneeRole(r.assigneeId)),
       dueDate: r.dueDate,
       createdAt: r.createdAt,
       assigneeId: r.assigneeId,

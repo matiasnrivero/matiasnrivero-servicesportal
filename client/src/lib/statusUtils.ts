@@ -61,7 +61,8 @@ export function getDisplayStatus(
   dbStatus: string,
   assigneeId: string | null | undefined,
   vendorAssigneeId: string | null | undefined,
-  viewerRole: string | undefined
+  viewerRole: string | undefined,
+  assigneeRole?: string | null
 ): DisplayStatus {
   if (dbStatus !== "pending") {
     return dbStatus as DisplayStatus;
@@ -71,15 +72,19 @@ export function getDisplayStatus(
     return "pending";
   }
 
+  // No assignment at all = pending assignment
   if (!assigneeId && !vendorAssigneeId) {
     return "pending-assignment";
   }
   
-  if (!assigneeId && vendorAssigneeId) {
+  // Vendor organization assigned (either via vendorAssigneeId or assigneeId points to a vendor)
+  if (vendorAssigneeId || assigneeRole === "vendor") {
     return "assigned-to-vendor";
   }
 
-  return "pending";
+  // Has an assignee but not a vendor (internal designer, vendor_designer, etc.) 
+  // This shouldn't happen for pending status but fallback to pending-assignment
+  return "pending-assignment";
 }
 
 export function getStatusInfo(displayStatus: DisplayStatus): StatusInfo {
