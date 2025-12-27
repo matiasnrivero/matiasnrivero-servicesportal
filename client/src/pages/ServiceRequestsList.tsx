@@ -819,6 +819,20 @@ export default function ServiceRequestsList() {
                     </div>
                   );
                 })()}
+
+                {hasActiveFilters && (
+                  <div className="mt-4 flex items-center gap-2">
+                    <span className="text-sm text-dark-gray">Active filters:</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearAllFilters}
+                      data-testid="button-clear-active-filters"
+                    >
+                      Clear all
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </CollapsibleContent>
           </Card>
