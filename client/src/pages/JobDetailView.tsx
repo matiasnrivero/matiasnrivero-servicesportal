@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { FileUploader } from "@/components/FileUploader";
 import { ImagePreviewTooltip } from "@/components/ImagePreviewTooltip";
@@ -79,6 +80,7 @@ export default function JobDetailView() {
   const [finalStoreUrl, setFinalStoreUrl] = useState<string>("");
   const [selectedDesignerId, setSelectedDesignerId] = useState<string>("");
   const [changeRequestModalOpen, setChangeRequestModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [mentionSearch, setMentionSearch] = useState("");
@@ -261,6 +263,20 @@ export default function JobDetailView() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to cancel request.", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("DELETE", `/api/service-requests/${requestId}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+      toast({ title: "Job deleted", description: "The service request has been permanently deleted." });
+      navigate("/service-requests");
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete job.", variant: "destructive" });
     },
   });
 
@@ -697,6 +713,28 @@ export default function JobDetailView() {
         </DialogContent>
       </Dialog>
 
+      <AlertDialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Job</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete job A-{request?.id?.slice(0, 5).toUpperCase()}? This action cannot be undone and will permanently remove this service request and all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteMutation.mutate()}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4 flex-wrap">
@@ -748,6 +786,18 @@ export default function JobDetailView() {
           </div>
 
           <div className="flex items-center gap-3">
+            {currentUser?.role === "admin" && (
+              <Button 
+                variant="outline" 
+                className="border-red-500 text-red-600 hover:bg-red-50"
+                onClick={() => setDeleteModalOpen(true)}
+                data-testid="button-delete-job"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete Job
+              </Button>
+            )}
+
             {request.status === "pending" && (
               <>
                 <Button 
