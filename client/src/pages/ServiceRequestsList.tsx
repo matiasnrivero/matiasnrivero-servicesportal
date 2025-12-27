@@ -909,7 +909,7 @@ export default function ServiceRequestsList() {
                           {request.serviceName}
                         </TableCell>
                         <TableCell data-testid={`text-method-${request.id}`}>
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-xs whitespace-nowrap">
                             {request.method}
                           </Badge>
                         </TableCell>
@@ -932,7 +932,7 @@ export default function ServiceRequestsList() {
                         )}
                         <TableCell>
                           <Badge 
-                            className={statusConfig[request.status]?.color || "bg-gray-100 text-gray-800"}
+                            className={`${statusConfig[request.status]?.color || "bg-gray-100 text-gray-800"} whitespace-nowrap`}
                             data-testid={`badge-status-${request.id}`}
                           >
                             <StatusIcon className="h-3 w-3 mr-1" />
