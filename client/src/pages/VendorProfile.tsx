@@ -897,6 +897,7 @@ export default function VendorProfile() {
                       data-testid={`row-team-member-${currentUser.id}`}
                     >
                       <div className="flex items-center gap-4">
+                        <Switch checked={currentUser.isActive} disabled />
                         <div>
                           <p className="font-semibold text-dark-blue-night">
                             {currentUser.username}
@@ -922,10 +923,6 @@ export default function VendorProfile() {
                           <Pencil className="h-4 w-4 mr-1" />
                           Edit
                         </Button>
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm text-dark-gray">Active</Label>
-                          <Switch checked={currentUser.isActive} disabled />
-                        </div>
                       </div>
                     </div>
                   )}
@@ -941,6 +938,17 @@ export default function VendorProfile() {
                         data-testid={`row-team-member-${member.id}`}
                       >
                         <div className="flex items-center gap-4">
+                          <Switch
+                            id={`toggle-team-${member.id}`}
+                            checked={member.isActive}
+                            onCheckedChange={(checked) =>
+                              toggleUserActiveMutation.mutate({
+                                userId: member.id,
+                                isActive: checked,
+                              })
+                            }
+                            data-testid={`switch-team-active-${member.id}`}
+                          />
                           <div>
                             <p className="font-semibold text-dark-blue-night">
                               {member.username}
@@ -981,25 +989,6 @@ export default function VendorProfile() {
                             <Pencil className="h-4 w-4 mr-1" />
                             Edit
                           </Button>
-                          <div className="flex items-center gap-2">
-                            <Label
-                              htmlFor={`toggle-team-${member.id}`}
-                              className="text-sm text-dark-gray"
-                            >
-                              Active
-                            </Label>
-                            <Switch
-                              id={`toggle-team-${member.id}`}
-                              checked={member.isActive}
-                              onCheckedChange={(checked) =>
-                                toggleUserActiveMutation.mutate({
-                                  userId: member.id,
-                                  isActive: checked,
-                                })
-                              }
-                              data-testid={`switch-team-active-${member.id}`}
-                            />
-                          </div>
                         </div>
                       </div>
                     ))

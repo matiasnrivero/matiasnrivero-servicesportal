@@ -693,6 +693,21 @@ export default function UserManagement() {
                     data-testid={`row-user-${user.id}`}
                   >
                     <div className="flex items-center gap-4">
+                      {canToggleUserActive(user) && user.id !== currentUser?.id ? (
+                        <Switch
+                          id={`toggle-${user.id}`}
+                          checked={user.isActive}
+                          onCheckedChange={(checked) =>
+                            toggleUserActiveMutation.mutate({
+                              userId: user.id,
+                              isActive: checked,
+                            })
+                          }
+                          data-testid={`switch-user-active-${user.id}`}
+                        />
+                      ) : (
+                        <div className="w-9" />
+                      )}
                       <div className="min-w-[180px]">
                         <p className="font-semibold text-dark-blue-night">
                           {user.username}
@@ -740,24 +755,6 @@ export default function UserManagement() {
                           <Pencil className="h-4 w-4 mr-1" />
                           Edit
                         </Button>
-                      )}
-                      {canToggleUserActive(user) && user.id !== currentUser?.id && (
-                        <div className="flex items-center gap-2">
-                          <Label htmlFor={`toggle-${user.id}`} className="text-sm text-dark-gray">
-                            Active
-                          </Label>
-                          <Switch
-                            id={`toggle-${user.id}`}
-                            checked={user.isActive}
-                            onCheckedChange={(checked) =>
-                              toggleUserActiveMutation.mutate({
-                                userId: user.id,
-                                isActive: checked,
-                              })
-                            }
-                            data-testid={`switch-user-active-${user.id}`}
-                          />
-                        </div>
                       )}
                     </div>
                   </div>
