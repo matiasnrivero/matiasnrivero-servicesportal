@@ -468,26 +468,49 @@ export default function JobDetailView() {
   const StatusIcon = statusInfo.icon;
   const showDeliverablesAtTop = request.status === "delivered" || request.status === "change-request";
 
+  const getRoleLabelForComment = (role: string | undefined) => {
+    switch (role) {
+      case "admin": return "Admin";
+      case "designer":
+      case "internal_designer": return "Internal Designer";
+      case "vendor": return "Vendor";
+      case "vendor_designer": return "Vendor Designer";
+      case "client":
+      case "distributor": return "Client";
+      default: return "User";
+    }
+  };
+
   const renderCommentThread = (comment: Comment, isReply = false) => {
     const author = getUserById(comment.authorId);
     const replies = getReplies(comment.id);
     const isChangeRequest = isChangeRequestComment(comment);
+    const roleLabel = getRoleLabelForComment(author?.role);
+    
+    const clientRoles = ["client", "distributor"];
+    const isCurrentUserClient = clientRoles.includes(currentUser?.role ?? "");
+    const isAuthorNonClient = !clientRoles.includes(author?.role ?? "");
+    const shouldHideUsername = isCurrentUserClient && isAuthorNonClient;
+    const displayName = shouldHideUsername ? roleLabel : (author?.username || "Unknown");
+    const avatarInitials = shouldHideUsername 
+      ? roleLabel.split(" ").map(w => w[0]).join("").slice(0, 2)
+      : (author?.username?.slice(0, 2).toUpperCase() || "NS");
     
     return (
       <div key={comment.id} className={`${isReply ? "ml-10 mt-3" : ""}`}>
         <div className="flex gap-3">
           <Avatar className="h-8 w-8 flex-shrink-0">
             <AvatarFallback className={`${comment.visibility === "internal" ? "bg-purple-500" : "bg-sky-blue-accent"} text-white text-xs`}>
-              {author?.username?.slice(0, 2).toUpperCase() || "NS"}
+              {avatarInitials}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-medium text-dark-blue-night">
-                {author?.username || "Unknown"}
+                {displayName}
               </span>
               <Badge variant="outline" className={`text-xs ${comment.visibility === "internal" ? "bg-purple-50" : ""}`}>
-                {author?.role === "designer" ? "Designer" : "Distributor"}
+                {roleLabel}
               </Badge>
               {isChangeRequest && (
                 <Badge className="bg-orange-100 text-orange-800 border-orange-200 text-xs">
