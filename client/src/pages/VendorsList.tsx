@@ -388,13 +388,11 @@ export default function VendorsList() {
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-destructive border-destructive/50"
+                                variant="ghost"
+                                size="icon"
                                 data-testid={`button-delete-vendor-${vendor.id}`}
                               >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
+                                <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
