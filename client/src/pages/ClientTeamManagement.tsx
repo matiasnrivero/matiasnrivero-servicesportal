@@ -203,8 +203,7 @@ export default function ClientTeamManagement() {
 
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const res = await apiRequest("DELETE", `/api/client-profiles/${clientProfileId}/team/${userId}`);
-      return res.json();
+      return apiRequest("DELETE", `/api/users/${userId}`);
     },
     onSuccess: () => {
       toast({
