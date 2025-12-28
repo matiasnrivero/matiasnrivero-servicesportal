@@ -4646,6 +4646,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== GLOBAL SEARCH ROUTES ====================
+
+  // Search for jobs by Job ID (A-XXXXX for ad-hoc, B-XXXXX for bundle)
+  app.get("/api/search/jobs", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      
+      const query = (req.query.q as string || "").trim().toUpperCase();
+      if (!query) {
+        return res.json({ results: [] });
+      }
+      
+      // Parse job ID format: A-XXXXX (ad-hoc) or B-XXXXX (bundle)
+      const match = query.match(/^([AB])-?([A-Z0-9]+)$/i);
+      if (!match) {
+        return res.json({ results: [] });
+      }
+      
+      const type = match[1].toUpperCase();
+      const idPrefix = match[2].toLowerCase();
+      
+      const results: Array<{
+        id: string;
+        jobId: string;
+        type: "adhoc" | "bundle";
+        title: string;
+      }> = [];
+      
+      if (type === "A") {
+        // Search ad-hoc service requests
+        const allRequests = await storage.getAllServiceRequests();
+        const filtered = allRequests.filter(r => 
+          r.id.toLowerCase().startsWith(idPrefix)
+        );
+        
+        // Apply role-based filtering
+        for (const request of filtered.slice(0, 10)) {
+          let canView = false;
+          
+          if (sessionUser.role === "admin" || sessionUser.role === "internal_designer") {
+            canView = true;
+          } else if (sessionUser.role === "vendor") {
+            canView = request.vendorAssigneeId === sessionUserId;
+          } else if (sessionUser.role === "vendor_designer") {
+            canView = request.assigneeId === sessionUserId;
+          } else if (sessionUser.role === "client") {
+            if (request.userId === sessionUserId) {
+              canView = true;
+            } else if (sessionUser.clientProfileId) {
+              const requestClient = await storage.getUser(request.userId);
+              canView = requestClient?.clientProfileId === sessionUser.clientProfileId;
+            }
+          }
+          
+          if (canView) {
+            const service = await storage.getService(request.serviceId);
+            results.push({
+              id: request.id,
+              jobId: `A-${request.id.slice(0, 5).toUpperCase()}`,
+              type: "adhoc",
+              title: service?.title || "Unknown Service"
+            });
+          }
+        }
+      } else if (type === "B") {
+        // Search bundle requests
+        const allBundles = await storage.getAllBundleRequests();
+        const filtered = allBundles.filter(r => 
+          r.id.toLowerCase().startsWith(idPrefix)
+        );
+        
+        // Apply role-based filtering
+        for (const bundle of filtered.slice(0, 10)) {
+          let canView = false;
+          
+          if (sessionUser.role === "admin" || sessionUser.role === "internal_designer") {
+            canView = true;
+          } else if (sessionUser.role === "vendor") {
+            canView = bundle.vendorAssigneeId === sessionUserId;
+          } else if (sessionUser.role === "vendor_designer") {
+            canView = bundle.assigneeId === sessionUserId;
+          } else if (sessionUser.role === "client") {
+            if (bundle.userId === sessionUserId) {
+              canView = true;
+            } else if (sessionUser.clientProfileId) {
+              const bundleClient = await storage.getUser(bundle.userId);
+              canView = bundleClient?.clientProfileId === sessionUser.clientProfileId;
+            }
+          }
+          
+          if (canView) {
+            // Get the bundle to get the name
+            const bundleInfo = await storage.getBundle(bundle.bundleId);
+            results.push({
+              id: bundle.id,
+              jobId: `B-${bundle.id.slice(0, 5).toUpperCase()}`,
+              type: "bundle",
+              title: bundleInfo?.name || "Untitled Bundle"
+            });
+          }
+        }
+      }
+      
+      res.json({ results });
+    } catch (error) {
+      console.error("Error searching jobs:", error);
+      res.status(500).json({ error: "Failed to search jobs" });
+    }
+  });
+
   // ==================== AUTOMATION LOGS ROUTES ====================
 
   // Get automation logs for a service request
