@@ -30,7 +30,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { ChevronLeft, CalendarIcon, Search, DollarSign, TrendingUp, BarChart3, X, ChevronDown, Clock, RefreshCw, CheckCircle2, AlertCircle, XCircle } from "lucide-react";
+import { ChevronLeft, CalendarIcon, Search, DollarSign, TrendingUp, BarChart3, X, ChevronDown, Clock, RefreshCw, CheckCircle2, AlertCircle, XCircle, Download } from "lucide-react";
 import { calculateServicePrice } from "@/lib/pricing";
 import type { ServiceRequest, Service, User, VendorProfile, ServicePricingTier, BundleRequest, Bundle, VendorBundleCost } from "@shared/schema";
 
@@ -593,6 +593,51 @@ export default function ServicesProfitReport() {
     ? ((totals.profit / totals.retailPrice) * 100).toFixed(1) 
     : "0.0";
 
+  const exportToCSV = () => {
+    const headers = [
+      "Job ID",
+      "Client",
+      "Service",
+      "Method",
+      "Status",
+      "Vendor",
+      "Retail Price",
+      "Vendor Cost",
+      "Discount",
+      "Profit",
+      "Created"
+    ];
+
+    const rows = filteredData.map(row => [
+      row.jobNumber,
+      row.clientName,
+      row.serviceName,
+      row.serviceMethod === "ad_hoc" ? "Ad-hoc" : "Bundle",
+      statusConfig[row.status]?.label || row.status,
+      row.vendorName || "-",
+      row.retailPrice.toFixed(2),
+      row.vendorCost.toFixed(2),
+      row.discount.toFixed(2),
+      row.profit.toFixed(2),
+      format(row.createdAt, "MMM d, yyyy")
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `services-profit-report-${format(new Date(), "yyyy-MM-dd")}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const isLoading = loadingRequests || loadingBundleRequests;
 
   if (!isAdmin) {
@@ -616,20 +661,31 @@ export default function ServicesProfitReport() {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-4 py-8">
-        <div className="flex items-center gap-4 mb-6">
-          <Link href="/reports">
-            <Button variant="ghost" size="icon" data-testid="button-back-reports">
-              <ChevronLeft className="w-5 h-5" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-dark-blue-night" data-testid="text-report-title">
-              Services Profit Report <span className="text-sky-blue-accent">({filteredData.length})</span>
-            </h1>
-            <p className="text-dark-gray text-sm mt-1">
-              Analyze retail prices, vendor costs, and profit margins
-            </p>
+        <div className="flex items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-4">
+            <Link href="/reports">
+              <Button variant="ghost" size="icon" data-testid="button-back-reports">
+                <ChevronLeft className="w-5 h-5" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-2xl font-bold text-dark-blue-night" data-testid="text-report-title">
+                Services Profit Report <span className="text-sky-blue-accent">({filteredData.length})</span>
+              </h1>
+              <p className="text-dark-gray text-sm mt-1">
+                Analyze retail prices, vendor costs, and profit margins
+              </p>
+            </div>
           </div>
+          <Button
+            variant="outline"
+            onClick={exportToCSV}
+            disabled={filteredData.length === 0}
+            data-testid="button-download-csv"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Download CSV
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
