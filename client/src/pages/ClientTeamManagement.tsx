@@ -472,7 +472,13 @@ export default function ClientTeamManagement() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {teamMembers.map((member) => {
+                  {[...teamMembers].sort((a, b) => {
+                    const aIsPrimary = a.id === clientProfile?.primaryUserId;
+                    const bIsPrimary = b.id === clientProfile?.primaryUserId;
+                    if (aIsPrimary && !bIsPrimary) return -1;
+                    if (!aIsPrimary && bIsPrimary) return 1;
+                    return 0;
+                  }).map((member) => {
                     const isPrimary = member.id === clientProfile?.primaryUserId;
                     const isSelf = member.id === currentUser?.id;
                     return (
