@@ -29,6 +29,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Building2, Search, Eye, Plus, Trash2 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { User, VendorProfile } from "@shared/schema";
 
 type UserSession = {
@@ -375,54 +380,63 @@ export default function VendorsList() {
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setLocation(`/vendors/${vendor.id}`)}
-                            data-testid={`button-view-vendor-${vendor.id}`}
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            View
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
+                        <div className="flex items-center gap-2">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                data-testid={`button-delete-vendor-${vendor.id}`}
+                                onClick={() => setLocation(`/vendors/${vendor.id}`)}
+                                data-testid={`button-view-vendor-${vendor.id}`}
                               >
-                                <Trash2 className="h-4 w-4 text-destructive" />
+                                <Eye className="h-4 w-4" />
                               </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete{" "}
-                                  <strong>{profile?.companyName || vendor.username}</strong>?
-                                  This will deactivate the vendor account and all associated
-                                  team members. This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel data-testid="button-cancel-delete">
-                                  Cancel
-                                </AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => {
-                                    if (profile) {
-                                      deleteVendorMutation.mutate(profile.id);
-                                    }
-                                  }}
-                                  className="bg-destructive text-destructive-foreground"
-                                  data-testid="button-confirm-delete"
-                                >
-                                  {deleteVendorMutation.isPending ? "Deleting..." : "Delete Vendor"}
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                            </TooltipTrigger>
+                            <TooltipContent>View</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    data-testid={`button-delete-vendor-${vendor.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </TooltipTrigger>
+                              </AlertDialogTrigger>
+                              <TooltipContent>Delete</TooltipContent>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete{" "}
+                                    <strong>{profile?.companyName || vendor.username}</strong>?
+                                    This will deactivate the vendor account and all associated
+                                    team members. This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel data-testid="button-cancel-delete">
+                                    Cancel
+                                  </AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => {
+                                      if (profile) {
+                                        deleteVendorMutation.mutate(profile.id);
+                                      }
+                                    }}
+                                    className="bg-destructive text-destructive-foreground"
+                                    data-testid="button-confirm-delete"
+                                  >
+                                    {deleteVendorMutation.isPending ? "Deleting..." : "Delete Vendor"}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </Tooltip>
                         </div>
                       </div>
                     );

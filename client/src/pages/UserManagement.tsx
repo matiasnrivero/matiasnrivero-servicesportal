@@ -39,7 +39,12 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { Users, UserPlus, Search, Filter, Pencil, CalendarIcon, X, LogIn, Trash2 } from "lucide-react";
+import { Users, UserPlus, Search, Filter, Pencil, CalendarIcon, X, LogIn, Trash2, ArrowRight } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { User } from "@shared/schema";
 import { userRoles, paymentMethods } from "@shared/schema";
 import { format } from "date-fns";
@@ -762,42 +767,55 @@ export default function UserManagement() {
                         {user.lastLoginAt ? format(new Date(user.lastLoginAt), "MMM d, yyyy") : "Never"}
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
                       {canImpersonateUser(user) && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => impersonateMutation.mutate(user.id)}
-                          disabled={impersonateMutation.isPending}
-                          data-testid={`button-login-as-${user.id}`}
-                        >
-                          <LogIn className="h-4 w-4 mr-1" />
-                          Login as
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => impersonateMutation.mutate(user.id)}
+                              disabled={impersonateMutation.isPending}
+                              data-testid={`button-login-as-${user.id}`}
+                            >
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Login as</TooltipContent>
+                        </Tooltip>
                       )}
                       {canEditUser(user) && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleOpenEditDialog(user)}
-                          data-testid={`button-edit-user-${user.id}`}
-                        >
-                          <Pencil className="h-4 w-4 mr-1" />
-                          Edit
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleOpenEditDialog(user)}
+                              data-testid={`button-edit-user-${user.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Edit</TooltipContent>
+                        </Tooltip>
                       )}
                       {currentUser?.role === "admin" && user.id !== currentUser.id && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => {
-                            setUserToDelete(user);
-                            setDeleteModalOpen(true);
-                          }}
-                          data-testid={`button-delete-user-${user.id}`}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                setUserToDelete(user);
+                                setDeleteModalOpen(true);
+                              }}
+                              data-testid={`button-delete-user-${user.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Delete</TooltipContent>
+                        </Tooltip>
                       )}
                     </div>
                   </div>

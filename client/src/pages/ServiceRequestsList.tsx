@@ -47,6 +47,11 @@ import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, XCircle, LayoutGrid, List, Trash2, CalendarIcon, Search, ChevronDown, X, SlidersHorizontal } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { BoardView } from "@/components/BoardView";
 import { calculateServicePrice } from "@/lib/pricing";
@@ -990,27 +995,36 @@ export default function ServiceRequestsList() {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Link href={detailLink}>
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                data-testid={`button-view-${request.id}`}
-                              >
-                                <Eye className="h-4 w-4 mr-1" />
-                                View
-                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost"
+                                    data-testid={`button-view-${request.id}`}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>View</TooltipContent>
+                              </Tooltip>
                             </Link>
                             {currentUser?.role === "admin" && (
-                              <Button 
-                                size="icon" 
-                                variant="ghost"
-                                onClick={() => {
-                                  setJobToDelete(request);
-                                  setDeleteModalOpen(true);
-                                }}
-                                data-testid={`button-delete-${request.id}`}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost"
+                                    onClick={() => {
+                                      setJobToDelete(request);
+                                      setDeleteModalOpen(true);
+                                    }}
+                                    data-testid={`button-delete-${request.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Delete</TooltipContent>
+                              </Tooltip>
                             )}
                           </div>
                         </TableCell>

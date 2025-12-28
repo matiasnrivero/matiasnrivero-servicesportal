@@ -41,7 +41,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Building2, Users, DollarSign, Clock, UserPlus, Save, LogIn, Pencil, CalendarDays, Plus, Trash2, Globe, Package, Layers, Eye, Zap, Loader2 } from "lucide-react";
+import { Building2, Users, DollarSign, Clock, UserPlus, Save, LogIn, Pencil, CalendarDays, Plus, Trash2, Globe, Package, Layers, Eye, Zap, Loader2, ArrowRight } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import type { User, VendorProfile as VendorProfileType, Service, ServicePricingTier, Bundle, BundleItem, BundleLineItem, ServicePack, ServicePackItem, VendorBundleCost, VendorPackCost } from "@shared/schema";
 
@@ -956,16 +961,20 @@ export default function VendorProfile() {
                           {currentUser.lastLoginAt ? format(new Date(currentUser.lastLoginAt), "MMM d, yyyy") : "Never"}
                         </span>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleEditMember(currentUser)}
-                          data-testid={`button-edit-member-${currentUser.id}`}
-                        >
-                          <Pencil className="h-4 w-4 mr-1" />
-                          Edit
-                        </Button>
+                      <div className="flex items-center gap-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleEditMember(currentUser)}
+                              data-testid={`button-edit-member-${currentUser.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Edit</TooltipContent>
+                        </Tooltip>
                       </div>
                     </div>
                   )}
@@ -1023,37 +1032,50 @@ export default function VendorProfile() {
                             {member.lastLoginAt ? format(new Date(member.lastLoginAt), "MMM d, yyyy") : "Never"}
                           </span>
                         </div>
-                        <div className="flex items-center gap-4">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => impersonateMutation.mutate(member.id)}
-                            disabled={!member.isActive || impersonateMutation.isPending}
-                            data-testid={`button-login-as-${member.id}`}
-                          >
-                            <LogIn className="h-4 w-4 mr-1" />
-                            Login as
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleEditMember(member)}
-                            data-testid={`button-edit-member-${member.id}`}
-                          >
-                            <Pencil className="h-4 w-4 mr-1" />
-                            Edit
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => {
-                              setMemberToDelete(member);
-                              setDeleteModalOpen(true);
-                            }}
-                            data-testid={`button-delete-member-${member.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                        <div className="flex items-center gap-2">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => impersonateMutation.mutate(member.id)}
+                                disabled={!member.isActive || impersonateMutation.isPending}
+                                data-testid={`button-login-as-${member.id}`}
+                              >
+                                <ArrowRight className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Login as</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleEditMember(member)}
+                                data-testid={`button-edit-member-${member.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Edit</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => {
+                                  setMemberToDelete(member);
+                                  setDeleteModalOpen(true);
+                                }}
+                                data-testid={`button-delete-member-${member.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Delete</TooltipContent>
+                          </Tooltip>
                         </div>
                       </div>
                     ))

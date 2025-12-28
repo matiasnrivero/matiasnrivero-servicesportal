@@ -27,6 +27,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Building2, Users, UserPlus, Save, Pencil, Loader2, Crown, Trash2 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import type { User, ClientProfile } from "@shared/schema";
 
@@ -287,108 +292,114 @@ export default function ClientTeamManagement() {
           </div>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4">
+            <CardHeader className="flex flex-row items-center gap-4 space-y-0 pb-4">
               <CardTitle className="flex items-center gap-2">
                 <Building2 className="w-5 h-5" />
                 Company Information
               </CardTitle>
-              {isPrimaryClient && (
-                <Dialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" data-testid="button-edit-company">
-                      <Pencil className="w-4 h-4 mr-2" />
-                      Edit
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Edit Company Information</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div>
-                        <Label htmlFor="companyName">Company Name</Label>
-                        <Input
-                          id="companyName"
-                          value={companyInfo.companyName}
-                          onChange={(e) => setCompanyInfo({ ...companyInfo, companyName: e.target.value })}
-                          placeholder="Your company name"
-                          data-testid="input-company-name"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="industry">Market Segment</Label>
-                        <Input
-                          id="industry"
-                          value={companyInfo.industry}
-                          onChange={(e) => setCompanyInfo({ ...companyInfo, industry: e.target.value })}
-                          placeholder="e.g., Apparel, Promotional Products"
-                          data-testid="input-industry"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="website">Website</Label>
-                        <Input
-                          id="website"
-                          value={companyInfo.website}
-                          onChange={(e) => setCompanyInfo({ ...companyInfo, website: e.target.value })}
-                          placeholder="https://yourcompany.com"
-                          data-testid="input-website"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="companyPhone">Phone</Label>
-                        <Input
-                          id="companyPhone"
-                          value={companyInfo.phone}
-                          onChange={(e) => setCompanyInfo({ ...companyInfo, phone: e.target.value })}
-                          placeholder="(555) 123-4567"
-                          data-testid="input-company-phone"
-                        />
-                      </div>
-                      <Button
-                        className="w-full"
-                        onClick={() => updateProfileMutation.mutate(companyInfo)}
-                        disabled={updateProfileMutation.isPending}
-                        data-testid="button-save-company"
-                      >
-                        {updateProfileMutation.isPending ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <Save className="w-4 h-4 mr-2" />
-                        )}
-                        Save Changes
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              )}
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm text-gray-500">Company Name</p>
-                  <p className="font-medium" data-testid="text-company-name">
-                    {clientProfile.companyName || "Not set"}
-                  </p>
+              <div className="flex items-center justify-between gap-6 flex-wrap">
+                <div className="flex items-center gap-8 flex-wrap">
+                  <div>
+                    <p className="text-sm text-gray-500">Company Name</p>
+                    <p className="font-medium" data-testid="text-company-name">
+                      {clientProfile.companyName || "Not set"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Market Segment</p>
+                    <p className="font-medium" data-testid="text-industry">
+                      {clientProfile.industry || "Not set"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Website</p>
+                    <p className="font-medium" data-testid="text-website">
+                      {clientProfile.website || "Not set"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Phone</p>
+                    <p className="font-medium" data-testid="text-phone">
+                      {clientProfile.phone || "Not set"}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500">Market Segment</p>
-                  <p className="font-medium" data-testid="text-industry">
-                    {clientProfile.industry || "Not set"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Website</p>
-                  <p className="font-medium" data-testid="text-website">
-                    {clientProfile.website || "Not set"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Phone</p>
-                  <p className="font-medium" data-testid="text-phone">
-                    {clientProfile.phone || "Not set"}
-                  </p>
-                </div>
+                {isPrimaryClient && (
+                  <Dialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" data-testid="button-edit-company">
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Edit</TooltipContent>
+                      </Tooltip>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Edit Company Information</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div>
+                          <Label htmlFor="companyName">Company Name</Label>
+                          <Input
+                            id="companyName"
+                            value={companyInfo.companyName}
+                            onChange={(e) => setCompanyInfo({ ...companyInfo, companyName: e.target.value })}
+                            placeholder="Your company name"
+                            data-testid="input-company-name"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="industry">Market Segment</Label>
+                          <Input
+                            id="industry"
+                            value={companyInfo.industry}
+                            onChange={(e) => setCompanyInfo({ ...companyInfo, industry: e.target.value })}
+                            placeholder="e.g., Apparel, Promotional Products"
+                            data-testid="input-industry"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="website">Website</Label>
+                          <Input
+                            id="website"
+                            value={companyInfo.website}
+                            onChange={(e) => setCompanyInfo({ ...companyInfo, website: e.target.value })}
+                            placeholder="https://yourcompany.com"
+                            data-testid="input-website"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="companyPhone">Phone</Label>
+                          <Input
+                            id="companyPhone"
+                            value={companyInfo.phone}
+                            onChange={(e) => setCompanyInfo({ ...companyInfo, phone: e.target.value })}
+                            placeholder="(555) 123-4567"
+                            data-testid="input-company-phone"
+                          />
+                        </div>
+                        <Button
+                          className="w-full"
+                          onClick={() => updateProfileMutation.mutate(companyInfo)}
+                          disabled={updateProfileMutation.isPending}
+                          data-testid="button-save-company"
+                        >
+                          {updateProfileMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Save className="w-4 h-4 mr-2" />
+                          )}
+                          Save Changes
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -534,30 +545,39 @@ export default function ClientTeamManagement() {
                             {member.lastLoginAt ? format(new Date(member.lastLoginAt), "MMM d, yyyy") : "Never"}
                           </span>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           {isPrimaryClient && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleEditUser(member)}
-                              data-testid={`button-edit-member-${member.id}`}
-                            >
-                              <Pencil className="w-4 h-4 mr-1" />
-                              Edit
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleEditUser(member)}
+                                  data-testid={`button-edit-member-${member.id}`}
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Edit</TooltipContent>
+                            </Tooltip>
                           )}
                           {isPrimaryClient && !isSelf && !isPrimary && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setUserToDelete(member);
-                                setDeleteModalOpen(true);
-                              }}
-                              data-testid={`button-delete-member-${member.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    setUserToDelete(member);
+                                    setDeleteModalOpen(true);
+                                  }}
+                                  data-testid={`button-delete-member-${member.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Delete</TooltipContent>
+                            </Tooltip>
                           )}
                         </div>
                       </div>
