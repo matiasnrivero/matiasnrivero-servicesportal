@@ -46,13 +46,20 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, XCircle, LayoutGrid, List, Trash2, CalendarIcon, Search, ChevronDown, X, SlidersHorizontal } from "lucide-react";
+import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, XCircle, LayoutGrid, List, Trash2, CalendarIcon, Search, ChevronDown, X, SlidersHorizontal, Users, Building2 } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { BoardView } from "@/components/BoardView";
 import { calculateServicePrice } from "@/lib/pricing";
 import { getDisplayStatus, getStatusInfo, statusConfig as roleAwareStatusConfig } from "@/lib/statusUtils";
@@ -249,6 +256,11 @@ export default function ServiceRequestsList() {
   });
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [jobToDelete, setJobToDelete] = useState<CombinedRequest | null>(null);
+  
+  const [selectedRequests, setSelectedRequests] = useState<Set<string>>(new Set());
+  const [bulkAssignModalOpen, setBulkAssignModalOpen] = useState(false);
+  const [selectedDesignerId, setSelectedDesignerId] = useState<string>("");
+  const [selectedVendorId, setSelectedVendorId] = useState<string>("");
 
   useEffect(() => {
     localStorage.setItem("serviceRequestsViewMode", viewMode);
@@ -366,6 +378,61 @@ export default function ServiceRequestsList() {
       toast({ title: "Error", description: "Failed to delete bundle request", variant: "destructive" });
     },
   });
+
+  const { data: assignableUsers = [] } = useQuery<User[]>({
+    queryKey: ["/api/assignable-users"],
+    enabled: !!currentUser,
+  });
+
+  const canAssignToVendor = ["admin", "internal_designer"].includes(currentUser?.role || "");
+  
+  const vendorUsers = useMemo(() => {
+    return users.filter(u => {
+      if (u.role !== "vendor" || !u.isActive) return false;
+      const profile = vendorProfiles.find(p => p.userId === u.id);
+      return profile?.companyName;
+    });
+  }, [users, vendorProfiles]);
+
+  const getVendorDisplayName = (vendorUser: User) => {
+    const profile = vendorProfiles.find(p => p.userId === vendorUser.id);
+    return profile?.companyName || vendorUser.username;
+  };
+
+  const bulkAssignMutation = useMutation({
+    mutationFn: async (data: { requestIds: string[]; assignmentType: "designer" | "vendor"; targetId: string }) => {
+      return apiRequest("POST", "/api/service-requests/bulk-assign", data);
+    },
+    onSuccess: (response: any) => {
+      localQueryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+      localQueryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] });
+      setSelectedRequests(new Set());
+      setBulkAssignModalOpen(false);
+      setSelectedDesignerId("");
+      setSelectedVendorId("");
+      
+      const assigned = response?.assigned || 0;
+      const skipped = response?.skipped || 0;
+      
+      if (assigned > 0) {
+        toast({ 
+          title: "Bulk assignment complete", 
+          description: `Successfully assigned ${assigned} job${assigned !== 1 ? 's' : ''}${skipped > 0 ? `. ${skipped} job${skipped !== 1 ? 's' : ''} skipped (not eligible).` : '.'}`
+        });
+      } else {
+        toast({ 
+          title: "No jobs assigned", 
+          description: `${skipped} job${skipped !== 1 ? 's' : ''} skipped - no eligible jobs in selection.`,
+          variant: "destructive"
+        });
+      }
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to bulk assign jobs", variant: "destructive" });
+    },
+  });
+
+  const canBulkAssign = ["admin", "internal_designer", "vendor", "vendor_designer"].includes(currentUser?.role || "");
 
   const getServiceTitle = (serviceId: string) => {
     const service = services.find(s => s.id === serviceId);
@@ -663,6 +730,17 @@ export default function ServiceRequestsList() {
                     </SelectContent>
                   </Select>
                 )}
+                {viewMode === "list" && canBulkAssign && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setBulkAssignModalOpen(true)}
+                    disabled={selectedRequests.size === 0}
+                    data-testid="button-bulk-assign"
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Bulk Assign {selectedRequests.size > 0 && `(${selectedRequests.size})`}
+                  </Button>
+                )}
                 <Link href="/">
                   <Button data-testid="button-new-request">New Request</Button>
                 </Link>
@@ -915,6 +993,21 @@ export default function ServiceRequestsList() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {canBulkAssign && (
+                      <TableHead className="w-[40px]">
+                        <Checkbox
+                          checked={selectedRequests.size > 0 && selectedRequests.size === combinedFilteredRequests.length}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedRequests(new Set(combinedFilteredRequests.map(r => r.id)));
+                            } else {
+                              setSelectedRequests(new Set());
+                            }
+                          }}
+                          data-testid="checkbox-select-all"
+                        />
+                      </TableHead>
+                    )}
                     <TableHead>Job ID</TableHead>
                     <TableHead>Service</TableHead>
                     <TableHead>Method</TableHead>
@@ -945,9 +1038,27 @@ export default function ServiceRequestsList() {
                     const detailLink = request.type === "adhoc" 
                       ? `/jobs/${request.id}` 
                       : `/bundle-jobs/${request.id}`;
+                    const isSelected = selectedRequests.has(request.id);
                     
                     return (
                       <TableRow key={`${request.type}-${request.id}`} data-testid={`row-request-${request.id}`}>
+                        {canBulkAssign && (
+                          <TableCell>
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={(checked) => {
+                                const newSelected = new Set(selectedRequests);
+                                if (checked) {
+                                  newSelected.add(request.id);
+                                } else {
+                                  newSelected.delete(request.id);
+                                }
+                                setSelectedRequests(newSelected);
+                              }}
+                              data-testid={`checkbox-select-${request.id}`}
+                            />
+                          </TableCell>
+                        )}
                         <TableCell className="font-medium whitespace-nowrap">
                           <Link href={detailLink}>
                             <span className="text-sky-blue-accent hover:underline cursor-pointer" data-testid={`link-job-id-${request.id}`}>
@@ -1037,6 +1148,109 @@ export default function ServiceRequestsList() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={bulkAssignModalOpen} onOpenChange={setBulkAssignModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Bulk Assign Jobs</DialogTitle>
+            <DialogDescription>
+              Assign {selectedRequests.size} selected job{selectedRequests.size !== 1 ? 's' : ''} to a designer{canAssignToVendor ? ' or vendor organization' : ''}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Assign to Designer
+              </label>
+              <Select value={selectedDesignerId} onValueChange={(val) => {
+                setSelectedDesignerId(val);
+                setSelectedVendorId("");
+              }}>
+                <SelectTrigger data-testid="select-bulk-assign-designer">
+                  <SelectValue placeholder="Select a designer..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {assignableUsers.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.username}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {canAssignToVendor && (
+              <>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">Or</span>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Assign to Vendor Organization
+                  </label>
+                  <Select value={selectedVendorId} onValueChange={(val) => {
+                    setSelectedVendorId(val);
+                    setSelectedDesignerId("");
+                  }}>
+                    <SelectTrigger data-testid="select-bulk-assign-vendor">
+                      <SelectValue placeholder="Select a vendor..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vendorUsers.map((vendor) => (
+                        <SelectItem key={vendor.id} value={vendor.id}>
+                          {getVendorDisplayName(vendor)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+            
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setBulkAssignModalOpen(false);
+                  setSelectedDesignerId("");
+                  setSelectedVendorId("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (selectedDesignerId) {
+                    bulkAssignMutation.mutate({
+                      requestIds: Array.from(selectedRequests),
+                      assignmentType: "designer",
+                      targetId: selectedDesignerId,
+                    });
+                  } else if (selectedVendorId) {
+                    bulkAssignMutation.mutate({
+                      requestIds: Array.from(selectedRequests),
+                      assignmentType: "vendor",
+                      targetId: selectedVendorId,
+                    });
+                  }
+                }}
+                disabled={!selectedDesignerId && !selectedVendorId || bulkAssignMutation.isPending}
+                data-testid="button-confirm-bulk-assign"
+              >
+                {bulkAssignMutation.isPending ? "Assigning..." : "Assign"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
         <AlertDialogContent>

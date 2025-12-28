@@ -727,6 +727,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk assign multiple service requests
+  app.post("/api/service-requests/bulk-assign", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const canManageJobs = ["admin", "internal_designer", "vendor", "vendor_designer"].includes(sessionUser.role);
+      if (!canManageJobs) {
+        return res.status(403).json({ error: "You don't have permission to assign jobs" });
+      }
+
+      const { requestIds, assignmentType, targetId } = req.body;
+      
+      if (!requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {
+        return res.status(400).json({ error: "requestIds array is required" });
+      }
+      
+      if (!assignmentType || !["designer", "vendor"].includes(assignmentType)) {
+        return res.status(400).json({ error: "assignmentType must be 'designer' or 'vendor'" });
+      }
+      
+      if (!targetId) {
+        return res.status(400).json({ error: "targetId is required" });
+      }
+
+      // Vendor assignment is only for admin/internal_designer
+      if (assignmentType === "vendor" && !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Only admins and internal designers can assign to vendors" });
+      }
+
+      // Verify target exists
+      const target = await storage.getUser(targetId);
+      if (!target) {
+        return res.status(404).json({ error: "Target user not found" });
+      }
+
+      if (assignmentType === "vendor" && target.role !== "vendor") {
+        return res.status(400).json({ error: "Target must be a vendor user" });
+      }
+
+      // Determine eligible status based on role
+      // Admin/Internal Designer: only "pending" status (Pending Assignment - no assignee, no vendor)
+      // Vendor/Vendor Designer: only "pending" status (Pending - assigned to their vendor but no designer)
+      const isAdminOrInternal = ["admin", "internal_designer"].includes(sessionUser.role);
+      
+      const results: { 
+        assigned: string[]; 
+        skipped: { id: string; reason: string }[] 
+      } = { assigned: [], skipped: [] };
+
+      for (const requestId of requestIds) {
+        try {
+          const request = await storage.getServiceRequest(requestId);
+          if (!request) {
+            results.skipped.push({ id: requestId, reason: "Not found" });
+            continue;
+          }
+
+          // Check status eligibility
+          if (request.status !== "pending") {
+            results.skipped.push({ id: requestId, reason: `Status is ${request.status}, not pending` });
+            continue;
+          }
+
+          if (isAdminOrInternal) {
+            // For admin/internal designer: only assign jobs that are "Pending Assignment"
+            // (no assignee AND no vendorAssigneeId)
+            if (request.assigneeId || request.vendorAssigneeId) {
+              results.skipped.push({ id: requestId, reason: "Already assigned to vendor or designer" });
+              continue;
+            }
+          } else {
+            // For vendor/vendor_designer: only assign jobs in "Pending" 
+            // (assigned to their vendor, no designer yet)
+            // Verify the request is assigned to the vendor
+            const vendorId = sessionUser.role === "vendor" ? sessionUser.id : sessionUser.vendorId;
+            if (request.vendorAssigneeId !== vendorId) {
+              results.skipped.push({ id: requestId, reason: "Not assigned to your organization" });
+              continue;
+            }
+            if (request.assigneeId) {
+              results.skipped.push({ id: requestId, reason: "Already assigned to a designer" });
+              continue;
+            }
+          }
+
+          // Check assignment permissions for designer assignment
+          if (assignmentType === "designer") {
+            const assignmentCheck = await canAssignTo(sessionUser, target);
+            if (!assignmentCheck.allowed) {
+              results.skipped.push({ id: requestId, reason: assignmentCheck.reason || "Cannot assign to this user" });
+              continue;
+            }
+            await storage.assignDesigner(requestId, targetId);
+          } else {
+            // Vendor assignment
+            await storage.assignVendor(requestId, targetId);
+          }
+
+          results.assigned.push(requestId);
+        } catch (err) {
+          results.skipped.push({ id: requestId, reason: "Error processing" });
+        }
+      }
+
+      res.json({
+        success: true,
+        assigned: results.assigned.length,
+        skipped: results.skipped.length,
+        details: results
+      });
+    } catch (error) {
+      console.error("Error in bulk assign:", error);
+      res.status(500).json({ error: "Failed to bulk assign" });
+    }
+  });
+
   // Mark request as delivered
   app.post("/api/service-requests/:id/deliver", async (req, res) => {
     try {
