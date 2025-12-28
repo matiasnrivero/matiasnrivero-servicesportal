@@ -42,7 +42,6 @@ export default function ClientTeamManagement() {
     industry: "",
     website: "",
     phone: "",
-    address: "",
   });
   const [editUserDialogOpen, setEditUserDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -82,7 +81,6 @@ export default function ClientTeamManagement() {
         industry: clientProfile.industry || "",
         website: clientProfile.website || "",
         phone: clientProfile.phone || "",
-        address: clientProfile.address || "",
       });
     }
   }, [clientProfile]);
@@ -336,16 +334,6 @@ export default function ClientTeamManagement() {
                           data-testid="input-company-phone"
                         />
                       </div>
-                      <div>
-                        <Label htmlFor="address">Address</Label>
-                        <Input
-                          id="address"
-                          value={companyInfo.address}
-                          onChange={(e) => setCompanyInfo({ ...companyInfo, address: e.target.value })}
-                          placeholder="123 Main St, City, State 12345"
-                          data-testid="input-address"
-                        />
-                      </div>
                       <Button
                         className="w-full"
                         onClick={() => updateProfileMutation.mutate(companyInfo)}
@@ -388,12 +376,6 @@ export default function ClientTeamManagement() {
                   <p className="text-sm text-gray-500">Phone</p>
                   <p className="font-medium" data-testid="text-phone">
                     {clientProfile.phone || "Not set"}
-                  </p>
-                </div>
-                <div className="md:col-span-2">
-                  <p className="text-sm text-gray-500">Address</p>
-                  <p className="font-medium" data-testid="text-address">
-                    {clientProfile.address || "Not set"}
                   </p>
                 </div>
               </div>
@@ -536,29 +518,27 @@ export default function ClientTeamManagement() {
                           </span>
                         </div>
                         <div className="flex items-center gap-3">
-                          {isPrimaryClient && !isSelf && (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleEditUser(member)}
-                                data-testid={`button-edit-member-${member.id}`}
-                              >
-                                <Pencil className="w-4 h-4 mr-1" />
-                                Edit
-                              </Button>
-                              {!isPrimary && (
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() => deleteUserMutation.mutate(member.id)}
-                                  disabled={deleteUserMutation.isPending}
-                                  data-testid={`button-delete-member-${member.id}`}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              )}
-                            </>
+                          {isPrimaryClient && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditUser(member)}
+                              data-testid={`button-edit-member-${member.id}`}
+                            >
+                              <Pencil className="w-4 h-4 mr-1" />
+                              Edit
+                            </Button>
+                          )}
+                          {isPrimaryClient && !isSelf && !isPrimary && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => deleteUserMutation.mutate(member.id)}
+                              disabled={deleteUserMutation.isPending}
+                              data-testid={`button-delete-member-${member.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
                           )}
                         </div>
                       </div>
