@@ -489,26 +489,25 @@ export default function ClientTeamManagement() {
                   No team members yet. Invite someone to get started.
                 </div>
               ) : (
-                <div className="divide-y">
+                <div className="space-y-2">
                   {teamMembers.map((member) => {
                     const isPrimary = member.id === clientProfile?.primaryUserId;
                     const isSelf = member.id === currentUser?.id;
                     return (
                       <div
                         key={member.id}
-                        className="flex items-center justify-between gap-4 py-4"
+                        className="flex items-center justify-between p-4 border rounded-md"
                         data-testid={`row-team-member-${member.id}`}
                       >
-                        <div className="flex items-center gap-3">
-                          {isPrimaryClient && !isSelf && (
-                            <Switch
-                              checked={member.isActive ?? true}
-                              onCheckedChange={(checked) =>
-                                toggleUserStatusMutation.mutate({ userId: member.id, isActive: checked })
-                              }
-                              data-testid={`switch-member-status-${member.id}`}
-                            />
-                          )}
+                        <div className="flex items-center gap-4">
+                          <Switch
+                            checked={member.isActive ?? true}
+                            disabled={isSelf || !isPrimaryClient}
+                            onCheckedChange={(checked) =>
+                              toggleUserStatusMutation.mutate({ userId: member.id, isActive: checked })
+                            }
+                            data-testid={`switch-member-status-${member.id}`}
+                          />
                           <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
                             <span className="text-blue-700 font-medium text-sm">
                               {member.username?.charAt(0).toUpperCase() || "?"}
@@ -525,8 +524,6 @@ export default function ClientTeamManagement() {
                             </div>
                             <p className="text-sm text-gray-500">{member.email || "No email"}</p>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-3 flex-wrap">
                           <Badge variant={isPrimary ? "default" : "secondary"}>
                             {isPrimary && <Crown className="w-3 h-3 mr-1" />}
                             {member.role === "client" ? (isPrimary ? "Admin" : "Member") : member.role}
@@ -537,6 +534,8 @@ export default function ClientTeamManagement() {
                           <span className="text-sm text-gray-500" data-testid={`text-last-login-${member.id}`}>
                             {member.lastLoginAt ? format(new Date(member.lastLoginAt), "MMM d, yyyy") : "Never"}
                           </span>
+                        </div>
+                        <div className="flex items-center gap-3">
                           {isPrimaryClient && !isSelf && (
                             <>
                               <Button

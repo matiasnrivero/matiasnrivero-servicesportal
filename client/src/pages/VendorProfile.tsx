@@ -916,6 +916,12 @@ export default function VendorProfile() {
                         <Badge variant="outline" className="bg-sky-blue-accent/10 text-sky-blue-accent border-sky-blue-accent/20">
                           Primary
                         </Badge>
+                        <span className="text-sm text-dark-gray" data-testid={`text-created-${currentUser.id}`}>
+                          {currentUser.createdAt ? format(new Date(currentUser.createdAt), "MMM d, yyyy") : "N/A"}
+                        </span>
+                        <span className="text-sm text-dark-gray" data-testid={`text-last-login-${currentUser.id}`}>
+                          {currentUser.lastLoginAt ? format(new Date(currentUser.lastLoginAt), "MMM d, yyyy") : "Never"}
+                        </span>
                       </div>
                       <div className="flex items-center gap-4">
                         <Button
@@ -972,6 +978,12 @@ export default function VendorProfile() {
                               Inactive
                             </Badge>
                           )}
+                          <span className="text-sm text-dark-gray" data-testid={`text-created-${member.id}`}>
+                            {member.createdAt ? format(new Date(member.createdAt), "MMM d, yyyy") : "N/A"}
+                          </span>
+                          <span className="text-sm text-dark-gray" data-testid={`text-last-login-${member.id}`}>
+                            {member.lastLoginAt ? format(new Date(member.lastLoginAt), "MMM d, yyyy") : "Never"}
+                          </span>
                         </div>
                         <div className="flex items-center gap-4">
                           <Button
