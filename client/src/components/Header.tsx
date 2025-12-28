@@ -92,9 +92,9 @@ export function Header() {
     setSearchResults([]);
     
     if (result.type === "adhoc") {
-      setLocation(`/service-requests/${result.id}`);
+      setLocation(`/jobs/${result.id}`);
     } else {
-      setLocation(`/service-requests/bundle/${result.id}`);
+      setLocation(`/bundle-jobs/${result.id}`);
     }
   };
 
