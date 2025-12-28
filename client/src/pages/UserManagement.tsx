@@ -778,7 +778,7 @@ export default function UserManagement() {
                               disabled={impersonateMutation.isPending}
                               data-testid={`button-login-as-${user.id}`}
                             >
-                              <ArrowRight className="h-4 w-4" />
+                              <LogIn className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>Login as</TooltipContent>

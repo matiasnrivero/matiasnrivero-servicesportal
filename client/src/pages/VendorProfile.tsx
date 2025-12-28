@@ -1042,7 +1042,7 @@ export default function VendorProfile() {
                                 disabled={!member.isActive || impersonateMutation.isPending}
                                 data-testid={`button-login-as-${member.id}`}
                               >
-                                <ArrowRight className="h-4 w-4" />
+                                <LogIn className="h-4 w-4" />
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>Login as</TooltipContent>
