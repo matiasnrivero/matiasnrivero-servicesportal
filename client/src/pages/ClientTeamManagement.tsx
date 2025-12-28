@@ -16,7 +16,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Users, UserPlus, Save, Pencil, Loader2, Crown } from "lucide-react";
+import { Building2, Users, UserPlus, Save, Pencil, Loader2, Crown, Trash2 } from "lucide-react";
+import { format } from "date-fns";
 import type { User, ClientProfile } from "@shared/schema";
 
 async function getDefaultUser(): Promise<User | null> {
@@ -42,6 +43,13 @@ export default function ClientTeamManagement() {
     website: "",
     phone: "",
     address: "",
+  });
+  const [editUserDialogOpen, setEditUserDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editUserData, setEditUserData] = useState({
+    username: "",
+    email: "",
+    phone: "",
   });
 
   const { data: currentUser, isLoading: userLoading } = useQuery<User | null>({
@@ -159,6 +167,61 @@ export default function ClientTeamManagement() {
     },
   });
 
+  const updateUserMutation = useMutation({
+    mutationFn: async (userData: typeof editUserData & { userId: string }) => {
+      const { userId, ...data } = userData;
+      const res = await apiRequest("PATCH", `/api/users/${userId}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "User updated",
+        description: "The team member's information has been saved.",
+      });
+      setEditUserDialogOpen(false);
+      setEditingUser(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/client-profiles", clientProfileId, "team"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update user",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await apiRequest("DELETE", `/api/client-profiles/${clientProfileId}/team/${userId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "User removed",
+        description: "The team member has been removed from your company.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/client-profiles", clientProfileId, "team"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to remove user",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEditUser = (user: User) => {
+    setEditingUser(user);
+    setEditUserData({
+      username: user.username || "",
+      email: user.email || "",
+      phone: user.phone || "",
+    });
+    setEditUserDialogOpen(true);
+  };
+
   if (userLoading || profileLoading) {
     return (
       <div className="min-h-screen flex flex-col bg-gray-50">
@@ -244,7 +307,7 @@ export default function ClientTeamManagement() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="industry">Industry</Label>
+                        <Label htmlFor="industry">Market Segment</Label>
                         <Input
                           id="industry"
                           value={companyInfo.industry}
@@ -310,7 +373,7 @@ export default function ClientTeamManagement() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Industry</p>
+                  <p className="text-sm text-gray-500">Market Segment</p>
                   <p className="font-medium" data-testid="text-industry">
                     {clientProfile.industry || "Not set"}
                   </p>
@@ -433,41 +496,11 @@ export default function ClientTeamManagement() {
                     return (
                       <div
                         key={member.id}
-                        className="flex items-center justify-between py-4"
+                        className="flex items-center justify-between gap-4 py-4"
                         data-testid={`row-team-member-${member.id}`}
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                            <span className="text-blue-700 font-medium text-sm">
-                              {member.username?.charAt(0).toUpperCase() || "?"}
-                            </span>
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium" data-testid={`text-member-name-${member.id}`}>
-                                {member.username}
-                              </span>
-                              {isPrimary && (
-                                <Badge variant="secondary" className="gap-1">
-                                  <Crown className="w-3 h-3" />
-                                  Admin
-                                </Badge>
-                              )}
-                              {isSelf && (
-                                <Badge variant="outline">You</Badge>
-                              )}
-                            </div>
-                            <p className="text-sm text-gray-500">{member.email || "No email"}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <Badge
-                            variant={member.isActive ? "default" : "secondary"}
-                            data-testid={`status-member-${member.id}`}
-                          >
-                            {member.isActive ? "Active" : "Inactive"}
-                          </Badge>
-                          {isPrimaryClient && !isPrimary && !isSelf && (
+                          {isPrimaryClient && !isSelf && (
                             <Switch
                               checked={member.isActive ?? true}
                               onCheckedChange={(checked) =>
@@ -475,6 +508,58 @@ export default function ClientTeamManagement() {
                               }
                               data-testid={`switch-member-status-${member.id}`}
                             />
+                          )}
+                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                            <span className="text-blue-700 font-medium text-sm">
+                              {member.username?.charAt(0).toUpperCase() || "?"}
+                            </span>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium" data-testid={`text-member-name-${member.id}`}>
+                                {member.username}
+                              </span>
+                              {isSelf && (
+                                <Badge variant="outline">You</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-500">{member.email || "No email"}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <Badge variant={isPrimary ? "default" : "secondary"}>
+                            {isPrimary && <Crown className="w-3 h-3 mr-1" />}
+                            {member.role === "client" ? (isPrimary ? "Admin" : "Member") : member.role}
+                          </Badge>
+                          <span className="text-sm text-gray-500" data-testid={`text-created-${member.id}`}>
+                            {member.createdAt ? format(new Date(member.createdAt), "MMM d, yyyy") : "N/A"}
+                          </span>
+                          <span className="text-sm text-gray-500" data-testid={`text-last-login-${member.id}`}>
+                            {member.lastLoginAt ? format(new Date(member.lastLoginAt), "MMM d, yyyy") : "Never"}
+                          </span>
+                          {isPrimaryClient && !isSelf && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEditUser(member)}
+                                data-testid={`button-edit-member-${member.id}`}
+                              >
+                                <Pencil className="w-4 h-4 mr-1" />
+                                Edit
+                              </Button>
+                              {!isPrimary && (
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => deleteUserMutation.mutate(member.id)}
+                                  disabled={deleteUserMutation.isPending}
+                                  data-testid={`button-delete-member-${member.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -484,6 +569,60 @@ export default function ClientTeamManagement() {
               )}
             </CardContent>
           </Card>
+
+          <Dialog open={editUserDialogOpen} onOpenChange={setEditUserDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Team Member</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div>
+                  <Label htmlFor="editUsername">Name</Label>
+                  <Input
+                    id="editUsername"
+                    value={editUserData.username}
+                    onChange={(e) => setEditUserData({ ...editUserData, username: e.target.value })}
+                    placeholder="Full name"
+                    data-testid="input-edit-username"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editEmail">Email</Label>
+                  <Input
+                    id="editEmail"
+                    type="email"
+                    value={editUserData.email}
+                    onChange={(e) => setEditUserData({ ...editUserData, email: e.target.value })}
+                    placeholder="email@example.com"
+                    data-testid="input-edit-email"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editPhone">Phone</Label>
+                  <Input
+                    id="editPhone"
+                    value={editUserData.phone}
+                    onChange={(e) => setEditUserData({ ...editUserData, phone: e.target.value })}
+                    placeholder="(555) 123-4567"
+                    data-testid="input-edit-phone"
+                  />
+                </div>
+                <Button
+                  className="w-full"
+                  onClick={() => editingUser && updateUserMutation.mutate({ ...editUserData, userId: editingUser.id })}
+                  disabled={updateUserMutation.isPending || !editUserData.username}
+                  data-testid="button-save-user"
+                >
+                  {updateUserMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4 mr-2" />
+                  )}
+                  Save Changes
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </main>
     </div>

@@ -2265,6 +2265,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Remove a team member from client company (soft delete or unlink)
+  app.delete("/api/client-profiles/:id/team/:userId", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const profile = await storage.getClientProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Client profile not found" });
+      }
+
+      // Only admin or primary client can remove team members
+      const canRemove = sessionUser.role === "admin" || 
+                        (sessionUser.role === "client" && profile.primaryUserId === sessionUserId);
+
+      if (!canRemove) {
+        return res.status(403).json({ error: "You don't have permission to remove team members" });
+      }
+
+      const targetUser = await storage.getUser(req.params.userId);
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Verify target user belongs to this company
+      if (targetUser.clientProfileId !== req.params.id) {
+        return res.status(403).json({ error: "User does not belong to this company" });
+      }
+
+      // Cannot remove the primary user
+      if (targetUser.id === profile.primaryUserId) {
+        return res.status(403).json({ error: "Cannot remove the primary account holder" });
+      }
+
+      // Cannot remove yourself
+      if (targetUser.id === sessionUserId) {
+        return res.status(403).json({ error: "Cannot remove yourself" });
+      }
+
+      // Deactivate the user and unlink from company
+      await storage.updateUser(req.params.userId, { 
+        isActive: false,
+        clientProfileId: null 
+      });
+
+      res.json({ success: true, message: "Team member removed" });
+    } catch (error) {
+      console.error("Error removing client team member:", error);
+      res.status(500).json({ error: "Failed to remove team member" });
+    }
+  });
+
   // System settings routes
   app.get("/api/system-settings/pricing", async (req, res) => {
     try {

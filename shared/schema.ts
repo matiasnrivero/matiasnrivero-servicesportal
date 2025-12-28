@@ -535,6 +535,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   phone: true,
   role: true,
   vendorId: true,
+  clientProfileId: true,
   paymentMethod: true,
   invitedBy: true,
 });
