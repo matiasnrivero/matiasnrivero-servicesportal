@@ -1735,6 +1735,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         invitedBy: sessionUserId,
       });
 
+      // Auto-create client profile for standalone client users
+      if (newUserRole === "client" && !req.body.clientProfileId) {
+        const clientProfile = await storage.createClientProfile({
+          primaryUserId: newUser.id,
+          companyName: req.body.username,
+        });
+        await storage.updateUser(newUser.id, { clientProfileId: clientProfile.id });
+      }
+
       res.status(201).json(newUser);
     } catch (error: any) {
       console.error("Error creating user:", error);
@@ -1764,7 +1773,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Permission check for activating/deactivating users
-      const canModify = () => {
+      const canModify = async () => {
         // Admin can modify anyone
         if (sessionUser.role === "admin") return true;
         // Vendor can modify vendors/vendor_designers under their structure
@@ -1773,10 +1782,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return targetUser.vendorId === vendorStructureId && 
                  ["vendor", "vendor_designer"].includes(targetUser.role);
         }
+        // Primary client can modify client team members in their company
+        if (sessionUser.role === "client" && sessionUser.clientProfileId && targetUser.role === "client") {
+          const clientProfile = await storage.getClientProfileById(sessionUser.clientProfileId);
+          if (clientProfile && clientProfile.primaryUserId === sessionUserId) {
+            // Primary client can modify team members (same clientProfileId) but not themselves
+            return targetUser.clientProfileId === sessionUser.clientProfileId && 
+                   targetUser.id !== sessionUserId;
+          }
+        }
         return false;
       };
 
-      if (!canModify()) {
+      if (!(await canModify())) {
         return res.status(403).json({ error: "You don't have permission to modify this user" });
       }
 
@@ -1959,6 +1977,289 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting vendor:", error);
       res.status(500).json({ error: "Failed to delete vendor" });
+    }
+  });
+
+  // ========== Client Profile Routes ==========
+
+  app.get("/api/client-profiles", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      // Only admin can list all client profiles
+      if (sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Only admins can list all client profiles" });
+      }
+
+      const profiles = await storage.getAllClientProfiles();
+      res.json(profiles);
+    } catch (error) {
+      console.error("Error fetching client profiles:", error);
+      res.status(500).json({ error: "Failed to fetch client profiles" });
+    }
+  });
+
+  app.get("/api/client-profiles/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const profile = await storage.getClientProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Client profile not found" });
+      }
+
+      // Admin can view any profile, clients can only view their own company profile
+      const canView = sessionUser.role === "admin" || 
+                      sessionUser.clientProfileId === req.params.id;
+      
+      if (!canView) {
+        return res.status(403).json({ error: "You don't have permission to view this profile" });
+      }
+
+      res.json(profile);
+    } catch (error) {
+      console.error("Error fetching client profile:", error);
+      res.status(500).json({ error: "Failed to fetch client profile" });
+    }
+  });
+
+  app.get("/api/client-profiles/user/:userId", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const profile = await storage.getClientProfile(req.params.userId);
+      if (!profile) {
+        return res.status(404).json({ error: "Client profile not found" });
+      }
+
+      // Admin can view any profile, clients can only view their own company profile
+      const canView = sessionUser.role === "admin" || 
+                      sessionUser.clientProfileId === profile.id;
+      
+      if (!canView) {
+        return res.status(403).json({ error: "You don't have permission to view this profile" });
+      }
+
+      res.json(profile);
+    } catch (error) {
+      console.error("Error fetching client profile:", error);
+      res.status(500).json({ error: "Failed to fetch client profile" });
+    }
+  });
+
+  // Get client profile by clientProfileId (for team members)
+  app.get("/api/client-profiles/by-profile/:profileId", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const profile = await storage.getClientProfileById(req.params.profileId);
+      if (!profile) {
+        return res.status(404).json({ error: "Client profile not found" });
+      }
+
+      // Admin can view any profile, clients can only view their own company profile
+      const canView = sessionUser.role === "admin" || 
+                      sessionUser.clientProfileId === req.params.profileId;
+      
+      if (!canView) {
+        return res.status(403).json({ error: "You don't have permission to view this profile" });
+      }
+
+      res.json(profile);
+    } catch (error) {
+      console.error("Error fetching client profile:", error);
+      res.status(500).json({ error: "Failed to fetch client profile" });
+    }
+  });
+
+  app.post("/api/client-profiles", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      // Admin can create profiles for anyone, clients can create their own profile
+      if (sessionUser.role !== "admin" && sessionUser.role !== "client") {
+        return res.status(403).json({ error: "Only admins and clients can create client profiles" });
+      }
+
+      // Clients can only create their own profile
+      if (sessionUser.role === "client" && req.body.primaryUserId !== sessionUserId) {
+        return res.status(403).json({ error: "Clients can only create their own profile" });
+      }
+
+      // Check if profile already exists for this user
+      const existingProfile = await storage.getClientProfile(req.body.primaryUserId);
+      if (existingProfile) {
+        return res.status(400).json({ error: "Profile already exists for this user" });
+      }
+
+      const profile = await storage.createClientProfile(req.body);
+      
+      // Link the primary user to this client profile
+      await storage.updateUser(req.body.primaryUserId, { clientProfileId: profile.id });
+      
+      res.status(201).json(profile);
+    } catch (error) {
+      console.error("Error creating client profile:", error);
+      res.status(500).json({ error: "Failed to create client profile" });
+    }
+  });
+
+  app.patch("/api/client-profiles/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const profile = await storage.getClientProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Client profile not found" });
+      }
+
+      // Admin can update any profile, primary client can update their own
+      const canUpdate = sessionUser.role === "admin" || 
+                        (sessionUser.role === "client" && profile.primaryUserId === sessionUserId);
+
+      if (!canUpdate) {
+        return res.status(403).json({ error: "You don't have permission to update this profile" });
+      }
+
+      const updatedProfile = await storage.updateClientProfile(req.params.id, req.body);
+      res.json(updatedProfile);
+    } catch (error) {
+      console.error("Error updating client profile:", error);
+      res.status(500).json({ error: "Failed to update client profile" });
+    }
+  });
+
+  // Get team members for a client company
+  app.get("/api/client-profiles/:id/team", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const profile = await storage.getClientProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Client profile not found" });
+      }
+
+      // Admin, or client from same company can view team
+      const canView = sessionUser.role === "admin" || 
+                      sessionUser.clientProfileId === req.params.id;
+
+      if (!canView) {
+        return res.status(403).json({ error: "You don't have permission to view this team" });
+      }
+
+      const teamMembers = await storage.getClientTeamMembers(req.params.id);
+      res.json(teamMembers);
+    } catch (error) {
+      console.error("Error fetching client team:", error);
+      res.status(500).json({ error: "Failed to fetch client team" });
+    }
+  });
+
+  // Invite a new client team member
+  app.post("/api/client-profiles/:id/invite", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const profile = await storage.getClientProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Client profile not found" });
+      }
+
+      // Admin or primary client can invite team members
+      const canInvite = sessionUser.role === "admin" || 
+                        (sessionUser.role === "client" && profile.primaryUserId === sessionUserId);
+
+      if (!canInvite) {
+        return res.status(403).json({ error: "You don't have permission to invite team members" });
+      }
+
+      const { username, email, phone, password } = req.body;
+
+      // Check for existing user with same username
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ error: "Username already exists" });
+      }
+
+      // Create the new client user linked to this company
+      const newUser = await storage.createUser({
+        username,
+        email,
+        phone,
+        password,
+        role: "client",
+        invitedBy: sessionUserId,
+        clientProfileId: req.params.id,
+      });
+
+      res.status(201).json(newUser);
+    } catch (error) {
+      console.error("Error inviting client team member:", error);
+      res.status(500).json({ error: "Failed to invite team member" });
     }
   });
 

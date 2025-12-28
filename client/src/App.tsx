@@ -20,6 +20,7 @@ import BundleRequestForm from "@/pages/BundleRequestForm";
 import BundleRequestDetail from "@/pages/BundleRequestDetail";
 import Reports from "@/pages/Reports";
 import ServicesProfitReport from "@/pages/ServicesProfitReport";
+import ClientTeamManagement from "@/pages/ClientTeamManagement";
 
 function Router() {
   return (
@@ -44,6 +45,7 @@ function Router() {
       <Route path="/bundle-jobs/:id" component={BundleRequestDetail} />
       <Route path="/reports" component={Reports} />
       <Route path="/reports/services-profit" component={ServicesProfitReport} />
+      <Route path="/client-team" component={ClientTeamManagement} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>

@@ -67,6 +67,9 @@ import {
   type UpdateAutomationRule,
   type AutomationAssignmentLog,
   type InsertAutomationAssignmentLog,
+  type ClientProfile,
+  type InsertClientProfile,
+  type UpdateClientProfile,
   users,
   services,
   servicePricingTiers,
@@ -94,6 +97,7 @@ import {
   vendorDesignerCapacities,
   automationRules,
   automationAssignmentLogs,
+  clientProfiles,
 } from "@shared/schema";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -116,6 +120,15 @@ export interface IStorage {
   createVendorProfile(profile: InsertVendorProfile): Promise<VendorProfile>;
   updateVendorProfile(id: string, profile: UpdateVendorProfile): Promise<VendorProfile | undefined>;
   deleteVendor(profileId: string): Promise<void>;
+
+  // Client Profile methods
+  getClientProfile(userId: string): Promise<ClientProfile | undefined>;
+  getClientProfileById(id: string): Promise<ClientProfile | undefined>;
+  getAllClientProfiles(): Promise<ClientProfile[]>;
+  createClientProfile(profile: InsertClientProfile): Promise<ClientProfile>;
+  updateClientProfile(id: string, profile: UpdateClientProfile): Promise<ClientProfile | undefined>;
+  deleteClientProfile(profileId: string): Promise<void>;
+  getClientTeamMembers(clientProfileId: string): Promise<User[]>;
 
   // Service methods
   getAllServices(): Promise<Service[]>;
@@ -373,6 +386,55 @@ export class DbStorage implements IStorage {
     await db.update(users)
       .set({ isActive: false })
       .where(eq(users.vendorId, profile.userId));
+  }
+
+  // Client Profile methods
+  async getClientProfile(userId: string): Promise<ClientProfile | undefined> {
+    const result = await db.select().from(clientProfiles).where(eq(clientProfiles.primaryUserId, userId)).limit(1);
+    return result[0];
+  }
+
+  async getClientProfileById(id: string): Promise<ClientProfile | undefined> {
+    const result = await db.select().from(clientProfiles).where(eq(clientProfiles.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAllClientProfiles(): Promise<ClientProfile[]> {
+    return await db.select().from(clientProfiles)
+      .where(isNull(clientProfiles.deletedAt))
+      .orderBy(clientProfiles.companyName);
+  }
+
+  async createClientProfile(profile: InsertClientProfile): Promise<ClientProfile> {
+    const result = await db.insert(clientProfiles).values(profile).returning();
+    return result[0];
+  }
+
+  async updateClientProfile(id: string, profile: UpdateClientProfile): Promise<ClientProfile | undefined> {
+    const result = await db.update(clientProfiles)
+      .set({ ...profile, updatedAt: new Date() })
+      .where(eq(clientProfiles.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteClientProfile(profileId: string): Promise<void> {
+    const profile = await this.getClientProfileById(profileId);
+    if (!profile) return;
+
+    await db.update(clientProfiles)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(eq(clientProfiles.id, profileId));
+
+    await db.update(users)
+      .set({ isActive: false })
+      .where(eq(users.clientProfileId, profileId));
+  }
+
+  async getClientTeamMembers(clientProfileId: string): Promise<User[]> {
+    return await db.select().from(users)
+      .where(eq(users.clientProfileId, clientProfileId))
+      .orderBy(users.username);
   }
 
   // Service methods

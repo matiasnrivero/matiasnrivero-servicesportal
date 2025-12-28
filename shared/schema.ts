@@ -33,6 +33,8 @@ export const users = pgTable("users", {
   isActive: boolean("is_active").notNull().default(true),
   // Vendor relationship - links vendor_designer to their parent vendor
   vendorId: varchar("vendor_id"),
+  // Client company relationship - links client users to their company
+  clientProfileId: varchar("client_profile_id"),
   // Client payment configuration
   paymentMethod: text("payment_method"),
   invitedBy: varchar("invited_by"),
@@ -57,6 +59,23 @@ export const vendorProfiles = pgTable("vendor_profiles", {
   // Working hours configuration (JSON: { timezone: string, startHour: string, endHour: string })
   workingHours: jsonb("working_hours"),
   // Soft delete timestamp - when set, vendor is considered deleted
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Client profiles with company info - links client users to their company
+export const clientProfiles = pgTable("client_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  // Primary user is the first client who created the company profile
+  primaryUserId: varchar("primary_user_id").notNull().references(() => users.id),
+  companyName: text("company_name").notNull(),
+  industry: text("industry"),
+  website: text("website"),
+  email: text("email"),
+  phone: text("phone"),
+  address: text("address"),
+  // Soft delete timestamp - when set, client company is considered deleted
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -531,6 +550,18 @@ export const updateVendorProfileSchema = createInsertSchema(vendorProfiles).part
   createdAt: true,
 });
 
+export const insertClientProfileSchema = createInsertSchema(clientProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateClientProfileSchema = createInsertSchema(clientProfiles).partial().omit({
+  id: true,
+  primaryUserId: true,
+  createdAt: true,
+});
+
 export const insertServiceSchema = createInsertSchema(services).omit({
   id: true,
   createdAt: true,
@@ -743,6 +774,9 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type VendorProfile = typeof vendorProfiles.$inferSelect;
 export type InsertVendorProfile = z.infer<typeof insertVendorProfileSchema>;
 export type UpdateVendorProfile = z.infer<typeof updateVendorProfileSchema>;
+export type ClientProfile = typeof clientProfiles.$inferSelect;
+export type InsertClientProfile = z.infer<typeof insertClientProfileSchema>;
+export type UpdateClientProfile = z.infer<typeof updateClientProfileSchema>;
 export type Service = typeof services.$inferSelect;
 export type InsertService = z.infer<typeof insertServiceSchema>;
 export type UpdateService = z.infer<typeof updateServiceSchema>;

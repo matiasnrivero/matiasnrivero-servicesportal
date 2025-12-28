@@ -141,6 +141,17 @@ export function Header() {
               </Button>
             </Link>
           )}
+          {isClient && (
+            <Link href="/client-team">
+              <Button
+                variant={location === "/client-team" ? "default" : "ghost"}
+                className={location === "/client-team" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
+                data-testid="nav-client-team"
+              >
+                Team
+              </Button>
+            </Link>
+          )}
           {canViewVendorProfile && (
             <Link href="/vendor-profile">
               <Button
