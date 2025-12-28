@@ -170,8 +170,8 @@ export function Header() {
     <header className="flex w-full items-center justify-between gap-12 px-8 py-4 bg-white shadow-shadow-top-bar">
       <div className="flex items-center gap-8">
         <Link href="/">
-          <h1 className="font-title-semibold text-dark-blue-night text-xl cursor-pointer">
-            Artwork Services
+          <h1 className="font-title-semibold text-dark-blue-night text-xl cursor-pointer whitespace-nowrap">
+            Services Portal
           </h1>
         </Link>
         <nav className="flex items-center gap-4">
@@ -270,7 +270,7 @@ export function Header() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search Job ID (A-XXXXX or B-XXXXX)"
+                  placeholder="Search Job ID"
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
@@ -283,7 +283,7 @@ export function Header() {
                       setSearchOpen(true);
                     }
                   }}
-                  className="w-64 pl-9"
+                  className="w-44 pl-9"
                   data-testid="input-global-search"
                 />
               </div>
@@ -323,9 +323,7 @@ export function Header() {
             </PopoverContent>
           </Popover>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-sm text-dark-gray">
-              <span>User Role</span>
-            </div>
+            <span className="text-sm text-dark-gray whitespace-nowrap">User Role</span>
             <Select
               value={currentUser.role}
               onValueChange={(role) => switchRoleMutation.mutate(role)}
