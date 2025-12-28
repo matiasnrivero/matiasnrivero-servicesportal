@@ -1790,7 +1790,7 @@ export default function VendorProfile() {
 
           <TabsContent value="automation">
             <VendorAutomationTab 
-              vendorProfile={vendorProfile} 
+              vendorProfile={vendorProfile ?? null} 
               teamMembers={teamMembers}
               allServices={allServices}
             />
