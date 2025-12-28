@@ -1284,7 +1284,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             role: existingUser.role, 
             username: existingUser.username,
             email: existingUser.email,
-            phone: existingUser.phone
+            phone: existingUser.phone,
+            clientProfileId: existingUser.clientProfileId,
+            vendorId: existingUser.vendorId
           };
           // Include impersonation info if applicable
           if (req.session.impersonatorId) {
@@ -1309,7 +1311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.userId = user.id;
       req.session.userRole = user.role;
       
-      res.json({ userId: user.id, role: user.role, username: user.username, email: user.email, phone: user.phone });
+      res.json({ userId: user.id, role: user.role, username: user.username, email: user.email, phone: user.phone, clientProfileId: user.clientProfileId, vendorId: user.vendorId });
     } catch (error) {
       console.error("Error getting default user:", error);
       res.status(500).json({ error: "Failed to get default user" });
