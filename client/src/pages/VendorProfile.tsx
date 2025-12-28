@@ -24,6 +24,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   Popover,
@@ -400,6 +410,10 @@ export default function VendorProfile() {
     phone: "",
   });
 
+  // Delete team member state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState<User | null>(null);
+
   const [, setLocation] = useLocation();
 
   useEffect(() => {
@@ -510,6 +524,20 @@ export default function VendorProfile() {
       setEditDialogOpen(false);
       setEditingMember(null);
       toast({ title: "Team member updated successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Delete team member mutation
+  const deleteTeamMemberMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return apiRequest("DELETE", `/api/users/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/vendor", vendorStructureId] });
+      toast({ title: "Team member removed successfully" });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -1014,6 +1042,17 @@ export default function VendorProfile() {
                           >
                             <Pencil className="h-4 w-4 mr-1" />
                             Edit
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => {
+                              setMemberToDelete(member);
+                              setDeleteModalOpen(true);
+                            }}
+                            data-testid={`button-delete-member-${member.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </div>
                       </div>
@@ -1820,6 +1859,32 @@ export default function VendorProfile() {
           </Tabs>
         </div>
       </div>
+
+      <AlertDialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Team Member</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove {memberToDelete?.username} from your team? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (memberToDelete) {
+                  deleteTeamMemberMutation.mutate(memberToDelete.id);
+                }
+                setDeleteModalOpen(false);
+                setMemberToDelete(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

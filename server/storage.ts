@@ -112,6 +112,7 @@ export interface IStorage {
   getUsersByVendor(vendorId: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<InsertUser & { isActive: boolean; lastLoginAt: Date }>): Promise<User | undefined>;
+  deleteUser(id: string): Promise<void>;
 
   // Vendor Profile methods
   getVendorProfile(userId: string): Promise<VendorProfile | undefined>;
@@ -335,6 +336,10 @@ export class DbStorage implements IStorage {
   async updateUser(id: string, data: Partial<InsertUser & { isActive: boolean; lastLoginAt: Date }>): Promise<User | undefined> {
     const result = await db.update(users).set(data).where(eq(users.id, id)).returning();
     return result[0];
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    await db.delete(users).where(eq(users.id, id));
   }
 
   async getUsersByVendor(vendorId: string): Promise<User[]> {

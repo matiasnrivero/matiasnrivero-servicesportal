@@ -1835,6 +1835,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete user
+  app.delete("/api/users/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const targetUser = await storage.getUser(req.params.id);
+      if (!targetUser) {
+        return res.status(404).json({ error: "Target user not found" });
+      }
+
+      // Cannot delete yourself
+      if (targetUser.id === sessionUserId) {
+        return res.status(403).json({ error: "You cannot delete yourself" });
+      }
+
+      // Permission check for deleting users
+      const canDelete = async () => {
+        // Admin can delete anyone except themselves
+        if (sessionUser.role === "admin") return true;
+        
+        // Vendor can delete vendor_designers under their structure (not primary)
+        if (sessionUser.role === "vendor") {
+          const vendorStructureId = sessionUser.vendorId || sessionUserId;
+          // Can only delete vendor_designers, not primary vendor
+          return targetUser.vendorId === vendorStructureId && 
+                 targetUser.role === "vendor_designer";
+        }
+        
+        // Primary client can delete non-primary client team members
+        if (sessionUser.role === "client" && sessionUser.clientProfileId && targetUser.role === "client") {
+          const clientProfile = await storage.getClientProfileById(sessionUser.clientProfileId);
+          if (clientProfile && clientProfile.primaryUserId === sessionUserId) {
+            // Primary client can delete team members (same clientProfileId) but not themselves
+            return targetUser.clientProfileId === sessionUser.clientProfileId && 
+                   targetUser.id !== clientProfile.primaryUserId;
+          }
+        }
+        return false;
+      };
+
+      if (!(await canDelete())) {
+        return res.status(403).json({ error: "You don't have permission to delete this user" });
+      }
+
+      await storage.deleteUser(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
   // Get users by vendor (for vendor team management)
   app.get("/api/users/vendor/:vendorId", async (req, res) => {
     try {

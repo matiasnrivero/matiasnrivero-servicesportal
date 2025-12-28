@@ -23,13 +23,23 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { Users, UserPlus, Search, Filter, Pencil, CalendarIcon, X, LogIn } from "lucide-react";
+import { Users, UserPlus, Search, Filter, Pencil, CalendarIcon, X, LogIn, Trash2 } from "lucide-react";
 import type { User } from "@shared/schema";
 import { userRoles, paymentMethods } from "@shared/schema";
 import { format } from "date-fns";
@@ -90,6 +100,8 @@ export default function UserManagement() {
     role: "",
     paymentMethod: "",
   });
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   const { data: currentUser } = useQuery<User | null>({
     queryKey: ["/api/default-user"],
@@ -170,6 +182,19 @@ export default function UserManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
       toast({ title: "Now viewing as selected user" });
       window.location.href = "/";
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return apiRequest("DELETE", `/api/users/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({ title: "User deleted successfully" });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -761,6 +786,19 @@ export default function UserManagement() {
                           Edit
                         </Button>
                       )}
+                      {currentUser?.role === "admin" && user.id !== currentUser.id && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setUserToDelete(user);
+                            setDeleteModalOpen(true);
+                          }}
+                          data-testid={`button-delete-user-${user.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))
@@ -770,6 +808,32 @@ export default function UserManagement() {
           </Card>
         </div>
       </div>
+
+      <AlertDialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {userToDelete?.username}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (userToDelete) {
+                  deleteUserMutation.mutate(userToDelete.id);
+                }
+                setDeleteModalOpen(false);
+                setUserToDelete(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

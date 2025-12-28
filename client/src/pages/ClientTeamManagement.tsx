@@ -15,6 +15,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Building2, Users, UserPlus, Save, Pencil, Loader2, Crown, Trash2 } from "lucide-react";
 import { format } from "date-fns";
@@ -50,6 +60,8 @@ export default function ClientTeamManagement() {
     email: "",
     phone: "",
   });
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   const { data: currentUser, isLoading: userLoading } = useQuery<User | null>({
     queryKey: ["/api/default-user"],
@@ -537,13 +549,15 @@ export default function ClientTeamManagement() {
                           )}
                           {isPrimaryClient && !isSelf && !isPrimary && (
                             <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => deleteUserMutation.mutate(member.id)}
-                              disabled={deleteUserMutation.isPending}
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setUserToDelete(member);
+                                setDeleteModalOpen(true);
+                              }}
                               data-testid={`button-delete-member-${member.id}`}
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           )}
                         </div>
@@ -608,6 +622,32 @@ export default function ClientTeamManagement() {
               </div>
             </DialogContent>
           </Dialog>
+
+          <AlertDialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Team Member</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to remove {userToDelete?.username} from your team? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={() => {
+                    if (userToDelete) {
+                      deleteUserMutation.mutate(userToDelete.id);
+                    }
+                    setDeleteModalOpen(false);
+                    setUserToDelete(null);
+                  }}
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </main>
     </div>
