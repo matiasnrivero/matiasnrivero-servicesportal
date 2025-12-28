@@ -27,6 +27,7 @@ function Router() {
       {/* Add pages below */}
       <Route path="/" component={ServicesRequestAd} />
       <Route path="/service-requests" component={ServiceRequestsList} />
+      <Route path="/jobs" component={ServiceRequestsList} />
       <Route path="/service-requests/new" component={ServiceRequestForm} />
       <Route path="/jobs/:id" component={JobDetailView} />
       <Route path="/users" component={UserManagement} />
