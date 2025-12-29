@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { format, startOfMonth, subDays, subMonths, endOfMonth, startOfYear, endOfYear, subYears, startOfDay, endOfDay } from "date-fns";
+import { format } from "date-fns";
 import { Header } from "@/components/Header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,8 +41,6 @@ interface CurrentUser {
 }
 
 type ServiceMethod = "ad_hoc" | "bundle";
-
-type DatePreset = "today" | "yesterday" | "last_7_days" | "last_30_days" | "last_90_days" | "last_365_days" | "this_month" | "last_month" | "this_year" | "last_year" | "custom";
 
 const PIXELS_HIVE_VENDOR_ID = "9903d7f7-2754-41a0-872f-62863489b22c";
 
@@ -216,46 +214,10 @@ export default function ServicesProfitReport() {
   const [vendorFilter, setVendorFilter] = useState<string>("all");
   const [serviceFilter, setServiceFilter] = useState<string>("all");
   const [serviceMethodFilter, setServiceMethodFilter] = useState<string>("all");
-  const [datePreset, setDatePreset] = useState<DatePreset>("this_month");
-  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
-  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
-  const [startCalendarOpen, setStartCalendarOpen] = useState(false);
-  const [endCalendarOpen, setEndCalendarOpen] = useState(false);
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [searchJobId, setSearchJobId] = useState("");
-
-  const { dateFrom, dateTo } = useMemo(() => {
-    const today = new Date();
-    switch (datePreset) {
-      case "today":
-        return { dateFrom: startOfDay(today), dateTo: endOfDay(today) };
-      case "yesterday":
-        const yesterday = subDays(today, 1);
-        return { dateFrom: startOfDay(yesterday), dateTo: endOfDay(yesterday) };
-      case "last_7_days":
-        return { dateFrom: startOfDay(subDays(today, 6)), dateTo: endOfDay(today) };
-      case "last_30_days":
-        return { dateFrom: startOfDay(subDays(today, 29)), dateTo: endOfDay(today) };
-      case "last_90_days":
-        return { dateFrom: startOfDay(subDays(today, 89)), dateTo: endOfDay(today) };
-      case "last_365_days":
-        return { dateFrom: startOfDay(subDays(today, 364)), dateTo: endOfDay(today) };
-      case "this_month":
-        return { dateFrom: startOfMonth(today), dateTo: today };
-      case "last_month":
-        const lastMonth = subMonths(today, 1);
-        return { dateFrom: startOfMonth(lastMonth), dateTo: endOfMonth(lastMonth) };
-      case "this_year":
-        return { dateFrom: startOfYear(today), dateTo: today };
-      case "last_year":
-        const lastYear = subYears(today, 1);
-        return { dateFrom: startOfYear(lastYear), dateTo: endOfYear(lastYear) };
-      case "custom":
-        return { dateFrom: customStartDate, dateTo: customEndDate };
-      default:
-        return { dateFrom: startOfMonth(today), dateTo: today };
-    }
-  }, [datePreset, customStartDate, customEndDate]);
 
   const { data: currentUser } = useQuery<CurrentUser>({
     queryKey: ["/api/default-user"],
@@ -855,81 +817,52 @@ export default function ServicesProfitReport() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm">Date Range</Label>
-                <Select value={datePreset} onValueChange={(v) => setDatePreset(v as DatePreset)}>
-                  <SelectTrigger data-testid="select-date-preset">
-                    <SelectValue placeholder="Select period" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="today">Today</SelectItem>
-                    <SelectItem value="yesterday">Yesterday</SelectItem>
-                    <SelectItem value="last_7_days">Last 7 Days</SelectItem>
-                    <SelectItem value="last_30_days">Last 30 Days</SelectItem>
-                    <SelectItem value="last_90_days">Last 90 Days</SelectItem>
-                    <SelectItem value="last_365_days">Last 365 Days</SelectItem>
-                    <SelectItem value="this_month">This Month</SelectItem>
-                    <SelectItem value="last_month">Last Month</SelectItem>
-                    <SelectItem value="this_year">This Year</SelectItem>
-                    <SelectItem value="last_year">Last Year</SelectItem>
-                    <SelectItem value="custom">Custom Range</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label className="text-sm">Date From</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                      data-testid="button-date-from"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateFrom ? format(dateFrom, "MMM d, yyyy") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateFrom}
+                      onSelect={setDateFrom}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
 
-              {datePreset === "custom" && (
-                <div className="space-y-2">
-                  <Label className="text-sm">Custom Dates</Label>
-                  <div className="flex items-center gap-2">
-                    <Popover open={startCalendarOpen} onOpenChange={setStartCalendarOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="flex-1 justify-start text-left font-normal"
-                          data-testid="button-date-from"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={customStartDate}
-                          onSelect={(date) => {
-                            setCustomStartDate(date);
-                            setStartCalendarOpen(false);
-                          }}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <span className="text-muted-foreground text-sm">to</span>
-                    <Popover open={endCalendarOpen} onOpenChange={setEndCalendarOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="flex-1 justify-start text-left font-normal"
-                          data-testid="button-date-to"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={customEndDate}
-                          onSelect={(date) => {
-                            setCustomEndDate(date);
-                            setEndCalendarOpen(false);
-                          }}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label className="text-sm">Date To</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                      data-testid="button-date-to"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateTo ? format(dateTo, "MMM d, yyyy") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateTo}
+                      onSelect={setDateTo}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
 
               <MultiSelectClientFilter
                 options={clientOptions}
@@ -952,7 +885,7 @@ export default function ServicesProfitReport() {
               </div>
             </div>
 
-            {(vendorFilter !== "all" || serviceFilter !== "all" || serviceMethodFilter !== "all" || datePreset !== "this_month" || selectedClients.length > 0 || searchJobId) && (
+            {(vendorFilter !== "all" || serviceFilter !== "all" || serviceMethodFilter !== "all" || dateFrom || dateTo || selectedClients.length > 0 || searchJobId) && (
               <div className="mt-4 flex items-center gap-2">
                 <span className="text-sm text-dark-gray">Active filters:</span>
                 <Button
@@ -962,9 +895,8 @@ export default function ServicesProfitReport() {
                     setVendorFilter("all");
                     setServiceFilter("all");
                     setServiceMethodFilter("all");
-                    setDatePreset("this_month");
-                    setCustomStartDate(undefined);
-                    setCustomEndDate(undefined);
+                    setDateFrom(undefined);
+                    setDateTo(undefined);
                     setSelectedClients([]);
                     setSearchJobId("");
                   }}
