@@ -187,7 +187,7 @@ export function Header() {
           </h1>
         </Link>
         <nav className="flex items-center gap-3">
-          {isAdmin && (
+          {(isAdmin || isInternalDesigner || isVendor || isVendorDesigner) && (
             <Link href="/dashboard">
               <Button
                 variant={location === "/dashboard" ? "default" : "ghost"}
