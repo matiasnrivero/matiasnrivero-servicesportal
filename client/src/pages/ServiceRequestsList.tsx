@@ -794,11 +794,11 @@ export default function ServiceRequestsList() {
                   <Button
                     variant="outline"
                     onClick={() => setBulkAssignModalOpen(true)}
-                    disabled={selectedRequests.length === 0}
+                    disabled={selectedRequests.size === 0}
                     data-testid="button-bulk-assign"
                   >
                     <Users className="h-4 w-4 mr-2" />
-                    Bulk Assign {selectedRequests.length > 0 && `(${selectedRequests.length})`}
+                    Bulk Assign {selectedRequests.size > 0 && `(${selectedRequests.size})`}
                   </Button>
                 )}
                 <Link href="/">
