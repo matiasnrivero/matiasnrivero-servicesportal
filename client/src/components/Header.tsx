@@ -186,12 +186,11 @@ export function Header() {
             Services Portal
           </h1>
         </Link>
-        <nav className="flex items-center gap-1">
+        <nav className="flex items-center gap-3">
           {isAdmin && (
             <Link href="/dashboard">
               <Button
                 variant={location === "/dashboard" ? "default" : "ghost"}
-                size="sm"
                 className={location === "/dashboard" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-dashboard"
               >
@@ -203,7 +202,6 @@ export function Header() {
             <Link href="/">
               <Button
                 variant={location === "/" ? "default" : "ghost"}
-                size="sm"
                 className={location === "/" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-services"
               >
@@ -214,7 +212,6 @@ export function Header() {
           <Link href="/service-requests">
             <Button
               variant={location.startsWith("/service-requests") && location !== "/service-requests/new" ? "default" : "ghost"}
-              size="sm"
               className={location.startsWith("/service-requests") && location !== "/service-requests/new" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
               data-testid="nav-requests"
             >
@@ -225,7 +222,6 @@ export function Header() {
             <Link href="/users">
               <Button
                 variant={location === "/users" ? "default" : "ghost"}
-                size="sm"
                 className={location === "/users" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-users"
               >
@@ -237,7 +233,6 @@ export function Header() {
             <Link href="/client-team">
               <Button
                 variant={location === "/client-team" ? "default" : "ghost"}
-                size="sm"
                 className={location === "/client-team" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-client-team"
               >
@@ -249,7 +244,6 @@ export function Header() {
             <Link href="/vendor-profile">
               <Button
                 variant={location === "/vendor-profile" ? "default" : "ghost"}
-                size="sm"
                 className={location === "/vendor-profile" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-vendor-profile"
               >
@@ -261,7 +255,6 @@ export function Header() {
             <Link href="/vendors">
               <Button
                 variant={location.startsWith("/vendors") ? "default" : "ghost"}
-                size="sm"
                 className={location.startsWith("/vendors") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-vendors"
               >
@@ -273,7 +266,6 @@ export function Header() {
             <Link href="/settings">
               <Button
                 variant={location.startsWith("/settings") ? "default" : "ghost"}
-                size="sm"
                 className={location.startsWith("/settings") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-settings"
               >
@@ -285,7 +277,6 @@ export function Header() {
             <Link href="/reports">
               <Button
                 variant={location.startsWith("/reports") ? "default" : "ghost"}
-                size="sm"
                 className={location.startsWith("/reports") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-reports"
               >
