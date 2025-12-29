@@ -335,8 +335,12 @@ export default function ServiceRequestsList() {
     },
     onSuccess: async () => {
       await refetchUser();
-      localQueryClient.invalidateQueries({ queryKey: ["/api/default-user"] });
-      localQueryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+      await Promise.all([
+        localQueryClient.invalidateQueries({ queryKey: ["/api/default-user"] }),
+        localQueryClient.invalidateQueries({ queryKey: ["/api/service-requests"] }),
+        localQueryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] }),
+        localQueryClient.invalidateQueries({ queryKey: ["/api/assignable-users"] }),
+      ]);
       toast({ 
         title: "Role switched", 
         description: `You are now viewing as ${currentUser?.role === "designer" ? "Client" : "Designer"}` 
@@ -401,9 +405,10 @@ export default function ServiceRequestsList() {
 
   const bulkAssignMutation = useMutation({
     mutationFn: async (data: { requestIds: string[]; assignmentType: "designer" | "vendor"; targetId: string }) => {
-      return apiRequest("POST", "/api/service-requests/bulk-assign", data);
+      const res = await apiRequest("POST", "/api/service-requests/bulk-assign", data);
+      return res.json();
     },
-    onSuccess: (response: any) => {
+    onSuccess: (data: { success: boolean; assigned: number; skipped: number }) => {
       localQueryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
       localQueryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] });
       setSelectedRequests(new Set());
@@ -411,8 +416,8 @@ export default function ServiceRequestsList() {
       setSelectedDesignerId("");
       setSelectedVendorId("");
       
-      const assigned = response?.assigned || 0;
-      const skipped = response?.skipped || 0;
+      const assigned = data?.assigned || 0;
+      const skipped = data?.skipped || 0;
       
       if (assigned > 0) {
         toast({ 
