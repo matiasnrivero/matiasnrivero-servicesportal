@@ -5413,6 +5413,259 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== ROLE-BASED DASHBOARD ROUTES ====================
+
+  // Dashboard summary for Internal Designer, Vendor, Vendor Designer
+  app.get("/api/dashboard/summary", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(403).json({ error: "User not found" });
+      }
+
+      const allowedRoles = ["admin", "internal_designer", "vendor", "vendor_designer"];
+      if (!allowedRoles.includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { start, end } = req.query;
+      const startDate = start ? new Date(start as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const endDate = end ? new Date(end as string) : new Date();
+      endDate.setHours(23, 59, 59, 999);
+
+      const allServiceRequests = await storage.getAllServiceRequests();
+      const allBundleRequests = await storage.getAllBundleRequests();
+      const users = await storage.getAllUsers();
+      const userMap: Record<string, typeof users[0]> = {};
+      users.forEach(u => { userMap[u.id] = u; });
+
+      // Filter requests based on role
+      let filteredServiceRequests = allServiceRequests;
+      let filteredBundleRequests = allBundleRequests;
+
+      if (sessionUser.role === "vendor") {
+        // Vendor sees jobs assigned to their vendor profile
+        // Fallback to user id if vendorId is not set (older records)
+        const vendorId = sessionUser.vendorId || sessionUser.id;
+        filteredServiceRequests = allServiceRequests.filter(r => r.vendorAssigneeId === vendorId);
+        filteredBundleRequests = allBundleRequests.filter(r => r.vendorAssigneeId === vendorId);
+      } else if (sessionUser.role === "vendor_designer") {
+        // Vendor Designer sees only jobs assigned to them personally
+        filteredServiceRequests = allServiceRequests.filter(r => r.assigneeId === sessionUser.id);
+        filteredBundleRequests = allBundleRequests.filter(r => r.assigneeId === sessionUser.id);
+      }
+      // admin and internal_designer see all jobs
+
+      // Filter by date range
+      const serviceRequests = filteredServiceRequests.filter(r => {
+        const created = new Date(r.createdAt);
+        return created >= startDate && created <= endDate;
+      });
+
+      const bundleRequests = filteredBundleRequests.filter(r => {
+        const created = new Date(r.createdAt);
+        return created >= startDate && created <= endDate;
+      });
+
+      // Count jobs by status
+      const jobCounts = {
+        pendingAssignment: 0,
+        assignedToVendor: 0,
+        inProgress: 0,
+        delivered: 0,
+        changeRequest: 0,
+        canceled: 0,
+      };
+
+      let jobsOverSla = 0;
+      const now = new Date();
+
+      for (const r of serviceRequests) {
+        const assigneeRole = r.assigneeId ? userMap[r.assigneeId]?.role : undefined;
+        
+        if (r.status === "pending") {
+          if (!r.assigneeId && !r.vendorAssigneeId) {
+            jobCounts.pendingAssignment++;
+          } else if (r.vendorAssigneeId || assigneeRole === "vendor") {
+            jobCounts.assignedToVendor++;
+          } else {
+            jobCounts.pendingAssignment++;
+          }
+        } else if (r.status === "in-progress") {
+          jobCounts.inProgress++;
+        } else if (r.status === "delivered") {
+          jobCounts.delivered++;
+        } else if (r.status === "change-request") {
+          jobCounts.changeRequest++;
+        } else if (r.status === "canceled") {
+          jobCounts.canceled++;
+        }
+
+        if (r.dueDate && r.status !== "delivered" && r.status !== "canceled") {
+          if (now > new Date(r.dueDate)) {
+            jobsOverSla++;
+          }
+        }
+      }
+
+      for (const r of bundleRequests) {
+        const assigneeRole = r.assigneeId ? userMap[r.assigneeId]?.role : undefined;
+        
+        if (r.status === "pending") {
+          if (!r.assigneeId && !r.vendorAssigneeId) {
+            jobCounts.pendingAssignment++;
+          } else if (r.vendorAssigneeId || assigneeRole === "vendor") {
+            jobCounts.assignedToVendor++;
+          } else {
+            jobCounts.pendingAssignment++;
+          }
+        } else if (r.status === "in-progress") {
+          jobCounts.inProgress++;
+        } else if (r.status === "delivered") {
+          jobCounts.delivered++;
+        } else if (r.status === "change-request") {
+          jobCounts.changeRequest++;
+        }
+
+        if (r.dueDate && r.status !== "delivered") {
+          if (now > new Date(r.dueDate)) {
+            jobsOverSla++;
+          }
+        }
+      }
+
+      // Calculate financial metrics (only for admin)
+      let totalSales = 0;
+      let vendorCost = 0;
+
+      if (sessionUser.role === "admin") {
+        for (const r of serviceRequests) {
+          if (r.finalPrice) {
+            totalSales += parseFloat(r.finalPrice);
+          }
+        }
+
+        const bundles = await storage.getAllBundles();
+        const bundleMap: Record<string, typeof bundles[0]> = {};
+        bundles.forEach(b => { bundleMap[b.id] = b; });
+
+        for (const r of bundleRequests) {
+          const bundle = bundleMap[r.bundleId];
+          if (bundle?.finalPrice) {
+            totalSales += parseFloat(bundle.finalPrice);
+          }
+        }
+
+        vendorCost = totalSales * 0.6;
+      }
+
+      const profit = totalSales - vendorCost;
+      const marginPercent = totalSales > 0 ? (profit / totalSales) * 100 : 0;
+      const openJobs = jobCounts.pendingAssignment + jobCounts.assignedToVendor + 
+                       jobCounts.inProgress + jobCounts.changeRequest;
+      const totalOrders = serviceRequests.length + bundleRequests.length;
+      const aov = totalOrders > 0 ? totalSales / totalOrders : 0;
+
+      res.json({
+        jobCounts,
+        jobsOverSla,
+        openJobs,
+        financial: {
+          totalSales,
+          vendorCost,
+          profit,
+          marginPercent,
+          aov,
+        },
+        totalOrders,
+      });
+    } catch (error) {
+      console.error("Error fetching dashboard summary:", error);
+      res.status(500).json({ error: "Failed to fetch dashboard summary" });
+    }
+  });
+
+  // Daily orders for role-based dashboard
+  app.get("/api/dashboard/daily-orders", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(403).json({ error: "User not found" });
+      }
+
+      const allowedRoles = ["admin", "internal_designer", "vendor", "vendor_designer"];
+      if (!allowedRoles.includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { start, end } = req.query;
+      const startDate = start ? new Date(start as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const endDate = end ? new Date(end as string) : new Date();
+      endDate.setHours(23, 59, 59, 999);
+
+      const allServiceRequests = await storage.getAllServiceRequests();
+      const allBundleRequests = await storage.getAllBundleRequests();
+
+      // Filter requests based on role
+      let filteredServiceRequests = allServiceRequests;
+      let filteredBundleRequests = allBundleRequests;
+
+      if (sessionUser.role === "vendor") {
+        // Fallback to user id if vendorId is not set (older records)
+        const vendorId = sessionUser.vendorId || sessionUser.id;
+        filteredServiceRequests = allServiceRequests.filter(r => r.vendorAssigneeId === vendorId);
+        filteredBundleRequests = allBundleRequests.filter(r => r.vendorAssigneeId === vendorId);
+      } else if (sessionUser.role === "vendor_designer") {
+        filteredServiceRequests = allServiceRequests.filter(r => r.assigneeId === sessionUser.id);
+        filteredBundleRequests = allBundleRequests.filter(r => r.assigneeId === sessionUser.id);
+      }
+
+      // Aggregate by day
+      const dailyOrders: Record<string, number> = {};
+
+      // Initialize all days in range
+      const current = new Date(startDate);
+      while (current <= endDate) {
+        const dateKey = current.toISOString().split('T')[0];
+        dailyOrders[dateKey] = 0;
+        current.setDate(current.getDate() + 1);
+      }
+
+      for (const r of filteredServiceRequests) {
+        const created = new Date(r.createdAt);
+        if (created >= startDate && created <= endDate) {
+          const dateKey = created.toISOString().split('T')[0];
+          dailyOrders[dateKey] = (dailyOrders[dateKey] || 0) + 1;
+        }
+      }
+
+      for (const r of filteredBundleRequests) {
+        const created = new Date(r.createdAt);
+        if (created >= startDate && created <= endDate) {
+          const dateKey = created.toISOString().split('T')[0];
+          dailyOrders[dateKey] = (dailyOrders[dateKey] || 0) + 1;
+        }
+      }
+
+      const result = Object.entries(dailyOrders)
+        .map(([date, orders]) => ({ date, orders }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching daily orders:", error);
+      res.status(500).json({ error: "Failed to fetch daily orders" });
+    }
+  });
+
   // ==================== AUTOMATION LOGS ROUTES ====================
 
   // Get automation logs for a service request

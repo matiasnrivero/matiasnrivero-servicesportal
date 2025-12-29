@@ -225,50 +225,61 @@ export default function AdminDashboard() {
     queryKey: ["/api/default-user"],
   });
 
+  // Role-based access configuration
+  const allowedRoles = ["admin", "internal_designer", "vendor", "vendor_designer"];
+  const isAllowedRole = Boolean(currentUser?.role && allowedRoles.includes(currentUser.role));
+  const showFinancials = currentUser?.role === "admin";
+  const showTopDrivers = currentUser?.role === "admin";
+  const showDailySales = currentUser?.role === "admin";
+
+  // Use role-based API endpoints
   const { data: summary, isLoading: summaryLoading } = useQuery<DashboardSummary>({
-    queryKey: [`/api/admin/dashboard/summary?${dateParams}`],
-    enabled: currentUser?.role === "admin",
+    queryKey: [`/api/dashboard/summary?${dateParams}`],
+    enabled: isAllowedRole,
   });
 
-  // Comparison period summary for period-over-period calculations
+  // Comparison period summary for period-over-period calculations (admin only)
   const { data: comparisonSummary } = useQuery<DashboardSummary>({
-    queryKey: [`/api/admin/dashboard/summary?${comparisonDateParams}`],
-    enabled: currentUser?.role === "admin",
+    queryKey: [`/api/dashboard/summary?${comparisonDateParams}`],
+    enabled: showFinancials,
   });
 
   const { data: topClients, isLoading: clientsLoading } = useQuery<TopClient[]>({
     queryKey: [`/api/admin/dashboard/top-clients?${dateParams}`],
-    enabled: currentUser?.role === "admin",
+    enabled: showTopDrivers,
   });
 
   const { data: topServices, isLoading: servicesLoading } = useQuery<TopService[]>({
     queryKey: [`/api/admin/dashboard/top-services?${dateParams}`],
-    enabled: currentUser?.role === "admin",
+    enabled: showTopDrivers,
   });
 
   const { data: topBundles, isLoading: bundlesLoading } = useQuery<TopBundle[]>({
     queryKey: [`/api/admin/dashboard/top-bundles?${dateParams}`],
-    enabled: currentUser?.role === "admin",
+    enabled: showTopDrivers,
   });
 
   const { data: dailySales, isLoading: salesLoading } = useQuery<DailyData[]>({
     queryKey: [`/api/admin/dashboard/daily-sales?${dateParams}`],
-    enabled: currentUser?.role === "admin",
+    enabled: showDailySales,
   });
 
   const { data: dailyOrders, isLoading: ordersLoading } = useQuery<DailyData[]>({
-    queryKey: [`/api/admin/dashboard/daily-orders?${dateParams}`],
-    enabled: currentUser?.role === "admin",
+    queryKey: [`/api/dashboard/daily-orders?${dateParams}`],
+    enabled: isAllowedRole,
   });
 
   const chartData = useMemo(() => {
-    if (!dailySales || !dailyOrders) return [];
+    if (!dailyOrders) return [];
     
     const combined: Record<string, { date: string; sales: number; orders: number }> = {};
     
-    dailySales.forEach(d => {
-      combined[d.date] = { date: d.date, sales: d.sales || 0, orders: 0 };
-    });
+    // Add sales data if available (admin only)
+    if (dailySales) {
+      dailySales.forEach(d => {
+        combined[d.date] = { date: d.date, sales: d.sales || 0, orders: 0 };
+      });
+    }
     
     dailyOrders.forEach(d => {
       if (combined[d.date]) {
@@ -434,14 +445,14 @@ export default function AdminDashboard() {
     setLocation(`/jobs?${params.toString()}`);
   };
 
-  if (currentUser?.role !== "admin") {
+  if (!isAllowedRole) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
         <div className="container mx-auto p-6">
           <Card>
             <CardContent className="p-6">
-              <p className="text-muted-foreground">Admin access required to view the dashboard.</p>
+              <p className="text-muted-foreground">Dashboard access is not available for your role.</p>
             </CardContent>
           </Card>
         </div>
@@ -674,7 +685,8 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        {/* Section 2: Financial Performance */}
+        {/* Section 2: Financial Performance (Admin only) */}
+        {showFinancials && (
         <section className="space-y-4">
           <h2 className="text-lg font-medium">Financial Performance</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -787,8 +799,10 @@ export default function AdminDashboard() {
             </Card>
           </div>
         </section>
+        )}
 
-        {/* Section 3: Top Drivers */}
+        {/* Section 3: Top Drivers (Admin only) */}
+        {showTopDrivers && (
         <section className="space-y-4">
           <h2 className="text-lg font-medium">Top Drivers</h2>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -924,12 +938,14 @@ export default function AdminDashboard() {
             </Card>
           </div>
         </section>
+        )}
 
         {/* Section 4: Daily Trends */}
         <section className="space-y-4">
           <h2 className="text-lg font-medium">Daily Trends</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Daily Sales Chart */}
+          <div className={`grid gap-4 ${showDailySales ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+            {/* Daily Sales Chart (Admin only) */}
+            {showDailySales && (
             <Card data-testid="card-daily-sales-chart">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-medium">Daily Sales ($)</CardTitle>
@@ -970,6 +986,7 @@ export default function AdminDashboard() {
                 )}
               </CardContent>
             </Card>
+            )}
 
             {/* Daily Orders Chart */}
             <Card data-testid="card-daily-orders-chart">
