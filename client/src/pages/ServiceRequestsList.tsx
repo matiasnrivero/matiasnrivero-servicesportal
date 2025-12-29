@@ -1208,7 +1208,7 @@ export default function ServiceRequestsList() {
                             {statusInfo.label}
                           </Badge>
                         </TableCell>
-                        <TableCell data-testid={`text-created-${request.id}`}>
+                        <TableCell className="whitespace-nowrap" data-testid={`text-created-${request.id}`}>
                           {format(new Date(request.createdAt), "MMM dd, yyyy")}
                         </TableCell>
                         <TableCell>
