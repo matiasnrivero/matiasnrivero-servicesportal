@@ -1538,7 +1538,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Prevent caching
       res.set('Cache-Control', 'no-store');
-      res.json({ userId: user!.id, role: user!.role, username: user!.username, email: user!.email, phone: user!.phone });
+      // Return full user object for optimistic UI updates
+      res.json({ role: user!.role, user: user });
     } catch (error) {
       console.error("Error switching role:", error);
       res.status(500).json({ error: "Failed to switch role" });
@@ -1620,12 +1621,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.userRole = originalUser.role;
       delete req.session.impersonatorId;
 
-      res.json({ 
-        userId: originalUser.id, 
-        role: originalUser.role, 
-        username: originalUser.username,
-        impersonating: false 
-      });
+      // Return full user object for optimistic UI updates
+      res.json({ user: originalUser });
     } catch (error) {
       console.error("Error exiting impersonation:", error);
       res.status(500).json({ error: "Failed to exit impersonation" });

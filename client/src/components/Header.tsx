@@ -106,17 +106,18 @@ export function Header() {
         body: JSON.stringify({ role }),
       });
       if (!res.ok) throw new Error("Failed to switch role");
-      return res.json() as Promise<{ role: string }>;
+      return res.json() as Promise<{ role: string; user: User }>;
     },
-    onSuccess: async (data) => {
-      // Only invalidate role-sensitive queries instead of all queries for better performance
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["/api/default-user"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/assignable-users"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/users"] }),
-      ]);
+    onSuccess: (data) => {
+      // Optimistically update user data immediately for instant UI response
+      if (data.user) {
+        queryClient.setQueryData(["/api/default-user"], data.user);
+      }
+      // Fire invalidations in background without awaiting - UI unlocks immediately
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/assignable-users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       // Navigate to vendor profile when switching to vendor role
       if (data.role === "vendor") {
         setLocation("/vendor-profile");
@@ -131,17 +132,18 @@ export function Header() {
         headers: { "Content-Type": "application/json" },
       });
       if (!res.ok) throw new Error("Failed to exit impersonation");
-      return res.json();
+      return res.json() as Promise<{ user: User }>;
     },
-    onSuccess: async () => {
-      // Only invalidate role-sensitive queries for better performance
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["/api/default-user"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/assignable-users"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/users"] }),
-      ]);
+    onSuccess: (data) => {
+      // Optimistically update user data immediately for instant UI response
+      if (data.user) {
+        queryClient.setQueryData(["/api/default-user"], data.user);
+      }
+      // Fire invalidations in background without awaiting
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/assignable-users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
     },
   });
 

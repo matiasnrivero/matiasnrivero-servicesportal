@@ -331,19 +331,21 @@ export default function ServiceRequestsList() {
 
   const switchRoleMutation = useMutation({
     mutationFn: async (role: string) => {
-      return apiRequest("POST", "/api/switch-role", { role });
+      const res = await apiRequest("POST", "/api/switch-role", { role });
+      return res.json() as Promise<{ role: string; user: User }>;
     },
-    onSuccess: async () => {
-      await refetchUser();
-      await Promise.all([
-        localQueryClient.invalidateQueries({ queryKey: ["/api/default-user"] }),
-        localQueryClient.invalidateQueries({ queryKey: ["/api/service-requests"] }),
-        localQueryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] }),
-        localQueryClient.invalidateQueries({ queryKey: ["/api/assignable-users"] }),
-      ]);
+    onSuccess: (data) => {
+      // Optimistically update user data immediately for instant UI response
+      if (data.user) {
+        localQueryClient.setQueryData(["/api/default-user"], data.user);
+      }
+      // Fire invalidations in background without awaiting
+      localQueryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+      localQueryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] });
+      localQueryClient.invalidateQueries({ queryKey: ["/api/assignable-users"] });
       toast({ 
         title: "Role switched", 
-        description: `You are now viewing as ${currentUser?.role === "designer" ? "Client" : "Designer"}` 
+        description: `You are now viewing as ${data.role}` 
       });
     },
     onError: () => {
