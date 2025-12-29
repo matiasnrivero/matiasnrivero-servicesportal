@@ -181,12 +181,23 @@ export function Header() {
       )}
     <header className="flex w-full items-center justify-between gap-12 px-8 py-4 bg-white shadow-shadow-top-bar">
       <div className="flex items-center gap-8">
-        <Link href="/">
-          <h1 className="font-title-semibold text-dark-blue-night text-xl cursor-pointer whitespace-nowrap">
+        <Link href={isAdmin ? "/dashboard" : "/"}>
+          <h1 className="font-title-semibold text-dark-blue-night text-xl cursor-pointer whitespace-nowrap" data-testid="link-services-portal">
             Services Portal
           </h1>
         </Link>
         <nav className="flex items-center gap-4">
+          {isAdmin && (
+            <Link href="/dashboard">
+              <Button
+                variant={location === "/dashboard" ? "default" : "ghost"}
+                className={location === "/dashboard" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
+                data-testid="nav-dashboard"
+              >
+                Dashboard
+              </Button>
+            </Link>
+          )}
           {canViewServices && (
             <Link href="/">
               <Button

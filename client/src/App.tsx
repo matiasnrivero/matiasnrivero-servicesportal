@@ -21,12 +21,14 @@ import BundleRequestDetail from "@/pages/BundleRequestDetail";
 import Reports from "@/pages/Reports";
 import ServicesProfitReport from "@/pages/ServicesProfitReport";
 import ClientTeamManagement from "@/pages/ClientTeamManagement";
+import AdminDashboard from "@/pages/AdminDashboard";
 
 function Router() {
   return (
     <Switch>
       {/* Add pages below */}
       <Route path="/" component={ServicesRequestAd} />
+      <Route path="/dashboard" component={AdminDashboard} />
       <Route path="/service-requests" component={ServiceRequestsList} />
       <Route path="/jobs" component={ServiceRequestsList} />
       <Route path="/service-requests/new" component={ServiceRequestForm} />

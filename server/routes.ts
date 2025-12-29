@@ -4918,6 +4918,501 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== ADMIN DASHBOARD ROUTES ====================
+
+  // Dashboard summary - job counts, financial metrics
+  app.get("/api/admin/dashboard/summary", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { start, end } = req.query;
+      const startDate = start ? new Date(start as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const endDate = end ? new Date(end as string) : new Date();
+      endDate.setHours(23, 59, 59, 999);
+
+      // Get all service requests and bundle requests within date range
+      const allServiceRequests = await storage.getAllServiceRequests();
+      const allBundleRequests = await storage.getAllBundleRequests();
+      const users = await storage.getAllUsers();
+      const userMap: Record<string, typeof users[0]> = {};
+      users.forEach(u => { userMap[u.id] = u; });
+
+      // Filter by date range
+      const serviceRequests = allServiceRequests.filter(r => {
+        const created = new Date(r.createdAt);
+        return created >= startDate && created <= endDate;
+      });
+
+      const bundleRequests = allBundleRequests.filter(r => {
+        const created = new Date(r.createdAt);
+        return created >= startDate && created <= endDate;
+      });
+
+      // Count jobs by admin-facing status
+      const jobCounts = {
+        pendingAssignment: 0,
+        assignedToVendor: 0,
+        inProgress: 0,
+        delivered: 0,
+        changeRequest: 0,
+        canceled: 0,
+      };
+
+      let jobsOverSla = 0;
+      const now = new Date();
+
+      // Process service requests
+      for (const r of serviceRequests) {
+        const assigneeRole = r.assigneeId ? userMap[r.assigneeId]?.role : undefined;
+        
+        if (r.status === "pending") {
+          if (!r.assigneeId && !r.vendorAssigneeId) {
+            jobCounts.pendingAssignment++;
+          } else if (r.vendorAssigneeId || assigneeRole === "vendor") {
+            jobCounts.assignedToVendor++;
+          } else {
+            jobCounts.pendingAssignment++;
+          }
+        } else if (r.status === "in-progress") {
+          jobCounts.inProgress++;
+        } else if (r.status === "delivered") {
+          jobCounts.delivered++;
+        } else if (r.status === "change-request") {
+          jobCounts.changeRequest++;
+        } else if (r.status === "canceled") {
+          jobCounts.canceled++;
+        }
+
+        // Check SLA - jobs over due date that are not delivered/canceled
+        if (r.dueDate && r.status !== "delivered" && r.status !== "canceled") {
+          if (now > new Date(r.dueDate)) {
+            jobsOverSla++;
+          }
+        }
+      }
+
+      // Process bundle requests
+      for (const r of bundleRequests) {
+        const assigneeRole = r.assigneeId ? userMap[r.assigneeId]?.role : undefined;
+        
+        if (r.status === "pending") {
+          if (!r.assigneeId && !r.vendorAssigneeId) {
+            jobCounts.pendingAssignment++;
+          } else if (r.vendorAssigneeId || assigneeRole === "vendor") {
+            jobCounts.assignedToVendor++;
+          } else {
+            jobCounts.pendingAssignment++;
+          }
+        } else if (r.status === "in-progress") {
+          jobCounts.inProgress++;
+        } else if (r.status === "delivered") {
+          jobCounts.delivered++;
+        } else if (r.status === "change-request") {
+          jobCounts.changeRequest++;
+        }
+
+        // Check SLA for bundles
+        if (r.dueDate && r.status !== "delivered") {
+          if (now > new Date(r.dueDate)) {
+            jobsOverSla++;
+          }
+        }
+      }
+
+      // Calculate financial metrics
+      let totalSales = 0;
+      let vendorCost = 0;
+
+      // Sum finalPrice from service requests
+      for (const r of serviceRequests) {
+        if (r.finalPrice) {
+          totalSales += parseFloat(r.finalPrice);
+        }
+      }
+
+      // Sum finalPrice from bundle requests (via bundle definition)
+      const bundles = await storage.getAllBundles();
+      const bundleMap: Record<string, typeof bundles[0]> = {};
+      bundles.forEach(b => { bundleMap[b.id] = b; });
+
+      for (const r of bundleRequests) {
+        const bundle = bundleMap[r.bundleId];
+        if (bundle?.finalPrice) {
+          totalSales += parseFloat(bundle.finalPrice);
+        }
+      }
+
+      // For vendor cost, we'd need vendor-specific pricing agreements
+      // For now, estimate vendor cost as 60% of sales (configurable later)
+      vendorCost = totalSales * 0.6;
+
+      const profit = totalSales - vendorCost;
+      const marginPercent = totalSales > 0 ? (profit / totalSales) * 100 : 0;
+
+      // Calculate additional metrics
+      const openJobs = jobCounts.pendingAssignment + jobCounts.assignedToVendor + 
+                       jobCounts.inProgress + jobCounts.changeRequest;
+      
+      const totalOrders = serviceRequests.length + bundleRequests.length;
+      const aov = totalOrders > 0 ? totalSales / totalOrders : 0;
+
+      res.json({
+        jobCounts,
+        jobsOverSla,
+        openJobs,
+        financial: {
+          totalSales,
+          vendorCost,
+          profit,
+          marginPercent,
+          aov,
+        },
+        totalOrders,
+      });
+    } catch (error) {
+      console.error("Error fetching dashboard summary:", error);
+      res.status(500).json({ error: "Failed to fetch dashboard summary" });
+    }
+  });
+
+  // Top clients by sales
+  app.get("/api/admin/dashboard/top-clients", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { start, end } = req.query;
+      const startDate = start ? new Date(start as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const endDate = end ? new Date(end as string) : new Date();
+      endDate.setHours(23, 59, 59, 999);
+
+      const allServiceRequests = await storage.getAllServiceRequests();
+      const allBundleRequests = await storage.getAllBundleRequests();
+      const users = await storage.getAllUsers();
+      const bundles = await storage.getAllBundles();
+
+      const userMap: Record<string, typeof users[0]> = {};
+      users.forEach(u => { userMap[u.id] = u; });
+      const bundleMap: Record<string, typeof bundles[0]> = {};
+      bundles.forEach(b => { bundleMap[b.id] = b; });
+
+      // Filter by date range
+      const serviceRequests = allServiceRequests.filter(r => {
+        const created = new Date(r.createdAt);
+        return created >= startDate && created <= endDate;
+      });
+      const bundleRequests = allBundleRequests.filter(r => {
+        const created = new Date(r.createdAt);
+        return created >= startDate && created <= endDate;
+      });
+
+      // Aggregate by client
+      const clientStats: Record<string, { requests: number; sales: number }> = {};
+
+      for (const r of serviceRequests) {
+        if (!clientStats[r.userId]) {
+          clientStats[r.userId] = { requests: 0, sales: 0 };
+        }
+        clientStats[r.userId].requests++;
+        if (r.finalPrice) {
+          clientStats[r.userId].sales += parseFloat(r.finalPrice);
+        }
+      }
+
+      for (const r of bundleRequests) {
+        if (!clientStats[r.userId]) {
+          clientStats[r.userId] = { requests: 0, sales: 0 };
+        }
+        clientStats[r.userId].requests++;
+        const bundle = bundleMap[r.bundleId];
+        if (bundle?.finalPrice) {
+          clientStats[r.userId].sales += parseFloat(bundle.finalPrice);
+        }
+      }
+
+      // Sort by sales and take top 10
+      const topClients = Object.entries(clientStats)
+        .map(([userId, stats]) => ({
+          userId,
+          clientName: userMap[userId]?.username || "Unknown",
+          totalRequests: stats.requests,
+          totalSales: stats.sales,
+        }))
+        .sort((a, b) => b.totalSales - a.totalSales)
+        .slice(0, 10);
+
+      res.json(topClients);
+    } catch (error) {
+      console.error("Error fetching top clients:", error);
+      res.status(500).json({ error: "Failed to fetch top clients" });
+    }
+  });
+
+  // Top services by sales
+  app.get("/api/admin/dashboard/top-services", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { start, end } = req.query;
+      const startDate = start ? new Date(start as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const endDate = end ? new Date(end as string) : new Date();
+      endDate.setHours(23, 59, 59, 999);
+
+      const allServiceRequests = await storage.getAllServiceRequests();
+      const services = await storage.getAllServices();
+
+      const serviceMap: Record<string, typeof services[0]> = {};
+      services.forEach(s => { serviceMap[s.id] = s; });
+
+      // Filter by date range
+      const serviceRequests = allServiceRequests.filter(r => {
+        const created = new Date(r.createdAt);
+        return created >= startDate && created <= endDate;
+      });
+
+      // Aggregate by service
+      const serviceStats: Record<string, { orders: number; sales: number }> = {};
+
+      for (const r of serviceRequests) {
+        if (!serviceStats[r.serviceId]) {
+          serviceStats[r.serviceId] = { orders: 0, sales: 0 };
+        }
+        serviceStats[r.serviceId].orders++;
+        if (r.finalPrice) {
+          serviceStats[r.serviceId].sales += parseFloat(r.finalPrice);
+        }
+      }
+
+      // Sort by sales and take top 10
+      const topServices = Object.entries(serviceStats)
+        .map(([serviceId, stats]) => ({
+          serviceId,
+          serviceName: serviceMap[serviceId]?.title || "Unknown",
+          totalOrders: stats.orders,
+          totalSales: stats.sales,
+        }))
+        .sort((a, b) => b.totalSales - a.totalSales)
+        .slice(0, 10);
+
+      res.json(topServices);
+    } catch (error) {
+      console.error("Error fetching top services:", error);
+      res.status(500).json({ error: "Failed to fetch top services" });
+    }
+  });
+
+  // Top bundles by sales
+  app.get("/api/admin/dashboard/top-bundles", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { start, end } = req.query;
+      const startDate = start ? new Date(start as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const endDate = end ? new Date(end as string) : new Date();
+      endDate.setHours(23, 59, 59, 999);
+
+      const allBundleRequests = await storage.getAllBundleRequests();
+      const bundles = await storage.getAllBundles();
+
+      const bundleMap: Record<string, typeof bundles[0]> = {};
+      bundles.forEach(b => { bundleMap[b.id] = b; });
+
+      // Filter by date range
+      const bundleRequests = allBundleRequests.filter(r => {
+        const created = new Date(r.createdAt);
+        return created >= startDate && created <= endDate;
+      });
+
+      // Aggregate by bundle
+      const bundleStats: Record<string, { orders: number; sales: number }> = {};
+
+      for (const r of bundleRequests) {
+        if (!bundleStats[r.bundleId]) {
+          bundleStats[r.bundleId] = { orders: 0, sales: 0 };
+        }
+        bundleStats[r.bundleId].orders++;
+        const bundle = bundleMap[r.bundleId];
+        if (bundle?.finalPrice) {
+          bundleStats[r.bundleId].sales += parseFloat(bundle.finalPrice);
+        }
+      }
+
+      // Sort by sales and take top 10
+      const topBundles = Object.entries(bundleStats)
+        .map(([bundleId, stats]) => ({
+          bundleId,
+          bundleName: bundleMap[bundleId]?.name || "Unknown",
+          totalOrders: stats.orders,
+          totalSales: stats.sales,
+        }))
+        .sort((a, b) => b.totalSales - a.totalSales)
+        .slice(0, 10);
+
+      res.json(topBundles);
+    } catch (error) {
+      console.error("Error fetching top bundles:", error);
+      res.status(500).json({ error: "Failed to fetch top bundles" });
+    }
+  });
+
+  // Daily sales trend
+  app.get("/api/admin/dashboard/daily-sales", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { start, end } = req.query;
+      const startDate = start ? new Date(start as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const endDate = end ? new Date(end as string) : new Date();
+      endDate.setHours(23, 59, 59, 999);
+
+      const allServiceRequests = await storage.getAllServiceRequests();
+      const allBundleRequests = await storage.getAllBundleRequests();
+      const bundles = await storage.getAllBundles();
+
+      const bundleMap: Record<string, typeof bundles[0]> = {};
+      bundles.forEach(b => { bundleMap[b.id] = b; });
+
+      // Aggregate by day
+      const dailySales: Record<string, number> = {};
+
+      // Initialize all days in range
+      const current = new Date(startDate);
+      while (current <= endDate) {
+        const dateKey = current.toISOString().split('T')[0];
+        dailySales[dateKey] = 0;
+        current.setDate(current.getDate() + 1);
+      }
+
+      // Add service request sales
+      for (const r of allServiceRequests) {
+        const created = new Date(r.createdAt);
+        if (created >= startDate && created <= endDate) {
+          const dateKey = created.toISOString().split('T')[0];
+          if (r.finalPrice) {
+            dailySales[dateKey] = (dailySales[dateKey] || 0) + parseFloat(r.finalPrice);
+          }
+        }
+      }
+
+      // Add bundle request sales
+      for (const r of allBundleRequests) {
+        const created = new Date(r.createdAt);
+        if (created >= startDate && created <= endDate) {
+          const dateKey = created.toISOString().split('T')[0];
+          const bundle = bundleMap[r.bundleId];
+          if (bundle?.finalPrice) {
+            dailySales[dateKey] = (dailySales[dateKey] || 0) + parseFloat(bundle.finalPrice);
+          }
+        }
+      }
+
+      // Convert to array sorted by date
+      const result = Object.entries(dailySales)
+        .map(([date, sales]) => ({ date, sales }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching daily sales:", error);
+      res.status(500).json({ error: "Failed to fetch daily sales" });
+    }
+  });
+
+  // Daily orders trend
+  app.get("/api/admin/dashboard/daily-orders", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { start, end } = req.query;
+      const startDate = start ? new Date(start as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const endDate = end ? new Date(end as string) : new Date();
+      endDate.setHours(23, 59, 59, 999);
+
+      const allServiceRequests = await storage.getAllServiceRequests();
+      const allBundleRequests = await storage.getAllBundleRequests();
+
+      // Aggregate by day
+      const dailyOrders: Record<string, number> = {};
+
+      // Initialize all days in range
+      const current = new Date(startDate);
+      while (current <= endDate) {
+        const dateKey = current.toISOString().split('T')[0];
+        dailyOrders[dateKey] = 0;
+        current.setDate(current.getDate() + 1);
+      }
+
+      // Count service requests
+      for (const r of allServiceRequests) {
+        const created = new Date(r.createdAt);
+        if (created >= startDate && created <= endDate) {
+          const dateKey = created.toISOString().split('T')[0];
+          dailyOrders[dateKey] = (dailyOrders[dateKey] || 0) + 1;
+        }
+      }
+
+      // Count bundle requests
+      for (const r of allBundleRequests) {
+        const created = new Date(r.createdAt);
+        if (created >= startDate && created <= endDate) {
+          const dateKey = created.toISOString().split('T')[0];
+          dailyOrders[dateKey] = (dailyOrders[dateKey] || 0) + 1;
+        }
+      }
+
+      // Convert to array sorted by date
+      const result = Object.entries(dailyOrders)
+        .map(([date, orders]) => ({ date, orders }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching daily orders:", error);
+      res.status(500).json({ error: "Failed to fetch daily orders" });
+    }
+  });
+
   // ==================== AUTOMATION LOGS ROUTES ====================
 
   // Get automation logs for a service request
