@@ -1,0 +1,326 @@
+Here’s a clean naming system + a “don’t-miss” KPI checklist + a Replit-ready scope you can paste straight into your vibe-coding prompt.
+
+## 1) Copywriting: dashboard section titles (A, B, C, D)
+
+### A) Jobs (status KPIs)
+
+**Title options (pick 1):**
+
+* **Job Operations**
+* **Work Queue**
+* **Production Pipeline**
+* **Operational Status**
+
+**Recommended:** **Job Operations** (clear + admin-friendly)
+
+---
+
+### B) Sales / Cost / Profit / Margin
+
+**Title options:**
+
+* **Financial Performance**
+* **Revenue & Profitability**
+* **Sales & Margin**
+* **P&L Snapshot**
+
+**Recommended:** **Financial Performance**
+
+---
+
+### C) “Top” tables (Clients / Services / Bundles)
+
+This section is basically “what’s driving the business”.
+
+**Title options:**
+
+* **Top Drivers**
+* **Demand Leaders**
+* **Sales Leaders**
+* **Performance Breakdown**
+
+**Recommended:** **Top Drivers**
+
+---
+
+### D) Graphs (daily sales + daily orders)
+
+**Title options:**
+
+* **Trends**
+* **Daily Trends**
+* **Performance Over Time**
+* **Daily Activity**
+
+**Recommended:** **Daily Trends**
+
+---
+
+## 2) KPI double-check: what you may be missing (high-value, admin-only)
+
+You already have the core. These are the most useful additions for an Admin dashboard **without overcomplicating v1**:
+
+### Jobs / SLA (highly recommended)
+
+1. **Open Jobs (Total)**
+   Sum of all non-terminal statuses (everything except Delivered/Canceled) — helps instantly gauge load.
+
+2. **SLA Compliance %** (for delivered jobs in the selected period)
+
+* `Delivered within SLA / Total Delivered * 100`
+* Pairs perfectly with “Jobs Over SLA”.
+
+3. **Avg Turnaround Time** (Delivered jobs)
+
+* Avg(DeliveredAt - CreatedAt)
+  This is one of the most meaningful operational KPIs.
+
+4. **Avg Time in Status** (optional but powerful)
+
+* Pending Assignment aging, Assigned to Vendor aging, In Progress aging
+  Even if you don’t show all, show at least:
+* **Oldest Pending Assignment (days)**
+* **Oldest In Progress (days)**
+
+### Financial (recommended)
+
+5. **Avg Order Value (AOV)**
+
+* `Total Sales / Total Orders` (orders = count of jobs that are billable)
+
+6. **Refunds / Credits Issued** (if cancellations can trigger refunds)
+
+* You already track Canceled jobs; finance should reflect it.
+
+### Vendors (recommended if you already have vendor assignment + costs)
+
+7. **Top Vendors by Volume** + **On-time % by Vendor**
+   Even a simple table: Vendor / Jobs / On-time % / Avg TAT
+   This becomes your vendor management control panel.
+
+### Services (nice-to-have)
+
+8. **Service Mix %** (top services share of total orders)
+   Useful, but can wait if you want to keep v1 lean.
+
+If you want to keep V1 strict: add **Open Jobs**, **SLA Compliance %**, **Avg Turnaround Time**, **AOV**. Those four deliver huge value.
+
+---
+
+## 3) Replit-ready detailed scope (pasteable)
+
+### Goal
+
+Build **Admin Dashboard** as the **default landing page after Admin login** for “Services Portal”. Provide KPI cards + top tables + 2 daily trend charts. Include a **Time Period Date Selector** (default: **current month**) that filters *all* metrics.
+
+---
+
+### Navigation / Layout Requirements
+
+* Top bar left shows brand text: **“Services Portal”**.
+* **Make “Services Portal” clickable** → navigates to `/admin/dashboard` (home).
+* No extra menu items in top bar (space constraint).
+* Dashboard route: `/admin/dashboard` (or `/dashboard` if admin-only app).
+
+---
+
+### Global Filter: Time Period Selector
+
+* Component: date range selector with presets:
+
+  * Current Month (default)
+  * Last Month
+  * Last 7 days
+  * Custom range
+* Default range:
+
+  * Start = first day of current month (local timezone)
+  * End = today (or end of month; pick one and be consistent—recommend: **today**)
+* This filter drives all queries (KPIs, tables, graphs).
+
+---
+
+### Data Definitions (must be consistent)
+
+**Job statuses (admin-facing):**
+
+* Pending Assignment
+* Assigned to Vendor
+* In Progress
+* Delivered
+* Change Request
+* Canceled
+
+**Client-facing mapping (FYI, not needed on admin dashboard):**
+
+* “Pending” for client includes Pending Assignment + Assigned to Vendor (and optionally others per your earlier logic)
+
+**SLA rule:**
+
+* Each Job has an SLA target datetime: `slaDueAt`
+* “Over SLA” means:
+
+  * `status != Delivered` AND `status != Canceled` AND `now > slaDueAt`
+
+**Money fields:**
+
+* `totalSales` = what the client paid for the service job(s) (gross)
+* `vendorCost` = your vendor payout / internal cost
+* `profit = totalSales - vendorCost`
+* `marginPercent = profit / totalSales * 100` (guard divide-by-zero)
+
+---
+
+### Dashboard Sections (UI + metrics)
+
+#### Section 1: **Job Operations**
+
+**KPI cards (count):**
+
+* Pending Assignment Jobs
+* Assigned to Vendor Jobs
+* In Progress Jobs
+* Delivered Jobs
+* Change Request Jobs
+* Canceled Jobs
+* Jobs Over SLA
+
+**(Recommended add-ons for v1.1 or v1 if easy)**
+
+* Open Jobs (Total) = all except Delivered & Canceled
+* SLA Compliance % (Delivered within SLA / Delivered)
+* Avg Turnaround Time (DeliveredAt - CreatedAt)
+
+**Behavior**
+
+* Clicking a KPI card should navigate to job list with filters:
+
+  * `/admin/jobs?status=IN_PROGRESS`
+  * `/admin/jobs?overSla=true`
+  * Date range should persist in URL query params.
+
+---
+
+#### Section 2: **Financial Performance**
+
+**KPI cards:**
+
+* Total Sales
+* Vendor Cost
+* Profit
+* Margin %
+
+**(Recommended add-on)**
+
+* AOV = Total Sales / Total Orders (billable jobs count)
+
+**Formatting**
+
+* Currency formatting: `$12,345.67`
+* Margin %: `34.2%`
+* If Total Sales = 0 → show Profit = 0 and Margin = “—”
+
+---
+
+#### Section 3: **Top Drivers**
+
+**Table 1: Top Clients**
+Columns:
+
+* Client Name
+* Total Requests (job count)
+* Total Sales
+
+Rules:
+
+* Group by clientId within date range
+* Sort by Total Sales desc
+* Top 10 (or Top 5 if compact)
+* Row click → `/admin/jobs?clientId=...`
+
+**Table 2: Top Selling Services**
+Columns:
+
+* Service Name
+* Total Sales
+  (Optionally add “Orders”)
+
+Rules:
+
+* Group by serviceId (or serviceName snapshot)
+* Sort by Total Sales desc
+
+**Table 3: Top Selling Bundles**
+Columns:
+
+* Bundle Name
+* Total Sales
+  (Optionally add “Orders”)
+
+Rules:
+
+* Group by bundleId
+* If a job is not a bundle, exclude from this table.
+
+---
+
+#### Section 4: **Daily Trends**
+
+Charts (2):
+
+1. **Daily Sales ($)**
+2. **Daily Service Orders**
+
+**X-axis tick requirements**
+
+* Show **15 tick labels** on the bottom axis
+* Label **every other day**
+* Works for monthly view (typically ~30 days → every 2 days = ~15 labels)
+* If custom range isn’t ~30 days, apply an algorithm:
+
+  * choose ~15 evenly spaced ticks, but never more than 15 labels
+
+**Chart interactions**
+
+* Hover tooltip: date + value
+* Clicking a date point/bar can optionally navigate to filtered job list by that day.
+
+---
+
+### API / Query Scope (backend or mock)
+
+You need endpoints (or server functions) that accept:
+
+* `startDate`
+* `endDate`
+
+Suggested endpoints:
+
+* `GET /api/admin/dashboard/summary?start=...&end=...`
+
+  * returns:
+
+    * jobCountsByStatus
+    * jobsOverSlaCount
+    * totalSales, vendorCost, profit, marginPercent
+    * optional: openJobsCount, slaCompliancePercent, avgTurnaroundHours, aov
+* `GET /api/admin/dashboard/top-clients?start=...&end=...`
+* `GET /api/admin/dashboard/top-services?start=...&end=...`
+* `GET /api/admin/dashboard/top-bundles?start=...&end=...`
+* `GET /api/admin/dashboard/daily-sales?start=...&end=...`
+* `GET /api/admin/dashboard/daily-orders?start=...&end=...`
+
+---
+
+### Acceptance Criteria
+
+* Admin lands on dashboard after login.
+* “Services Portal” top-left navigates to dashboard.
+* Changing date range refreshes all KPIs/tables/charts.
+* KPIs match the status definitions exactly.
+* “Jobs Over SLA” follows `now > slaDueAt` and excludes Delivered/Canceled.
+* Charts show daily aggregates across the selected period with ~15 x-axis labels.
+
+---
+
+## If you want, I can also write the exact microcopy for each KPI card label (short labels vs long labels) + the query-param schema so your dashboard filters stay consistent across Jobs List + Dashboard.
