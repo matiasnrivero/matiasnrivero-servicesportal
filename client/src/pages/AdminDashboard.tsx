@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { format, startOfMonth, subDays, subMonths, endOfMonth } from "date-fns";
+import { format, startOfMonth, subDays, subMonths, endOfMonth, startOfYear, endOfYear, subYears, startOfDay, endOfDay } from "date-fns";
 import { 
   Clock, 
   Building2, 
@@ -16,7 +16,6 @@ import {
   Users,
   Package,
   Layers,
-  Download,
   CalendarIcon,
   ArrowUpRight,
   ArrowDownRight,
@@ -63,7 +62,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import type { User } from "@shared/schema";
 
-type DatePreset = "current_month" | "last_month" | "last_7_days" | "custom";
+type DatePreset = "today" | "yesterday" | "last_7_days" | "last_30_days" | "last_90_days" | "last_365_days" | "this_month" | "last_month" | "this_year" | "last_year" | "custom";
 
 interface DashboardSummary {
   jobCounts: {
@@ -128,7 +127,7 @@ function formatPercent(value: number): string {
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
-  const [datePreset, setDatePreset] = useState<DatePreset>("current_month");
+  const [datePreset, setDatePreset] = useState<DatePreset>("this_month");
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
   const [startCalendarOpen, setStartCalendarOpen] = useState(false);
@@ -137,7 +136,38 @@ export default function AdminDashboard() {
   const { startDate, endDate } = useMemo(() => {
     const today = new Date();
     switch (datePreset) {
-      case "current_month":
+      case "today":
+        return {
+          startDate: startOfDay(today),
+          endDate: endOfDay(today),
+        };
+      case "yesterday":
+        const yesterday = subDays(today, 1);
+        return {
+          startDate: startOfDay(yesterday),
+          endDate: endOfDay(yesterday),
+        };
+      case "last_7_days":
+        return {
+          startDate: startOfDay(subDays(today, 6)),
+          endDate: endOfDay(today),
+        };
+      case "last_30_days":
+        return {
+          startDate: startOfDay(subDays(today, 29)),
+          endDate: endOfDay(today),
+        };
+      case "last_90_days":
+        return {
+          startDate: startOfDay(subDays(today, 89)),
+          endDate: endOfDay(today),
+        };
+      case "last_365_days":
+        return {
+          startDate: startOfDay(subDays(today, 364)),
+          endDate: endOfDay(today),
+        };
+      case "this_month":
         return {
           startDate: startOfMonth(today),
           endDate: today,
@@ -148,10 +178,16 @@ export default function AdminDashboard() {
           startDate: startOfMonth(lastMonth),
           endDate: endOfMonth(lastMonth),
         };
-      case "last_7_days":
+      case "this_year":
         return {
-          startDate: subDays(today, 7),
+          startDate: startOfYear(today),
           endDate: today,
+        };
+      case "last_year":
+        const lastYear = subYears(today, 1);
+        return {
+          startDate: startOfYear(lastYear),
+          endDate: endOfYear(lastYear),
         };
       case "custom":
         return {
@@ -425,9 +461,16 @@ export default function AdminDashboard() {
                 <SelectValue placeholder="Select period" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="current_month">Current Month</SelectItem>
-                <SelectItem value="last_month">Last Month</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="yesterday">Yesterday</SelectItem>
                 <SelectItem value="last_7_days">Last 7 Days</SelectItem>
+                <SelectItem value="last_30_days">Last 30 Days</SelectItem>
+                <SelectItem value="last_90_days">Last 90 Days</SelectItem>
+                <SelectItem value="last_365_days">Last 365 Days</SelectItem>
+                <SelectItem value="this_month">This Month</SelectItem>
+                <SelectItem value="last_month">Last Month</SelectItem>
+                <SelectItem value="this_year">This Year</SelectItem>
+                <SelectItem value="last_year">Last Year</SelectItem>
                 <SelectItem value="custom">Custom Range</SelectItem>
               </SelectContent>
             </Select>
@@ -475,16 +518,6 @@ export default function AdminDashboard() {
                 </Popover>
               </>
             )}
-            
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={exportToCsv}
-              disabled={summaryLoading}
-              data-testid="button-export-csv"
-            >
-              <Download className="h-4 w-4" />
-            </Button>
           </div>
         </div>
 
