@@ -179,18 +179,19 @@ export function Header() {
           </Button>
         </div>
       )}
-    <header className="flex w-full items-center justify-between gap-12 px-8 py-4 bg-white shadow-shadow-top-bar">
-      <div className="flex items-center gap-8">
+    <header className="flex w-full items-center justify-between gap-4 px-4 py-3 bg-white shadow-shadow-top-bar">
+      <div className="flex items-center gap-4">
         <Link href={isAdmin ? "/dashboard" : "/"}>
-          <h1 className="font-title-semibold text-dark-blue-night text-xl cursor-pointer whitespace-nowrap" data-testid="link-services-portal">
+          <h1 className="font-title-semibold text-dark-blue-night text-lg cursor-pointer whitespace-nowrap" data-testid="link-services-portal">
             Services Portal
           </h1>
         </Link>
-        <nav className="flex items-center gap-4">
+        <nav className="flex items-center gap-1">
           {isAdmin && (
             <Link href="/dashboard">
               <Button
                 variant={location === "/dashboard" ? "default" : "ghost"}
+                size="sm"
                 className={location === "/dashboard" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-dashboard"
               >
@@ -202,6 +203,7 @@ export function Header() {
             <Link href="/">
               <Button
                 variant={location === "/" ? "default" : "ghost"}
+                size="sm"
                 className={location === "/" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-services"
               >
@@ -212,16 +214,18 @@ export function Header() {
           <Link href="/service-requests">
             <Button
               variant={location.startsWith("/service-requests") && location !== "/service-requests/new" ? "default" : "ghost"}
+              size="sm"
               className={location.startsWith("/service-requests") && location !== "/service-requests/new" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
               data-testid="nav-requests"
             >
-              {currentUser?.role === "client" ? "My Requests" : "Requests"}
+              Requests
             </Button>
           </Link>
           {canManageUsers && (
             <Link href="/users">
               <Button
                 variant={location === "/users" ? "default" : "ghost"}
+                size="sm"
                 className={location === "/users" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-users"
               >
@@ -233,6 +237,7 @@ export function Header() {
             <Link href="/client-team">
               <Button
                 variant={location === "/client-team" ? "default" : "ghost"}
+                size="sm"
                 className={location === "/client-team" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-client-team"
               >
@@ -244,10 +249,11 @@ export function Header() {
             <Link href="/vendor-profile">
               <Button
                 variant={location === "/vendor-profile" ? "default" : "ghost"}
+                size="sm"
                 className={location === "/vendor-profile" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-vendor-profile"
               >
-                Vendor Profile
+                Profile
               </Button>
             </Link>
           )}
@@ -255,6 +261,7 @@ export function Header() {
             <Link href="/vendors">
               <Button
                 variant={location.startsWith("/vendors") ? "default" : "ghost"}
+                size="sm"
                 className={location.startsWith("/vendors") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-vendors"
               >
@@ -266,6 +273,7 @@ export function Header() {
             <Link href="/settings">
               <Button
                 variant={location.startsWith("/settings") ? "default" : "ghost"}
+                size="sm"
                 className={location.startsWith("/settings") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-settings"
               >
@@ -277,6 +285,7 @@ export function Header() {
             <Link href="/reports">
               <Button
                 variant={location.startsWith("/reports") ? "default" : "ghost"}
+                size="sm"
                 className={location.startsWith("/reports") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-reports"
               >
@@ -287,11 +296,11 @@ export function Header() {
         </nav>
       </div>
       {currentUser && !currentUser.impersonating && (
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3">
           <Popover open={searchOpen} onOpenChange={setSearchOpen}>
             <PopoverTrigger asChild>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search Job ID"
                   value={searchQuery}
@@ -306,7 +315,7 @@ export function Header() {
                       setSearchOpen(true);
                     }
                   }}
-                  className="w-44 pl-9"
+                  className="w-36 pl-8"
                   data-testid="input-global-search"
                 />
               </div>
@@ -345,13 +354,12 @@ export function Header() {
               )}
             </PopoverContent>
           </Popover>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-dark-gray whitespace-nowrap">User Role</span>
+          <div className="flex items-center gap-2">
             <Select
               value={currentUser.role}
               onValueChange={(role) => switchRoleMutation.mutate(role)}
             >
-              <SelectTrigger className="w-40" data-testid="select-role-switcher">
+              <SelectTrigger className="w-36" data-testid="select-role-switcher">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
