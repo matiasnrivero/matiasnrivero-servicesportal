@@ -504,9 +504,9 @@ export default function AdminDashboard() {
               onClick={() => navigateToJobs("pending-assignment")}
               data-testid="card-pending-assignment"
             >
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+              <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2 min-h-[60px]">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Pending Assignment</CardTitle>
-                <Clock className="h-4 w-4 text-yellow-500" />
+                <Clock className="h-4 w-4 text-yellow-500 shrink-0" />
               </CardHeader>
               <CardContent>
                 {summaryLoading ? (
@@ -524,9 +524,9 @@ export default function AdminDashboard() {
               onClick={() => navigateToJobs("assigned-to-vendor")}
               data-testid="card-assigned-to-vendor"
             >
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+              <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2 min-h-[60px]">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Assigned to Vendor</CardTitle>
-                <Building2 className="h-4 w-4 text-yellow-600" />
+                <Building2 className="h-4 w-4 text-yellow-600 shrink-0" />
               </CardHeader>
               <CardContent>
                 {summaryLoading ? (
@@ -544,9 +544,9 @@ export default function AdminDashboard() {
               onClick={() => navigateToJobs("in-progress")}
               data-testid="card-in-progress"
             >
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+              <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2 min-h-[60px]">
                 <CardTitle className="text-sm font-medium text-muted-foreground">In Progress</CardTitle>
-                <RefreshCw className="h-4 w-4 text-blue-500" />
+                <RefreshCw className="h-4 w-4 text-blue-500 shrink-0" />
               </CardHeader>
               <CardContent>
                 {summaryLoading ? (
@@ -564,9 +564,9 @@ export default function AdminDashboard() {
               onClick={() => navigateToJobs("delivered")}
               data-testid="card-delivered"
             >
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+              <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2 min-h-[60px]">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Delivered</CardTitle>
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
               </CardHeader>
               <CardContent>
                 {summaryLoading ? (
@@ -584,9 +584,9 @@ export default function AdminDashboard() {
               onClick={() => navigateToJobs("change-request")}
               data-testid="card-change-request"
             >
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+              <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2 min-h-[60px]">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Change Request</CardTitle>
-                <AlertCircle className="h-4 w-4 text-orange-500" />
+                <AlertCircle className="h-4 w-4 text-orange-500 shrink-0" />
               </CardHeader>
               <CardContent>
                 {summaryLoading ? (
@@ -604,9 +604,9 @@ export default function AdminDashboard() {
               onClick={() => navigateToJobs("canceled")}
               data-testid="card-canceled"
             >
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+              <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2 min-h-[60px]">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Canceled</CardTitle>
-                <XCircle className="h-4 w-4 text-gray-500" />
+                <XCircle className="h-4 w-4 text-gray-500 shrink-0" />
               </CardHeader>
               <CardContent>
                 {summaryLoading ? (
@@ -624,9 +624,9 @@ export default function AdminDashboard() {
               onClick={() => navigateToJobs(undefined, true)}
               data-testid="card-over-sla"
             >
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+              <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2 min-h-[60px]">
                 <CardTitle className="text-sm font-medium text-destructive">Jobs Over SLA</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
               </CardHeader>
               <CardContent>
                 {summaryLoading ? (
