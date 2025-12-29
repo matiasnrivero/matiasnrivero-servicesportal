@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
@@ -434,6 +434,61 @@ export default function ServiceRequestsList() {
 
   const canBulkAssign = ["admin", "internal_designer", "vendor", "vendor_designer"].includes(currentUser?.role || "");
 
+  // Helper to get assignee role from user map (moved here for use in isJobEligibleForBulkAssign)
+  const getAssigneeRole = useCallback((assigneeId: string | null | undefined): string | null => {
+    if (!assigneeId) return null;
+    const user = userMap[assigneeId];
+    return user?.role || null;
+  }, [userMap]);
+
+  // Eligibility check for bulk assignment that mirrors backend logic exactly
+  // Backend checks in /api/service-requests/bulk-assign:
+  // - status must be "pending"
+  // - Admin/Internal: skip if assigneeId points to a designer (non-vendor role)
+  // - Vendor/VendorDesigner: skip if vendorAssigneeId doesn't match their org OR if assigneeId is set
+  const isJobEligibleForBulkAssign = useCallback((request: CombinedRequest): boolean => {
+    // Guard: if userMap isn't loaded yet, treat as not eligible to prevent stale counts
+    if (Object.keys(userMap).length === 0) return false;
+    
+    // First check: must be pending status (backend line 800-803)
+    if (request.status !== "pending") return false;
+    
+    const isAdminOrInternal = ["admin", "internal_designer"].includes(currentUser?.role || "");
+    
+    if (isAdminOrInternal) {
+      // Backend logic (lines 806-818): 
+      // Skip only if assigneeId points to a designer (not vendor)
+      if (request.assigneeId) {
+        const assigneeRole = getAssigneeRole(request.assigneeId);
+        // Backend also skips if getUser returns null (user deleted/inactive)
+        // We mirror this by checking if we can't find the assignee in userMap
+        if (!assigneeRole) {
+          // Assignee not in userMap - could be deleted/inactive, skip for safety
+          return false;
+        }
+        // If there's an assignee and it's NOT a vendor role, skip
+        if (assigneeRole !== "vendor") {
+          return false;
+        }
+      }
+      // Otherwise eligible (pending-assignment or assigned-to-vendor)
+      return true;
+    } else {
+      // Vendor/Vendor Designer backend logic (lines 820-832):
+      // Must be assigned to their vendor org and have no designer assignee
+      const currentUserData = userMap[currentUser?.userId || ""];
+      const vendorId = currentUser?.role === "vendor" 
+        ? currentUser?.userId 
+        : currentUserData?.vendorId;
+      
+      // Skip if can't determine vendor or not assigned to their org
+      if (!vendorId || request.vendorAssigneeId !== vendorId) return false;
+      // Skip if already has a designer assignee
+      if (request.assigneeId) return false;
+      return true;
+    }
+  }, [currentUser?.role, currentUser?.userId, getAssigneeRole, userMap]);
+
   const getServiceTitle = (serviceId: string) => {
     const service = services.find(s => s.id === serviceId);
     return service?.title || "Unknown Service";
@@ -488,12 +543,6 @@ export default function ServiceRequestsList() {
     if (user.role === "vendor") return user.id;
     if (user.role === "vendor_designer") return user.vendorId || null;
     return null;
-  };
-
-  const getAssigneeRole = (assigneeId: string | null | undefined): string | null => {
-    if (!assigneeId) return null;
-    const user = userMap[assigneeId];
-    return user?.role || null;
   };
 
   const filteredRequests = useMemo(() => {
@@ -674,6 +723,17 @@ export default function ServiceRequestsList() {
     );
   }, [filteredRequests, filteredBundleRequests]);
 
+  // Compute eligible count from selected requests for bulk assignment
+  const eligibleSelectedRequests = useMemo(() => {
+    return combinedFilteredRequests.filter(
+      request => selectedRequests.has(request.id) && isJobEligibleForBulkAssign(request)
+    );
+  }, [combinedFilteredRequests, selectedRequests, isJobEligibleForBulkAssign]);
+
+  const eligibleCount = eligibleSelectedRequests.length;
+  const totalSelectedCount = selectedRequests.size;
+  const hasIneligibleSelected = totalSelectedCount > eligibleCount;
+
   return (
     <main className="flex flex-col w-full min-h-screen bg-light-grey">
       <Header />
@@ -734,11 +794,11 @@ export default function ServiceRequestsList() {
                   <Button
                     variant="outline"
                     onClick={() => setBulkAssignModalOpen(true)}
-                    disabled={selectedRequests.size === 0}
+                    disabled={eligibleCount === 0}
                     data-testid="button-bulk-assign"
                   >
                     <Users className="h-4 w-4 mr-2" />
-                    Bulk Assign {selectedRequests.size > 0 && `(${selectedRequests.size})`}
+                    Bulk Assign {eligibleCount > 0 && `(${eligibleCount})`}
                   </Button>
                 )}
                 <Link href="/">
@@ -1154,9 +1214,23 @@ export default function ServiceRequestsList() {
           <DialogHeader>
             <DialogTitle>Bulk Assign Jobs</DialogTitle>
             <DialogDescription>
-              Assign {selectedRequests.size} selected job{selectedRequests.size !== 1 ? 's' : ''} to a designer{canAssignToVendor ? ' or vendor organization' : ''}.
+              Assign {eligibleCount} eligible job{eligibleCount !== 1 ? 's' : ''} to a designer{canAssignToVendor ? ' or vendor organization' : ''}.
             </DialogDescription>
           </DialogHeader>
+          
+          {hasIneligibleSelected && (
+            <div className="flex items-start gap-3 p-3 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+              <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-amber-800 dark:text-amber-200">
+                <p className="font-medium">Only {eligibleCount} of {totalSelectedCount} selected jobs qualify for bulk assignment</p>
+                <p className="mt-1 text-amber-700 dark:text-amber-300">
+                  Only jobs with "Pending Assignment" or "Assigned to Vendor" status can be bulk assigned. 
+                  Jobs with other statuses (In Progress, Delivered, Change Request, Canceled) will be skipped.
+                </p>
+              </div>
+            </div>
+          )}
+          
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">

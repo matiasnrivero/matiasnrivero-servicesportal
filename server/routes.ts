@@ -775,7 +775,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Determine eligible status based on role
-      // Admin/Internal Designer: only "pending" status (Pending Assignment - no assignee, no vendor)
+      // Admin/Internal Designer: "pending" status jobs that are either:
+      //   - "Pending Assignment" (no assignee, no vendor) OR
+      //   - "Assigned to Vendor" (has vendor, no designer assignee)
       // Vendor/Vendor Designer: only "pending" status (Pending - assigned to their vendor but no designer)
       const isAdminOrInternal = ["admin", "internal_designer"].includes(sessionUser.role);
       
@@ -799,12 +801,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           if (isAdminOrInternal) {
-            // For admin/internal designer: only assign jobs that are "Pending Assignment"
-            // (no assignee AND no vendorAssigneeId)
-            if (request.assigneeId || request.vendorAssigneeId) {
-              results.skipped.push({ id: requestId, reason: "Already assigned to vendor or designer" });
-              continue;
+            // For admin/internal designer: can assign jobs in "Pending Assignment" or "Assigned to Vendor"
+            // "Pending Assignment": no assignee AND no vendorAssigneeId
+            // "Assigned to Vendor": has vendorAssigneeId but no designer assignee
+            // Skip only if there's already a designer assigned (assigneeId points to a designer)
+            if (request.assigneeId) {
+              // Check if assignee is a designer (not the vendor)
+              const assignee = await storage.getUser(request.assigneeId);
+              if (assignee && assignee.role !== "vendor") {
+                results.skipped.push({ id: requestId, reason: "Already assigned to a designer" });
+                continue;
+              }
             }
+            // Allow both "Pending Assignment" (no vendor) and "Assigned to Vendor" (has vendor)
           } else {
             // For vendor/vendor_designer: only assign jobs in "Pending" 
             // (assigned to their vendor, no designer yet)
