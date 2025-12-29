@@ -788,7 +788,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const requestId of requestIds) {
         try {
-          const request = await storage.getServiceRequest(requestId);
+          // Try to find as service request first, then as bundle request
+          let request = await storage.getServiceRequest(requestId);
+          let isBundle = false;
+          
+          if (!request) {
+            // Try bundle request
+            const bundleRequest = await storage.getBundleRequest(requestId);
+            if (bundleRequest) {
+              request = {
+                id: bundleRequest.id,
+                status: bundleRequest.status,
+                assigneeId: bundleRequest.assigneeId,
+                vendorAssigneeId: bundleRequest.vendorAssigneeId,
+              } as any;
+              isBundle = true;
+            }
+          }
+          
           if (!request) {
             results.skipped.push({ id: requestId, reason: "Not found" });
             continue;
@@ -836,10 +853,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
               results.skipped.push({ id: requestId, reason: assignmentCheck.reason || "Cannot assign to this user" });
               continue;
             }
-            await storage.assignDesigner(requestId, targetId);
+            if (isBundle) {
+              await storage.assignBundleDesigner(requestId, targetId);
+            } else {
+              await storage.assignDesigner(requestId, targetId);
+            }
           } else {
             // Vendor assignment
-            await storage.assignVendor(requestId, targetId);
+            if (isBundle) {
+              await storage.assignBundleVendor(requestId, targetId);
+            } else {
+              await storage.assignVendor(requestId, targetId);
+            }
           }
 
           results.assigned.push(requestId);
