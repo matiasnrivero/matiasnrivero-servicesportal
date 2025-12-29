@@ -1716,7 +1716,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Seeding services...");
       const servicesData = [
         {
-          title: "Vectorization & Color Separation",
+          title: "Vectorization",
           description: "Turn fuzzy images into sharp vectors, ready for screen printing.",
           basePrice: "10.00",
           priceRange: "$ 10",
@@ -1724,7 +1724,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           decorationMethods: "Screen Printing",
         },
         {
-          title: "Artwork Touch-Ups (DTF / DTG)",
+          title: "Artwork Touch-Ups",
           description: "Clean, refine, and prep your artwork for flawless digital prints.",
           basePrice: "10.00",
           priceRange: "$ 10",

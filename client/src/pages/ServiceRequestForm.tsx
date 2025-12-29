@@ -92,8 +92,8 @@ async function createServiceRequest(data: InsertServiceRequest) {
 }
 
 const SERVICE_ORDER = [
-  "Vectorization & Color Separation",
-  "Artwork Touch-Ups (DTF / DTG)",
+  "Vectorization",
+  "Artwork Touch-Ups",
   "Embroidery Digitization",
   "Creative Art",
   "Artwork Composition",
@@ -1007,7 +1007,7 @@ export default function ServiceRequestForm() {
     // Fall back to hardcoded fields for backwards compatibility
     const title = selectedService.title;
 
-    if (title === "Vectorization & Color Separation") {
+    if (title === "Vectorization") {
       return (
         <>
           <div className="space-y-2">
@@ -1078,7 +1078,7 @@ export default function ServiceRequestForm() {
       );
     }
 
-    if (title === "Artwork Touch-Ups (DTF / DTG)") {
+    if (title === "Artwork Touch-Ups") {
       return (
         <>
           <div className="space-y-2">
