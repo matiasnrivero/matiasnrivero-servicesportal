@@ -68,6 +68,32 @@ Role-based access to reports (Admin, Client, Vendor).
 - **Reports Hub**: Central page for role-specific reports.
 - **Services Profit Report (Admin only)**: Comprehensive financial report with summaries, filters (vendor, service, date), search (client, job ID), and a detailed data table. Pricing calculations consider retail price, vendor cost, and exception rules.
 
+## Role-Specific Dashboards
+
+The Admin Dashboard (`/dashboard`) provides analytics with role-based views:
+
+### Sections by Role
+| Section | Admin | Internal Designer | Vendor | Vendor Designer |
+|---------|-------|-------------------|--------|-----------------|
+| Date Range Selector | Yes | Yes | Yes | Yes |
+| Job Operations KPIs | Yes (all jobs) | Yes (all jobs) | Yes (vendor jobs) | Yes (own jobs) |
+| Financial Performance | Yes | No | No | No |
+| Top Drivers | Yes | No | No | No |
+| Daily Sales Chart | Yes | No | No | No |
+| Daily Orders Chart | Yes | Yes | Yes | Yes |
+
+### API Endpoints
+- **`GET /api/dashboard/summary`**: Returns job status counts, financial metrics (admin only), comparison percentages
+- **`GET /api/dashboard/daily-orders`**: Returns daily order counts for chart visualization
+
+### Data Filtering
+- **Admin/Internal Designer**: Access to all jobs system-wide
+- **Vendor**: Filtered by `vendorAssigneeId` matching the vendor's `vendorId` (or `userId` fallback)
+- **Vendor Designer**: Filtered by `assigneeId` matching the user's ID
+
+### Date Range Presets
+11 preset options: Today, Yesterday, Last 7 Days, Last 30 Days, Last 90 Days, Last 365 Days, This Month, Last Month, This Year, Last Year, Custom Range. Uses `startOfDay`/`endOfDay` from date-fns for precision.
+
 ## Job Auto-Assignment Engine (Phase 3 Complete)
 
 Fully functional automation engine for automatic job routing based on vendor/designer capacity and configurable rules, with complete frontend management UI.
