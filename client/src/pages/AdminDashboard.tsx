@@ -1,7 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { format, startOfMonth, subDays, subMonths } from "date-fns";
+import { format, startOfMonth, subDays, subMonths, endOfMonth } from "date-fns";
 import { 
   Clock, 
   Building2, 
@@ -12,9 +12,15 @@ import {
   AlertTriangle,
   DollarSign,
   TrendingUp,
+  TrendingDown,
   Users,
   Package,
-  Layers
+  Layers,
+  Download,
+  CalendarIcon,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus
 } from "lucide-react";
 import {
   LineChart,
@@ -24,8 +30,9 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
+  Legend,
 } from "recharts";
 
 import { Header } from "@/components/Header";
@@ -47,6 +54,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
 import type { User } from "@shared/schema";
 
 type DatePreset = "current_month" | "last_month" | "last_7_days" | "custom";
@@ -115,6 +129,10 @@ function formatPercent(value: number): string {
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
   const [datePreset, setDatePreset] = useState<DatePreset>("current_month");
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
+  const [startCalendarOpen, setStartCalendarOpen] = useState(false);
+  const [endCalendarOpen, setEndCalendarOpen] = useState(false);
   
   const { startDate, endDate } = useMemo(() => {
     const today = new Date();
@@ -128,12 +146,17 @@ export default function AdminDashboard() {
         const lastMonth = subMonths(today, 1);
         return {
           startDate: startOfMonth(lastMonth),
-          endDate: new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0),
+          endDate: endOfMonth(lastMonth),
         };
       case "last_7_days":
         return {
           startDate: subDays(today, 7),
           endDate: today,
+        };
+      case "custom":
+        return {
+          startDate: customStartDate || startOfMonth(today),
+          endDate: customEndDate || today,
         };
       default:
         return {
@@ -141,11 +164,26 @@ export default function AdminDashboard() {
           endDate: today,
         };
     }
-  }, [datePreset]);
+  }, [datePreset, customStartDate, customEndDate]);
+
+  // Calculate comparison period (same duration, immediately before)
+  const { comparisonStartDate, comparisonEndDate } = useMemo(() => {
+    const duration = endDate.getTime() - startDate.getTime();
+    const compEnd = new Date(startDate.getTime() - 1); // Day before start
+    const compStart = new Date(compEnd.getTime() - duration);
+    return {
+      comparisonStartDate: compStart,
+      comparisonEndDate: compEnd,
+    };
+  }, [startDate, endDate]);
 
   const dateParams = useMemo(() => {
     return `start=${startDate.toISOString()}&end=${endDate.toISOString()}`;
   }, [startDate, endDate]);
+
+  const comparisonDateParams = useMemo(() => {
+    return `start=${comparisonStartDate.toISOString()}&end=${comparisonEndDate.toISOString()}`;
+  }, [comparisonStartDate, comparisonEndDate]);
 
   const { data: currentUser } = useQuery<User>({
     queryKey: ["/api/default-user"],
@@ -153,6 +191,12 @@ export default function AdminDashboard() {
 
   const { data: summary, isLoading: summaryLoading } = useQuery<DashboardSummary>({
     queryKey: [`/api/admin/dashboard/summary?${dateParams}`],
+    enabled: currentUser?.role === "admin",
+  });
+
+  // Comparison period summary for period-over-period calculations
+  const { data: comparisonSummary } = useQuery<DashboardSummary>({
+    queryKey: [`/api/admin/dashboard/summary?${comparisonDateParams}`],
     enabled: currentUser?.role === "admin",
   });
 
@@ -207,6 +251,144 @@ export default function AdminDashboard() {
     return chartData.filter((_, i) => i % step === 0).map(d => d.date);
   }, [chartData]);
 
+  // Calculate period-over-period change
+  const calculateChange = useCallback((current: number, previous: number): { value: number; direction: 'up' | 'down' | 'neutral' } => {
+    if (previous === 0) {
+      if (current > 0) return { value: 100, direction: 'up' };
+      return { value: 0, direction: 'neutral' };
+    }
+    const change = ((current - previous) / previous) * 100;
+    return {
+      value: Math.abs(change),
+      direction: change > 0.5 ? 'up' : change < -0.5 ? 'down' : 'neutral',
+    };
+  }, []);
+
+  // Comparison metrics
+  const salesChange = useMemo(() => {
+    return calculateChange(summary?.financial.totalSales || 0, comparisonSummary?.financial.totalSales || 0);
+  }, [summary, comparisonSummary, calculateChange]);
+
+  const ordersChange = useMemo(() => {
+    return calculateChange(summary?.totalOrders || 0, comparisonSummary?.totalOrders || 0);
+  }, [summary, comparisonSummary, calculateChange]);
+
+  const profitChange = useMemo(() => {
+    return calculateChange(summary?.financial.profit || 0, comparisonSummary?.financial.profit || 0);
+  }, [summary, comparisonSummary, calculateChange]);
+
+  const aovChange = useMemo(() => {
+    return calculateChange(summary?.financial.aov || 0, comparisonSummary?.financial.aov || 0);
+  }, [summary, comparisonSummary, calculateChange]);
+
+  // CSV Export functionality
+  const exportToCsv = useCallback(() => {
+    const rows: string[][] = [];
+    
+    // Header section
+    rows.push(['Dashboard Report']);
+    rows.push([`Period: ${format(startDate, "MMM d, yyyy")} - ${format(endDate, "MMM d, yyyy")}`]);
+    rows.push([]);
+    
+    // Financial Summary
+    rows.push(['Financial Summary']);
+    rows.push(['Metric', 'Value', 'vs Previous Period']);
+    rows.push(['Total Sales', formatCurrency(summary?.financial.totalSales || 0), `${salesChange.direction === 'up' ? '+' : salesChange.direction === 'down' ? '-' : ''}${salesChange.value.toFixed(1)}%`]);
+    rows.push(['Vendor Cost', formatCurrency(summary?.financial.vendorCost || 0), '']);
+    rows.push(['Profit', formatCurrency(summary?.financial.profit || 0), `${profitChange.direction === 'up' ? '+' : profitChange.direction === 'down' ? '-' : ''}${profitChange.value.toFixed(1)}%`]);
+    rows.push(['Margin', formatPercent(summary?.financial.marginPercent || 0), '']);
+    rows.push(['Total Orders', String(summary?.totalOrders || 0), `${ordersChange.direction === 'up' ? '+' : ordersChange.direction === 'down' ? '-' : ''}${ordersChange.value.toFixed(1)}%`]);
+    rows.push(['AOV', formatCurrency(summary?.financial.aov || 0), `${aovChange.direction === 'up' ? '+' : aovChange.direction === 'down' ? '-' : ''}${aovChange.value.toFixed(1)}%`]);
+    rows.push([]);
+    
+    // Job Counts
+    rows.push(['Job Counts by Status']);
+    rows.push(['Status', 'Count']);
+    rows.push(['Pending Assignment', String(summary?.jobCounts.pendingAssignment || 0)]);
+    rows.push(['Assigned to Vendor', String(summary?.jobCounts.assignedToVendor || 0)]);
+    rows.push(['In Progress', String(summary?.jobCounts.inProgress || 0)]);
+    rows.push(['Delivered', String(summary?.jobCounts.delivered || 0)]);
+    rows.push(['Change Request', String(summary?.jobCounts.changeRequest || 0)]);
+    rows.push(['Canceled', String(summary?.jobCounts.canceled || 0)]);
+    rows.push(['Jobs Over SLA', String(summary?.jobsOverSla || 0)]);
+    rows.push([]);
+    
+    // Top Clients
+    if (topClients && topClients.length > 0) {
+      rows.push(['Top Clients']);
+      rows.push(['Client', 'Orders', 'Sales']);
+      topClients.forEach(c => {
+        rows.push([c.clientName, String(c.totalRequests), formatCurrency(c.totalSales)]);
+      });
+      rows.push([]);
+    }
+    
+    // Top Services
+    if (topServices && topServices.length > 0) {
+      rows.push(['Top Services']);
+      rows.push(['Service', 'Orders', 'Sales']);
+      topServices.forEach(s => {
+        rows.push([s.serviceName, String(s.totalOrders), formatCurrency(s.totalSales)]);
+      });
+      rows.push([]);
+    }
+    
+    // Top Bundles
+    if (topBundles && topBundles.length > 0) {
+      rows.push(['Top Bundles']);
+      rows.push(['Bundle', 'Orders', 'Sales']);
+      topBundles.forEach(b => {
+        rows.push([b.bundleName, String(b.totalOrders), formatCurrency(b.totalSales)]);
+      });
+      rows.push([]);
+    }
+    
+    // Daily Data
+    if (chartData.length > 0) {
+      rows.push(['Daily Trends']);
+      rows.push(['Date', 'Sales', 'Orders']);
+      chartData.forEach(d => {
+        rows.push([d.date, formatCurrency(d.sales), String(d.orders)]);
+      });
+    }
+    
+    // Convert to CSV
+    const csvContent = rows.map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n');
+    
+    // Download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `dashboard-report-${format(startDate, 'yyyy-MM-dd')}-to-${format(endDate, 'yyyy-MM-dd')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [startDate, endDate, summary, topClients, topServices, topBundles, chartData, salesChange, ordersChange, profitChange, aovChange]);
+
+  // Change indicator component
+  const ChangeIndicator = ({ change, invertColors = false }: { change: { value: number; direction: 'up' | 'down' | 'neutral' }; invertColors?: boolean }) => {
+    const isPositive = invertColors ? change.direction === 'down' : change.direction === 'up';
+    const isNegative = invertColors ? change.direction === 'up' : change.direction === 'down';
+    
+    if (change.direction === 'neutral') {
+      return (
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Minus className="h-3 w-3" />
+          <span>0%</span>
+        </span>
+      );
+    }
+    
+    return (
+      <span className={`flex items-center gap-1 text-xs ${isPositive ? 'text-green-600 dark:text-green-400' : isNegative ? 'text-red-600 dark:text-red-400' : ''}`}>
+        {change.direction === 'up' ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+        <span>{change.value.toFixed(1)}%</span>
+      </span>
+    );
+  };
+
   const navigateToJobs = (status?: string, overSla?: boolean) => {
     const params = new URLSearchParams();
     if (status) params.set("status", status);
@@ -237,21 +419,81 @@ export default function AdminDashboard() {
       <div className="container mx-auto p-6 space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold" data-testid="text-dashboard-title">Dashboard</h1>
-          <Select value={datePreset} onValueChange={(v) => setDatePreset(v as DatePreset)}>
-            <SelectTrigger className="w-48" data-testid="select-date-preset">
-              <SelectValue placeholder="Select period" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="current_month">Current Month</SelectItem>
-              <SelectItem value="last_month">Last Month</SelectItem>
-              <SelectItem value="last_7_days">Last 7 Days</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={datePreset} onValueChange={(v) => setDatePreset(v as DatePreset)}>
+              <SelectTrigger className="w-44" data-testid="select-date-preset">
+                <SelectValue placeholder="Select period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="current_month">Current Month</SelectItem>
+                <SelectItem value="last_month">Last Month</SelectItem>
+                <SelectItem value="last_7_days">Last 7 Days</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            {datePreset === "custom" && (
+              <>
+                <Popover open={startCalendarOpen} onOpenChange={setStartCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-36 justify-start text-left font-normal" data-testid="button-start-date">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={customStartDate}
+                      onSelect={(date) => {
+                        setCustomStartDate(date);
+                        setStartCalendarOpen(false);
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <span className="text-muted-foreground">to</span>
+                <Popover open={endCalendarOpen} onOpenChange={setEndCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-36 justify-start text-left font-normal" data-testid="button-end-date">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={customEndDate}
+                      onSelect={(date) => {
+                        setCustomEndDate(date);
+                        setEndCalendarOpen(false);
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </>
+            )}
+            
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={exportToCsv}
+              disabled={summaryLoading}
+              data-testid="button-export-csv"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
-        <p className="text-sm text-muted-foreground">
-          Showing data from {format(startDate, "MMM d, yyyy")} to {format(endDate, "MMM d, yyyy")}
-        </p>
+        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <span>Showing data from {format(startDate, "MMM d, yyyy")} to {format(endDate, "MMM d, yyyy")}</span>
+          <Badge variant="secondary" className="text-xs">
+            vs {format(comparisonStartDate, "MMM d")} - {format(comparisonEndDate, "MMM d")}
+          </Badge>
+        </div>
 
         {/* Section 1: Job Operations */}
         <section className="space-y-4">
@@ -402,7 +644,7 @@ export default function AdminDashboard() {
         {/* Section 2: Financial Performance */}
         <section className="space-y-4">
           <h2 className="text-lg font-medium">Financial Performance</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <Card data-testid="card-total-sales">
               <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total Sales</CardTitle>
@@ -412,8 +654,49 @@ export default function AdminDashboard() {
                 {summaryLoading ? (
                   <Skeleton className="h-8 w-24" />
                 ) : (
-                  <div className="text-2xl font-bold" data-testid="text-total-sales">
-                    {formatCurrency(summary?.financial.totalSales || 0)}
+                  <div className="space-y-1">
+                    <div className="text-2xl font-bold" data-testid="text-total-sales">
+                      {formatCurrency(summary?.financial.totalSales || 0)}
+                    </div>
+                    <ChangeIndicator change={salesChange} />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-total-orders">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Orders</CardTitle>
+                <Package className="h-4 w-4 text-blue-500" />
+              </CardHeader>
+              <CardContent>
+                {summaryLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <div className="space-y-1">
+                    <div className="text-2xl font-bold" data-testid="text-total-orders">
+                      {summary?.totalOrders || 0}
+                    </div>
+                    <ChangeIndicator change={ordersChange} />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-aov">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Avg Order Value</CardTitle>
+                <TrendingUp className="h-4 w-4 text-indigo-500" />
+              </CardHeader>
+              <CardContent>
+                {summaryLoading ? (
+                  <Skeleton className="h-8 w-24" />
+                ) : (
+                  <div className="space-y-1">
+                    <div className="text-2xl font-bold" data-testid="text-aov">
+                      {formatCurrency(summary?.financial.aov || 0)}
+                    </div>
+                    <ChangeIndicator change={aovChange} />
                   </div>
                 )}
               </CardContent>
@@ -438,14 +721,17 @@ export default function AdminDashboard() {
             <Card data-testid="card-profit">
               <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Profit</CardTitle>
-                <TrendingUp className="h-4 w-4 text-blue-600" />
+                <TrendingUp className="h-4 w-4 text-green-600" />
               </CardHeader>
               <CardContent>
                 {summaryLoading ? (
                   <Skeleton className="h-8 w-24" />
                 ) : (
-                  <div className="text-2xl font-bold" data-testid="text-profit">
-                    {formatCurrency(summary?.financial.profit || 0)}
+                  <div className="space-y-1">
+                    <div className="text-2xl font-bold" data-testid="text-profit">
+                      {formatCurrency(summary?.financial.profit || 0)}
+                    </div>
+                    <ChangeIndicator change={profitChange} />
                   </div>
                 )}
               </CardContent>
@@ -633,9 +919,10 @@ export default function AdminDashboard() {
                           tickFormatter={(value) => `$${value}`}
                           className="text-xs"
                         />
-                        <Tooltip 
+                        <RechartsTooltip 
                           formatter={(value: number) => [formatCurrency(value), "Sales"]}
-                          labelFormatter={(label) => format(new Date(label), "MMM d, yyyy")}
+                          labelFormatter={(label: string) => format(new Date(label), "MMM d, yyyy")}
+                          contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '6px' }}
                         />
                         <Line 
                           type="monotone" 
@@ -671,9 +958,10 @@ export default function AdminDashboard() {
                           className="text-xs"
                         />
                         <YAxis className="text-xs" />
-                        <Tooltip 
+                        <RechartsTooltip 
                           formatter={(value: number) => [value, "Orders"]}
-                          labelFormatter={(label) => format(new Date(label), "MMM d, yyyy")}
+                          labelFormatter={(label: string) => format(new Date(label), "MMM d, yyyy")}
+                          contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '6px' }}
                         />
                         <Bar 
                           dataKey="orders" 

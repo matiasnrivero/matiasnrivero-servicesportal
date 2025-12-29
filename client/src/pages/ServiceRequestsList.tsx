@@ -237,7 +237,23 @@ function MultiSelectClientFilter({ options, selected, onChange }: MultiSelectCli
 export default function ServiceRequestsList() {
   const { toast } = useToast();
   const localQueryClient = useQueryClient();
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [location] = useLocation();
+  
+  // Parse URL params for dashboard drill-down
+  const urlParams = useMemo(() => {
+    const searchIndex = location.indexOf('?');
+    if (searchIndex === -1) return new URLSearchParams();
+    return new URLSearchParams(location.slice(searchIndex));
+  }, [location]);
+  
+  const initialStatusFromUrl = urlParams.get("status") || "all";
+  const initialClientFromUrl = urlParams.get("clientId");
+  const initialOverSla = urlParams.get("overSla") === "true";
+  const initialStartDate = urlParams.get("start");
+  const initialEndDate = urlParams.get("end");
+  
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatusFromUrl);
+  const [overSlaFilter, setOverSlaFilter] = useState<boolean>(initialOverSla);
   const [viewMode, setViewMode] = useState<"list" | "board">(() => {
     const saved = localStorage.getItem("serviceRequestsViewMode");
     return (saved as "list" | "board") || "list";
@@ -246,11 +262,21 @@ export default function ServiceRequestsList() {
   const [vendorFilter, setVendorFilter] = useState<string>("all");
   const [serviceFilter, setServiceFilter] = useState<string>("all");
   const [serviceMethodFilter, setServiceMethodFilter] = useState<string>("all");
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
-  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
-  const [selectedClients, setSelectedClients] = useState<string[]>([]);
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(
+    initialStartDate ? new Date(initialStartDate) : undefined
+  );
+  const [dateTo, setDateTo] = useState<Date | undefined>(
+    initialEndDate ? new Date(initialEndDate) : undefined
+  );
+  const [selectedClients, setSelectedClients] = useState<string[]>(
+    initialClientFromUrl ? [initialClientFromUrl] : []
+  );
   const [searchJobId, setSearchJobId] = useState("");
   const [isFiltersOpen, setIsFiltersOpen] = useState<boolean>(() => {
+    // Open filters if coming from dashboard with params
+    if (initialStatusFromUrl !== "all" || initialOverSla || initialClientFromUrl) {
+      return true;
+    }
     const saved = localStorage.getItem("serviceRequestsFiltersOpen");
     return saved === null ? true : saved === "true";
   });
@@ -689,7 +715,15 @@ export default function ServiceRequestsList() {
     setSelectedClients([]);
     setSearchJobId("");
     setStatusFilter("all");
+    setOverSlaFilter(false);
   };
+  
+  // Helper function to check if a job is over SLA
+  const isOverSla = useCallback((dueDate: Date | null, status: string): boolean => {
+    if (!dueDate) return false;
+    if (status === "delivered" || status === "canceled") return false;
+    return new Date(dueDate) < new Date();
+  }, []);
 
   // Create combined request list
   const combinedFilteredRequests = useMemo((): CombinedRequest[] => {
@@ -725,10 +759,17 @@ export default function ServiceRequestsList() {
       price: getBundlePrice(r),
     }));
 
-    return [...adhocItems, ...bundleItems].sort((a, b) => 
+    let combined = [...adhocItems, ...bundleItems];
+    
+    // Apply overSLA filter if active
+    if (overSlaFilter) {
+      combined = combined.filter(r => isOverSla(r.dueDate, r.status));
+    }
+    
+    return combined.sort((a, b) => 
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
-  }, [filteredRequests, filteredBundleRequests]);
+  }, [filteredRequests, filteredBundleRequests, overSlaFilter, isOverSla]);
 
   // Compute eligible count from selected requests for bulk assignment
   const eligibleSelectedRequests = useMemo(() => {
