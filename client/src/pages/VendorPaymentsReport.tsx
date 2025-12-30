@@ -228,32 +228,55 @@ export default function VendorPaymentsReport() {
   const exportToCSV = () => {
     if (!jobsData?.jobs) return;
 
-    const headers = [
-      "Job ID",
-      "Type",
-      "Service/Bundle",
-      "Vendor",
-      "Customer",
-      "Delivered Date",
-      "Vendor Cost",
-      "Payment Status",
-    ];
-    const rows = jobsData.jobs.map((job) => [
-      job.jobId,
-      job.type,
-      job.serviceName,
-      job.vendorName,
-      job.customerName || "",
-      job.deliveredAt ? format(new Date(job.deliveredAt), "MM/dd/yyyy") : "",
-      `$${job.vendorCost.toFixed(2)}`,
-      job.paymentStatus,
-    ]);
+    // Use "Cost" for admin, "Price" for vendor - matching the UI table
+    const costLabel = isAdmin ? "Cost" : "Price";
+    
+    // Headers match the Individual Jobs table in the UI
+    const headers = isAdmin 
+      ? ["Job ID", "Type", "Service/Bundle", "Vendor", "Delivered", costLabel, "Status"]
+      : ["Job ID", "Type", "Service/Bundle", "Delivered", costLabel, "Status"];
+    
+    const rows = jobsData.jobs.map((job) => {
+      const baseRow = [
+        job.jobId,
+        job.type,
+        job.serviceName,
+      ];
+      
+      if (isAdmin) {
+        // Admin sees Vendor column
+        return [
+          ...baseRow,
+          job.vendorName,
+          job.deliveredAt ? format(new Date(job.deliveredAt), "MMM dd, yyyy") : "-",
+          `$${job.vendorCost.toFixed(2)}`,
+          job.paymentStatus === "paid" ? "Paid" : "Pending",
+        ];
+      } else {
+        // Vendor does not see Vendor column
+        return [
+          ...baseRow,
+          job.deliveredAt ? format(new Date(job.deliveredAt), "MMM dd, yyyy") : "-",
+          `$${job.vendorCost.toFixed(2)}`,
+          job.paymentStatus === "paid" ? "Paid" : "Pending",
+        ];
+      }
+    });
+
+    // Build CSV content with proper escaping
+    const escapeCell = (cell: string) => {
+      // Escape double quotes by doubling them
+      const escaped = String(cell).replace(/"/g, '""');
+      return `"${escaped}"`;
+    };
 
     const csvContent = [headers, ...rows]
-      .map((row) => row.map((cell) => `"${cell}"`).join(","))
-      .join("\n");
+      .map((row) => row.map((cell) => escapeCell(String(cell))).join(","))
+      .join("\r\n");
 
-    const blob = new Blob([csvContent], { type: "text/csv" });
+    // Add UTF-8 BOM for better Excel compatibility
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
