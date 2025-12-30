@@ -236,37 +236,51 @@ export default function AdminDashboard() {
   const { data: summary, isLoading: summaryLoading } = useQuery<DashboardSummary>({
     queryKey: [`/api/dashboard/summary?${dateParams}`],
     enabled: isAllowedRole,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   // Comparison period summary for period-over-period calculations (admin only)
   const { data: comparisonSummary } = useQuery<DashboardSummary>({
     queryKey: [`/api/dashboard/summary?${comparisonDateParams}`],
     enabled: showFinancials,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: topClients, isLoading: clientsLoading } = useQuery<TopClient[]>({
     queryKey: [`/api/admin/dashboard/top-clients?${dateParams}`],
     enabled: showTopDrivers,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: topServices, isLoading: servicesLoading } = useQuery<TopService[]>({
     queryKey: [`/api/admin/dashboard/top-services?${dateParams}`],
     enabled: showTopDrivers,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: topBundles, isLoading: bundlesLoading } = useQuery<TopBundle[]>({
     queryKey: [`/api/admin/dashboard/top-bundles?${dateParams}`],
     enabled: showTopDrivers,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: dailySales, isLoading: salesLoading } = useQuery<DailyData[]>({
     queryKey: [`/api/admin/dashboard/daily-sales?${dateParams}`],
     enabled: showDailySales,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: dailyOrders, isLoading: ordersLoading } = useQuery<DailyData[]>({
     queryKey: [`/api/dashboard/daily-orders?${dateParams}`],
     enabled: isAllowedRole,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const chartData = useMemo(() => {

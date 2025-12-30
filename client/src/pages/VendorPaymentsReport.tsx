@@ -146,6 +146,8 @@ export default function VendorPaymentsReport() {
       if (!response.ok) throw new Error("Failed to fetch report");
       return response.json();
     },
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: jobsData } = useQuery<JobsResponse>({
@@ -158,6 +160,8 @@ export default function VendorPaymentsReport() {
       return response.json();
     },
     enabled: !!currentUser,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const markPaidMutation = useMutation({

@@ -225,18 +225,26 @@ export default function ServicesProfitReport() {
 
   const { data: requests = [], isLoading: loadingRequests } = useQuery<ServiceRequest[]>({
     queryKey: ["/api/service-requests"],
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: bundleRequests = [], isLoading: loadingBundleRequests } = useQuery<BundleRequest[]>({
     queryKey: ["/api/bundle-requests"],
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: bundles = [] } = useQuery<Bundle[]>({
     queryKey: ["/api/bundles"],
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: vendorBundleCosts = [] } = useQuery<VendorBundleCost[]>({
     queryKey: ["/api/vendor-bundle-costs"],
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: services = [] } = useQuery<Service[]>({
@@ -246,18 +254,26 @@ export default function ServicesProfitReport() {
       if (!res.ok) throw new Error("Failed to fetch services");
       return res.json();
     },
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: vendorProfiles = [] } = useQuery<VendorProfile[]>({
     queryKey: ["/api/vendor-profiles"],
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: allTiers = [] } = useQuery<ServicePricingTier[]>({
     queryKey: ["/api/service-pricing-tiers"],
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const isAdmin = currentUser?.role === "admin";

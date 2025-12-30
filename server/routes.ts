@@ -5752,9 +5752,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return true;
       });
 
-      console.log(`[Vendor Payments] Filtering bundles for period ${paymentPeriod}`);
-      console.log(`[Vendor Payments] All bundle requests count: ${allBundleRequests.length}`);
-      
       let filteredBundleRequests = allBundleRequests.filter(r => {
         const isDelivered = r.status === "delivered" && r.deliveredAt;
         const jobPeriod = r.vendorPaymentPeriod || (r.deliveredAt ? new Date(r.deliveredAt).toISOString().slice(0, 7) : null);
@@ -5768,27 +5765,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        console.log(`[Vendor Payments] Bundle ${r.id}: status=${r.status}, delivered=${!!r.deliveredAt}, period=${jobPeriod}, periodMatches=${periodMatches}, excludedByAssignee=${excludedByAssignee}, vendorAssigneeId=${r.vendorAssigneeId}`);
-        
         if (!isDelivered) return false;
         if (!periodMatches) return false;
         if (excludedByAssignee) return false;
 
         return true;
       });
-      
-      console.log(`[Vendor Payments] Filtered bundle requests count: ${filteredBundleRequests.length}`);
 
       // If vendor is viewing, filter to only their jobs
       if (sessionUser.role === "vendor") {
         const vendorUserId = sessionUser.id;
-        console.log(`[Vendor Payments] Vendor user ID: ${vendorUserId}`);
-        filteredBundleRequests.forEach(r => {
-          console.log(`[Vendor Payments] Before vendor filter - Bundle ${r.id}: vendorAssigneeId=${r.vendorAssigneeId}, match=${r.vendorAssigneeId === vendorUserId}`);
-        });
         filteredServiceRequests = filteredServiceRequests.filter(r => r.vendorAssigneeId === vendorUserId);
         filteredBundleRequests = filteredBundleRequests.filter(r => r.vendorAssigneeId === vendorUserId);
-        console.log(`[Vendor Payments] After vendor filter: ${filteredBundleRequests.length} bundles`);
       } else if (vendorId) {
         // Admin can filter by specific vendor
         filteredServiceRequests = filteredServiceRequests.filter(r => r.vendorAssigneeId === vendorId);
