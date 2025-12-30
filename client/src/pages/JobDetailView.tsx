@@ -38,7 +38,7 @@ import {
   DollarSign,
   Building2
 } from "lucide-react";
-import type { ServiceRequest, Service, User as UserType, ServiceAttachment, Comment, VendorProfile } from "@shared/schema";
+import type { ServiceRequest, Service, User as UserType, ServiceAttachment, Comment, VendorProfile, ClientProfile } from "@shared/schema";
 
 interface CurrentUser {
   userId: string;
@@ -147,6 +147,10 @@ export default function JobDetailView() {
     queryKey: ["/api/vendor-profiles"],
   });
 
+  const { data: clientProfiles = [] } = useQuery<ClientProfile[]>({
+    queryKey: ["/api/client-profiles"],
+  });
+
   // Get users that the current user can assign to (role-based filtering)
   const { data: assignableUsers = [] } = useQuery<UserType[]>({
     queryKey: ["/api/assignable-users"],
@@ -160,6 +164,15 @@ export default function JobDetailView() {
   const getVendorDisplayName = (vendorUser: UserType) => {
     const profile = vendorProfiles.find(p => p.userId === vendorUser.id);
     return profile?.companyName || vendorUser.username;
+  };
+
+  // Helper to get client company name
+  const getClientCompanyName = (userId: string | null | undefined): string | null => {
+    if (!userId) return null;
+    const user = allUsers.find(u => u.id === userId);
+    if (!user?.clientProfileId) return null;
+    const profile = clientProfiles.find(p => p.id === user.clientProfileId);
+    return profile?.companyName || null;
   };
   
   // Only include vendors that have a vendor profile with a company name
@@ -950,7 +963,15 @@ export default function JobDetailView() {
                 <CardTitle className="text-lg">General Info</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
-                {/* System fields: Client and Assignee */}
+                {/* System fields: Client Company Name (for admin/internal_designer) and Client Name */}
+                {["admin", "internal_designer"].includes(currentUser?.role || "") && getClientCompanyName(request.userId) && (
+                  <div className="p-3 bg-blue-lavender/30 rounded-lg">
+                    <p className="text-xs text-dark-gray mb-1">Client Company</p>
+                    <p className="text-sm font-medium text-dark-blue-night" data-testid="text-client-company">
+                      {getClientCompanyName(request.userId)}
+                    </p>
+                  </div>
+                )}
                 <div className="p-3 bg-blue-lavender/30 rounded-lg">
                   <p className="text-xs text-dark-gray mb-1">Client</p>
                   <p className="text-sm font-medium text-dark-blue-night" data-testid="text-client">

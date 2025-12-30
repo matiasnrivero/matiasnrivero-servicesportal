@@ -63,7 +63,7 @@ import {
 import { BoardView } from "@/components/BoardView";
 import { calculateServicePrice } from "@/lib/pricing";
 import { getDisplayStatus, getStatusInfo, statusConfig as roleAwareStatusConfig } from "@/lib/statusUtils";
-import type { ServiceRequest, Service, User, BundleRequest, Bundle, VendorProfile } from "@shared/schema";
+import type { ServiceRequest, Service, User, BundleRequest, Bundle, VendorProfile, ClientProfile } from "@shared/schema";
 
 interface CurrentUser {
   userId: string;
@@ -324,6 +324,10 @@ export default function ServiceRequestsList() {
     queryKey: ["/api/vendor-profiles"],
   });
 
+  const { data: clientProfiles = [] } = useQuery<ClientProfile[]>({
+    queryKey: ["/api/client-profiles"],
+  });
+
   const isAdmin = currentUser?.role === "admin";
 
   const userMap = useMemo(() => {
@@ -337,6 +341,12 @@ export default function ServiceRequestsList() {
     vendorProfiles.forEach(vp => { map[vp.userId] = vp; });
     return map;
   }, [vendorProfiles]);
+
+  const clientProfileMap = useMemo(() => {
+    const map: Record<string, ClientProfile> = {};
+    clientProfiles.forEach(cp => { map[cp.id] = cp; });
+    return map;
+  }, [clientProfiles]);
 
   const vendors = useMemo(() => {
     return users.filter(u => u.role === "vendor" || u.role === "vendor_designer");
@@ -567,6 +577,22 @@ export default function ServiceRequestsList() {
     }
     const user = users.find(u => u.id === request.userId);
     return user?.username || "Unknown";
+  };
+
+  const getClientCompanyName = (userId: string): string | null => {
+    const user = userMap[userId];
+    if (!user?.clientProfileId) return null;
+    const profile = clientProfileMap[user.clientProfileId];
+    return profile?.companyName || null;
+  };
+
+  const getCustomerDisplayName = (userId: string, customerName: string): string => {
+    if (isDistributor(currentUser?.role)) {
+      const user = userMap[userId];
+      return user?.username || customerName || "Unknown";
+    }
+    const companyName = getClientCompanyName(userId);
+    return companyName || customerName || "Unknown";
   };
 
   const getVendorIdFromAssignee = (assigneeId: string | null): string | null => {
@@ -1119,7 +1145,7 @@ export default function ServiceRequestsList() {
                     <TableHead>Job ID</TableHead>
                     <TableHead>Service</TableHead>
                     <TableHead>Method</TableHead>
-                    <TableHead>Customer</TableHead>
+                    <TableHead>{isDistributor(currentUser?.role) ? "User" : "Customer"}</TableHead>
                     <TableHead>Due Date</TableHead>
                     {isDistributor(currentUser?.role) ? (
                       <TableHead>Price</TableHead>
@@ -1183,7 +1209,7 @@ export default function ServiceRequestsList() {
                           </Badge>
                         </TableCell>
                         <TableCell data-testid={`text-customer-${request.id}`}>
-                          {request.customerName}
+                          {getCustomerDisplayName(request.userId, request.customerName)}
                         </TableCell>
                         <TableCell data-testid={`text-due-date-${request.id}`}>
                           {request.dueDate
