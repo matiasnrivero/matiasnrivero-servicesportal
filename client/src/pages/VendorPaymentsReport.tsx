@@ -264,7 +264,7 @@ export default function VendorPaymentsReport() {
           job.vendorName || "-",
           job.deliveredAt ? format(new Date(job.deliveredAt), "MMM dd, yyyy") : "-",
           `$${job.vendorCost.toFixed(2)}`,
-          job.paymentStatus === "paid" ? "Paid" : "Pending",
+          job.paymentStatus === "paid" ? "Paid" : "Pending Payment",
         ];
       } else {
         // Vendor does not see Vendor column
@@ -272,7 +272,7 @@ export default function VendorPaymentsReport() {
           ...baseRow,
           job.deliveredAt ? format(new Date(job.deliveredAt), "MMM dd, yyyy") : "-",
           `$${job.vendorCost.toFixed(2)}`,
-          job.paymentStatus === "paid" ? "Paid" : "Pending",
+          job.paymentStatus === "paid" ? "Paid" : "Pending Payment",
         ];
       }
     });
@@ -858,7 +858,7 @@ export default function VendorPaymentsReport() {
                                             ) : (
                                               <>
                                                 <Clock className="h-3 w-3 mr-1" />
-                                                Pending
+                                                Pending Payment
                                               </>
                                             )}
                                           </Badge>
@@ -1012,7 +1012,7 @@ export default function VendorPaymentsReport() {
                                         ) : (
                                           <>
                                             <Clock className="h-3 w-3 mr-1" />
-                                            Pending
+                                            Pending Payment
                                           </>
                                         )}
                                       </Badge>
