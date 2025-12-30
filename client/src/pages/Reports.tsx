@@ -54,7 +54,7 @@ const reportCards: ReportCard[] = [
   },
   {
     id: "vendor-designer-workload",
-    title: "Vendor Designer Workload Report",
+    title: "Vendor Designer Workload",
     description: "View designer workload and job assignments",
     icon: FileText,
     path: "/reports/vendor-designer-workload",
