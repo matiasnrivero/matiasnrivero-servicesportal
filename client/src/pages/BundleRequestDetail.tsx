@@ -402,7 +402,10 @@ export default function BundleRequestDetail() {
             {request.status === "in-progress" && (
               currentUser?.role === "admin" || 
               currentUser?.role === "internal_designer" || 
-              request.assigneeId === currentUser?.userId
+              currentUser?.role === "vendor" ||
+              currentUser?.role === "vendor_designer" ||
+              request.assigneeId === currentUser?.userId ||
+              request.vendorAssigneeId === currentUser?.userId
             ) && (
               <>
                 <Button 
@@ -426,7 +429,10 @@ export default function BundleRequestDetail() {
             {request.status === "change-request" && (
               currentUser?.role === "admin" || 
               currentUser?.role === "internal_designer" || 
-              request.assigneeId === currentUser?.userId
+              currentUser?.role === "vendor" ||
+              currentUser?.role === "vendor_designer" ||
+              request.assigneeId === currentUser?.userId ||
+              request.vendorAssigneeId === currentUser?.userId
             ) && (
               <>
                 <Button 
