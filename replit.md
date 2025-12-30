@@ -67,6 +67,13 @@ TanStack Query manages server data, caching, and synchronization. Optimistic upd
 Role-based access to reports (Admin, Client, Vendor).
 - **Reports Hub**: Central page for role-specific reports.
 - **Services Profit Report (Admin only)**: Comprehensive financial report with summaries, filters (vendor, service, date), search (client, job ID), and a detailed data table. Pricing calculations consider retail price, vendor cost, and exception rules.
+- **Vendor Payments Report (Admin and Vendor)**: Monthly payment tracking for vendor-completed jobs.
+  - **Schema Fields**: `vendorPaymentStatus`, `vendorPaymentPeriod`, `vendorPaymentMarkedAt`, `vendorPaymentMarkedBy`, `vendorCost` on both `serviceRequests` and `bundleRequests`.
+  - **Filtering Logic**: Jobs appear based on `vendorPaymentPeriod` if set, otherwise `deliveredAt` month. Only delivered jobs are included.
+  - **Role Access**: Admin has full access with "Mark as Paid" functionality; Vendor has read-only access to their own jobs.
+  - **Exclusions**: Jobs assigned to admin or internal_designer roles have $0 cost and are excluded from payment reports.
+  - **Exports**: CSV and PDF exports with job details, vendor names, and payment status.
+  - **API Endpoints**: `GET /api/reports/vendor-payments`, `POST /api/reports/vendor-payments/mark-paid`, `GET /api/reports/vendor-payments/jobs`.
 
 ## Role-Specific Dashboards
 
