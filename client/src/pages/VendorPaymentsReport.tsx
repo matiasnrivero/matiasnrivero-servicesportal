@@ -39,6 +39,7 @@ import {
   Clock,
   ChevronLeft,
   Building2,
+  RefreshCw,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -137,6 +138,8 @@ export default function VendorPaymentsReport() {
     data: reportData,
     isLoading,
     error,
+    refetch: refetchReport,
+    isFetching: isRefetching,
   } = useQuery<VendorPaymentReportData>({
     queryKey: ["/api/reports/vendor-payments", selectedPeriod],
     queryFn: async () => {
@@ -148,9 +151,10 @@ export default function VendorPaymentsReport() {
     },
     staleTime: 0,
     refetchOnMount: 'always',
+    gcTime: 0,
   });
 
-  const { data: jobsData } = useQuery<JobsResponse>({
+  const { data: jobsData, refetch: refetchJobs } = useQuery<JobsResponse>({
     queryKey: ["/api/reports/vendor-payments/jobs", selectedPeriod],
     queryFn: async () => {
       const response = await fetch(
@@ -162,7 +166,13 @@ export default function VendorPaymentsReport() {
     enabled: !!currentUser,
     staleTime: 0,
     refetchOnMount: 'always',
+    gcTime: 0,
   });
+  
+  const handleRefresh = () => {
+    refetchReport();
+    refetchJobs();
+  };
 
   const markPaidMutation = useMutation({
     mutationFn: async (jobIds: string[]) => {
@@ -408,6 +418,15 @@ export default function VendorPaymentsReport() {
                   ))}
                 </SelectContent>
               </Select>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleRefresh}
+                disabled={isRefetching}
+                data-testid="button-refresh-report"
+              >
+                <RefreshCw className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
+              </Button>
               <Button
                 variant="outline"
                 size="sm"

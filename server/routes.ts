@@ -5772,15 +5772,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return true;
       });
 
+      // Helper to check if a job belongs to a vendor (either via vendorAssigneeId or assignee's vendorId)
+      const jobBelongsToVendor = (vendorUserId: string, vendorAssigneeId: string | null, assigneeId: string | null): boolean => {
+        // Direct match via vendorAssigneeId
+        if (vendorAssigneeId === vendorUserId) return true;
+        // Fallback: check if assignee is a vendor_designer belonging to this vendor
+        if (assigneeId) {
+          const assignee = userMap[assigneeId];
+          if (assignee?.role === "vendor_designer" && assignee?.vendorId === vendorUserId) {
+            return true;
+          }
+        }
+        return false;
+      };
+      
       // If vendor is viewing, filter to only their jobs
       if (sessionUser.role === "vendor") {
         const vendorUserId = sessionUser.id;
-        filteredServiceRequests = filteredServiceRequests.filter(r => r.vendorAssigneeId === vendorUserId);
-        filteredBundleRequests = filteredBundleRequests.filter(r => r.vendorAssigneeId === vendorUserId);
+        filteredServiceRequests = filteredServiceRequests.filter(r => 
+          jobBelongsToVendor(vendorUserId, r.vendorAssigneeId, r.assigneeId)
+        );
+        filteredBundleRequests = filteredBundleRequests.filter(r => 
+          jobBelongsToVendor(vendorUserId, r.vendorAssigneeId, r.assigneeId)
+        );
       } else if (vendorId) {
         // Admin can filter by specific vendor
-        filteredServiceRequests = filteredServiceRequests.filter(r => r.vendorAssigneeId === vendorId);
-        filteredBundleRequests = filteredBundleRequests.filter(r => r.vendorAssigneeId === vendorId);
+        const vendorIdStr = String(vendorId);
+        filteredServiceRequests = filteredServiceRequests.filter(r => 
+          jobBelongsToVendor(vendorIdStr, r.vendorAssigneeId, r.assigneeId)
+        );
+        filteredBundleRequests = filteredBundleRequests.filter(r => 
+          jobBelongsToVendor(vendorIdStr, r.vendorAssigneeId, r.assigneeId)
+        );
       }
 
       // Build vendor cost lookup from vendor profiles pricing agreements
@@ -5840,9 +5863,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }>;
       }> = {};
 
+      // Helper to get the effective vendor ID for a job
+      const getEffectiveVendorId = (vendorAssigneeId: string | null, assigneeId: string | null): string | null => {
+        if (vendorAssigneeId) return vendorAssigneeId;
+        // If no vendorAssigneeId, check if assignee is a vendor_designer and get their vendor
+        if (assigneeId) {
+          const assignee = userMap[assigneeId];
+          if (assignee?.role === "vendor_designer" && assignee?.vendorId) {
+            return assignee.vendorId;
+          }
+        }
+        return null;
+      };
+      
       // Process service requests (ad-hoc)
       for (const r of filteredServiceRequests) {
-        const vendorUserId = r.vendorAssigneeId;
+        const vendorUserId = getEffectiveVendorId(r.vendorAssigneeId, r.assigneeId);
         if (!vendorUserId) continue;
 
         const vendorProfile = vendorProfileMap[vendorUserId];
@@ -5895,7 +5931,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Process bundle requests
       for (const r of filteredBundleRequests) {
-        const vendorUserId = r.vendorAssigneeId;
+        const vendorUserId = getEffectiveVendorId(r.vendorAssigneeId, r.assigneeId);
         if (!vendorUserId) continue;
 
         const vendorProfile = vendorProfileMap[vendorUserId];
