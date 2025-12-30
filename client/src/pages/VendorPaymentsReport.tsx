@@ -243,8 +243,8 @@ export default function VendorPaymentsReport() {
     
     // Headers match the Individual Jobs table in the UI
     const headers = isAdmin 
-      ? ["Job ID", "Type", "Service/Bundle", "Vendor", "Delivered", costLabel, "Status"]
-      : ["Job ID", "Type", "Service/Bundle", "Delivered", costLabel, "Status"];
+      ? ["Job ID", "Service/Bundle", "Method", "Vendor", "Delivered", costLabel, "Status"]
+      : ["Job ID", "Service/Bundle", "Method", "Delivered", costLabel, "Status"];
     
     const rows = allJobs.map((job) => {
       // Format Job ID same as UI: A-XXXXX for adhoc, B-XXXXX for bundle
@@ -253,8 +253,8 @@ export default function VendorPaymentsReport() {
       
       const baseRow = [
         jobIdDisplay,
-        job.type === "adhoc" ? "Ad-hoc" : "Bundle",
         job.serviceName,
+        job.type === "adhoc" ? "Ad-hoc" : "Bundle",
       ];
       
       if (isAdmin) {
@@ -371,8 +371,8 @@ export default function VendorPaymentsReport() {
         <table>
           <thead>
             <tr>
-              <th>Type</th>
               <th>Service/Bundle</th>
+              <th>Method</th>
               <th class="text-right">Unit ${priceLabel}</th>
               <th class="text-right">Quantity</th>
               <th class="text-right">Total ${priceLabel}</th>
@@ -384,8 +384,8 @@ export default function VendorPaymentsReport() {
       for (const row of breakdownRows) {
         htmlContent += `
           <tr>
-            <td><span class="type-badge">${row.type}</span></td>
             <td>${row.name}</td>
+            <td><span class="type-badge">${row.type}</span></td>
             <td class="text-right">$${row.unitCost.toFixed(2)}</td>
             <td class="text-right">${row.count}</td>
             <td class="text-right">$${row.totalCost.toFixed(2)}</td>
@@ -698,8 +698,8 @@ export default function VendorPaymentsReport() {
                                   <Table>
                                     <TableHeader>
                                       <TableRow>
-                                        <TableHead>Type</TableHead>
                                         <TableHead>Service/Bundle</TableHead>
+                                        <TableHead>Method</TableHead>
                                         <TableHead className="text-right">Unit Cost</TableHead>
                                         <TableHead className="text-right">Quantity</TableHead>
                                         <TableHead className="text-right">Total Cost</TableHead>
@@ -708,10 +708,10 @@ export default function VendorPaymentsReport() {
                                     <TableBody>
                                       {Object.entries(vendor.adhocJobs.services).map(([serviceName, breakdown]) => (
                                         <TableRow key={`adhoc-${serviceName}`}>
+                                          <TableCell>{serviceName}</TableCell>
                                           <TableCell>
                                             <Badge variant="outline" className="text-xs">Ad-hoc</Badge>
                                           </TableCell>
-                                          <TableCell>{serviceName}</TableCell>
                                           <TableCell className="text-right">${breakdown.unitCost.toFixed(2)}</TableCell>
                                           <TableCell className="text-right">{breakdown.count}</TableCell>
                                           <TableCell className="text-right font-medium">${breakdown.totalCost.toFixed(2)}</TableCell>
@@ -719,10 +719,10 @@ export default function VendorPaymentsReport() {
                                       ))}
                                       {Object.entries(vendor.bundleJobs.bundles).map(([bundleName, breakdown]) => (
                                         <TableRow key={`bundle-${bundleName}`}>
+                                          <TableCell>{bundleName}</TableCell>
                                           <TableCell>
                                             <Badge variant="outline" className="text-xs">Bundle</Badge>
                                           </TableCell>
-                                          <TableCell>{bundleName}</TableCell>
                                           <TableCell className="text-right">${breakdown.unitCost.toFixed(2)}</TableCell>
                                           <TableCell className="text-right">{breakdown.count}</TableCell>
                                           <TableCell className="text-right font-medium">${breakdown.totalCost.toFixed(2)}</TableCell>
@@ -782,8 +782,8 @@ export default function VendorPaymentsReport() {
                                         />
                                       </TableHead>
                                       <TableHead>Job ID</TableHead>
-                                      <TableHead>Type</TableHead>
                                       <TableHead>Service/Bundle</TableHead>
+                                      <TableHead>Method</TableHead>
                                       <TableHead>Delivered</TableHead>
                                       <TableHead>Cost</TableHead>
                                       <TableHead>Status</TableHead>
@@ -823,6 +823,7 @@ export default function VendorPaymentsReport() {
                                             </span>
                                           </Link>
                                         </TableCell>
+                                        <TableCell>{job.serviceName}</TableCell>
                                         <TableCell>
                                           <Badge variant="outline" className="text-xs">
                                             {job.type === "adhoc"
@@ -830,7 +831,6 @@ export default function VendorPaymentsReport() {
                                               : "Bundle"}
                                           </Badge>
                                         </TableCell>
-                                        <TableCell>{job.serviceName}</TableCell>
                                         <TableCell className="whitespace-nowrap">
                                           {job.deliveredAt
                                             ? format(
@@ -885,8 +885,8 @@ export default function VendorPaymentsReport() {
                             <Table>
                               <TableHeader>
                                 <TableRow>
-                                  <TableHead>Type</TableHead>
                                   <TableHead>Service/Bundle</TableHead>
+                                  <TableHead>Method</TableHead>
                                   <TableHead className="text-right">Unit Price</TableHead>
                                   <TableHead className="text-right">Quantity</TableHead>
                                   <TableHead className="text-right">Total Price</TableHead>
@@ -895,10 +895,10 @@ export default function VendorPaymentsReport() {
                               <TableBody>
                                 {Object.entries(vendor.adhocJobs.services).map(([serviceName, breakdown]) => (
                                   <TableRow key={`adhoc-${serviceName}`}>
+                                    <TableCell>{serviceName}</TableCell>
                                     <TableCell>
                                       <Badge variant="outline" className="text-xs">Ad-hoc</Badge>
                                     </TableCell>
-                                    <TableCell>{serviceName}</TableCell>
                                     <TableCell className="text-right">${breakdown.unitCost.toFixed(2)}</TableCell>
                                     <TableCell className="text-right">{breakdown.count}</TableCell>
                                     <TableCell className="text-right font-medium">${breakdown.totalCost.toFixed(2)}</TableCell>
@@ -906,10 +906,10 @@ export default function VendorPaymentsReport() {
                                 ))}
                                 {Object.entries(vendor.bundleJobs.bundles).map(([bundleName, breakdown]) => (
                                   <TableRow key={`bundle-${bundleName}`}>
+                                    <TableCell>{bundleName}</TableCell>
                                     <TableCell>
                                       <Badge variant="outline" className="text-xs">Bundle</Badge>
                                     </TableCell>
-                                    <TableCell>{bundleName}</TableCell>
                                     <TableCell className="text-right">${breakdown.unitCost.toFixed(2)}</TableCell>
                                     <TableCell className="text-right">{breakdown.count}</TableCell>
                                     <TableCell className="text-right font-medium">${breakdown.totalCost.toFixed(2)}</TableCell>
@@ -950,8 +950,8 @@ export default function VendorPaymentsReport() {
                               <TableHeader>
                                 <TableRow>
                                   <TableHead>Job ID</TableHead>
-                                  <TableHead>Type</TableHead>
                                   <TableHead>Service/Bundle</TableHead>
+                                  <TableHead>Method</TableHead>
                                   <TableHead>Delivered</TableHead>
                                   <TableHead>Price</TableHead>
                                   <TableHead>Status</TableHead>
@@ -977,6 +977,7 @@ export default function VendorPaymentsReport() {
                                         </span>
                                       </Link>
                                     </TableCell>
+                                    <TableCell>{job.serviceName}</TableCell>
                                     <TableCell>
                                       <Badge variant="outline" className="text-xs">
                                         {job.type === "adhoc"
@@ -984,7 +985,6 @@ export default function VendorPaymentsReport() {
                                           : "Bundle"}
                                       </Badge>
                                     </TableCell>
-                                    <TableCell>{job.serviceName}</TableCell>
                                     <TableCell className="whitespace-nowrap">
                                       {job.deliveredAt
                                         ? format(
