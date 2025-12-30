@@ -286,81 +286,107 @@ export default function VendorPaymentsReport() {
   };
 
   const exportToPDF = () => {
-    if (!jobsData?.jobs || !reportData?.vendors) return;
+    if (!reportData?.vendors) return;
 
     const periodLabel =
       paymentPeriods.find((p) => p.value === selectedPeriod)?.label ||
       selectedPeriod;
+    
+    // Use "Cost" for admin, "Price" for vendor
+    const priceLabel = isAdmin ? "Cost" : "Price";
 
     let htmlContent = `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Vendor Payment Report - ${periodLabel}</title>
+        <title>Payment Summary - ${periodLabel}</title>
         <style>
-          body { font-family: Arial, sans-serif; padding: 20px; }
-          h1 { color: #1e3a5f; margin-bottom: 5px; }
-          h2 { color: #1e3a5f; margin-top: 30px; }
-          .period { color: #666; margin-bottom: 30px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          th { background-color: #f5f5f5; }
-          .summary { background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 30px; }
-          .summary-item { display: inline-block; margin-right: 30px; }
-          .amount { font-weight: bold; color: #1e3a5f; }
-          .pending { color: #d97706; }
-          .paid { color: #059669; }
+          body { font-family: Arial, sans-serif; padding: 30px; }
+          h1 { color: #1e3a5f; margin-bottom: 5px; font-size: 24px; }
+          h2 { color: #1e3a5f; margin-top: 30px; font-size: 18px; margin-bottom: 15px; }
+          .period { color: #666; margin-bottom: 30px; font-size: 14px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+          th { background-color: #f5f5f5; font-weight: 600; }
+          .text-right { text-align: right; }
+          .type-badge { 
+            display: inline-block; 
+            padding: 2px 8px; 
+            border-radius: 4px; 
+            font-size: 12px; 
+            background: #f0f0f0; 
+            border: 1px solid #ddd;
+          }
+          .total-row { background-color: #f9f9f9; font-weight: bold; }
+          .total-row td { border-top: 2px solid #1e3a5f; }
         </style>
       </head>
       <body>
-        <h1>Vendor Payment Report</h1>
+        <h1>Payment Summary</h1>
         <p class="period">Period: ${periodLabel}</p>
     `;
 
     for (const vendor of reportData.vendors) {
-      const vendorJobs = jobsData.jobs.filter(
-        (j) => j.vendorName === vendor.vendorName
-      );
+      // Build payment breakdown rows from adhocJobs and bundleJobs
+      const breakdownRows: { type: string; name: string; unitCost: number; count: number; totalCost: number }[] = [];
+      
+      // Add ad-hoc service breakdowns
+      Object.entries(vendor.adhocJobs.services).forEach(([serviceName, breakdown]) => {
+        breakdownRows.push({
+          type: "Ad-hoc",
+          name: serviceName,
+          unitCost: breakdown.unitCost,
+          count: breakdown.count,
+          totalCost: breakdown.totalCost,
+        });
+      });
+      
+      // Add bundle breakdowns
+      Object.entries(vendor.bundleJobs.bundles).forEach(([bundleName, breakdown]) => {
+        breakdownRows.push({
+          type: "Bundle",
+          name: bundleName,
+          unitCost: breakdown.unitCost,
+          count: breakdown.count,
+          totalCost: breakdown.totalCost,
+        });
+      });
 
       htmlContent += `
-        <h2>${vendor.vendorName}</h2>
-        <div class="summary">
-          <div class="summary-item">Total Jobs: <span class="amount">${vendor.adhocJobs.count + vendor.bundleJobs.count}</span></div>
-          <div class="summary-item">Total Earnings: <span class="amount">$${vendor.totalEarnings.toFixed(2)}</span></div>
-          <div class="summary-item">Pending: <span class="pending">${vendor.pendingCount}</span></div>
-          <div class="summary-item">Paid: <span class="paid">${vendor.paidCount}</span></div>
-        </div>
+        <h2>${vendor.vendorName} Payment Summary</h2>
         <table>
           <thead>
             <tr>
-              <th>Job ID</th>
               <th>Type</th>
               <th>Service/Bundle</th>
-              <th>Customer</th>
-              <th>Delivered</th>
-              <th>Cost</th>
-              <th>Status</th>
+              <th class="text-right">Unit ${priceLabel}</th>
+              <th class="text-right">Quantity</th>
+              <th class="text-right">Total ${priceLabel}</th>
             </tr>
           </thead>
           <tbody>
       `;
 
-      for (const job of vendorJobs) {
+      for (const row of breakdownRows) {
         htmlContent += `
           <tr>
-            <td>${job.jobId}</td>
-            <td>${job.type}</td>
-            <td>${job.serviceName}</td>
-            <td>${job.customerName || "-"}</td>
-            <td>${job.deliveredAt ? format(new Date(job.deliveredAt), "MM/dd/yyyy") : "-"}</td>
-            <td>$${job.vendorCost.toFixed(2)}</td>
-            <td class="${job.paymentStatus === "paid" ? "paid" : "pending"}">${job.paymentStatus === "paid" ? "Paid" : "Pending"}</td>
+            <td><span class="type-badge">${row.type}</span></td>
+            <td>${row.name}</td>
+            <td class="text-right">$${row.unitCost.toFixed(2)}</td>
+            <td class="text-right">${row.count}</td>
+            <td class="text-right">$${row.totalCost.toFixed(2)}</td>
           </tr>
         `;
       }
 
       htmlContent += `
           </tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td colspan="4"><strong>Total ${priceLabel}</strong></td>
+              <td class="text-right"><strong>$${vendor.totalEarnings.toFixed(2)}</strong></td>
+            </tr>
+          </tfoot>
         </table>
       `;
     }
@@ -593,7 +619,7 @@ export default function VendorPaymentsReport() {
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    {isAdmin ? "Vendor Breakdown" : `${reportData?.vendors[0]?.vendorName || "Your"} Payment Breakdown`}
+                    {isAdmin ? "Vendor Breakdown" : `${reportData?.vendors[0]?.vendorName || "Your"} Payment Summary`}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -705,7 +731,7 @@ export default function VendorPaymentsReport() {
                             {isAdmin && vendor.pendingCount > 0 && (
                               <div className="mt-4 pt-4 border-t">
                                 <div className="flex items-center justify-between mb-3">
-                                  <h4 className="text-sm font-medium text-dark-gray">Individual Jobs (for payment marking)</h4>
+                                  <h4 className="text-sm font-medium text-dark-gray">Individual Jobs Breakdown (for payment marking)</h4>
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -892,7 +918,7 @@ export default function VendorPaymentsReport() {
                         {vendor.jobs.length > 0 && (
                           <div className="mt-4 pt-4 border-t">
                             <div className="flex items-center justify-between mb-3">
-                              <h4 className="text-sm font-medium text-dark-gray">Individual Jobs</h4>
+                              <h4 className="text-sm font-medium text-dark-gray">Individual Jobs Breakdown</h4>
                               <Button
                                 variant="outline"
                                 size="sm"
