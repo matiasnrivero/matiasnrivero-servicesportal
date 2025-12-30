@@ -70,6 +70,9 @@ import {
   type ClientProfile,
   type InsertClientProfile,
   type UpdateClientProfile,
+  type DiscountCoupon,
+  type InsertDiscountCoupon,
+  type UpdateDiscountCoupon,
   users,
   services,
   servicePricingTiers,
@@ -98,6 +101,7 @@ import {
   automationRules,
   automationAssignmentLogs,
   clientProfiles,
+  discountCoupons,
 } from "@shared/schema";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -306,6 +310,15 @@ export interface IStorage {
   // Automation Assignment Log methods
   getAutomationLogsByRequest(requestId: string): Promise<AutomationAssignmentLog[]>;
   createAutomationLog(data: InsertAutomationAssignmentLog): Promise<AutomationAssignmentLog>;
+
+  // Discount Coupon methods
+  getAllDiscountCoupons(): Promise<DiscountCoupon[]>;
+  getDiscountCoupon(id: string): Promise<DiscountCoupon | undefined>;
+  getDiscountCouponByCode(code: string): Promise<DiscountCoupon | undefined>;
+  createDiscountCoupon(data: InsertDiscountCoupon): Promise<DiscountCoupon>;
+  updateDiscountCoupon(id: string, data: UpdateDiscountCoupon): Promise<DiscountCoupon | undefined>;
+  deleteDiscountCoupon(id: string): Promise<void>;
+  incrementCouponUsage(id: string): Promise<DiscountCoupon | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -1303,6 +1316,48 @@ export class DbStorage implements IStorage {
 
   async createAutomationLog(data: InsertAutomationAssignmentLog): Promise<AutomationAssignmentLog> {
     const result = await db.insert(automationAssignmentLogs).values(data).returning();
+    return result[0];
+  }
+
+  // Discount Coupon methods
+  async getAllDiscountCoupons(): Promise<DiscountCoupon[]> {
+    return await db.select().from(discountCoupons).orderBy(desc(discountCoupons.createdAt));
+  }
+
+  async getDiscountCoupon(id: string): Promise<DiscountCoupon | undefined> {
+    const result = await db.select().from(discountCoupons).where(eq(discountCoupons.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getDiscountCouponByCode(code: string): Promise<DiscountCoupon | undefined> {
+    const result = await db.select().from(discountCoupons).where(eq(discountCoupons.code, code)).limit(1);
+    return result[0];
+  }
+
+  async createDiscountCoupon(data: InsertDiscountCoupon): Promise<DiscountCoupon> {
+    const result = await db.insert(discountCoupons).values(data).returning();
+    return result[0];
+  }
+
+  async updateDiscountCoupon(id: string, data: UpdateDiscountCoupon): Promise<DiscountCoupon | undefined> {
+    const result = await db.update(discountCoupons)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(discountCoupons.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteDiscountCoupon(id: string): Promise<void> {
+    await db.delete(discountCoupons).where(eq(discountCoupons.id, id));
+  }
+
+  async incrementCouponUsage(id: string): Promise<DiscountCoupon | undefined> {
+    const coupon = await this.getDiscountCoupon(id);
+    if (!coupon) return undefined;
+    const result = await db.update(discountCoupons)
+      .set({ currentUses: coupon.currentUses + 1, updatedAt: new Date() })
+      .where(eq(discountCoupons.id, id))
+      .returning();
     return result[0];
   }
 }

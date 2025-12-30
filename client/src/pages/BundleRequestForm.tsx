@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/Header";
 import { DynamicFormField, type ServiceFieldWithInput } from "@/components/DynamicFormField";
 import { FileUploader } from "@/components/FileUploader";
-import { ArrowLeft, Package, Loader2, User, ClipboardList } from "lucide-react";
+import { ArrowLeft, Package, Loader2, User, ClipboardList, Percent, CheckCircle, X } from "lucide-react";
 import { Link } from "wouter";
 import type { Bundle, Service, InputField, ServiceField, BundleField, InsertBundleRequest, User as UserType } from "@shared/schema";
 
@@ -44,6 +44,7 @@ interface CurrentUser {
   userId: string;
   role: string;
   username: string;
+  clientProfileId?: string | null;
 }
 
 async function fetchBundleFormStructure(bundleId: string): Promise<BundleFormStructure> {
@@ -84,6 +85,16 @@ export default function BundleRequestForm() {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [bundleHeaderData, setBundleHeaderData] = useState<Record<string, any>>({});
   const [selectedAssignee, setSelectedAssignee] = useState<string>("");
+  
+  const [couponCode, setCouponCode] = useState<string>("");
+  const [validatedCoupon, setValidatedCoupon] = useState<{
+    id: string;
+    code: string;
+    discountType: string;
+    discountValue: string;
+  } | null>(null);
+  const [couponError, setCouponError] = useState<string>("");
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState<boolean>(false);
 
   const { data: bundleStructure, isLoading: isLoadingStructure, error: structureError } = useQuery({
     queryKey: ["/api/bundles", bundleId, "form-structure"],
@@ -172,16 +183,84 @@ export default function BundleRequestForm() {
     });
   };
 
+  const validateCoupon = async () => {
+    if (!couponCode.trim()) {
+      setCouponError("");
+      setValidatedCoupon(null);
+      return;
+    }
+
+    setIsValidatingCoupon(true);
+    setCouponError("");
+
+    try {
+      const response = await fetch("/api/discount-coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: couponCode.trim().toUpperCase(),
+          bundleId,
+          clientId: currentUser?.userId,
+          clientProfileId: currentUser?.clientProfileId,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setCouponError(result.error || "Invalid coupon");
+        setValidatedCoupon(null);
+      } else {
+        setValidatedCoupon(result.coupon);
+        setCouponError("");
+        toast({
+          title: "Coupon Applied",
+          description: `Discount: ${result.coupon.discountType === "percentage" ? `${result.coupon.discountValue}%` : `$${result.coupon.discountValue}`}`,
+        });
+      }
+    } catch (error) {
+      setCouponError("Failed to validate coupon");
+      setValidatedCoupon(null);
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
+  const clearCoupon = () => {
+    setCouponCode("");
+    setValidatedCoupon(null);
+    setCouponError("");
+  };
+
+  const calculateDiscountedPrice = (basePrice: number): { discountAmount: number; finalPrice: number } => {
+    if (!validatedCoupon) {
+      return { discountAmount: 0, finalPrice: basePrice };
+    }
+
+    let discountAmount = 0;
+    if (validatedCoupon.discountType === "percentage") {
+      discountAmount = basePrice * (parseFloat(validatedCoupon.discountValue) / 100);
+    } else {
+      discountAmount = parseFloat(validatedCoupon.discountValue);
+    }
+
+    const finalPrice = Math.max(0, basePrice - discountAmount);
+    return { discountAmount, finalPrice };
+  };
+
   const handleSubmit = () => {
-    if (!bundleId) return;
+    if (!bundleId || !bundleStructure) return;
 
     // Merge bundle header data with service form data
     const combinedFormData = { ...formData, ...bundleHeaderData };
 
+    // Note: discountAmount and finalPrice are calculated server-side to prevent tampering
     const requestData = {
       bundleId,
       formData: combinedFormData,
       assigneeId: selectedAssignee || null,
+      discountCouponId: validatedCoupon?.id || null,
+      discountCouponCode: validatedCoupon?.code || null,
     };
 
     createMutation.mutate(requestData as InsertBundleRequest);
@@ -349,7 +428,6 @@ export default function BundleRequestForm() {
                   [fieldKey]: newFiles,
                 }));
               }}
-              existingFiles={files}
             />
             {description && (
               <p className="text-xs text-muted-foreground">{description}</p>
@@ -411,9 +489,25 @@ export default function BundleRequestForm() {
             <h1 className="font-title-semibold text-dark-blue-night text-2xl flex items-center gap-3" data-testid="text-bundle-name">
               {bundle.name}
               {showPricing && bundle.finalPrice && (
-                <span className="text-sky-blue-accent font-body-2-semibold">
-                  ${parseFloat(bundle.finalPrice).toFixed(2)}
-                </span>
+                <>
+                  {validatedCoupon ? (
+                    <span className="flex items-center gap-2">
+                      <span className="text-muted-foreground line-through font-body-2-semibold">
+                        ${parseFloat(bundle.finalPrice).toFixed(2)}
+                      </span>
+                      <span className="text-green-600 font-body-2-semibold">
+                        ${calculateDiscountedPrice(parseFloat(bundle.finalPrice)).finalPrice.toFixed(2)}
+                      </span>
+                      <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded">
+                        -{validatedCoupon.discountType === "percentage" ? `${validatedCoupon.discountValue}%` : `$${parseFloat(validatedCoupon.discountValue).toFixed(2)}`}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-sky-blue-accent font-body-2-semibold">
+                      ${parseFloat(bundle.finalPrice).toFixed(2)}
+                    </span>
+                  )}
+                </>
               )}
             </h1>
             {bundle.description && (
@@ -422,7 +516,7 @@ export default function BundleRequestForm() {
           </div>
 
         {/* Bundle Header Section - General Info */}
-        {(hasBundleFields || showAssigneeSelector) && (
+        {(hasBundleFields || showAssigneeSelector || showPricing) && (
           <Card className="mb-6">
             <CardHeader className="flex flex-row items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
@@ -462,6 +556,68 @@ export default function BundleRequestForm() {
 
               {/* Bundle-level Input Fields */}
               {bundleFields?.map((bf) => renderBundleHeaderField(bf))}
+
+              {/* Discount Coupon Field (visible to clients and admins when pricing is shown) */}
+              {showPricing && (
+                <div className="space-y-2">
+                  <Label htmlFor="coupon">
+                    <span className="flex items-center gap-2">
+                      <Percent className="h-4 w-4" />
+                      Discount Code
+                    </span>
+                  </Label>
+                  <div className="flex gap-2">
+                    <div className="flex-1 relative">
+                      <Input
+                        id="coupon"
+                        placeholder="Enter coupon code"
+                        value={couponCode}
+                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                        disabled={!!validatedCoupon}
+                        className={`${validatedCoupon ? "pr-8 border-green-500 bg-green-50 dark:bg-green-900/20" : ""} ${couponError ? "border-destructive" : ""}`}
+                        data-testid="input-bundle-coupon-code"
+                      />
+                      {validatedCoupon && (
+                        <CheckCircle className="h-4 w-4 text-green-500 absolute right-2 top-1/2 -translate-y-1/2" />
+                      )}
+                    </div>
+                    {validatedCoupon ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={clearCoupon}
+                        data-testid="button-clear-bundle-coupon"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={validateCoupon}
+                        disabled={isValidatingCoupon || !couponCode.trim()}
+                        data-testid="button-apply-bundle-coupon"
+                      >
+                        {isValidatingCoupon ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          "Apply"
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                  {couponError && (
+                    <p className="text-sm text-destructive">{couponError}</p>
+                  )}
+                  {validatedCoupon && (
+                    <p className="text-sm text-green-600">
+                      Discount applied: {validatedCoupon.discountType === "percentage" 
+                        ? `${validatedCoupon.discountValue}% off` 
+                        : `$${parseFloat(validatedCoupon.discountValue).toFixed(2)} off`}
+                    </p>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

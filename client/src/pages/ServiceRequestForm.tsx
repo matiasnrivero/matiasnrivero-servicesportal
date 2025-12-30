@@ -40,7 +40,7 @@ import { User as UserIcon } from "lucide-react";
 import { Header } from "@/components/Header";
 import { FileUploader } from "@/components/FileUploader";
 import { DynamicFormField, type ServiceFieldWithInput } from "@/components/DynamicFormField";
-import { ChevronRight, HelpCircle, X, Boxes, CalendarRange, Package, ArrowLeft } from "lucide-react";
+import { ChevronRight, HelpCircle, X, Boxes, CalendarRange, Package, ArrowLeft, Percent, CheckCircle, Loader2 } from "lucide-react";
 import { Link } from "wouter";
 
 import complexityExample1 from "@assets/Imagen_de_WhatsApp_2025-09-04_a_las_11.08.18_29a99002_(1)_1765400666338.jpg";
@@ -309,6 +309,16 @@ export default function ServiceRequestForm() {
   const [calculatedPrice, setCalculatedPrice] = useState<number>(0);
   const [selectedAssignee, setSelectedAssignee] = useState<string>("");
   
+  const [couponCode, setCouponCode] = useState<string>("");
+  const [validatedCoupon, setValidatedCoupon] = useState<{
+    id: string;
+    code: string;
+    discountType: string;
+    discountValue: string;
+  } | null>(null);
+  const [couponError, setCouponError] = useState<string>("");
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState<boolean>(false);
+  
   const { register, handleSubmit, reset, setValue, watch } = useForm();
 
   useEffect(() => {
@@ -472,6 +482,71 @@ export default function ServiceRequestForm() {
     }
   };
 
+  const validateCoupon = async () => {
+    if (!couponCode.trim()) {
+      setCouponError("");
+      setValidatedCoupon(null);
+      return;
+    }
+
+    setIsValidatingCoupon(true);
+    setCouponError("");
+
+    try {
+      const response = await fetch("/api/discount-coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: couponCode.trim().toUpperCase(),
+          serviceId: selectedServiceId,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setCouponError(result.error || "Invalid coupon");
+        setValidatedCoupon(null);
+      } else {
+        setValidatedCoupon(result.coupon);
+        setCouponError("");
+        toast({
+          title: "Coupon Applied",
+          description: `Discount: ${result.coupon.discountType === "percentage" ? `${result.coupon.discountValue}%` : `$${result.coupon.discountValue}`}`,
+        });
+      }
+    } catch (error) {
+      setCouponError("Failed to validate coupon");
+      setValidatedCoupon(null);
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
+  const clearCoupon = () => {
+    setCouponCode("");
+    setValidatedCoupon(null);
+    setCouponError("");
+  };
+
+  const calculateDiscountedPrice = (basePrice: number): { discountAmount: number; finalPrice: number } => {
+    if (!validatedCoupon) {
+      return { discountAmount: 0, finalPrice: basePrice };
+    }
+
+    let discountAmount = 0;
+    if (validatedCoupon.discountType === "percentage") {
+      discountAmount = basePrice * (parseFloat(validatedCoupon.discountValue) / 100);
+    } else {
+      discountAmount = parseFloat(validatedCoupon.discountValue);
+    }
+
+    const finalPrice = Math.max(0, basePrice - discountAmount);
+    return { discountAmount, finalPrice };
+  };
+
+  const { discountAmount, finalPrice: discountedFinalPrice } = calculateDiscountedPrice(calculatedPrice);
+
   const onSubmit = async (data: any) => {
     try {
       const allFormData = {
@@ -498,8 +573,10 @@ export default function ServiceRequestForm() {
         dueDate,
         formData: allFormData,
         assigneeId: selectedAssignee || null,
-        // Store final calculated price as dedicated column for accurate display
-        finalPrice: calculatedPrice > 0 ? calculatedPrice.toFixed(2) : null,
+        discountCouponId: validatedCoupon?.id || null,
+        discountCouponCode: validatedCoupon?.code || null,
+        discountAmount: discountAmount > 0 ? discountAmount.toFixed(2) : null,
+        finalPrice: discountedFinalPrice > 0 ? discountedFinalPrice.toFixed(2) : (calculatedPrice > 0 ? calculatedPrice.toFixed(2) : null),
       });
     } catch (error) {
       toast({
@@ -960,7 +1037,7 @@ export default function ServiceRequestForm() {
   const renderGeneralInfoFromDatabase = () => {
     const { generalInfoFields } = groupFieldsBySection(serviceFormFields);
     
-    const hasContent = generalInfoFields.length > 0 || showAssigneeSelector;
+    const hasContent = generalInfoFields.length > 0 || showAssigneeSelector || showPricing;
     if (!hasContent) return null;
     
     return (
@@ -991,6 +1068,68 @@ export default function ServiceRequestForm() {
             </div>
           )}
           {generalInfoFields.map(field => renderDynamicField(field))}
+
+          {/* Discount Coupon Field (visible to clients and admins when pricing is shown) */}
+          {showPricing && (
+            <div className="space-y-2">
+              <Label htmlFor="coupon">
+                <span className="flex items-center gap-2">
+                  <Percent className="h-4 w-4" />
+                  Discount Code
+                </span>
+              </Label>
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <Input
+                    id="coupon"
+                    placeholder="Enter coupon code"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                    disabled={!!validatedCoupon}
+                    className={`${validatedCoupon ? "pr-8 border-green-500 bg-green-50 dark:bg-green-900/20" : ""} ${couponError ? "border-destructive" : ""}`}
+                    data-testid="input-coupon-code"
+                  />
+                  {validatedCoupon && (
+                    <CheckCircle className="h-4 w-4 text-green-500 absolute right-2 top-1/2 -translate-y-1/2" />
+                  )}
+                </div>
+                {validatedCoupon ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={clearCoupon}
+                    data-testid="button-clear-coupon"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={validateCoupon}
+                    disabled={isValidatingCoupon || !couponCode.trim()}
+                    data-testid="button-apply-coupon"
+                  >
+                    {isValidatingCoupon ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Apply"
+                    )}
+                  </Button>
+                )}
+              </div>
+              {couponError && (
+                <p className="text-sm text-destructive">{couponError}</p>
+              )}
+              {validatedCoupon && (
+                <p className="text-sm text-green-600">
+                  Discount applied: {validatedCoupon.discountType === "percentage" 
+                    ? `${validatedCoupon.discountValue}% off` 
+                    : `$${parseFloat(validatedCoupon.discountValue).toFixed(2)} off`}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </>
     );
@@ -1845,13 +1984,29 @@ export default function ServiceRequestForm() {
                           ${parseFloat(selectedService?.basePrice || "0").toFixed(2)}
                         </span>
                       </div>
-                      {selectedAddOns.size > 0 && (
-                        <div className="flex items-center gap-2 text-lg font-semibold">
-                          <span className="text-muted-foreground">Total:</span>
-                          <span className="text-sky-blue-accent">
-                            ${calculatedPrice.toFixed(2)}
-                          </span>
-                        </div>
+                      {(selectedAddOns.size > 0 || validatedCoupon) && (
+                        <>
+                          <div className="flex items-center gap-2 text-lg font-semibold">
+                            <span className="text-muted-foreground">Subtotal:</span>
+                            <span className={validatedCoupon ? "line-through text-muted-foreground" : "text-sky-blue-accent"}>
+                              ${calculatedPrice.toFixed(2)}
+                            </span>
+                          </div>
+                          {validatedCoupon && discountAmount > 0 && (
+                            <>
+                              <div className="flex items-center gap-2 text-sm text-green-600">
+                                <span>Discount ({validatedCoupon.code}):</span>
+                                <span>-${discountAmount.toFixed(2)}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-lg font-bold">
+                                <span className="text-muted-foreground">Total:</span>
+                                <span className="text-green-600">
+                                  ${discountedFinalPrice.toFixed(2)}
+                                </span>
+                              </div>
+                            </>
+                          )}
+                        </>
                       )}
                     </div>
                   )}

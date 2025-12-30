@@ -56,8 +56,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap } from "lucide-react";
+import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap, Percent } from "lucide-react";
 import { AutomationSettingsTab } from "@/components/AutomationSettings";
+import { DiscountCouponsTab } from "@/components/DiscountCouponsTab";
 import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem, InputField, ServiceField, BundleField, ServicePricingTier, LineItemField } from "@shared/schema";
 import { insertBundleLineItemSchema, inputFieldTypes, valueModes, pricingStructures, assignToModes, inputForTypes } from "@shared/schema";
 
@@ -4137,6 +4138,10 @@ export default function Settings() {
                     <Zap className="h-4 w-4 mr-1" />
                     Automation
                   </TabsTrigger>
+                  <TabsTrigger value="discount-coupons" data-testid="tab-discount-coupons">
+                    <Percent className="h-4 w-4 mr-1" />
+                    Discounts
+                  </TabsTrigger>
                 </>
               )}
               <TabsTrigger value="input-fields" data-testid="tab-input-fields">
@@ -4174,6 +4179,10 @@ export default function Settings() {
 
                 <TabsContent value="automation">
                   <AutomationSettingsTab />
+                </TabsContent>
+
+                <TabsContent value="discount-coupons">
+                  <DiscountCouponsTab />
                 </TabsContent>
               </>
             )}

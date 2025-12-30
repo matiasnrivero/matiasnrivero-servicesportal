@@ -137,6 +137,10 @@ export const serviceRequests = pgTable("service_requests", {
   formData: jsonb("form_data"),
   // Final calculated price for the client - stored at submission time
   finalPrice: decimal("final_price", { precision: 10, scale: 2 }),
+  // Discount coupon tracking
+  discountCouponId: varchar("discount_coupon_id"),
+  discountCouponCode: text("discount_coupon_code"),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }),
   // Automation fields
   autoAssignmentStatus: text("auto_assignment_status").default("not_attempted"),
   lastAutomationRunAt: timestamp("last_automation_run_at"),
@@ -408,6 +412,11 @@ export const bundleRequests = pgTable("bundle_requests", {
   deliveredAt: timestamp("delivered_at"),
   deliveredBy: varchar("delivered_by").references(() => users.id),
   changeRequestNote: text("change_request_note"),
+  // Discount coupon tracking
+  discountCouponId: varchar("discount_coupon_id"),
+  discountCouponCode: text("discount_coupon_code"),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }),
+  finalPrice: decimal("final_price", { precision: 10, scale: 2 }),
   // Vendor payment tracking
   vendorPaymentStatus: text("vendor_payment_status").default("pending"),
   vendorPaymentPeriod: text("vendor_payment_period"), // Format: YYYY-MM
@@ -543,6 +552,36 @@ export const automationAssignmentLogs = pgTable("automation_assignment_logs", {
 });
 
 // ==================== END PHASE 5 TABLES ====================
+
+// ==================== PHASE 6: DISCOUNT COUPONS ====================
+
+// Discount coupon types
+export const discountCouponTypes = ["amount", "percentage"] as const;
+export type DiscountCouponType = typeof discountCouponTypes[number];
+
+// Discount coupons - promotional codes for services and bundles
+export const discountCoupons = pgTable("discount_coupons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  isActive: boolean("is_active").notNull().default(true),
+  discountType: text("discount_type").notNull(), // "amount" or "percentage"
+  discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull(),
+  // Service/Bundle restrictions (null = all services/bundles)
+  serviceId: varchar("service_id").references(() => services.id, { onDelete: "set null" }),
+  bundleId: varchar("bundle_id").references(() => bundles.id, { onDelete: "set null" }),
+  // Usage limits
+  maxUses: integer("max_uses").notNull().default(1),
+  currentUses: integer("current_uses").notNull().default(0),
+  // Client restriction (null = any client)
+  clientId: varchar("client_id").references(() => users.id, { onDelete: "set null" }),
+  // Valid date range
+  validFrom: timestamp("valid_from"),
+  validTo: timestamp("valid_to"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ==================== END PHASE 6 TABLES ====================
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -786,6 +825,20 @@ export const insertAutomationAssignmentLogSchema = createInsertSchema(automation
   createdAt: true,
 });
 
+// Phase 6: Discount Coupons schemas
+export const insertDiscountCouponSchema = createInsertSchema(discountCoupons).omit({
+  id: true,
+  currentUses: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateDiscountCouponSchema = createInsertSchema(discountCoupons).partial().omit({
+  id: true,
+  currentUses: true,
+  createdAt: true,
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type VendorProfile = typeof vendorProfiles.$inferSelect;
@@ -862,6 +915,11 @@ export type InsertAutomationRule = z.infer<typeof insertAutomationRuleSchema>;
 export type UpdateAutomationRule = z.infer<typeof updateAutomationRuleSchema>;
 export type AutomationAssignmentLog = typeof automationAssignmentLogs.$inferSelect;
 export type InsertAutomationAssignmentLog = z.infer<typeof insertAutomationAssignmentLogSchema>;
+
+// Phase 6: Discount Coupons types
+export type DiscountCoupon = typeof discountCoupons.$inferSelect;
+export type InsertDiscountCoupon = z.infer<typeof insertDiscountCouponSchema>;
+export type UpdateDiscountCoupon = z.infer<typeof updateDiscountCouponSchema>;
 
 // Helper type for dropdown options
 export type FieldOption = {

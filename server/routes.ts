@@ -546,6 +546,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let request = await storage.createServiceRequest(requestData);
 
+      // If a discount coupon was used, increment the usage counter
+      if (request.discountCouponId) {
+        try {
+          await storage.incrementCouponUsage(request.discountCouponId);
+        } catch (couponError) {
+          console.error("Failed to increment coupon usage:", couponError);
+        }
+      }
+
       // Trigger auto-assignment if no manual assignment was provided
       if (!hasManualAssignment && !request.assigneeId && !request.vendorAssigneeId) {
         try {
@@ -3737,7 +3746,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
         delete requestData.assigneeId;
       }
 
+      // Validate and apply discount coupon if provided
+      let validatedCoupon: any = null;
+      if (requestData.discountCouponCode) {
+        const coupon = await storage.getDiscountCouponByCode(requestData.discountCouponCode);
+        if (!coupon) {
+          return res.status(400).json({ error: "Invalid discount coupon code" });
+        }
+        
+        // Validate coupon is active and within dates
+        if (!coupon.isActive) {
+          return res.status(400).json({ error: "This coupon is no longer active" });
+        }
+        const now = new Date();
+        if (coupon.validFrom && new Date(coupon.validFrom) > now) {
+          return res.status(400).json({ error: "This coupon is not yet valid" });
+        }
+        if (coupon.validTo && new Date(coupon.validTo) < now) {
+          return res.status(400).json({ error: "This coupon has expired" });
+        }
+        if (coupon.maxUses !== null && coupon.maxUses !== undefined && coupon.currentUses >= coupon.maxUses) {
+          return res.status(400).json({ error: "This coupon has reached its usage limit" });
+        }
+        
+        // Validate coupon applies to this bundle
+        // Coupon applicability rules:
+        // - If coupon.serviceId is set but bundleId is null: service-only coupon
+        // - If coupon.bundleId is set: must match this bundle
+        // - If both are set: reject (specific service+bundle combo not supported for standalone requests)
+        const couponHasServiceRestriction = !!coupon.serviceId;
+        const couponHasBundleRestriction = !!coupon.bundleId;
+        
+        // Handle dual-restriction case (coupon has both serviceId AND bundleId set)
+        // This is an unsupported configuration - coupons should be either service-only, bundle-only, or global
+        if (couponHasServiceRestriction && couponHasBundleRestriction) {
+          return res.status(400).json({ error: "Invalid coupon configuration - please contact support" });
+        }
+        
+        if (couponHasServiceRestriction) {
+          return res.status(400).json({ error: "This coupon is only valid for services" });
+        }
+        
+        if (couponHasBundleRestriction && coupon.bundleId !== requestData.bundleId) {
+          return res.status(400).json({ error: "This coupon is not valid for the selected bundle" });
+        }
+        
+        // Validate client restriction (if any) - check both userId and clientProfileId
+        if (coupon.clientId) {
+          const clientMatch = coupon.clientId === sessionUserId || 
+            (sessionUser.clientProfileId && coupon.clientId === sessionUser.clientProfileId);
+          if (!clientMatch) {
+            return res.status(400).json({ error: "This coupon is not valid for your account" });
+          }
+        }
+
+        // Store the coupon ID
+        requestData.discountCouponId = coupon.id;
+        validatedCoupon = coupon;
+        
+        // Get the bundle to calculate server-side discount
+        const bundle = await storage.getBundle(requestData.bundleId);
+        if (bundle && bundle.finalPrice) {
+          const basePrice = parseFloat(bundle.finalPrice);
+          let discountAmount = 0;
+          
+          if (coupon.discountType === "percentage") {
+            discountAmount = basePrice * (parseFloat(coupon.discountValue) / 100);
+          } else {
+            discountAmount = parseFloat(coupon.discountValue);
+          }
+          
+          const finalPrice = Math.max(0, basePrice - discountAmount);
+          requestData.discountAmount = discountAmount.toFixed(2);
+          requestData.finalPrice = finalPrice.toFixed(2);
+        }
+      }
+
       const request = await storage.createBundleRequest(requestData);
+      
+      // Increment coupon usage counter AFTER successful creation
+      if (validatedCoupon) {
+        await storage.incrementCouponUsage(validatedCoupon.id);
+      }
+      
       res.status(201).json(request);
     } catch (error) {
       console.error("Error creating bundle request:", error);
@@ -6442,6 +6533,277 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching vendor designer workload:", error);
       res.status(500).json({ error: "Failed to fetch vendor designer workload" });
+    }
+  });
+
+  // ==================== DISCOUNT COUPON ENDPOINTS ====================
+
+  // Get all discount coupons (admin only)
+  app.get("/api/discount-coupons", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+      const coupons = await storage.getAllDiscountCoupons();
+      res.json(coupons);
+    } catch (error) {
+      console.error("Error fetching discount coupons:", error);
+      res.status(500).json({ error: "Failed to fetch discount coupons" });
+    }
+  });
+
+  // Get single discount coupon (admin only)
+  app.get("/api/discount-coupons/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+      const coupon = await storage.getDiscountCoupon(req.params.id);
+      if (!coupon) {
+        return res.status(404).json({ error: "Discount coupon not found" });
+      }
+      res.json(coupon);
+    } catch (error) {
+      console.error("Error fetching discount coupon:", error);
+      res.status(500).json({ error: "Failed to fetch discount coupon" });
+    }
+  });
+
+  // Create discount coupon (admin only)
+  app.post("/api/discount-coupons", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+
+      const { code, serviceId, bundleId } = req.body;
+      if (!code) {
+        return res.status(400).json({ error: "Coupon code is required" });
+      }
+
+      // Check for unique code
+      const existingCoupon = await storage.getDiscountCouponByCode(code);
+      if (existingCoupon) {
+        return res.status(400).json({ error: "A coupon with this code already exists" });
+      }
+
+      // Prevent setting both serviceId and bundleId - coupons must be either service-only, bundle-only, or global
+      if (serviceId && bundleId) {
+        return res.status(400).json({ error: "A coupon cannot be restricted to both a service and a bundle. Choose one or neither (for a global coupon)." });
+      }
+
+      const coupon = await storage.createDiscountCoupon(req.body);
+      res.status(201).json(coupon);
+    } catch (error) {
+      console.error("Error creating discount coupon:", error);
+      res.status(500).json({ error: "Failed to create discount coupon" });
+    }
+  });
+
+  // Update discount coupon (admin only)
+  app.patch("/api/discount-coupons/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+
+      const { code, serviceId, bundleId } = req.body;
+      if (code) {
+        // Check for unique code (excluding current coupon)
+        const existingCoupon = await storage.getDiscountCouponByCode(code);
+        if (existingCoupon && existingCoupon.id !== req.params.id) {
+          return res.status(400).json({ error: "A coupon with this code already exists" });
+        }
+      }
+
+      // Prevent setting both serviceId and bundleId - coupons must be either service-only, bundle-only, or global
+      // Need to check what the final state would be after the update
+      const existingCouponToUpdate = await storage.getDiscountCoupon(req.params.id);
+      if (existingCouponToUpdate) {
+        const finalServiceId = serviceId !== undefined ? serviceId : existingCouponToUpdate.serviceId;
+        const finalBundleId = bundleId !== undefined ? bundleId : existingCouponToUpdate.bundleId;
+        if (finalServiceId && finalBundleId) {
+          return res.status(400).json({ error: "A coupon cannot be restricted to both a service and a bundle. Choose one or neither (for a global coupon)." });
+        }
+      }
+
+      const coupon = await storage.updateDiscountCoupon(req.params.id, req.body);
+      if (!coupon) {
+        return res.status(404).json({ error: "Discount coupon not found" });
+      }
+      res.json(coupon);
+    } catch (error) {
+      console.error("Error updating discount coupon:", error);
+      res.status(500).json({ error: "Failed to update discount coupon" });
+    }
+  });
+
+  // Delete discount coupon (admin only)
+  app.delete("/api/discount-coupons/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+      await storage.deleteDiscountCoupon(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting discount coupon:", error);
+      res.status(500).json({ error: "Failed to delete discount coupon" });
+    }
+  });
+
+  // Validate discount coupon for a specific service/bundle and client
+  app.post("/api/discount-coupons/validate", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { code, serviceId, bundleId, clientId, clientProfileId } = req.body;
+      if (!code) {
+        return res.status(400).json({ error: "Coupon code is required" });
+      }
+
+      // Get session user for clientProfileId check
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const coupon = await storage.getDiscountCouponByCode(code);
+      if (!coupon) {
+        return res.status(404).json({ error: "Invalid coupon code" });
+      }
+
+      // Check if coupon is active
+      if (!coupon.isActive) {
+        return res.status(400).json({ error: "This coupon is inactive" });
+      }
+
+      // Check usage limits (only if maxUses is set - null means unlimited)
+      if (coupon.maxUses !== null && coupon.maxUses !== undefined && coupon.currentUses >= coupon.maxUses) {
+        return res.status(400).json({ error: "This coupon has reached its maximum uses" });
+      }
+
+      // Check valid date range
+      const now = new Date();
+      if (coupon.validFrom && new Date(coupon.validFrom) > now) {
+        return res.status(400).json({ error: "This coupon is not yet valid" });
+      }
+      if (coupon.validTo && new Date(coupon.validTo) < now) {
+        return res.status(400).json({ error: "This coupon has expired" });
+      }
+
+      // Check service/bundle restriction based on what's being purchased
+      // Coupon applicability rules:
+      // - If coupon.serviceId is set: coupon is restricted to that specific service
+      // - If coupon.bundleId is set: coupon is restricted to that specific bundle
+      // - If both are null: global coupon, applies to anything
+      // - If both are set: coupon requires BOTH service AND bundle to match (rare case)
+      
+      const couponHasServiceRestriction = !!coupon.serviceId;
+      const couponHasBundleRestriction = !!coupon.bundleId;
+      const isServiceRequest = !!serviceId && !bundleId;
+      const isBundleRequest = !!bundleId && !serviceId;
+      
+      // Handle dual-restriction case first (coupon has both serviceId AND bundleId set)
+      // This is an unsupported configuration - coupons should be either service-only, bundle-only, or global
+      if (couponHasServiceRestriction && couponHasBundleRestriction) {
+        return res.status(400).json({ error: "Invalid coupon configuration - please contact support" });
+      }
+      
+      if (isServiceRequest) {
+        // Purchasing a service
+        if (couponHasBundleRestriction) {
+          // Coupon is bundle-only, not valid for services
+          return res.status(400).json({ error: "This coupon is only valid for bundles" });
+        }
+        if (couponHasServiceRestriction && coupon.serviceId !== serviceId) {
+          // Coupon is for a different service
+          return res.status(400).json({ error: "This coupon is not valid for the selected service" });
+        }
+      }
+      
+      if (isBundleRequest) {
+        // Purchasing a bundle
+        if (couponHasServiceRestriction) {
+          // Coupon is service-only, not valid for bundles
+          return res.status(400).json({ error: "This coupon is only valid for services" });
+        }
+        if (couponHasBundleRestriction && coupon.bundleId !== bundleId) {
+          // Coupon is for a different bundle
+          return res.status(400).json({ error: "This coupon is not valid for the selected bundle" });
+        }
+      }
+
+      // Check client restriction - check both userId and clientProfileId
+      if (coupon.clientId) {
+        const clientMatch = coupon.clientId === sessionUserId || 
+          (sessionUser.clientProfileId && coupon.clientId === sessionUser.clientProfileId) ||
+          (clientProfileId && coupon.clientId === clientProfileId);
+        if (!clientMatch) {
+          return res.status(400).json({ error: "This coupon is not valid for your account" });
+        }
+      }
+
+      res.json({
+        valid: true,
+        coupon: {
+          id: coupon.id,
+          code: coupon.code,
+          discountType: coupon.discountType,
+          discountValue: coupon.discountValue,
+        },
+      });
+    } catch (error) {
+      console.error("Error validating discount coupon:", error);
+      res.status(500).json({ error: "Failed to validate discount coupon" });
+    }
+  });
+
+  // Check if coupon code is unique (for form validation)
+  app.get("/api/discount-coupons/check-code/:code", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+
+      const existingCoupon = await storage.getDiscountCouponByCode(req.params.code);
+      res.json({ exists: !!existingCoupon, couponId: existingCoupon?.id });
+    } catch (error) {
+      console.error("Error checking coupon code:", error);
+      res.status(500).json({ error: "Failed to check coupon code" });
     }
   });
 
