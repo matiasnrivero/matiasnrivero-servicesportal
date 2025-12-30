@@ -226,7 +226,17 @@ export default function VendorPaymentsReport() {
   };
 
   const exportToCSV = () => {
-    if (!jobsData?.jobs) return;
+    if (!reportData?.vendors) return;
+
+    // Collect all jobs from all vendors (same data source as the UI table)
+    const allJobs: Array<VendorJob & { vendorName: string }> = [];
+    for (const vendor of reportData.vendors) {
+      for (const job of vendor.jobs) {
+        allJobs.push({ ...job, vendorName: vendor.vendorName });
+      }
+    }
+    
+    if (allJobs.length === 0) return;
 
     // Use "Cost" for admin, "Price" for vendor - matching the UI table
     const costLabel = isAdmin ? "Cost" : "Price";
@@ -236,10 +246,14 @@ export default function VendorPaymentsReport() {
       ? ["Job ID", "Type", "Service/Bundle", "Vendor", "Delivered", costLabel, "Status"]
       : ["Job ID", "Type", "Service/Bundle", "Delivered", costLabel, "Status"];
     
-    const rows = jobsData.jobs.map((job) => {
+    const rows = allJobs.map((job) => {
+      // Format Job ID same as UI: A-XXXXX for adhoc, B-XXXXX for bundle
+      const prefix = job.type === "adhoc" ? "A-" : "B-";
+      const jobIdDisplay = prefix + job.id.slice(0, 5).toUpperCase();
+      
       const baseRow = [
-        job.jobId,
-        job.type,
+        jobIdDisplay,
+        job.type === "adhoc" ? "Ad-hoc" : "Bundle",
         job.serviceName,
       ];
       
@@ -247,7 +261,7 @@ export default function VendorPaymentsReport() {
         // Admin sees Vendor column
         return [
           ...baseRow,
-          job.vendorName,
+          job.vendorName || "-",
           job.deliveredAt ? format(new Date(job.deliveredAt), "MMM dd, yyyy") : "-",
           `$${job.vendorCost.toFixed(2)}`,
           job.paymentStatus === "paid" ? "Paid" : "Pending",
@@ -480,7 +494,7 @@ export default function VendorPaymentsReport() {
                 variant="outline"
                 size="sm"
                 onClick={exportToPDF}
-                disabled={!jobsData?.jobs?.length}
+                disabled={!reportData?.vendors?.some(v => v.jobs.length > 0)}
                 data-testid="button-export-pdf"
               >
                 <FileText className="h-4 w-4 mr-2" />
@@ -736,7 +750,7 @@ export default function VendorPaymentsReport() {
                                     variant="outline"
                                     size="sm"
                                     onClick={exportToCSV}
-                                    disabled={!jobsData?.jobs?.length}
+                                    disabled={!reportData?.vendors?.some(v => v.jobs.length > 0)}
                                     data-testid="button-export-csv"
                                   >
                                     <Download className="h-4 w-4 mr-2" />
@@ -923,7 +937,7 @@ export default function VendorPaymentsReport() {
                                 variant="outline"
                                 size="sm"
                                 onClick={exportToCSV}
-                                disabled={!jobsData?.jobs?.length}
+                                disabled={!reportData?.vendors?.some(v => v.jobs.length > 0)}
                                 data-testid="button-export-csv-vendor"
                               >
                                 <Download className="h-4 w-4 mr-2" />
