@@ -5776,14 +5776,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Build vendor cost lookup from vendor profiles pricing agreements
-      // Priority: 1) Pricing agreement, 2) Request's vendorCost field
-      const getVendorServiceCost = (vendorUserId: string, serviceId: string, requestVendorCost?: string | null): number => {
-        // First check pricing agreements
+      // Priority: 1) Pricing agreement (by service title), 2) Request's vendorCost field
+      const getVendorServiceCost = (vendorUserId: string, serviceId: string, serviceName: string, requestVendorCost?: string | null): number => {
+        // First check pricing agreements (keyed by service title, not ID)
         const vendorProfile = vendorProfileMap[vendorUserId];
         if (vendorProfile?.pricingAgreements) {
-          const agreements = vendorProfile.pricingAgreements as Record<string, { cost: string }>;
-          if (agreements[serviceId]?.cost) {
-            return parseFloat(agreements[serviceId].cost);
+          const agreements = vendorProfile.pricingAgreements as Record<string, { basePrice?: number | string; cost?: number | string }>;
+          const agreement = agreements[serviceName];
+          // Check basePrice first (primary field), then legacy cost field
+          if (agreement?.basePrice !== undefined && agreement.basePrice !== null) {
+            const val = typeof agreement.basePrice === 'string' ? parseFloat(agreement.basePrice) : agreement.basePrice;
+            if (!isNaN(val)) return val;
+          }
+          // Fallback to legacy cost field
+          if (agreement?.cost !== undefined && agreement.cost !== null) {
+            const val = typeof agreement.cost === 'string' ? parseFloat(agreement.cost) : agreement.cost;
+            if (!isNaN(val)) return val;
           }
         }
         // Fall back to stored vendorCost on the request
@@ -5847,7 +5855,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const service = serviceMap[r.serviceId];
         const serviceName = service?.title || "Unknown Service";
-        const unitCost = getVendorServiceCost(vendorUserId, r.serviceId, r.vendorCost);
+        const unitCost = getVendorServiceCost(vendorUserId, r.serviceId, serviceName, r.vendorCost);
 
         vendorSummaries[vendorUserId].adhocJobs.count++;
         vendorSummaries[vendorUserId].adhocJobs.totalCost += unitCost;

@@ -10,6 +10,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -555,122 +556,124 @@ export default function VendorPaymentsReport() {
             ) : (
               <Card>
                 <CardHeader>
-                  <CardTitle>Vendor Breakdown</CardTitle>
+                  <CardTitle>{isAdmin ? "Vendor Breakdown" : "Payment Breakdown"}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Accordion
-                    type="single"
-                    collapsible
-                    value={expandedVendor || undefined}
-                    onValueChange={(value) => setExpandedVendor(value || null)}
-                  >
-                    {reportData?.vendors.map((vendor) => (
-                      <AccordionItem
-                        key={vendor.vendorId}
-                        value={vendor.vendorId}
-                      >
-                        <AccordionTrigger className="hover:no-underline">
-                          <div className="flex items-center justify-between w-full pr-4">
-                            <div className="flex items-center gap-3">
-                              <Building2 className="h-5 w-5 text-sky-blue-accent" />
-                              <span className="font-semibold">
-                                {vendor.vendorName}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-6 text-sm">
-                              <span>
-                                <span className="text-dark-gray">Jobs:</span>{" "}
-                                <span className="font-medium">
-                                  {vendor.adhocJobs.count +
-                                    vendor.bundleJobs.count}
+                  {isAdmin ? (
+                    /* Admin view: Accordion for multiple vendors */
+                    <Accordion
+                      type="single"
+                      collapsible
+                      value={expandedVendor || undefined}
+                      onValueChange={(value) => setExpandedVendor(value || null)}
+                    >
+                      {reportData?.vendors.map((vendor) => (
+                        <AccordionItem
+                          key={vendor.vendorId}
+                          value={vendor.vendorId}
+                        >
+                          <AccordionTrigger className="hover:no-underline">
+                            <div className="flex items-center justify-between w-full pr-4">
+                              <div className="flex items-center gap-3">
+                                <Building2 className="h-5 w-5 text-sky-blue-accent" />
+                                <span className="font-semibold">
+                                  {vendor.vendorName}
                                 </span>
-                              </span>
-                              <span>
-                                <span className="text-dark-gray">Total:</span>{" "}
-                                <span className="font-medium text-dark-blue-night">
-                                  ${vendor.totalEarnings.toFixed(2)}
-                                </span>
-                              </span>
-                              <Badge
-                                variant="outline"
-                                className={
-                                  vendor.pendingCount > 0
-                                    ? "bg-yellow-50 text-yellow-700 border-yellow-300"
-                                    : "bg-green-50 text-green-700 border-green-300"
-                                }
-                              >
-                                {vendor.pendingCount > 0
-                                  ? `${vendor.pendingCount} Pending`
-                                  : "All Paid"}
-                              </Badge>
-                            </div>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <div className="pt-4">
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                              <div className="p-3 bg-muted rounded-md">
-                                <p className="text-sm text-dark-gray mb-1">
-                                  Ad-hoc Jobs
-                                </p>
-                                <p className="font-semibold">
-                                  {vendor.adhocJobs.count} jobs - $
-                                  {vendor.adhocJobs.totalCost.toFixed(2)}
-                                </p>
                               </div>
-                              <div className="p-3 bg-muted rounded-md">
-                                <p className="text-sm text-dark-gray mb-1">
-                                  Bundle Jobs
-                                </p>
-                                <p className="font-semibold">
-                                  {vendor.bundleJobs.count} jobs - $
-                                  {vendor.bundleJobs.totalCost.toFixed(2)}
-                                </p>
+                              <div className="flex items-center gap-6 text-sm">
+                                <span>
+                                  <span className="text-dark-gray">Jobs:</span>{" "}
+                                  <span className="font-medium">
+                                    {vendor.adhocJobs.count +
+                                      vendor.bundleJobs.count}
+                                  </span>
+                                </span>
+                                <span>
+                                  <span className="text-dark-gray">Total:</span>{" "}
+                                  <span className="font-medium text-dark-blue-night">
+                                    ${vendor.totalEarnings.toFixed(2)}
+                                  </span>
+                                </span>
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    vendor.pendingCount > 0
+                                      ? "bg-yellow-50 text-yellow-700 border-yellow-300"
+                                      : "bg-green-50 text-green-700 border-green-300"
+                                  }
+                                >
+                                  {vendor.pendingCount > 0
+                                    ? `${vendor.pendingCount} Pending`
+                                    : "All Paid"}
+                                </Badge>
                               </div>
                             </div>
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="pt-4">
+                              <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div className="p-3 bg-muted rounded-md">
+                                  <p className="text-sm text-dark-gray mb-1">
+                                    Ad-hoc Jobs
+                                  </p>
+                                  <p className="font-semibold">
+                                    {vendor.adhocJobs.count} jobs - $
+                                    {vendor.adhocJobs.totalCost.toFixed(2)}
+                                  </p>
+                                </div>
+                                <div className="p-3 bg-muted rounded-md">
+                                  <p className="text-sm text-dark-gray mb-1">
+                                    Bundle Jobs
+                                  </p>
+                                  <p className="font-semibold">
+                                    {vendor.bundleJobs.count} jobs - $
+                                    {vendor.bundleJobs.totalCost.toFixed(2)}
+                                  </p>
+                                </div>
+                              </div>
 
-                            {/* Grouped Service Breakdown Table */}
-                            {(Object.keys(vendor.adhocJobs.services).length > 0 || 
-                              Object.keys(vendor.bundleJobs.bundles).length > 0) && (
-                              <div className="mb-6">
-                                <h4 className="text-sm font-medium text-dark-gray mb-2">Service Breakdown</h4>
-                                <Table>
-                                  <TableHeader>
-                                    <TableRow>
-                                      <TableHead>Type</TableHead>
-                                      <TableHead>Service/Bundle</TableHead>
-                                      <TableHead className="text-right">Unit Cost</TableHead>
-                                      <TableHead className="text-right">Quantity</TableHead>
-                                      <TableHead className="text-right">Total Cost</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {Object.entries(vendor.adhocJobs.services).map(([serviceName, breakdown]) => (
-                                      <TableRow key={`adhoc-${serviceName}`}>
-                                        <TableCell>
-                                          <Badge variant="outline" className="text-xs">Ad-hoc</Badge>
-                                        </TableCell>
-                                        <TableCell>{serviceName}</TableCell>
-                                        <TableCell className="text-right">${breakdown.unitCost.toFixed(2)}</TableCell>
-                                        <TableCell className="text-right">{breakdown.count}</TableCell>
-                                        <TableCell className="text-right font-medium">${breakdown.totalCost.toFixed(2)}</TableCell>
+                              {/* Grouped Service Breakdown Table */}
+                              {(Object.keys(vendor.adhocJobs.services).length > 0 || 
+                                Object.keys(vendor.bundleJobs.bundles).length > 0) && (
+                                <div className="mb-6">
+                                  <h4 className="text-sm font-medium text-dark-gray mb-2">Service Breakdown</h4>
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead>Service/Bundle</TableHead>
+                                        <TableHead className="text-right">Unit Cost</TableHead>
+                                        <TableHead className="text-right">Quantity</TableHead>
+                                        <TableHead className="text-right">Total Cost</TableHead>
                                       </TableRow>
-                                    ))}
-                                    {Object.entries(vendor.bundleJobs.bundles).map(([bundleName, breakdown]) => (
-                                      <TableRow key={`bundle-${bundleName}`}>
-                                        <TableCell>
-                                          <Badge variant="outline" className="text-xs">Bundle</Badge>
-                                        </TableCell>
-                                        <TableCell>{bundleName}</TableCell>
-                                        <TableCell className="text-right">${breakdown.unitCost.toFixed(2)}</TableCell>
-                                        <TableCell className="text-right">{breakdown.count}</TableCell>
-                                        <TableCell className="text-right font-medium">${breakdown.totalCost.toFixed(2)}</TableCell>
-                                      </TableRow>
-                                    ))}
-                                  </TableBody>
-                                </Table>
-                              </div>
-                            )}
+                                    </TableHeader>
+                                    <TableBody>
+                                      {Object.entries(vendor.adhocJobs.services).map(([serviceName, breakdown]) => (
+                                        <TableRow key={`adhoc-${serviceName}`}>
+                                          <TableCell>
+                                            <Badge variant="outline" className="text-xs">Ad-hoc</Badge>
+                                          </TableCell>
+                                          <TableCell>{serviceName}</TableCell>
+                                          <TableCell className="text-right">${breakdown.unitCost.toFixed(2)}</TableCell>
+                                          <TableCell className="text-right">{breakdown.count}</TableCell>
+                                          <TableCell className="text-right font-medium">${breakdown.totalCost.toFixed(2)}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                      {Object.entries(vendor.bundleJobs.bundles).map(([bundleName, breakdown]) => (
+                                        <TableRow key={`bundle-${bundleName}`}>
+                                          <TableCell>
+                                            <Badge variant="outline" className="text-xs">Bundle</Badge>
+                                          </TableCell>
+                                          <TableCell>{bundleName}</TableCell>
+                                          <TableCell className="text-right">${breakdown.unitCost.toFixed(2)}</TableCell>
+                                          <TableCell className="text-right">{breakdown.count}</TableCell>
+                                          <TableCell className="text-right font-medium">${breakdown.totalCost.toFixed(2)}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              )}
 
                             {/* Admin: Individual Jobs for Mark as Paid */}
                             {isAdmin && vendor.pendingCount > 0 && (
@@ -785,6 +788,86 @@ export default function VendorPaymentsReport() {
                       </AccordionItem>
                     ))}
                   </Accordion>
+                  ) : (
+                    /* Vendor view: Single vendor, no accordion, labels use "Price" */
+                    reportData?.vendors.map((vendor) => (
+                      <div key={vendor.vendorId}>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div className="p-3 bg-muted rounded-md">
+                            <p className="text-sm text-dark-gray mb-1">
+                              Ad-hoc Jobs
+                            </p>
+                            <p className="font-semibold">
+                              {vendor.adhocJobs.count} jobs - $
+                              {vendor.adhocJobs.totalCost.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="p-3 bg-muted rounded-md">
+                            <p className="text-sm text-dark-gray mb-1">
+                              Bundle Jobs
+                            </p>
+                            <p className="font-semibold">
+                              {vendor.bundleJobs.count} jobs - $
+                              {vendor.bundleJobs.totalCost.toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Service Breakdown Table with "Price" labels for vendor */}
+                        {(Object.keys(vendor.adhocJobs.services).length > 0 || 
+                          Object.keys(vendor.bundleJobs.bundles).length > 0) && (
+                          <div className="mb-6">
+                            <h4 className="text-sm font-medium text-dark-gray mb-2">Service Breakdown</h4>
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Type</TableHead>
+                                  <TableHead>Service/Bundle</TableHead>
+                                  <TableHead className="text-right">Unit Price</TableHead>
+                                  <TableHead className="text-right">Quantity</TableHead>
+                                  <TableHead className="text-right">Total Price</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {Object.entries(vendor.adhocJobs.services).map(([serviceName, breakdown]) => (
+                                  <TableRow key={`adhoc-${serviceName}`}>
+                                    <TableCell>
+                                      <Badge variant="outline" className="text-xs">Ad-hoc</Badge>
+                                    </TableCell>
+                                    <TableCell>{serviceName}</TableCell>
+                                    <TableCell className="text-right">${breakdown.unitCost.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right">{breakdown.count}</TableCell>
+                                    <TableCell className="text-right font-medium">${breakdown.totalCost.toFixed(2)}</TableCell>
+                                  </TableRow>
+                                ))}
+                                {Object.entries(vendor.bundleJobs.bundles).map(([bundleName, breakdown]) => (
+                                  <TableRow key={`bundle-${bundleName}`}>
+                                    <TableCell>
+                                      <Badge variant="outline" className="text-xs">Bundle</Badge>
+                                    </TableCell>
+                                    <TableCell>{bundleName}</TableCell>
+                                    <TableCell className="text-right">${breakdown.unitCost.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right">{breakdown.count}</TableCell>
+                                    <TableCell className="text-right font-medium">${breakdown.totalCost.toFixed(2)}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                              <TableFooter className="bg-muted sticky bottom-0">
+                                <TableRow>
+                                  <TableCell colSpan={4} className="font-semibold text-dark-blue-night">
+                                    Total Price
+                                  </TableCell>
+                                  <TableCell className="text-right text-lg font-bold text-dark-blue-night">
+                                    ${vendor.totalEarnings.toFixed(2)}
+                                  </TableCell>
+                                </TableRow>
+                              </TableFooter>
+                            </Table>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </CardContent>
               </Card>
             )}
