@@ -556,7 +556,9 @@ export default function VendorPaymentsReport() {
             ) : (
               <Card>
                 <CardHeader>
-                  <CardTitle>{isAdmin ? "Vendor Breakdown" : "Payment Breakdown"}</CardTitle>
+                  <CardTitle>
+                    {isAdmin ? "Vendor Breakdown" : `${reportData?.vendors[0]?.vendorName || "Your"} Payment Breakdown`}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   {isAdmin ? (
@@ -792,27 +794,6 @@ export default function VendorPaymentsReport() {
                     /* Vendor view: Single vendor, no accordion, labels use "Price" */
                     reportData?.vendors.map((vendor) => (
                       <div key={vendor.vendorId}>
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                          <div className="p-3 bg-muted rounded-md">
-                            <p className="text-sm text-dark-gray mb-1">
-                              Ad-hoc Jobs
-                            </p>
-                            <p className="font-semibold">
-                              {vendor.adhocJobs.count} jobs - $
-                              {vendor.adhocJobs.totalCost.toFixed(2)}
-                            </p>
-                          </div>
-                          <div className="p-3 bg-muted rounded-md">
-                            <p className="text-sm text-dark-gray mb-1">
-                              Bundle Jobs
-                            </p>
-                            <p className="font-semibold">
-                              {vendor.bundleJobs.count} jobs - $
-                              {vendor.bundleJobs.totalCost.toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
-
                         {/* Service Breakdown Table with "Price" labels for vendor */}
                         {(Object.keys(vendor.adhocJobs.services).length > 0 || 
                           Object.keys(vendor.bundleJobs.bundles).length > 0) && (
