@@ -46,6 +46,7 @@ interface EnrichedBundleField {
   displayLabelOverride?: string | null;
   uiGroup?: string | null;
   sortOrder?: number;
+  required?: boolean;
 }
 
 interface LineItemField {
@@ -248,6 +249,25 @@ export default function BundleRequestDetail() {
     await addAttachmentMutation.mutateAsync({ fileUrl, fileName, kind: "deliverable" });
   };
 
+  const handleDeliver = () => {
+    // Check if Final Store URL is required for this bundle
+    // Only bundleFields have the required property
+    const bundleDeliveryFieldsForCheck = (requestDetail?.bundleFields ?? []).filter(bf => bf.inputField?.inputFor === "delivery");
+    const finalUrlBundleField = bundleDeliveryFieldsForCheck.find(f => f.inputField?.fieldKey === "final_store_url");
+    const isRequired = finalUrlBundleField?.required === true;
+    
+    if (isRequired && !finalStoreUrl.trim()) {
+      toast({ 
+        title: "Final Store URL Required", 
+        description: "Please provide the Final Store URL before delivering this job.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    deliverMutation.mutate({ finalStoreUrl });
+  };
+
 
   if (isLoading) {
     return (
@@ -305,8 +325,12 @@ export default function BundleRequestDetail() {
   // Get the label for delivery fields
   const deliveryFilesLabel = [...bundleDeliveryFields, ...serviceDeliveryFields, ...lineItemDeliveryFields]
     .find(f => f.inputField?.fieldKey === "delivery_files")?.inputField?.label || "Upload Delivery Files";
-  const finalStoreUrlLabel = [...bundleDeliveryFields, ...serviceDeliveryFields, ...lineItemDeliveryFields]
-    .find(f => f.inputField?.fieldKey === "final_store_url")?.inputField?.label || "Final Store URL";
+  const finalStoreUrlField = [...bundleDeliveryFields, ...serviceDeliveryFields, ...lineItemDeliveryFields]
+    .find(f => f.inputField?.fieldKey === "final_store_url");
+  const finalStoreUrlLabel = finalStoreUrlField?.inputField?.label || "Final Store URL";
+  // Check required status only from bundleFields which has the required property
+  const finalStoreUrlBundleField = bundleDeliveryFields.find(f => f.inputField?.fieldKey === "final_store_url");
+  const isFinalStoreUrlRequired = finalStoreUrlBundleField?.required === true;
 
   // Get stored final_store_url from bundle request formData
   const formData = (request.formData as Record<string, any>) || {};
@@ -416,7 +440,7 @@ export default function BundleRequestDetail() {
                   Cancel
                 </Button>
                 <Button 
-                  onClick={() => deliverMutation.mutate({ finalStoreUrl })}
+                  onClick={handleDeliver}
                   disabled={deliverMutation.isPending}
                   className="bg-sky-blue-accent hover:bg-sky-blue-accent/90"
                   data-testid="button-deliver-top"
@@ -443,7 +467,7 @@ export default function BundleRequestDetail() {
                   Cancel
                 </Button>
                 <Button 
-                  onClick={() => deliverMutation.mutate({ finalStoreUrl })}
+                  onClick={handleDeliver}
                   disabled={deliverMutation.isPending}
                   className="bg-sky-blue-accent hover:bg-sky-blue-accent/90"
                   data-testid="button-deliver-top"
