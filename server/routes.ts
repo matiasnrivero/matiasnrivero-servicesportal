@@ -3904,12 +3904,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Bundle request not found" });
       }
 
-      // Only the assigned designer, admin, or internal_designer can deliver
+      // Only the assigned designer, vendor, admin, or internal_designer can deliver
       const isAdmin = sessionUser.role === "admin";
       const isInternalDesigner = sessionUser.role === "internal_designer";
+      const isVendor = sessionUser.role === "vendor";
+      const isVendorDesigner = sessionUser.role === "vendor_designer";
       const isAssignee = existingRequest.assigneeId === sessionUserId;
+      const isVendorAssignee = existingRequest.vendorAssigneeId === sessionUserId;
 
-      if (!isAdmin && !isInternalDesigner && !isAssignee) {
+      if (!isAdmin && !isInternalDesigner && !isVendor && !isVendorDesigner && !isAssignee && !isVendorAssignee) {
         return res.status(403).json({ error: "Access denied" });
       }
 
