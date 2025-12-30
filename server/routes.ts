@@ -5752,20 +5752,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return true;
       });
 
+      console.log(`[Vendor Payments] Filtering bundles for period ${paymentPeriod}`);
+      console.log(`[Vendor Payments] All bundle requests count: ${allBundleRequests.length}`);
+      
       let filteredBundleRequests = allBundleRequests.filter(r => {
-        if (!["delivered"].includes(r.status) || !r.deliveredAt) return false;
+        const isDelivered = r.status === "delivered" && r.deliveredAt;
+        const jobPeriod = r.vendorPaymentPeriod || (r.deliveredAt ? new Date(r.deliveredAt).toISOString().slice(0, 7) : null);
+        const periodMatches = jobPeriod === paymentPeriod;
         
-        // Determine job period: use vendorPaymentPeriod if set, else deliveredAt
-        const jobPeriod = r.vendorPaymentPeriod || new Date(r.deliveredAt).toISOString().slice(0, 7);
-        if (jobPeriod !== paymentPeriod) return false;
-
+        let excludedByAssignee = false;
         if (r.assigneeId) {
           const assignee = userMap[r.assigneeId];
-          if (assignee && ["admin", "internal_designer"].includes(assignee.role)) return false;
+          if (assignee && ["admin", "internal_designer"].includes(assignee.role)) {
+            excludedByAssignee = true;
+          }
         }
+        
+        console.log(`[Vendor Payments] Bundle ${r.id}: status=${r.status}, delivered=${!!r.deliveredAt}, period=${jobPeriod}, periodMatches=${periodMatches}, excludedByAssignee=${excludedByAssignee}, vendorAssigneeId=${r.vendorAssigneeId}`);
+        
+        if (!isDelivered) return false;
+        if (!periodMatches) return false;
+        if (excludedByAssignee) return false;
 
         return true;
       });
+      
+      console.log(`[Vendor Payments] Filtered bundle requests count: ${filteredBundleRequests.length}`);
 
       // If vendor is viewing, filter to only their jobs
       if (sessionUser.role === "vendor") {
