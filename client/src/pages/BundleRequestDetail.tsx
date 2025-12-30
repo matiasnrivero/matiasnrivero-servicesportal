@@ -517,9 +517,13 @@ export default function BundleRequestDetail() {
                 </div>
                 
                 {/* Row 2+: Dynamic general_info fields from bundleFields (includes Order/Project Reference, Due Date, Store Replication Template) */}
+                {/* Note: Fields with empty/null uiGroup are treated as general_info */}
                 {(() => {
                   const generalInfoFields = (bundleFields ?? [])
-                    .filter(bf => bf.uiGroup === "general_info" && bf.inputField?.inputFor !== "delivery")
+                    .filter(bf => 
+                      (!bf.uiGroup || bf.uiGroup === "" || bf.uiGroup === "general_info") && 
+                      bf.inputField?.inputFor !== "delivery"
+                    )
                     .sort((a, b) => (a.sortOrder ?? 9999) - (b.sortOrder ?? 9999));
                   
                   // Check if Due Date is provided via bundle fields with a value
@@ -598,40 +602,6 @@ export default function BundleRequestDetail() {
                   <div className="space-y-4">
                     {(bundleFields ?? [])
                       .filter(bf => bf.uiGroup === "info_details" && bf.inputField?.inputFor !== "delivery")
-                      .sort((a, b) => (a.sortOrder ?? 9999) - (b.sortOrder ?? 9999))
-                      .map((bf) => {
-                        const value = bf.value;
-                        if (value === null || value === undefined || value === "") return null;
-                        
-                        return (
-                          <div key={bf.id} className="flex flex-col gap-1">
-                            <Label className="text-sm font-medium text-muted-foreground">
-                              {bf.displayLabelOverride || bf.inputField?.label || "Field"}
-                            </Label>
-                            <div className="text-sm" data-testid={`text-bundle-field-${bf.id}`}>
-                              {renderFieldValue(value)}
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-            
-            {/* Render additional_info bundle fields in Additional Information section */}
-            {(bundleFields ?? []).filter(bf => 
-              bf.uiGroup === "additional_info" && 
-              bf.inputField?.inputFor !== "delivery"
-            ).length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Additional Information</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {(bundleFields ?? [])
-                      .filter(bf => bf.uiGroup === "additional_info" && bf.inputField?.inputFor !== "delivery")
                       .sort((a, b) => (a.sortOrder ?? 9999) - (b.sortOrder ?? 9999))
                       .map((bf) => {
                         const value = bf.value;
@@ -743,6 +713,40 @@ export default function BundleRequestDetail() {
                         </a>
                       </div>
                     ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Render additional_info bundle fields in Additional Information section - right before Deliverables */}
+            {(bundleFields ?? []).filter(bf => 
+              bf.uiGroup === "additional_info" && 
+              bf.inputField?.inputFor !== "delivery"
+            ).length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Additional Information</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {(bundleFields ?? [])
+                      .filter(bf => bf.uiGroup === "additional_info" && bf.inputField?.inputFor !== "delivery")
+                      .sort((a, b) => (a.sortOrder ?? 9999) - (b.sortOrder ?? 9999))
+                      .map((bf) => {
+                        const value = bf.value;
+                        if (value === null || value === undefined || value === "") return null;
+                        
+                        return (
+                          <div key={bf.id} className="flex flex-col gap-1">
+                            <Label className="text-sm font-medium text-muted-foreground">
+                              {bf.displayLabelOverride || bf.inputField?.label || "Field"}
+                            </Label>
+                            <div className="text-sm" data-testid={`text-bundle-field-${bf.id}`}>
+                              {renderFieldValue(value)}
+                            </div>
+                          </div>
+                        );
+                      })}
                   </div>
                 </CardContent>
               </Card>
