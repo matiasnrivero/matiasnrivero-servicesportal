@@ -299,8 +299,8 @@ export default function ClientTeamManagement() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between gap-6 flex-wrap">
-                <div className="flex items-center gap-8 flex-wrap">
+              <div className="flex items-start justify-between gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 flex-1">
                   <div>
                     <p className="text-sm text-gray-500">Company Name</p>
                     <p className="font-medium" data-testid="text-company-name">
@@ -315,7 +315,7 @@ export default function ClientTeamManagement() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Website</p>
-                    <p className="font-medium" data-testid="text-website">
+                    <p className="font-medium break-all" data-testid="text-website">
                       {clientProfile.website || "Not set"}
                     </p>
                   </div>
@@ -328,16 +328,16 @@ export default function ClientTeamManagement() {
                 </div>
                 {isPrimaryClient && (
                   <Dialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DialogTrigger asChild>
                           <Button variant="ghost" size="icon" data-testid="button-edit-company">
                             <Pencil className="w-4 h-4" />
                           </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Edit</TooltipContent>
-                      </Tooltip>
-                    </DialogTrigger>
+                        </DialogTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent>Edit</TooltipContent>
+                    </Tooltip>
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>Edit Company Information</DialogTitle>
