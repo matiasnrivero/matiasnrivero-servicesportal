@@ -179,7 +179,7 @@ export default function Reports() {
           <div className="mb-8">
             <h2 className="text-lg font-semibold text-dark-blue-night mb-4 flex items-center gap-2">
               <FileText className="w-5 h-5" />
-              Earnings Reports
+              Vendor Reports
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {groupedReports.vendor.map((report) => {
