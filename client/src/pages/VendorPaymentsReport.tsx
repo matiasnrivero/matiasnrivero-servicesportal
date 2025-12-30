@@ -674,6 +674,16 @@ export default function VendorPaymentsReport() {
                                         </TableRow>
                                       ))}
                                     </TableBody>
+                                    <TableFooter>
+                                      <TableRow className="bg-muted/50">
+                                        <TableCell colSpan={4} className="font-semibold text-dark-blue-night">
+                                          Total Cost
+                                        </TableCell>
+                                        <TableCell className="text-right font-bold text-dark-blue-night">
+                                          ${vendor.totalEarnings.toFixed(2)}
+                                        </TableCell>
+                                      </TableRow>
+                                    </TableFooter>
                                   </Table>
                                 </div>
                               )}
@@ -697,7 +707,25 @@ export default function VendorPaymentsReport() {
                                 <Table>
                                   <TableHeader>
                                     <TableRow>
-                                      <TableHead className="w-[40px]"></TableHead>
+                                      <TableHead className="w-[40px]">
+                                        <Checkbox
+                                          checked={vendor.jobs.filter(j => j.paymentStatus === "pending").every(j => selectedJobs.has(j.id)) && vendor.pendingCount > 0}
+                                          onCheckedChange={(checked) => {
+                                            if (checked) {
+                                              handleSelectAllPending(vendor.jobs);
+                                            } else {
+                                              // Deselect all pending jobs for this vendor
+                                              const pendingJobIds = vendor.jobs.filter(j => j.paymentStatus === "pending").map(j => j.id);
+                                              setSelectedJobs(prev => {
+                                                const newSet = new Set(prev);
+                                                pendingJobIds.forEach(id => newSet.delete(id));
+                                                return newSet;
+                                              });
+                                            }
+                                          }}
+                                          data-testid={`checkbox-select-all-${vendor.vendorId}`}
+                                        />
+                                      </TableHead>
                                       <TableHead>Job ID</TableHead>
                                       <TableHead>Type</TableHead>
                                       <TableHead>Service/Bundle</TableHead>
