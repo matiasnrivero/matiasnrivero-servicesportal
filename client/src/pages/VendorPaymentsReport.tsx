@@ -490,16 +490,6 @@ export default function VendorPaymentsReport() {
               >
                 <RefreshCw className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={exportToPDF}
-                disabled={!reportData?.vendors?.some(v => v.jobs.length > 0)}
-                data-testid="button-export-pdf"
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                PDF
-              </Button>
             </div>
           </div>
         </div>
@@ -631,10 +621,22 @@ export default function VendorPaymentsReport() {
               </Card>
             ) : (
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between gap-4">
                   <CardTitle>
                     {isAdmin ? "Vendor Breakdown" : `${reportData?.vendors[0]?.vendorName || "Your"} Payment Summary`}
                   </CardTitle>
+                  {!isAdmin && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={exportToPDF}
+                      disabled={!reportData?.vendors?.some(v => v.jobs.length > 0)}
+                      data-testid="button-export-pdf"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      PDF
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent>
                   {isAdmin ? (
