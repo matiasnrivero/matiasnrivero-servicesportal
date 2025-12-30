@@ -105,6 +105,7 @@ export default function JobDetailView() {
     inputFieldId: string;
     uiGroup: string | null;
     sortOrder: number;
+    required?: boolean;
     inputField: {
       id: string;
       fieldKey: string;
@@ -360,6 +361,15 @@ export default function JobDetailView() {
   const isAssignee = currentUser?.userId === request?.assigneeId;
 
   const handleDeliver = () => {
+    // Check if Final Store URL is required but not filled
+    if (isFinalStoreUrlRequired && !finalStoreUrl.trim()) {
+      toast({
+        title: "Final Store URL Required",
+        description: "Please provide the Final Store URL before delivering this job.",
+        variant: "destructive",
+      });
+      return;
+    }
     deliverMutation.mutate({ finalStoreUrl });
   };
 
@@ -544,6 +554,11 @@ export default function JobDetailView() {
   // Check if this service has specific delivery fields configured
   const hasDeliveryFilesField = deliveryFields.some(df => df.inputField?.fieldKey === "delivery_files");
   const hasFinalStoreUrlField = deliveryFields.some(df => df.inputField?.fieldKey === "final_store_url");
+  
+  // Check if Final Store URL is required
+  const finalStoreUrlField = deliveryFields.find(df => df.inputField?.fieldKey === "final_store_url");
+  const isFinalStoreUrlRequired = finalStoreUrlField?.required === true;
+  const finalStoreUrlLabel = finalStoreUrlField?.inputField?.label || "Final Store URL";
 
   // Get stored final_store_url from formData if it was already saved
   const formData = request?.formData as Record<string, unknown> | null;
@@ -720,26 +735,17 @@ export default function JobDetailView() {
               </div>
             )}
 
-            {/* Render URL input if final_store_url is configured for this service */}
-            {hasFinalStoreUrlField && (
-              <div>
-                <Label className="text-sm font-medium text-dark-blue-night mb-2 block">
-                  {deliveryFields.find(df => df.inputField?.fieldKey === "final_store_url")?.inputField?.label || "Final Store URL"}
-                </Label>
-                <Input
-                  type="url"
-                  placeholder="https://..."
-                  value={finalStoreUrl}
-                  onChange={(e) => setFinalStoreUrl(e.target.value)}
-                  data-testid="input-final-store-url"
-                />
-              </div>
-            )}
           </div>
         )}
       </CardContent>
     </Card>
   );
+
+  // Check if the service allows delivery via URL only (no files required)
+  // The delivery should be allowed if: files are uploaded OR finalStoreUrl is filled (if the field exists)
+  const hasValidDelivery = deliverableAttachments.length > 0 || 
+    deliverableUrls.length > 0 || 
+    (hasFinalStoreUrlField && finalStoreUrl.trim().length > 0);
 
   return (
     <div className="min-h-screen bg-off-white-cream">
@@ -893,7 +899,7 @@ export default function JobDetailView() {
                 </Button>
                 <Button 
                   onClick={handleDeliver}
-                  disabled={deliverMutation.isPending || (deliverableAttachments.length === 0 && deliverableUrls.length === 0)}
+                  disabled={deliverMutation.isPending || !hasValidDelivery}
                   className="bg-sky-blue-accent hover:bg-sky-blue-accent/90"
                   data-testid="button-deliver"
                 >
@@ -924,7 +930,7 @@ export default function JobDetailView() {
                 </Button>
                 <Button 
                   onClick={handleDeliver}
-                  disabled={deliverMutation.isPending || (deliverableAttachments.length === 0 && deliverableUrls.length === 0)}
+                  disabled={deliverMutation.isPending || !hasValidDelivery}
                   className="bg-sky-blue-accent hover:bg-sky-blue-accent/90"
                   data-testid="button-deliver"
                 >
@@ -1800,7 +1806,27 @@ export default function JobDetailView() {
             </Card>
 
             {!showDeliverablesAtTop && (canManageJobs || deliverableAttachments.length > 0) && (
-              <DeliverablesSection />
+              <>
+                <DeliverablesSection />
+                {/* Final Store URL input rendered outside DeliverablesSection to prevent focus loss */}
+                {hasFinalStoreUrlField && canManageJobs && (request.status === "in-progress" || request.status === "change-request") && (
+                  <Card className="mt-4">
+                    <CardContent className="pt-4">
+                      <Label className="text-sm font-medium text-dark-blue-night mb-2 block">
+                        {finalStoreUrlLabel}
+                        {isFinalStoreUrlRequired && <span className="text-red-500 ml-1">*</span>}
+                      </Label>
+                      <Input
+                        type="url"
+                        placeholder="https://..."
+                        value={finalStoreUrl}
+                        onChange={(e) => setFinalStoreUrl(e.target.value)}
+                        data-testid="input-final-store-url"
+                      />
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             )}
 
             {request.status === "change-request" && request.changeRequestNote && (
