@@ -312,8 +312,9 @@ export default function ServiceRequestsList() {
     queryKey: ["/api/services"],
   });
 
+  // Use public bundles endpoint which is accessible to all authenticated users
   const { data: bundles = [] } = useQuery<Bundle[]>({
-    queryKey: ["/api/bundles"],
+    queryKey: ["/api/public/bundles"],
   });
 
   const { data: users = [] } = useQuery<User[]>({

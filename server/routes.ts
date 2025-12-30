@@ -4114,14 +4114,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "User not found" });
       }
 
-      // Only admins, internal_designers, vendors, vendor_designers can see full detail
-      if (!["admin", "internal_designer", "vendor", "vendor_designer"].includes(sessionUser.role)) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
       const request = await storage.getBundleRequest(req.params.id);
       if (!request) {
         return res.status(404).json({ error: "Bundle request not found" });
+      }
+
+      // Allow admins, internal_designers, vendors, vendor_designers, and the request owner
+      const isOwner = request.userId === sessionUserId;
+      if (!isOwner && !["admin", "internal_designer", "vendor", "vendor_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
       }
 
       const bundle = await storage.getBundle(request.bundleId);
