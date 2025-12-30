@@ -53,11 +53,11 @@ const reportCards: ReportCard[] = [
     roles: ["client"],
   },
   {
-    id: "vendor-earnings",
-    title: "Vendor Earnings",
-    description: "View your completed work and pending payments",
+    id: "vendor-designer-workload",
+    title: "Vendor Designer Workload Report",
+    description: "View designer workload and job assignments",
     icon: FileText,
-    path: "/reports/vendor-earnings",
+    path: "/reports/vendor-designer-workload",
     roles: ["vendor"],
   },
 ];
