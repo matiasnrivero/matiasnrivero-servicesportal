@@ -1207,8 +1207,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!canUploadDeliverables) {
           return res.status(403).json({ error: "You don't have permission to upload deliverables" });
         }
-        // Admins can always upload deliverables, others must be the assigned user
-        if (sessionUser.role !== "admin" && existingRequest.assigneeId !== sessionUserId) {
+        // Admins can always upload deliverables, others must be the assigned user or vendor assignee
+        const isAssignee = existingRequest.assigneeId === sessionUserId;
+        const isVendorAssignee = existingRequest.vendorAssigneeId === sessionUserId;
+        if (sessionUser.role !== "admin" && !isAssignee && !isVendorAssignee) {
           return res.status(403).json({ error: "Only the assigned user can upload deliverables" });
         }
         // Deliverables can only be uploaded when job is in-progress or change-request
