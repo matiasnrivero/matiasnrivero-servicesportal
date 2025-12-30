@@ -575,6 +575,11 @@ export default function JobDetailView() {
   const isFinalStoreUrlRequired = finalStoreUrlField?.required === true;
   const finalStoreUrlLabel = finalStoreUrlField?.inputField?.label || "Final Store URL";
 
+  // Check if delivery files are required
+  const deliveryFilesField = deliveryFields.find(df => df.inputField?.fieldKey === "delivery_files");
+  const isDeliveryFilesRequired = deliveryFilesField?.required === true;
+  const deliveryFilesLabel = deliveryFilesField?.inputField?.label || "Upload Delivery Files";
+
   // Get stored final_store_url from formData if it was already saved
   const formData = request?.formData as Record<string, unknown> | null;
   const storedFinalStoreUrl = formData?.final_store_url as string | undefined;
@@ -744,7 +749,8 @@ export default function JobDetailView() {
             {(hasDeliveryFilesField || deliveryFields.length === 0) && (
               <div>
                 <Label className="text-sm font-medium text-dark-blue-night mb-2 block">
-                  {deliveryFields.find(df => df.inputField?.fieldKey === "delivery_files")?.inputField?.label || "Upload Delivery Files"}
+                  {deliveryFilesLabel}
+                  {isDeliveryFilesRequired && <span className="text-red-500 ml-1">*</span>}
                 </Label>
                 <FileUploader onUploadComplete={handleDeliverableUpload} />
               </div>

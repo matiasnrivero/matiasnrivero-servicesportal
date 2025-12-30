@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -21,11 +23,11 @@ import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/Header";
 import { FileUploader } from "@/components/FileUploader";
 import { ImagePreviewTooltip } from "@/components/ImagePreviewTooltip";
-import { ArrowLeft, Package, Loader2, User, Calendar, CheckCircle, Clock, AlertCircle, Download, Users, RefreshCw, XCircle, CheckCircle2, DollarSign, Building2 } from "lucide-react";
+import { ArrowLeft, Package, Loader2, User, Calendar, CheckCircle, Clock, AlertCircle, Download, Users, RefreshCw, XCircle, CheckCircle2, DollarSign, Building2, Send, Reply, X } from "lucide-react";
 import { getDisplayStatus, getStatusInfo } from "@/lib/statusUtils";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import type { Bundle, BundleRequest, User as UserType, Service, InputField, VendorProfile, ClientProfile } from "@shared/schema";
+import type { Bundle, BundleRequest, User as UserType, Service, InputField, VendorProfile, ClientProfile, BundleRequestComment } from "@shared/schema";
 
 interface EnrichedField {
   id: string;
@@ -122,6 +124,12 @@ export default function BundleRequestDetail() {
   const [selectedVendorId, setSelectedVendorId] = useState<string>("");
   const [deliverableUrls, setDeliverableUrls] = useState<{ url: string; name: string }[]>([]);
   const [finalStoreUrl, setFinalStoreUrl] = useState<string>("");
+  const [changeRequestModalOpen, setChangeRequestModalOpen] = useState(false);
+  const [changeNote, setChangeNote] = useState("");
+  const [commentText, setCommentText] = useState("");
+  const [commentTab, setCommentTab] = useState<"public" | "internal">("public");
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: requestDetail, isLoading, error } = useQuery({
     queryKey: ["/api/bundle-requests", requestId, "full-detail"],
@@ -151,7 +159,14 @@ export default function BundleRequestDetail() {
     queryKey: ["/api/client-profiles"],
   });
 
+  const { data: comments = [], refetch: refetchComments } = useQuery<BundleRequestComment[]>({
+    queryKey: ["/api/bundle-requests", requestId, "comments"],
+    enabled: !!requestId && !!currentUser,
+  });
+
   const canAssignToVendor = ["admin", "internal_designer"].includes(currentUser?.role || "");
+  const isDesigner = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(currentUser?.role || "");
+  const isClient = currentUser?.role === "client" || currentUser?.role === "distributor";
   
   // Helper to get vendor company name from profile
   const getVendorDisplayName = (vendorUser: UserType) => {
@@ -257,6 +272,44 @@ export default function BundleRequestDetail() {
     },
   });
 
+  const changeRequestMutation = useMutation({
+    mutationFn: async (note: string) => {
+      return apiRequest("POST", `/api/bundle-requests/${requestId}/change-request`, { 
+        changeNote: note
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests", requestId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] });
+      refetchComments();
+      setChangeNote("");
+      setChangeRequestModalOpen(false);
+      toast({ title: "Change requested", description: "The designer has been notified." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to request changes.", variant: "destructive" });
+    },
+  });
+
+  const addCommentMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", `/api/bundle-requests/${requestId}/comments`, {
+        body: commentText,
+        visibility: commentTab,
+        parentId: replyingTo || undefined,
+      });
+    },
+    onSuccess: () => {
+      refetchComments();
+      setCommentText("");
+      setReplyingTo(null);
+      toast({ title: "Comment added" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to add comment.", variant: "destructive" });
+    },
+  });
+
   const handleDeliverableUpload = async (fileUrl: string, fileName: string) => {
     setDeliverableUrls(prev => [...prev, { url: fileUrl, name: fileName }]);
     await addAttachmentMutation.mutateAsync({ fileUrl, fileName, kind: "deliverable" });
@@ -349,6 +402,99 @@ export default function BundleRequestDetail() {
   const formData = (request.formData as Record<string, any>) || {};
   const storedFinalStoreUrl = formData.final_store_url as string | undefined;
 
+  // Check if delivery files are required
+  const deliveryFilesField = [...bundleDeliveryFields, ...serviceDeliveryFields, ...lineItemDeliveryFields]
+    .find(f => f.inputField?.fieldKey === "delivery_files");
+  const isDeliveryFilesRequired = (deliveryFilesField as any)?.required === true;
+
+  // Helper functions for comments
+  const getUserById = (userId: string) => allUsers.find(u => u.id === userId);
+  
+  const getRoleLabelForComment = (role: string | undefined) => {
+    switch (role) {
+      case "admin": return "Admin";
+      case "internal_designer": return "Internal Designer";
+      case "vendor": return "Vendor";
+      case "vendor_designer": return "Vendor Designer";
+      case "designer": return "Designer";
+      case "client": return "Client";
+      case "distributor": return "Distributor";
+      default: return "User";
+    }
+  };
+
+  const getTopLevelComments = (visibility: "public" | "internal") => {
+    return comments.filter(c => c.visibility === visibility && !c.parentId);
+  };
+
+  const getReplies = (parentId: string) => {
+    return comments.filter(c => c.parentId === parentId);
+  };
+
+  const isChangeRequestComment = (comment: BundleRequestComment) => {
+    return comment.body.startsWith("[Change Request]");
+  };
+
+  const renderCommentThread = (comment: BundleRequestComment, isReply = false) => {
+    const author = getUserById(comment.authorId);
+    const replies = getReplies(comment.id);
+    const isChangeRequest = isChangeRequestComment(comment);
+    const roleLabel = getRoleLabelForComment(author?.role);
+    
+    const clientRoles = ["client", "distributor"];
+    const isCurrentUserClient = clientRoles.includes(currentUser?.role ?? "");
+    const isAuthorNonClient = !clientRoles.includes(author?.role ?? "");
+    const shouldHideUsername = isCurrentUserClient && isAuthorNonClient;
+    const displayName = shouldHideUsername ? roleLabel : (author?.username || "Unknown");
+    const avatarInitials = shouldHideUsername 
+      ? roleLabel.split(" ").map(w => w[0]).join("").slice(0, 2)
+      : (author?.username?.slice(0, 2).toUpperCase() || "NS");
+    
+    return (
+      <div key={comment.id} className={`${isReply ? "ml-10 mt-3" : ""}`}>
+        <div className="flex gap-3">
+          <Avatar className="h-8 w-8 flex-shrink-0">
+            <AvatarFallback className={`${comment.visibility === "internal" ? "bg-purple-500" : "bg-sky-blue-accent"} text-white text-xs`}>
+              {avatarInitials}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-medium text-dark-blue-night">
+                {displayName}
+              </span>
+              <Badge variant="outline" className={`text-xs ${comment.visibility === "internal" ? "bg-purple-50" : ""}`}>
+                {roleLabel}
+              </Badge>
+              {isChangeRequest && (
+                <Badge className="bg-orange-100 text-orange-800 border-orange-200 text-xs">
+                  Change Request
+                </Badge>
+              )}
+              <span className="text-xs text-dark-gray">
+                {format(new Date(comment.createdAt), "MMM dd, yyyy")}
+              </span>
+            </div>
+            <p className="text-sm text-dark-gray mt-1" data-testid={`text-comment-${comment.id}`}>
+              {isChangeRequest ? comment.body.replace("[Change Request] ", "") : comment.body}
+            </p>
+            {!isReply && (
+              <button
+                onClick={() => setReplyingTo(comment.id)}
+                className="flex items-center gap-1 text-xs text-sky-blue-accent mt-2 hover:underline"
+                data-testid={`button-reply-${comment.id}`}
+              >
+                <Reply className="h-3 w-3" />
+                Reply
+              </button>
+            )}
+          </div>
+        </div>
+        {replies.map(reply => renderCommentThread(reply, true))}
+      </div>
+    );
+  };
+
   const renderFieldValue = (value: any): React.ReactNode => {
     if (value === null || value === undefined) return "Not provided";
     if (Array.isArray(value)) {
@@ -382,6 +528,38 @@ export default function BundleRequestDetail() {
 
   return (
     <div className="min-h-screen bg-off-white-cream">
+      <Dialog open={changeRequestModalOpen} onOpenChange={setChangeRequestModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Request</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Textarea
+              placeholder="Please leave a comment explaining the reason for the rejection."
+              value={changeNote}
+              onChange={(e) => setChangeNote(e.target.value)}
+              className="min-h-[120px]"
+              data-testid="textarea-change-request-modal"
+            />
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setChangeRequestModalOpen(false)}
+              data-testid="button-cancel-change-request"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => changeRequestMutation.mutate(changeNote)}
+              disabled={!changeNote.trim() || changeRequestMutation.isPending}
+              data-testid="button-submit-change-request"
+            >
+              {changeRequestMutation.isPending ? "Submitting..." : "Submit"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Header />
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
@@ -488,6 +666,17 @@ export default function BundleRequestDetail() {
                   {deliverMutation.isPending ? "Delivering..." : "Deliver"}
                 </Button>
               </>
+            )}
+
+            {request.status === "delivered" && isClient && (
+              <Button 
+                variant="outline" 
+                className="border-red-300 text-red-600"
+                onClick={() => setChangeRequestModalOpen(true)}
+                data-testid="button-change-request"
+              >
+                Change Request
+              </Button>
             )}
           </div>
         </div>
@@ -871,7 +1060,10 @@ export default function BundleRequestDetail() {
                       {/* File upload field - only if delivery_files is configured */}
                       {hasDeliveryFilesField && (
                         <div>
-                          <p className="text-sm font-medium text-dark-blue-night mb-2">{deliveryFilesLabel}</p>
+                          <p className="text-sm font-medium text-dark-blue-night mb-2">
+                            {deliveryFilesLabel}
+                            {isDeliveryFilesRequired && <span className="text-red-500 ml-1">*</span>}
+                          </p>
                           <FileUploader onUploadComplete={handleDeliverableUpload} />
                         </div>
                       )}
@@ -906,6 +1098,77 @@ export default function BundleRequestDetail() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Comments Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Comments</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Tabs value={commentTab} onValueChange={(v) => setCommentTab(v as "public" | "internal")}>
+                  <TabsList>
+                    <TabsTrigger value="public" data-testid="tab-comments-public">Comments</TabsTrigger>
+                    {isDesigner && (
+                      <TabsTrigger value="internal" data-testid="tab-comments-internal">Internal Comments</TabsTrigger>
+                    )}
+                  </TabsList>
+
+                  <TabsContent value="public" className="space-y-4">
+                    <div className="space-y-4 max-h-96 overflow-y-auto">
+                      {getTopLevelComments("public").map((comment) => renderCommentThread(comment))}
+                      {getTopLevelComments("public").length === 0 && (
+                        <p className="text-sm text-dark-gray text-center py-4">No comments yet</p>
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  {isDesigner && (
+                    <TabsContent value="internal" className="space-y-4">
+                      <div className="space-y-4 max-h-96 overflow-y-auto">
+                        {getTopLevelComments("internal").map((comment) => renderCommentThread(comment))}
+                        {getTopLevelComments("internal").length === 0 && (
+                          <p className="text-sm text-dark-gray text-center py-4">No internal comments yet</p>
+                        )}
+                      </div>
+                    </TabsContent>
+                  )}
+                </Tabs>
+
+                <div className="border-t pt-4">
+                  {replyingTo && (
+                    <div className="flex items-center gap-2 mb-2 text-sm text-dark-gray bg-blue-lavender/30 p-2 rounded">
+                      <Reply className="h-4 w-4" />
+                      <span>Replying to comment</span>
+                      <button 
+                        onClick={() => setReplyingTo(null)} 
+                        className="ml-auto"
+                        data-testid="button-cancel-reply"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                  <Textarea
+                    ref={commentTextareaRef}
+                    placeholder={commentTab === "internal" ? "Write an internal comment..." : "Write a comment..."}
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    className="mb-3"
+                    data-testid="textarea-comment"
+                  />
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => addCommentMutation.mutate()}
+                      disabled={!commentText.trim() || addCommentMutation.isPending}
+                      data-testid="button-submit-comment"
+                    >
+                      <Send className="h-4 w-4 mr-2" />
+                      Submit
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           <div className="space-y-6">
