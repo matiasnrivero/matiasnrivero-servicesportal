@@ -768,7 +768,10 @@ export default function BundleRequestDetail() {
                       {/* URL input field - only if final_store_url is configured */}
                       {hasFinalStoreUrlField && (
                         <div>
-                          <Label className="text-sm font-medium text-dark-blue-night">{finalStoreUrlLabel}</Label>
+                          <Label className="text-sm font-medium text-dark-blue-night">
+                            {finalStoreUrlLabel}
+                            {isFinalStoreUrlRequired && <span className="text-red-500 ml-1">*</span>}
+                          </Label>
                           <Input
                             type="url"
                             placeholder="https://example.com/store/..."
