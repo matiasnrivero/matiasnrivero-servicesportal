@@ -21,6 +21,7 @@ import BundleRequestDetail from "@/pages/BundleRequestDetail";
 import Reports from "@/pages/Reports";
 import ServicesProfitReport from "@/pages/ServicesProfitReport";
 import VendorPaymentsReport from "@/pages/VendorPaymentsReport";
+import VendorDesignerWorkloadReport from "@/pages/VendorDesignerWorkloadReport";
 import ClientTeamManagement from "@/pages/ClientTeamManagement";
 import AdminDashboard from "@/pages/AdminDashboard";
 
@@ -49,6 +50,7 @@ function Router() {
       <Route path="/reports" component={Reports} />
       <Route path="/reports/services-profit" component={ServicesProfitReport} />
       <Route path="/reports/vendor-payments" component={VendorPaymentsReport} />
+      <Route path="/reports/vendor-designer-workload" component={VendorDesignerWorkloadReport} />
       <Route path="/client-team" component={ClientTeamManagement} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />

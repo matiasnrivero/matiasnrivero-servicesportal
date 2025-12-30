@@ -6300,6 +6300,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== VENDOR DESIGNER WORKLOAD REPORT ROUTES ====================
+
+  // Get vendor designer workload report data
+  app.get("/api/reports/vendor-designer-workload", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(403).json({ error: "User not found" });
+      }
+
+      // Only vendor can access this report
+      if (sessionUser.role !== "vendor") {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { period, userId } = req.query;
+      const paymentPeriod = period as string || new Date().toISOString().slice(0, 7); // Default to current month YYYY-MM
+
+      const allServiceRequests = await storage.getAllServiceRequests();
+      const allBundleRequests = await storage.getAllBundleRequests();
+      const allUsers = await storage.getAllUsers();
+      const allServices = await storage.getAllServices();
+      const allBundles = await storage.getAllBundles();
+
+      const userMap: Record<string, typeof allUsers[0]> = {};
+      allUsers.forEach(u => { userMap[u.id] = u; });
+      const serviceMap: Record<string, typeof allServices[0]> = {};
+      allServices.forEach(s => { serviceMap[s.id] = s; });
+      const bundleMap: Record<string, typeof allBundles[0]> = {};
+      allBundles.forEach(b => { bundleMap[b.id] = b; });
+
+      // Get all users in this vendor's organization
+      // The vendor user's ID is used as the organization identifier
+      // Include: the session vendor, vendor_designers with vendorId matching session vendor, 
+      // and other vendors in the same organization (vendorId matching session vendor)
+      const vendorUserId = sessionUser.id;
+      const vendorOrgUsers = allUsers.filter(u => 
+        (u.id === vendorUserId) || 
+        (u.role === "vendor_designer" && u.vendorId === vendorUserId) ||
+        (u.role === "vendor" && u.vendorId === vendorUserId)
+      );
+      const vendorOrgUserIds = new Set(vendorOrgUsers.map(u => u.id));
+
+      // Filter service requests:
+      // 1. Must be delivered
+      // 2. Assignee must be in vendor's organization
+      // 3. Match payment period (use vendorPaymentPeriod if set, else deliveredAt)
+      let filteredServiceRequests = allServiceRequests.filter(r => {
+        // Must be delivered
+        if (!["delivered"].includes(r.status) || !r.deliveredAt) return false;
+        
+        // Assignee must be in vendor organization
+        if (!r.assigneeId || !vendorOrgUserIds.has(r.assigneeId)) return false;
+        
+        // Determine job period: use vendorPaymentPeriod if set, else deliveredAt
+        const jobPeriod = r.vendorPaymentPeriod || new Date(r.deliveredAt).toISOString().slice(0, 7);
+        if (jobPeriod !== paymentPeriod) return false;
+
+        return true;
+      });
+
+      let filteredBundleRequests = allBundleRequests.filter(r => {
+        // Must be delivered
+        if (r.status !== "delivered" || !r.deliveredAt) return false;
+        
+        // Assignee must be in vendor organization
+        if (!r.assigneeId || !vendorOrgUserIds.has(r.assigneeId)) return false;
+        
+        // Match period
+        const jobPeriod = r.vendorPaymentPeriod || new Date(r.deliveredAt).toISOString().slice(0, 7);
+        if (jobPeriod !== paymentPeriod) return false;
+
+        return true;
+      });
+
+      // Optional: Filter by specific user within the organization
+      if (userId && typeof userId === "string" && vendorOrgUserIds.has(userId)) {
+        filteredServiceRequests = filteredServiceRequests.filter(r => r.assigneeId === userId);
+        filteredBundleRequests = filteredBundleRequests.filter(r => r.assigneeId === userId);
+      }
+
+      // Build the jobs list
+      const jobs = [
+        ...filteredServiceRequests.map(r => {
+          const service = serviceMap[r.serviceId];
+          const assignee = r.assigneeId ? userMap[r.assigneeId] : null;
+          return {
+            id: r.id,
+            jobId: `A-${r.id.slice(0, 5).toUpperCase()}`,
+            type: "Ad-hoc" as const,
+            serviceName: service?.title || "Unknown Service",
+            userName: assignee?.username || "Unknown",
+            userId: r.assigneeId,
+            userRole: assignee?.role || "unknown",
+            deliveredAt: r.deliveredAt,
+          };
+        }),
+        ...filteredBundleRequests.map(r => {
+          const bundle = bundleMap[r.bundleId];
+          const assignee = r.assigneeId ? userMap[r.assigneeId] : null;
+          return {
+            id: r.id,
+            jobId: `B-${r.id.slice(0, 5).toUpperCase()}`,
+            type: "Bundle" as const,
+            serviceName: bundle?.name || "Unknown Bundle",
+            userName: assignee?.username || "Unknown",
+            userId: r.assigneeId,
+            userRole: assignee?.role || "unknown",
+            deliveredAt: r.deliveredAt,
+          };
+        }),
+      ];
+
+      // Sort by delivered date (newest first)
+      jobs.sort((a, b) => {
+        const dateA = a.deliveredAt ? new Date(a.deliveredAt).getTime() : 0;
+        const dateB = b.deliveredAt ? new Date(b.deliveredAt).getTime() : 0;
+        return dateB - dateA;
+      });
+
+      // Build team members list for filter dropdown
+      const teamMembers = vendorOrgUsers.map(u => ({
+        id: u.id,
+        username: u.username,
+        role: u.role,
+      }));
+
+      res.json({ 
+        period: paymentPeriod, 
+        jobs,
+        teamMembers,
+      });
+    } catch (error) {
+      console.error("Error fetching vendor designer workload:", error);
+      res.status(500).json({ error: "Failed to fetch vendor designer workload" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
