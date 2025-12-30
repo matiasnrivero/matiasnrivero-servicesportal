@@ -446,10 +446,14 @@ export default function ServicesProfitReport() {
       const createdBy = userMap[request.userId];
       
       let retailPrice = 0;
+      let discount = 0;
       if (createdBy?.role === "admin") {
         retailPrice = 0;
       } else if (request.finalPrice) {
         retailPrice = parseFloat(String(request.finalPrice));
+        if (request.discountAmount) {
+          discount = parseFloat(String(request.discountAmount));
+        }
       } else if (service) {
         const formData = request.formData as Record<string, unknown> | null;
         const priceStr = calculateServicePrice({
@@ -465,8 +469,7 @@ export default function ServicesProfitReport() {
       }
       
       const vendorCost = calculateVendorCost(request, service, assignee);
-      const discount = 0;
-      const profit = retailPrice - vendorCost - discount;
+      const profit = retailPrice - vendorCost;
       
       let vendorId: string | null = null;
       let vendorName: string | null = null;
@@ -511,15 +514,26 @@ export default function ServicesProfitReport() {
       const createdBy = userMap[bundleRequest.userId];
       
       let retailPrice = 0;
+      let discount = 0;
       if (createdBy?.role === "admin") {
         retailPrice = 0;
+      } else if (bundleRequest.finalPrice) {
+        retailPrice = parseFloat(String(bundleRequest.finalPrice));
       } else if (bundle?.finalPrice) {
-        retailPrice = parseFloat(String(bundle.finalPrice));
+        let templatePrice = parseFloat(String(bundle.finalPrice));
+        if (bundleRequest.discountAmount) {
+          discount = parseFloat(String(bundleRequest.discountAmount));
+          retailPrice = Math.max(templatePrice - discount, 0);
+        } else {
+          retailPrice = templatePrice;
+        }
+      }
+      if (bundleRequest.discountAmount) {
+        discount = parseFloat(String(bundleRequest.discountAmount));
       }
       
       const vendorCost = calculateBundleVendorCost(bundleRequest);
-      const discount = 0;
-      const profit = retailPrice - vendorCost - discount;
+      const profit = retailPrice - vendorCost;
       
       const vendorId = PIXELS_HIVE_VENDOR_ID;
       const vp = vendorProfileMap[PIXELS_HIVE_VENDOR_ID];
