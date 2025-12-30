@@ -492,64 +492,63 @@ export default function BundleRequestDetail() {
           </div>
         </div>
 
-        {/* Deliverables at top when delivered/change-request - read-only view for quick access */}
-        {showDeliverablesAtTop && (deliverableAttachments.length > 0 || storedFinalStoreUrl) && (
-          <Card className="border-green-200 bg-green-50/30 mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                Deliverables
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Display stored final store URL if delivered */}
-              {storedFinalStoreUrl && (
-                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-sm font-medium text-dark-blue-night mb-1">{finalStoreUrlLabel}</p>
-                  <a 
-                    href={storedFinalStoreUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue-600 hover:underline break-all"
-                    data-testid="link-final-store-url-top"
-                  >
-                    {storedFinalStoreUrl}
-                  </a>
-                </div>
-              )}
-
-              {deliverableAttachments.length > 0 && (
-                <div className="space-y-2">
-                  {deliverableAttachments.map((att) => (
-                    <div 
-                      key={att.id}
-                      className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
-                        <ImagePreviewTooltip
-                          fileUrl={att.fileUrl}
-                          fileName={att.fileName}
-                          thumbnailSize="sm"
-                        />
-                        <span className="text-sm text-dark-blue-night flex-1 truncate">{att.fileName}</span>
-                      </div>
-                      <a href={att.fileUrl} target="_blank" rel="noopener noreferrer">
-                        <Button size="sm" variant="default" data-testid={`button-download-deliverable-top-${att.id}`}>
-                          <Download className="h-3 w-3 mr-1" />
-                          Download
-                        </Button>
-                      </a>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
+            {/* Deliverables at top when delivered/change-request - read-only view for quick access */}
+            {showDeliverablesAtTop && (deliverableAttachments.length > 0 || storedFinalStoreUrl) && (
+              <Card className="border-green-200 bg-green-50/30">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    Deliverables
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Display stored final store URL if delivered */}
+                  {storedFinalStoreUrl && (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-sm font-medium text-dark-blue-night mb-1">{finalStoreUrlLabel}</p>
+                      <a 
+                        href={storedFinalStoreUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:underline break-all"
+                        data-testid="link-final-store-url-top"
+                      >
+                        {storedFinalStoreUrl}
+                      </a>
+                    </div>
+                  )}
+
+                  {deliverableAttachments.length > 0 && (
+                    <div className="space-y-2">
+                      {deliverableAttachments.map((att) => (
+                        <div 
+                          key={att.id}
+                          className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
+                        >
+                          <div className="flex items-center gap-3">
+                            <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+                            <ImagePreviewTooltip
+                              fileUrl={att.fileUrl}
+                              fileName={att.fileName}
+                              thumbnailSize="sm"
+                            />
+                            <span className="text-sm text-dark-blue-night flex-1 truncate">{att.fileName}</span>
+                          </div>
+                          <a href={att.fileUrl} target="_blank" rel="noopener noreferrer">
+                            <Button size="sm" variant="default" data-testid={`button-download-deliverable-top-${att.id}`}>
+                              <Download className="h-3 w-3 mr-1" />
+                              Download
+                            </Button>
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>
