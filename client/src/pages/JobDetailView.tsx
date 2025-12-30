@@ -36,7 +36,8 @@ import {
   Upload,
   Trash2,
   DollarSign,
-  Building2
+  Building2,
+  Percent
 } from "lucide-react";
 import type { ServiceRequest, Service, User as UserType, ServiceAttachment, Comment, VendorProfile, ClientProfile } from "@shared/schema";
 
@@ -851,10 +852,22 @@ export default function JobDetailView() {
                   });
                   if (!price || price === "N/A") return null;
                   return (
-                    <Badge variant="outline" className="text-sm bg-green-50 text-green-700 border-green-200" data-testid="text-job-price">
-                      <DollarSign className="h-3 w-3 mr-0.5" />
-                      {price.replace('$', '')}
-                    </Badge>
+                    <>
+                      <Badge variant="outline" className="text-sm bg-green-50 text-green-700 border-green-200" data-testid="text-job-price">
+                        <DollarSign className="h-3 w-3 mr-0.5" />
+                        {price.replace('$', '')}
+                      </Badge>
+                      {request.discountCouponId && (
+                        <Badge 
+                          variant="secondary" 
+                          className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                          data-testid="badge-discount-applied"
+                        >
+                          <Percent className="h-3 w-3 mr-1" />
+                          Discount
+                        </Badge>
+                      )}
+                    </>
                   );
                 })()}
                 <Badge variant="outline" className="text-sm" data-testid="text-job-id">

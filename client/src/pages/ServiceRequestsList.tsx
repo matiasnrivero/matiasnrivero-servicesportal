@@ -46,7 +46,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, XCircle, LayoutGrid, List, Trash2, CalendarIcon, Search, ChevronDown, X, SlidersHorizontal, Users, Building2 } from "lucide-react";
+import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, XCircle, LayoutGrid, List, Trash2, CalendarIcon, Search, ChevronDown, X, SlidersHorizontal, Users, Building2, Percent } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -93,6 +93,7 @@ interface CombinedRequest {
   userId: string;
   originalRequest: ServiceRequest | BundleRequest;
   price: string;
+  hasDiscount: boolean;
 }
 
 interface MultiSelectClientFilterProps {
@@ -768,6 +769,7 @@ export default function ServiceRequestsList() {
       userId: r.userId,
       originalRequest: r,
       price: getServicePrice(r),
+      hasDiscount: !!r.discountCouponId,
     }));
 
     const bundleItems: CombinedRequest[] = filteredBundleRequests.map(r => ({
@@ -784,6 +786,7 @@ export default function ServiceRequestsList() {
       userId: r.userId,
       originalRequest: r,
       price: getBundlePrice(r),
+      hasDiscount: !!r.discountCouponId,
     }));
 
     let combined = [...adhocItems, ...bundleItems];
@@ -1219,7 +1222,23 @@ export default function ServiceRequestsList() {
                         </TableCell>
                         {isDistributor(currentUser?.role) ? (
                           <TableCell data-testid={`text-price-${request.id}`}>
-                            <span className="text-dark-blue-night font-medium">{request.price}</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-dark-blue-night font-medium">{request.price}</span>
+                              {request.hasDiscount && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge 
+                                      variant="secondary" 
+                                      className="text-xs px-1.5 py-0 h-5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                      data-testid={`badge-discount-${request.id}`}
+                                    >
+                                      <Percent className="w-3 h-3" />
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Discount applied</TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
                           </TableCell>
                         ) : (
                           <TableCell data-testid={`text-assignee-${request.id}`}>

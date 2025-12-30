@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/Header";
 import { FileUploader } from "@/components/FileUploader";
 import { ImagePreviewTooltip } from "@/components/ImagePreviewTooltip";
-import { ArrowLeft, Package, Loader2, User, Calendar, CheckCircle, Clock, AlertCircle, Download, Users, RefreshCw, XCircle, CheckCircle2, DollarSign, Building2, Send, Reply, X } from "lucide-react";
+import { ArrowLeft, Package, Loader2, User, Calendar, CheckCircle, Clock, AlertCircle, Download, Users, RefreshCw, XCircle, CheckCircle2, DollarSign, Building2, Send, Reply, X, Percent } from "lucide-react";
 import { getDisplayStatus, getStatusInfo } from "@/lib/statusUtils";
 import { Link } from "wouter";
 import { format } from "date-fns";
@@ -576,10 +576,22 @@ export default function BundleRequestDetail() {
                   {bundle.name}
                 </h1>
                 {(currentUser?.role === "admin" || currentUser?.role === "client") && bundle.finalPrice && (
-                  <Badge variant="outline" className="text-sm bg-green-50 text-green-700 border-green-200" data-testid="text-bundle-price">
-                    <DollarSign className="h-3 w-3 mr-0.5" />
-                    {bundle.finalPrice}
-                  </Badge>
+                  <>
+                    <Badge variant="outline" className="text-sm bg-green-50 text-green-700 border-green-200" data-testid="text-bundle-price">
+                      <DollarSign className="h-3 w-3 mr-0.5" />
+                      {bundle.finalPrice}
+                    </Badge>
+                    {request.discountCouponId && (
+                      <Badge 
+                        variant="secondary" 
+                        className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                        data-testid="badge-discount-applied"
+                      >
+                        <Percent className="h-3 w-3 mr-1" />
+                        Discount
+                      </Badge>
+                    )}
+                  </>
                 )}
                 <Badge variant="outline" className="text-sm" data-testid="text-job-id">
                   B-{request.id.slice(0, 5).toUpperCase()}
