@@ -874,6 +874,88 @@ export default function VendorPaymentsReport() {
                             </Table>
                           </div>
                         )}
+
+                        {/* Vendor: Individual Jobs (read-only, no checkboxes) */}
+                        {vendor.jobs.length > 0 && (
+                          <div className="mt-4 pt-4 border-t">
+                            <h4 className="text-sm font-medium text-dark-gray mb-3">Individual Jobs</h4>
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Job ID</TableHead>
+                                  <TableHead>Type</TableHead>
+                                  <TableHead>Service/Bundle</TableHead>
+                                  <TableHead>Delivered</TableHead>
+                                  <TableHead>Price</TableHead>
+                                  <TableHead>Status</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {vendor.jobs.map((job) => (
+                                  <TableRow
+                                    key={job.id}
+                                    data-testid={`row-vendor-job-${job.id}`}
+                                  >
+                                    <TableCell className="font-medium">
+                                      <Link
+                                        href={
+                                          job.type === "adhoc"
+                                            ? `/jobs/${job.id}`
+                                            : `/bundle-jobs/${job.id}`
+                                        }
+                                      >
+                                        <span className="text-sky-blue-accent hover:underline cursor-pointer">
+                                          {job.type === "adhoc" ? "A" : "B"}-
+                                          {job.id.slice(0, 5).toUpperCase()}
+                                        </span>
+                                      </Link>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant="outline" className="text-xs">
+                                        {job.type === "adhoc"
+                                          ? "Ad-hoc"
+                                          : "Bundle"}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell>{job.serviceName}</TableCell>
+                                    <TableCell className="whitespace-nowrap">
+                                      {job.deliveredAt
+                                        ? format(
+                                            new Date(job.deliveredAt),
+                                            "MMM dd, yyyy"
+                                          )
+                                        : "-"}
+                                    </TableCell>
+                                    <TableCell className="font-medium">
+                                      ${job.vendorCost.toFixed(2)}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge
+                                        className={
+                                          job.paymentStatus === "paid"
+                                            ? "bg-green-100 text-green-700"
+                                            : "bg-yellow-100 text-yellow-700"
+                                        }
+                                      >
+                                        {job.paymentStatus === "paid" ? (
+                                          <>
+                                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                                            Paid
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Clock className="h-3 w-3 mr-1" />
+                                            Pending
+                                          </>
+                                        )}
+                                      </Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
                       </div>
                     ))
                   )}
