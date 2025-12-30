@@ -5807,13 +5807,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Build vendor cost lookup from vendor profiles pricing agreements
-      // Priority: 1) Pricing agreement (by service title), 2) Request's vendorCost field
-      const getVendorServiceCost = (vendorUserId: string, serviceId: string, serviceName: string, requestVendorCost?: string | null): number => {
+      // Priority: 1) Quantity-based pricing (for services like Store Creation), 2) Base pricing agreement, 3) Request's vendorCost field
+      const getVendorServiceCost = (
+        vendorUserId: string, 
+        serviceId: string, 
+        serviceName: string, 
+        requestVendorCost?: string | null,
+        formData?: Record<string, any> | null,
+        pricingStructure?: string
+      ): number => {
         // First check pricing agreements (keyed by service title, not ID)
         const vendorProfile = vendorProfileMap[vendorUserId];
         if (vendorProfile?.pricingAgreements) {
-          const agreements = vendorProfile.pricingAgreements as Record<string, { basePrice?: number | string; cost?: number | string }>;
+          const agreements = vendorProfile.pricingAgreements as Record<string, { 
+            basePrice?: number | string; 
+            cost?: number | string;
+            quantity?: Record<string, number | string>;
+          }>;
           const agreement = agreements[serviceName];
+          
+          // Check for quantity-based pricing (e.g., Store Creation)
+          if (agreement?.quantity && formData) {
+            const productCount = parseInt(formData?.amount_of_products || formData?.amountOfProducts || "0");
+            if (productCount > 0) {
+              // Find the matching tier based on product count
+              // Tier labels are like: "1-50", "51-75", "76-100", ">100"
+              let matchedPricePerItem: number | null = null;
+              
+              for (const [tierLabel, pricePerItem] of Object.entries(agreement.quantity)) {
+                const price = typeof pricePerItem === 'string' ? parseFloat(pricePerItem) : pricePerItem;
+                if (isNaN(price)) continue;
+                
+                // Parse tier label to extract min/max range
+                if (tierLabel.startsWith(">") || tierLabel.startsWith("≥")) {
+                  // Format: ">100" or "≥100" - anything above this number
+                  const minVal = parseInt(tierLabel.replace(/[>≥\s]/g, ""));
+                  if (!isNaN(minVal) && productCount >= minVal) {
+                    matchedPricePerItem = price;
+                    break;
+                  }
+                } else if (tierLabel.includes("-")) {
+                  // Format: "1-50", "51-75", etc.
+                  const [minStr, maxStr] = tierLabel.split("-");
+                  const minVal = parseInt(minStr);
+                  const maxVal = parseInt(maxStr);
+                  if (!isNaN(minVal) && !isNaN(maxVal) && productCount >= minVal && productCount <= maxVal) {
+                    matchedPricePerItem = price;
+                    break;
+                  }
+                }
+              }
+              
+              if (matchedPricePerItem !== null) {
+                // Calculate total cost: quantity × price per item
+                return Number((productCount * matchedPricePerItem).toFixed(2));
+              }
+            }
+          }
+          
           // Check basePrice first (primary field), then legacy cost field
           if (agreement?.basePrice !== undefined && agreement.basePrice !== null) {
             const val = typeof agreement.basePrice === 'string' ? parseFloat(agreement.basePrice) : agreement.basePrice;
@@ -5899,7 +5950,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const service = serviceMap[r.serviceId];
         const serviceName = service?.title || "Unknown Service";
-        const unitCost = getVendorServiceCost(vendorUserId, r.serviceId, serviceName, r.vendorCost);
+        const unitCost = getVendorServiceCost(
+          vendorUserId, 
+          r.serviceId, 
+          serviceName, 
+          r.vendorCost,
+          r.formData as Record<string, any> | null,
+          service?.pricingStructure
+        );
 
         vendorSummaries[vendorUserId].adhocJobs.count++;
         vendorSummaries[vendorUserId].adhocJobs.totalCost += unitCost;
@@ -6131,10 +6189,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filteredBundleRequests = filteredBundleRequests.filter(r => r.vendorAssigneeId === vendorId);
       }
 
+      // Helper for quantity-based cost calculation (same logic as main report)
+      const calculateServiceCost = (
+        vendorUserId: string, 
+        serviceName: string, 
+        requestVendorCost?: string | null,
+        formData?: Record<string, any> | null
+      ): number => {
+        const vendorProfile = vendorProfileMap[vendorUserId];
+        if (vendorProfile?.pricingAgreements) {
+          const agreements = vendorProfile.pricingAgreements as Record<string, { 
+            basePrice?: number | string; 
+            cost?: number | string;
+            quantity?: Record<string, number | string>;
+          }>;
+          const agreement = agreements[serviceName];
+          
+          // Check for quantity-based pricing
+          if (agreement?.quantity && formData) {
+            const productCount = parseInt(formData?.amount_of_products || formData?.amountOfProducts || "0");
+            if (productCount > 0) {
+              for (const [tierLabel, pricePerItem] of Object.entries(agreement.quantity)) {
+                const price = typeof pricePerItem === 'string' ? parseFloat(pricePerItem) : pricePerItem;
+                if (isNaN(price)) continue;
+                
+                if (tierLabel.startsWith(">") || tierLabel.startsWith("≥")) {
+                  const minVal = parseInt(tierLabel.replace(/[>≥\s]/g, ""));
+                  if (!isNaN(minVal) && productCount >= minVal) {
+                    return Number((productCount * price).toFixed(2));
+                  }
+                } else if (tierLabel.includes("-")) {
+                  const [minStr, maxStr] = tierLabel.split("-");
+                  const minVal = parseInt(minStr);
+                  const maxVal = parseInt(maxStr);
+                  if (!isNaN(minVal) && !isNaN(maxVal) && productCount >= minVal && productCount <= maxVal) {
+                    return Number((productCount * price).toFixed(2));
+                  }
+                }
+              }
+            }
+          }
+          
+          if (agreement?.basePrice !== undefined && agreement.basePrice !== null) {
+            const val = typeof agreement.basePrice === 'string' ? parseFloat(agreement.basePrice) : agreement.basePrice;
+            if (!isNaN(val)) return val;
+          }
+          if (agreement?.cost !== undefined && agreement.cost !== null) {
+            const val = typeof agreement.cost === 'string' ? parseFloat(agreement.cost) : agreement.cost;
+            if (!isNaN(val)) return val;
+          }
+        }
+        if (requestVendorCost) {
+          return parseFloat(requestVendorCost);
+        }
+        return 0;
+      };
+
       const jobs = [
         ...filteredServiceRequests.map(r => {
           const service = serviceMap[r.serviceId];
           const vendorProfile = r.vendorAssigneeId ? vendorProfileMap[r.vendorAssigneeId] : null;
+          const calculatedCost = r.vendorAssigneeId 
+            ? calculateServiceCost(
+                r.vendorAssigneeId, 
+                service?.title || "Unknown Service",
+                r.vendorCost,
+                r.formData as Record<string, any> | null
+              )
+            : (r.vendorCost ? parseFloat(r.vendorCost) : 0);
           return {
             id: r.id,
             jobId: `A-${r.id.slice(0, 5).toUpperCase()}`,
@@ -6143,7 +6265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             vendorName: vendorProfile?.companyName || (r.vendorAssigneeId ? userMap[r.vendorAssigneeId]?.username : null) || "Unknown",
             customerName: r.customerName,
             deliveredAt: r.deliveredAt,
-            vendorCost: r.vendorCost ? parseFloat(r.vendorCost) : 0,
+            vendorCost: calculatedCost,
             paymentStatus: r.vendorPaymentStatus || "pending",
           };
         }),
