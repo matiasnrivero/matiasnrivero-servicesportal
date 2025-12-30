@@ -613,32 +613,10 @@ export default function VendorPaymentsReport() {
                           </AccordionTrigger>
                           <AccordionContent>
                             <div className="pt-4">
-                              <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div className="p-3 bg-muted rounded-md">
-                                  <p className="text-sm text-dark-gray mb-1">
-                                    Ad-hoc Jobs
-                                  </p>
-                                  <p className="font-semibold">
-                                    {vendor.adhocJobs.count} jobs - $
-                                    {vendor.adhocJobs.totalCost.toFixed(2)}
-                                  </p>
-                                </div>
-                                <div className="p-3 bg-muted rounded-md">
-                                  <p className="text-sm text-dark-gray mb-1">
-                                    Bundle Jobs
-                                  </p>
-                                  <p className="font-semibold">
-                                    {vendor.bundleJobs.count} jobs - $
-                                    {vendor.bundleJobs.totalCost.toFixed(2)}
-                                  </p>
-                                </div>
-                              </div>
-
                               {/* Grouped Service Breakdown Table */}
                               {(Object.keys(vendor.adhocJobs.services).length > 0 || 
                                 Object.keys(vendor.bundleJobs.bundles).length > 0) && (
                                 <div className="mb-6">
-                                  <h4 className="text-sm font-medium text-dark-gray mb-2">Service Breakdown</h4>
                                   <Table>
                                     <TableHeader>
                                       <TableRow>
@@ -798,7 +776,6 @@ export default function VendorPaymentsReport() {
                         {(Object.keys(vendor.adhocJobs.services).length > 0 || 
                           Object.keys(vendor.bundleJobs.bundles).length > 0) && (
                           <div className="mb-6">
-                            <h4 className="text-sm font-medium text-dark-gray mb-2">Service Breakdown</h4>
                             <Table>
                               <TableHeader>
                                 <TableRow>
