@@ -372,6 +372,8 @@ export default function JobDetailView() {
   // Use role-based filtered assignable users from backend
   const designers = assignableUsers;
   const isAssignee = currentUser?.userId === request?.assigneeId;
+  const isVendorAssignee = currentUser?.userId === request?.vendorAssigneeId;
+  const canDeliver = isAssignee || isVendorAssignee || currentUser?.role === "admin";
 
   const handleDeliver = () => {
     // Check if Final Store URL is required but not filled
@@ -901,7 +903,7 @@ export default function JobDetailView() {
               </>
             )}
 
-            {request.status === "in-progress" && (isAssignee || currentUser?.role === "admin") && (
+            {request.status === "in-progress" && canDeliver && (
               <>
                 <Button 
                   variant="outline" 
@@ -932,7 +934,7 @@ export default function JobDetailView() {
               </Button>
             )}
 
-            {request.status === "change-request" && (isAssignee || currentUser?.role === "admin") && (
+            {request.status === "change-request" && canDeliver && (
               <>
                 <Button 
                   variant="outline" 
