@@ -7,6 +7,10 @@ import { z } from "zod";
 export const userRoles = ["admin", "internal_designer", "vendor", "vendor_designer", "client"] as const;
 export type UserRole = typeof userRoles[number];
 
+// Vendor payment statuses for jobs
+export const vendorPaymentStatuses = ["pending", "paid"] as const;
+export type VendorPaymentStatus = typeof vendorPaymentStatuses[number];
+
 // Client payment methods
 export const paymentMethods = ["pay_as_you_go", "monthly_payment", "deduct_from_royalties"] as const;
 export type PaymentMethod = typeof paymentMethods[number];
@@ -138,6 +142,12 @@ export const serviceRequests = pgTable("service_requests", {
   lastAutomationRunAt: timestamp("last_automation_run_at"),
   lastAutomationNote: text("last_automation_note"),
   lockedAssignment: boolean("locked_assignment").notNull().default(false),
+  // Vendor payment tracking
+  vendorPaymentStatus: text("vendor_payment_status").default("pending"),
+  vendorPaymentPeriod: text("vendor_payment_period"), // Format: YYYY-MM
+  vendorPaymentMarkedAt: timestamp("vendor_payment_marked_at"),
+  vendorPaymentMarkedBy: varchar("vendor_payment_marked_by").references(() => users.id),
+  vendorCost: decimal("vendor_cost", { precision: 10, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -398,6 +408,12 @@ export const bundleRequests = pgTable("bundle_requests", {
   deliveredAt: timestamp("delivered_at"),
   deliveredBy: varchar("delivered_by").references(() => users.id),
   changeRequestNote: text("change_request_note"),
+  // Vendor payment tracking
+  vendorPaymentStatus: text("vendor_payment_status").default("pending"),
+  vendorPaymentPeriod: text("vendor_payment_period"), // Format: YYYY-MM
+  vendorPaymentMarkedAt: timestamp("vendor_payment_marked_at"),
+  vendorPaymentMarkedBy: varchar("vendor_payment_marked_by").references(() => users.id),
+  vendorCost: decimal("vendor_cost", { precision: 10, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

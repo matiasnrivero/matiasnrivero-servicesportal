@@ -29,6 +29,14 @@ const reportCards: ReportCard[] = [
     roles: ["admin"],
   },
   {
+    id: "vendor-payments",
+    title: "Vendor Payments",
+    description: "Manage vendor payment periods and mark jobs as paid",
+    icon: Receipt,
+    path: "/reports/vendor-payments",
+    roles: ["admin", "vendor"],
+  },
+  {
     id: "stripe-billing",
     title: "Stripe Billing",
     description: "View your billing history and payment details from Stripe",

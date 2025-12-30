@@ -5688,6 +5688,427 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== VENDOR PAYMENT REPORT ROUTES ====================
+
+  // Get vendor payment report data
+  app.get("/api/reports/vendor-payments", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(403).json({ error: "User not found" });
+      }
+
+      // Only admin and vendor can access
+      if (!["admin", "vendor"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { period, vendorId } = req.query;
+      const paymentPeriod = period as string || new Date().toISOString().slice(0, 7); // Default to current month YYYY-MM
+
+      const allServiceRequests = await storage.getAllServiceRequests();
+      const allBundleRequests = await storage.getAllBundleRequests();
+      const allUsers = await storage.getAllUsers();
+      const allServices = await storage.getAllServices();
+      const allBundles = await storage.getAllBundles();
+      const vendorProfiles = await storage.getAllVendorProfiles();
+      const vendorBundleCosts = await storage.getAllVendorBundleCosts();
+
+      const userMap: Record<string, typeof allUsers[0]> = {};
+      allUsers.forEach(u => { userMap[u.id] = u; });
+      const serviceMap: Record<string, typeof allServices[0]> = {};
+      allServices.forEach(s => { serviceMap[s.id] = s; });
+      const bundleMap: Record<string, typeof allBundles[0]> = {};
+      allBundles.forEach(b => { bundleMap[b.id] = b; });
+      const vendorProfileMap: Record<string, typeof vendorProfiles[0]> = {};
+      vendorProfiles.forEach(v => { vendorProfileMap[v.userId] = v; });
+
+      // Filter service requests:
+      // 1. Must be delivered or completed
+      // 2. Assignee must NOT be admin or internal_designer (these are $0 cost)
+      // 3. Match payment period (use vendorPaymentPeriod if set, else deliveredAt)
+      // 4. If vendor is viewing, only their jobs
+      let filteredServiceRequests = allServiceRequests.filter(r => {
+        // Must be delivered
+        if (!["delivered"].includes(r.status) || !r.deliveredAt) return false;
+        
+        // Determine job period: use vendorPaymentPeriod if set, else deliveredAt
+        const jobPeriod = r.vendorPaymentPeriod || new Date(r.deliveredAt).toISOString().slice(0, 7);
+        if (jobPeriod !== paymentPeriod) return false;
+
+        // Exclude if assignee is admin or internal_designer
+        if (r.assigneeId) {
+          const assignee = userMap[r.assigneeId];
+          if (assignee && ["admin", "internal_designer"].includes(assignee.role)) return false;
+        }
+
+        return true;
+      });
+
+      let filteredBundleRequests = allBundleRequests.filter(r => {
+        if (!["delivered"].includes(r.status) || !r.deliveredAt) return false;
+        
+        // Determine job period: use vendorPaymentPeriod if set, else deliveredAt
+        const jobPeriod = r.vendorPaymentPeriod || new Date(r.deliveredAt).toISOString().slice(0, 7);
+        if (jobPeriod !== paymentPeriod) return false;
+
+        if (r.assigneeId) {
+          const assignee = userMap[r.assigneeId];
+          if (assignee && ["admin", "internal_designer"].includes(assignee.role)) return false;
+        }
+
+        return true;
+      });
+
+      // If vendor is viewing, filter to only their jobs
+      if (sessionUser.role === "vendor") {
+        const vendorUserId = sessionUser.id;
+        filteredServiceRequests = filteredServiceRequests.filter(r => r.vendorAssigneeId === vendorUserId);
+        filteredBundleRequests = filteredBundleRequests.filter(r => r.vendorAssigneeId === vendorUserId);
+      } else if (vendorId) {
+        // Admin can filter by specific vendor
+        filteredServiceRequests = filteredServiceRequests.filter(r => r.vendorAssigneeId === vendorId);
+        filteredBundleRequests = filteredBundleRequests.filter(r => r.vendorAssigneeId === vendorId);
+      }
+
+      // Build vendor cost lookup from vendor profiles pricing agreements
+      const getVendorServiceCost = (vendorUserId: string, serviceId: string): number => {
+        const vendorProfile = vendorProfileMap[vendorUserId];
+        if (vendorProfile?.pricingAgreements) {
+          const agreements = vendorProfile.pricingAgreements as Record<string, { cost: string }>;
+          if (agreements[serviceId]?.cost) {
+            return parseFloat(agreements[serviceId].cost);
+          }
+        }
+        // Fall back to stored vendorCost on the request if available
+        return 0;
+      };
+
+      const getVendorBundleCost = (vendorUserId: string, bundleId: string): number => {
+        const cost = vendorBundleCosts.find(c => c.vendorId === vendorUserId && c.bundleId === bundleId);
+        if (cost) return parseFloat(cost.cost);
+        return 0;
+      };
+
+      // Group by vendor
+      const vendorSummaries: Record<string, {
+        vendorId: string;
+        vendorName: string;
+        adhocJobs: { count: number; totalCost: number; services: Record<string, { count: number; unitCost: number; totalCost: number }> };
+        bundleJobs: { count: number; totalCost: number; bundles: Record<string, { count: number; unitCost: number; totalCost: number }> };
+        totalEarnings: number;
+        pendingCount: number;
+        paidCount: number;
+        jobs: Array<{
+          id: string;
+          type: "adhoc" | "bundle";
+          serviceName: string;
+          vendorCost: number;
+          paymentStatus: string;
+          deliveredAt: Date | null;
+          customerName: string | null;
+        }>;
+      }> = {};
+
+      // Process service requests (ad-hoc)
+      for (const r of filteredServiceRequests) {
+        const vendorUserId = r.vendorAssigneeId;
+        if (!vendorUserId) continue;
+
+        const vendorProfile = vendorProfileMap[vendorUserId];
+        const vendorName = vendorProfile?.companyName || userMap[vendorUserId]?.username || "Unknown Vendor";
+
+        if (!vendorSummaries[vendorUserId]) {
+          vendorSummaries[vendorUserId] = {
+            vendorId: vendorUserId,
+            vendorName,
+            adhocJobs: { count: 0, totalCost: 0, services: {} },
+            bundleJobs: { count: 0, totalCost: 0, bundles: {} },
+            totalEarnings: 0,
+            pendingCount: 0,
+            paidCount: 0,
+            jobs: [],
+          };
+        }
+
+        const service = serviceMap[r.serviceId];
+        const serviceName = service?.title || "Unknown Service";
+        const unitCost = r.vendorCost ? parseFloat(r.vendorCost) : getVendorServiceCost(vendorUserId, r.serviceId);
+
+        vendorSummaries[vendorUserId].adhocJobs.count++;
+        vendorSummaries[vendorUserId].adhocJobs.totalCost += unitCost;
+
+        if (!vendorSummaries[vendorUserId].adhocJobs.services[serviceName]) {
+          vendorSummaries[vendorUserId].adhocJobs.services[serviceName] = { count: 0, unitCost, totalCost: 0 };
+        }
+        vendorSummaries[vendorUserId].adhocJobs.services[serviceName].count++;
+        vendorSummaries[vendorUserId].adhocJobs.services[serviceName].totalCost += unitCost;
+
+        vendorSummaries[vendorUserId].totalEarnings += unitCost;
+
+        if (r.vendorPaymentStatus === "paid") {
+          vendorSummaries[vendorUserId].paidCount++;
+        } else {
+          vendorSummaries[vendorUserId].pendingCount++;
+        }
+
+        vendorSummaries[vendorUserId].jobs.push({
+          id: r.id,
+          type: "adhoc",
+          serviceName,
+          vendorCost: unitCost,
+          paymentStatus: r.vendorPaymentStatus || "pending",
+          deliveredAt: r.deliveredAt,
+          customerName: r.customerName,
+        });
+      }
+
+      // Process bundle requests
+      for (const r of filteredBundleRequests) {
+        const vendorUserId = r.vendorAssigneeId;
+        if (!vendorUserId) continue;
+
+        const vendorProfile = vendorProfileMap[vendorUserId];
+        const vendorName = vendorProfile?.companyName || userMap[vendorUserId]?.username || "Unknown Vendor";
+
+        if (!vendorSummaries[vendorUserId]) {
+          vendorSummaries[vendorUserId] = {
+            vendorId: vendorUserId,
+            vendorName,
+            adhocJobs: { count: 0, totalCost: 0, services: {} },
+            bundleJobs: { count: 0, totalCost: 0, bundles: {} },
+            totalEarnings: 0,
+            pendingCount: 0,
+            paidCount: 0,
+            jobs: [],
+          };
+        }
+
+        const bundle = bundleMap[r.bundleId];
+        const bundleName = bundle?.name || "Unknown Bundle";
+        const unitCost = r.vendorCost ? parseFloat(r.vendorCost) : getVendorBundleCost(vendorUserId, r.bundleId);
+
+        vendorSummaries[vendorUserId].bundleJobs.count++;
+        vendorSummaries[vendorUserId].bundleJobs.totalCost += unitCost;
+
+        if (!vendorSummaries[vendorUserId].bundleJobs.bundles[bundleName]) {
+          vendorSummaries[vendorUserId].bundleJobs.bundles[bundleName] = { count: 0, unitCost, totalCost: 0 };
+        }
+        vendorSummaries[vendorUserId].bundleJobs.bundles[bundleName].count++;
+        vendorSummaries[vendorUserId].bundleJobs.bundles[bundleName].totalCost += unitCost;
+
+        vendorSummaries[vendorUserId].totalEarnings += unitCost;
+
+        if (r.vendorPaymentStatus === "paid") {
+          vendorSummaries[vendorUserId].paidCount++;
+        } else {
+          vendorSummaries[vendorUserId].pendingCount++;
+        }
+
+        vendorSummaries[vendorUserId].jobs.push({
+          id: r.id,
+          type: "bundle",
+          serviceName: bundleName,
+          vendorCost: unitCost,
+          paymentStatus: r.vendorPaymentStatus || "pending",
+          deliveredAt: r.deliveredAt,
+          customerName: null,
+        });
+      }
+
+      res.json({
+        period: paymentPeriod,
+        vendors: Object.values(vendorSummaries),
+      });
+    } catch (error) {
+      console.error("Error fetching vendor payment report:", error);
+      res.status(500).json({ error: "Failed to fetch vendor payment report" });
+    }
+  });
+
+  // Mark jobs as paid
+  app.post("/api/reports/vendor-payments/mark-paid", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { jobIds, period } = req.body;
+      if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
+        return res.status(400).json({ error: "jobIds array required" });
+      }
+
+      const now = new Date();
+      const paymentPeriod = period || now.toISOString().slice(0, 7);
+
+      // Update service requests
+      for (const jobId of jobIds) {
+        // Try service request first
+        const serviceRequest = await storage.getServiceRequest(jobId);
+        if (serviceRequest) {
+          await storage.updateServiceRequest(jobId, {
+            vendorPaymentStatus: "paid",
+            vendorPaymentPeriod: paymentPeriod,
+            vendorPaymentMarkedAt: now,
+            vendorPaymentMarkedBy: sessionUserId,
+          });
+          continue;
+        }
+
+        // Try bundle request
+        const bundleRequest = await storage.getBundleRequest(jobId);
+        if (bundleRequest) {
+          await storage.updateBundleRequest(jobId, {
+            vendorPaymentStatus: "paid",
+            vendorPaymentPeriod: paymentPeriod,
+            vendorPaymentMarkedAt: now,
+            vendorPaymentMarkedBy: sessionUserId,
+          });
+        }
+      }
+
+      res.json({ success: true, markedCount: jobIds.length });
+    } catch (error) {
+      console.error("Error marking jobs as paid:", error);
+      res.status(500).json({ error: "Failed to mark jobs as paid" });
+    }
+  });
+
+  // Get job details for payment period (for PDF/CSV export)
+  app.get("/api/reports/vendor-payments/jobs", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(403).json({ error: "User not found" });
+      }
+
+      if (!["admin", "vendor"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { period, vendorId, status } = req.query;
+      const paymentPeriod = period as string || new Date().toISOString().slice(0, 7);
+
+      const allServiceRequests = await storage.getAllServiceRequests();
+      const allBundleRequests = await storage.getAllBundleRequests();
+      const allUsers = await storage.getAllUsers();
+      const allServices = await storage.getAllServices();
+      const allBundles = await storage.getAllBundles();
+      const vendorProfiles = await storage.getAllVendorProfiles();
+
+      const userMap: Record<string, typeof allUsers[0]> = {};
+      allUsers.forEach(u => { userMap[u.id] = u; });
+      const serviceMap: Record<string, typeof allServices[0]> = {};
+      allServices.forEach(s => { serviceMap[s.id] = s; });
+      const bundleMap: Record<string, typeof allBundles[0]> = {};
+      allBundles.forEach(b => { bundleMap[b.id] = b; });
+      const vendorProfileMap: Record<string, typeof vendorProfiles[0]> = {};
+      vendorProfiles.forEach(v => { vendorProfileMap[v.userId] = v; });
+
+      // Filter service requests - use vendorPaymentPeriod if set, else deliveredAt
+      let filteredServiceRequests = allServiceRequests.filter(r => {
+        if (!["delivered"].includes(r.status) || !r.deliveredAt) return false;
+        
+        // Determine job period: use vendorPaymentPeriod if set, else deliveredAt
+        const jobPeriod = r.vendorPaymentPeriod || new Date(r.deliveredAt).toISOString().slice(0, 7);
+        if (jobPeriod !== paymentPeriod) return false;
+
+        if (r.assigneeId) {
+          const assignee = userMap[r.assigneeId];
+          if (assignee && ["admin", "internal_designer"].includes(assignee.role)) return false;
+        }
+
+        if (status && r.vendorPaymentStatus !== status) return false;
+
+        return true;
+      });
+
+      let filteredBundleRequests = allBundleRequests.filter(r => {
+        if (!["delivered"].includes(r.status) || !r.deliveredAt) return false;
+        
+        // Determine job period: use vendorPaymentPeriod if set, else deliveredAt
+        const jobPeriod = r.vendorPaymentPeriod || new Date(r.deliveredAt).toISOString().slice(0, 7);
+        if (jobPeriod !== paymentPeriod) return false;
+
+        if (r.assigneeId) {
+          const assignee = userMap[r.assigneeId];
+          if (assignee && ["admin", "internal_designer"].includes(assignee.role)) return false;
+        }
+
+        if (status && r.vendorPaymentStatus !== status) return false;
+
+        return true;
+      });
+
+      // Filter by vendor
+      if (sessionUser.role === "vendor") {
+        filteredServiceRequests = filteredServiceRequests.filter(r => r.vendorAssigneeId === sessionUser.id);
+        filteredBundleRequests = filteredBundleRequests.filter(r => r.vendorAssigneeId === sessionUser.id);
+      } else if (vendorId) {
+        filteredServiceRequests = filteredServiceRequests.filter(r => r.vendorAssigneeId === vendorId);
+        filteredBundleRequests = filteredBundleRequests.filter(r => r.vendorAssigneeId === vendorId);
+      }
+
+      const jobs = [
+        ...filteredServiceRequests.map(r => {
+          const service = serviceMap[r.serviceId];
+          const vendorProfile = r.vendorAssigneeId ? vendorProfileMap[r.vendorAssigneeId] : null;
+          return {
+            id: r.id,
+            jobId: `A-${r.id.slice(0, 5).toUpperCase()}`,
+            type: "Ad-hoc" as const,
+            serviceName: service?.title || "Unknown Service",
+            vendorName: vendorProfile?.companyName || (r.vendorAssigneeId ? userMap[r.vendorAssigneeId]?.username : null) || "Unknown",
+            customerName: r.customerName,
+            deliveredAt: r.deliveredAt,
+            vendorCost: r.vendorCost ? parseFloat(r.vendorCost) : 0,
+            paymentStatus: r.vendorPaymentStatus || "pending",
+          };
+        }),
+        ...filteredBundleRequests.map(r => {
+          const bundle = bundleMap[r.bundleId];
+          const vendorProfile = r.vendorAssigneeId ? vendorProfileMap[r.vendorAssigneeId] : null;
+          return {
+            id: r.id,
+            jobId: `B-${r.id.slice(0, 5).toUpperCase()}`,
+            type: "Bundle" as const,
+            serviceName: bundle?.name || "Unknown Bundle",
+            vendorName: vendorProfile?.companyName || (r.vendorAssigneeId ? userMap[r.vendorAssigneeId]?.username : null) || "Unknown",
+            customerName: null,
+            deliveredAt: r.deliveredAt,
+            vendorCost: r.vendorCost ? parseFloat(r.vendorCost) : 0,
+            paymentStatus: r.vendorPaymentStatus || "pending",
+          };
+        }),
+      ];
+
+      // Sort by delivered date
+      jobs.sort((a, b) => {
+        const dateA = a.deliveredAt ? new Date(a.deliveredAt).getTime() : 0;
+        const dateB = b.deliveredAt ? new Date(b.deliveredAt).getTime() : 0;
+        return dateB - dateA;
+      });
+
+      res.json({ period: paymentPeriod, jobs });
+    } catch (error) {
+      console.error("Error fetching job details:", error);
+      res.status(500).json({ error: "Failed to fetch job details" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
