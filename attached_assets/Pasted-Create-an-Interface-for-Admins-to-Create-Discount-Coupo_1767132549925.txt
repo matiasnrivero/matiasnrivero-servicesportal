@@ -1,0 +1,24 @@
+Create an Interface for Admins to Create "Discount Coupons"
+The Discount Coupon input screen should have:
+Discount Coupon Code Manual Input: like CHRISTMAS2025.
+Random Discount Coupon Code Generation: The user don't enter manual, click a random code generation button. Can Regenerate and never repeat a code. Add Validation to the code to be unique in the database when submitting the code.
+Add An Active/Inactive Checkbox (so user can create Inactive Discount Coupons) and activate them on demand. Or can create them as active too.
+Discount Coupon Type: Amount / Percentage.
+Input field for Amount or Percentage based on the previous selection (Dynamic input).
+Specified Discount Coupon Usage on Specific Service or Bundle. When apply validate Service or Bundle.
+Max Uses: 1 or many (Number input), show default to 1 (editable).
+Client Selector: If empty, any client can use it / If Client Specific, only should work for the defined client.
+Valid Dates: From Date - To Date selector. Add Validation that Discount Coupon cannot be used if is not used on the defined dates.
+
+Create a Discount Coupon List:
+Add all the inputs as columns.
+Add a column to show Discount Coupon Usage (show 0/1 when not used or 1/1 when used for one time discount coupon codes, or the for example if it has 10 usages: 1/10, 2/10 and so on until 10/10.
+Add a column to show Creation Date.
+Add Actions for "View", just the little eye icon, "Edit", just the little pencil icon, and "Delete", just the little red trash can icon.
+
+Extra Notes:
+User the Input Field created under all Services and Bundles called discount_coupon for the General Info Section (both Ad-hoc Services and Bundle Services), so when the Client User is creating a Service Request (Ad-hoc and Bundle) they have on the General Info Section an input to apply the Discount Coupon.
+On the Job Submission, the system has to use the Discount Coupon, Amount or Percentage, and save the Request on the Request list with the discounted price, that it will be less than the service of bundle discount up to 0.
+Add on Admin Request List a badge on the line item called "Code [discount_code]" when a discount coupon is used.
+Add on the Service Detail Page, on the Top bar information the same badge explained before, when a discount coupon is used.
+Consider the Discount coupon on the Profit Report, so we don't show the service full price, but the discounted price.
