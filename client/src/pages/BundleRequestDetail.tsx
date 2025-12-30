@@ -500,7 +500,7 @@ export default function BundleRequestDetail() {
                 <CardTitle className="text-lg">General Info</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
-                {/* System fields: Client Company Name (for admin/internal_designer) and Client Name */}
+                {/* Row 1: Client Company (left), Client (right) */}
                 {["admin", "internal_designer"].includes(currentUser?.role || "") && getClientCompanyName(request?.userId) && (
                   <div className="p-3 bg-blue-lavender/30 rounded-lg">
                     <p className="text-xs text-dark-gray mb-1">Client Company</p>
@@ -515,7 +515,65 @@ export default function BundleRequestDetail() {
                     {requester?.username || "N/A"}
                   </p>
                 </div>
+                
+                {/* Row 2+: Dynamic general_info fields from bundleFields (includes Order/Project Reference, Due Date, Store Replication Template) */}
+                {(() => {
+                  const generalInfoFields = (bundleFields ?? [])
+                    .filter(bf => bf.uiGroup === "general_info" && bf.inputField?.inputFor !== "delivery")
+                    .sort((a, b) => (a.sortOrder ?? 9999) - (b.sortOrder ?? 9999));
+                  
+                  // Check if Due Date is provided via bundle fields with a value
+                  const hasDueDateFieldWithValue = generalInfoFields.some(bf => 
+                    (bf.inputField?.fieldKey?.toLowerCase().includes("due_date") || 
+                     bf.inputField?.label?.toLowerCase().includes("due date")) &&
+                    bf.value !== null && bf.value !== undefined && bf.value !== ""
+                  );
+                  
+                  return (
+                    <>
+                      {generalInfoFields.map((bf) => {
+                        const value = bf.value;
+                        if (value === null || value === undefined || value === "") return null;
+                        
+                        let displayValue: string;
+                        if (typeof value === "boolean") {
+                          displayValue = value ? "Yes" : "No";
+                        } else if (Array.isArray(value)) {
+                          displayValue = value.join(", ");
+                        } else {
+                          displayValue = String(value);
+                        }
+                        
+                        return (
+                          <div key={bf.id} className="p-3 bg-blue-lavender/30 rounded-lg">
+                            <p className="text-xs text-dark-gray mb-1">
+                              {bf.displayLabelOverride || bf.inputField?.label || "Field"}
+                            </p>
+                            <p className="text-sm font-medium text-dark-blue-night" data-testid={`text-bundle-field-${bf.id}`}>
+                              {displayValue}
+                            </p>
+                          </div>
+                        );
+                      })}
+                      
+                      {/* Fallback: Show request.dueDate if no Due Date bundle field with value */}
+                      {!hasDueDateFieldWithValue && request?.dueDate && (() => {
+                        const dueDateObj = new Date(request.dueDate);
+                        if (isNaN(dueDateObj.getTime())) return null;
+                        return (
+                          <div className="p-3 bg-blue-lavender/30 rounded-lg">
+                            <p className="text-xs text-dark-gray mb-1">Due Date</p>
+                            <p className="text-sm font-medium text-dark-blue-night" data-testid="text-due-date">
+                              {format(dueDateObj, "yyyy-MM-dd")}
+                            </p>
+                          </div>
+                        );
+                      })()}
+                    </>
+                  );
+                })()}
 
+                {/* Assignee - shown last for proper ordering */}
                 {canManageJobs && (
                   <div className="p-3 bg-blue-lavender/30 rounded-lg">
                     <p className="text-xs text-dark-gray mb-1">Assignee</p>
@@ -524,49 +582,6 @@ export default function BundleRequestDetail() {
                     </p>
                   </div>
                 )}
-
-                {/* Due Date - static field */}
-                {request?.dueDate && (() => {
-                  const dueDateObj = new Date(request.dueDate);
-                  if (isNaN(dueDateObj.getTime())) return null;
-                  return (
-                    <div className="p-3 bg-blue-lavender/30 rounded-lg">
-                      <p className="text-xs text-dark-gray mb-1">Due Date</p>
-                      <p className="text-sm font-medium text-dark-blue-night" data-testid="text-due-date">
-                        {format(dueDateObj, "yyyy-MM-dd")}
-                      </p>
-                    </div>
-                  );
-                })()}
-                
-                {/* Render dynamic general_info fields from bundleFields */}
-                {(bundleFields ?? [])
-                  .filter(bf => bf.uiGroup === "general_info" && bf.inputField?.inputFor !== "delivery")
-                  .sort((a, b) => (a.sortOrder ?? 9999) - (b.sortOrder ?? 9999))
-                  .map((bf) => {
-                    const value = bf.value;
-                    if (value === null || value === undefined || value === "") return null;
-                    
-                    let displayValue: string;
-                    if (typeof value === "boolean") {
-                      displayValue = value ? "Yes" : "No";
-                    } else if (Array.isArray(value)) {
-                      displayValue = value.join(", ");
-                    } else {
-                      displayValue = String(value);
-                    }
-                    
-                    return (
-                      <div key={bf.id} className="p-3 bg-blue-lavender/30 rounded-lg">
-                        <p className="text-xs text-dark-gray mb-1">
-                          {bf.displayLabelOverride || bf.inputField?.label || "Field"}
-                        </p>
-                        <p className="text-sm font-medium text-dark-blue-night" data-testid={`text-bundle-field-${bf.id}`}>
-                          {displayValue}
-                        </p>
-                      </div>
-                    );
-                  })}
               </CardContent>
             </Card>
 

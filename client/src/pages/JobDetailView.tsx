@@ -963,7 +963,7 @@ export default function JobDetailView() {
                 <CardTitle className="text-lg">General Info</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
-                {/* System fields: Client Company Name (for admin/internal_designer) and Client Name */}
+                {/* Row 1: Client Company (left), Client (right) */}
                 {["admin", "internal_designer"].includes(currentUser?.role || "") && getClientCompanyName(request.userId) && (
                   <div className="p-3 bg-blue-lavender/30 rounded-lg">
                     <p className="text-xs text-dark-gray mb-1">Client Company</p>
@@ -978,17 +978,8 @@ export default function JobDetailView() {
                     {request.customerName || "N/A"}
                   </p>
                 </div>
-
-                {canManageJobs && (
-                  <div className="p-3 bg-blue-lavender/30 rounded-lg">
-                    <p className="text-xs text-dark-gray mb-1">Assignee</p>
-                    <p className="text-sm font-medium text-dark-blue-night" data-testid="text-assignee">
-                      {assignedDesigner?.username || "Unassigned"}
-                    </p>
-                  </div>
-                )}
                 
-                {/* Render dynamic general_info fields from formData */}
+                {/* Row 2+: Dynamic general_info fields from formData (includes Order/Project Reference, Due Date) */}
                 {(() => {
                   const formData = request.formData as Record<string, unknown> | null;
                   if (!formData || serviceFields.length === 0) return null;
@@ -1028,6 +1019,16 @@ export default function JobDetailView() {
                     );
                   });
                 })()}
+
+                {/* Assignee - shown last for proper ordering */}
+                {canManageJobs && (
+                  <div className="p-3 bg-blue-lavender/30 rounded-lg">
+                    <p className="text-xs text-dark-gray mb-1">Assignee</p>
+                    <p className="text-sm font-medium text-dark-blue-night" data-testid="text-assignee">
+                      {assignedDesigner?.username || "Unassigned"}
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
