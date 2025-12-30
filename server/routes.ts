@@ -5776,7 +5776,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Build vendor cost lookup from vendor profiles pricing agreements
-      const getVendorServiceCost = (vendorUserId: string, serviceId: string): number => {
+      // Priority: 1) Pricing agreement, 2) Request's vendorCost field
+      const getVendorServiceCost = (vendorUserId: string, serviceId: string, requestVendorCost?: string | null): number => {
+        // First check pricing agreements
         const vendorProfile = vendorProfileMap[vendorUserId];
         if (vendorProfile?.pricingAgreements) {
           const agreements = vendorProfile.pricingAgreements as Record<string, { cost: string }>;
@@ -5784,13 +5786,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return parseFloat(agreements[serviceId].cost);
           }
         }
-        // Fall back to stored vendorCost on the request if available
+        // Fall back to stored vendorCost on the request
+        if (requestVendorCost) {
+          return parseFloat(requestVendorCost);
+        }
         return 0;
       };
 
-      const getVendorBundleCost = (vendorUserId: string, bundleId: string): number => {
+      const getVendorBundleCost = (vendorUserId: string, bundleId: string, requestVendorCost?: string | null): number => {
+        // First check vendor bundle costs table
         const cost = vendorBundleCosts.find(c => c.vendorId === vendorUserId && c.bundleId === bundleId);
         if (cost) return parseFloat(cost.cost);
+        // Fall back to request's vendorCost
+        if (requestVendorCost) {
+          return parseFloat(requestVendorCost);
+        }
         return 0;
       };
 
@@ -5837,7 +5847,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const service = serviceMap[r.serviceId];
         const serviceName = service?.title || "Unknown Service";
-        const unitCost = r.vendorCost ? parseFloat(r.vendorCost) : getVendorServiceCost(vendorUserId, r.serviceId);
+        const unitCost = getVendorServiceCost(vendorUserId, r.serviceId, r.vendorCost);
 
         vendorSummaries[vendorUserId].adhocJobs.count++;
         vendorSummaries[vendorUserId].adhocJobs.totalCost += unitCost;
@@ -5890,7 +5900,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const bundle = bundleMap[r.bundleId];
         const bundleName = bundle?.name || "Unknown Bundle";
-        const unitCost = r.vendorCost ? parseFloat(r.vendorCost) : getVendorBundleCost(vendorUserId, r.bundleId);
+        const unitCost = getVendorBundleCost(vendorUserId, r.bundleId, r.vendorCost);
 
         vendorSummaries[vendorUserId].bundleJobs.count++;
         vendorSummaries[vendorUserId].bundleJobs.totalCost += unitCost;

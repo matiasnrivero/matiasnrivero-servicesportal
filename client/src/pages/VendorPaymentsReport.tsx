@@ -455,22 +455,24 @@ export default function VendorPaymentsReport() {
           </Card>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-md bg-sky-blue-accent/10">
-                      <Building2 className="h-5 w-5 text-sky-blue-accent" />
+            <div className={`grid grid-cols-1 gap-4 mb-6 ${isAdmin ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
+              {isAdmin && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-md bg-sky-blue-accent/10">
+                        <Building2 className="h-5 w-5 text-sky-blue-accent" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-dark-blue-night">
+                          {reportData?.vendors.length || 0}
+                        </p>
+                        <p className="text-sm text-dark-gray">Vendors</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-2xl font-bold text-dark-blue-night">
-                        {reportData?.vendors.length || 0}
-                      </p>
-                      <p className="text-sm text-dark-gray">Vendors</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )}
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
@@ -627,116 +629,157 @@ export default function VendorPaymentsReport() {
                               </div>
                             </div>
 
-                            {isAdmin && vendor.pendingCount > 0 && (
-                              <div className="mb-4">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleSelectAllPending(vendor.jobs)
-                                  }
-                                  data-testid={`button-select-all-${vendor.vendorId}`}
-                                >
-                                  Select All Pending (
-                                  {vendor.pendingCount})
-                                </Button>
+                            {/* Grouped Service Breakdown Table */}
+                            {(Object.keys(vendor.adhocJobs.services).length > 0 || 
+                              Object.keys(vendor.bundleJobs.bundles).length > 0) && (
+                              <div className="mb-6">
+                                <h4 className="text-sm font-medium text-dark-gray mb-2">Service Breakdown</h4>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Type</TableHead>
+                                      <TableHead>Service/Bundle</TableHead>
+                                      <TableHead className="text-right">Unit Cost</TableHead>
+                                      <TableHead className="text-right">Quantity</TableHead>
+                                      <TableHead className="text-right">Total Cost</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {Object.entries(vendor.adhocJobs.services).map(([serviceName, breakdown]) => (
+                                      <TableRow key={`adhoc-${serviceName}`}>
+                                        <TableCell>
+                                          <Badge variant="outline" className="text-xs">Ad-hoc</Badge>
+                                        </TableCell>
+                                        <TableCell>{serviceName}</TableCell>
+                                        <TableCell className="text-right">${breakdown.unitCost.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">{breakdown.count}</TableCell>
+                                        <TableCell className="text-right font-medium">${breakdown.totalCost.toFixed(2)}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                    {Object.entries(vendor.bundleJobs.bundles).map(([bundleName, breakdown]) => (
+                                      <TableRow key={`bundle-${bundleName}`}>
+                                        <TableCell>
+                                          <Badge variant="outline" className="text-xs">Bundle</Badge>
+                                        </TableCell>
+                                        <TableCell>{bundleName}</TableCell>
+                                        <TableCell className="text-right">${breakdown.unitCost.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">{breakdown.count}</TableCell>
+                                        <TableCell className="text-right font-medium">${breakdown.totalCost.toFixed(2)}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
                               </div>
                             )}
 
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  {isAdmin && (
-                                    <TableHead className="w-[40px]"></TableHead>
-                                  )}
-                                  <TableHead>Job ID</TableHead>
-                                  <TableHead>Type</TableHead>
-                                  <TableHead>Service/Bundle</TableHead>
-                                  <TableHead>Delivered</TableHead>
-                                  <TableHead>Cost</TableHead>
-                                  <TableHead>Status</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {vendor.jobs.map((job) => (
-                                  <TableRow
-                                    key={job.id}
-                                    data-testid={`row-job-${job.id}`}
+                            {/* Admin: Individual Jobs for Mark as Paid */}
+                            {isAdmin && vendor.pendingCount > 0 && (
+                              <div className="mt-4 pt-4 border-t">
+                                <div className="flex items-center justify-between mb-3">
+                                  <h4 className="text-sm font-medium text-dark-gray">Individual Jobs (for payment marking)</h4>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleSelectAllPending(vendor.jobs)
+                                    }
+                                    data-testid={`button-select-all-${vendor.vendorId}`}
                                   >
-                                    {isAdmin && (
-                                      <TableCell>
-                                        {job.paymentStatus === "pending" && (
-                                          <Checkbox
-                                            checked={selectedJobs.has(job.id)}
-                                            onCheckedChange={(checked) =>
-                                              handleJobSelection(
-                                                job.id,
-                                                checked as boolean
-                                              )
+                                    Select All Pending ({vendor.pendingCount})
+                                  </Button>
+                                </div>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead className="w-[40px]"></TableHead>
+                                      <TableHead>Job ID</TableHead>
+                                      <TableHead>Type</TableHead>
+                                      <TableHead>Service/Bundle</TableHead>
+                                      <TableHead>Delivered</TableHead>
+                                      <TableHead>Cost</TableHead>
+                                      <TableHead>Status</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {vendor.jobs.map((job) => (
+                                      <TableRow
+                                        key={job.id}
+                                        data-testid={`row-job-${job.id}`}
+                                      >
+                                        <TableCell>
+                                          {job.paymentStatus === "pending" && (
+                                            <Checkbox
+                                              checked={selectedJobs.has(job.id)}
+                                              onCheckedChange={(checked) =>
+                                                handleJobSelection(
+                                                  job.id,
+                                                  checked as boolean
+                                                )
+                                              }
+                                              data-testid={`checkbox-job-${job.id}`}
+                                            />
+                                          )}
+                                        </TableCell>
+                                        <TableCell className="font-medium">
+                                          <Link
+                                            href={
+                                              job.type === "adhoc"
+                                                ? `/jobs/${job.id}`
+                                                : `/bundle-jobs/${job.id}`
                                             }
-                                            data-testid={`checkbox-job-${job.id}`}
-                                          />
-                                        )}
-                                      </TableCell>
-                                    )}
-                                    <TableCell className="font-medium">
-                                      <Link
-                                        href={
-                                          job.type === "adhoc"
-                                            ? `/jobs/${job.id}`
-                                            : `/bundle-jobs/${job.id}`
-                                        }
-                                      >
-                                        <span className="text-sky-blue-accent hover:underline cursor-pointer">
-                                          {job.type === "adhoc" ? "A" : "B"}-
-                                          {job.id.slice(0, 5).toUpperCase()}
-                                        </span>
-                                      </Link>
-                                    </TableCell>
-                                    <TableCell>
-                                      <Badge variant="outline" className="text-xs">
-                                        {job.type === "adhoc"
-                                          ? "Ad-hoc"
-                                          : "Bundle"}
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell>{job.serviceName}</TableCell>
-                                    <TableCell className="whitespace-nowrap">
-                                      {job.deliveredAt
-                                        ? format(
-                                            new Date(job.deliveredAt),
-                                            "MMM dd, yyyy"
-                                          )
-                                        : "-"}
-                                    </TableCell>
-                                    <TableCell className="font-medium">
-                                      ${job.vendorCost.toFixed(2)}
-                                    </TableCell>
-                                    <TableCell>
-                                      <Badge
-                                        className={
-                                          job.paymentStatus === "paid"
-                                            ? "bg-green-100 text-green-700"
-                                            : "bg-yellow-100 text-yellow-700"
-                                        }
-                                      >
-                                        {job.paymentStatus === "paid" ? (
-                                          <>
-                                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                                            Paid
-                                          </>
-                                        ) : (
-                                          <>
-                                            <Clock className="h-3 w-3 mr-1" />
-                                            Pending
-                                          </>
-                                        )}
-                                      </Badge>
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
+                                          >
+                                            <span className="text-sky-blue-accent hover:underline cursor-pointer">
+                                              {job.type === "adhoc" ? "A" : "B"}-
+                                              {job.id.slice(0, 5).toUpperCase()}
+                                            </span>
+                                          </Link>
+                                        </TableCell>
+                                        <TableCell>
+                                          <Badge variant="outline" className="text-xs">
+                                            {job.type === "adhoc"
+                                              ? "Ad-hoc"
+                                              : "Bundle"}
+                                          </Badge>
+                                        </TableCell>
+                                        <TableCell>{job.serviceName}</TableCell>
+                                        <TableCell className="whitespace-nowrap">
+                                          {job.deliveredAt
+                                            ? format(
+                                                new Date(job.deliveredAt),
+                                                "MMM dd, yyyy"
+                                              )
+                                            : "-"}
+                                        </TableCell>
+                                        <TableCell className="font-medium">
+                                          ${job.vendorCost.toFixed(2)}
+                                        </TableCell>
+                                        <TableCell>
+                                          <Badge
+                                            className={
+                                              job.paymentStatus === "paid"
+                                                ? "bg-green-100 text-green-700"
+                                                : "bg-yellow-100 text-yellow-700"
+                                            }
+                                          >
+                                            {job.paymentStatus === "paid" ? (
+                                              <>
+                                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                                Paid
+                                              </>
+                                            ) : (
+                                              <>
+                                                <Clock className="h-3 w-3 mr-1" />
+                                                Pending
+                                              </>
+                                            )}
+                                          </Badge>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            )}
                           </div>
                         </AccordionContent>
                       </AccordionItem>
