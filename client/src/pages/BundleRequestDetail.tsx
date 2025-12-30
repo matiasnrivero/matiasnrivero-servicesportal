@@ -524,6 +524,20 @@ export default function BundleRequestDetail() {
                     </p>
                   </div>
                 )}
+
+                {/* Due Date - static field */}
+                {request?.dueDate && (() => {
+                  const dueDateObj = new Date(request.dueDate);
+                  if (isNaN(dueDateObj.getTime())) return null;
+                  return (
+                    <div className="p-3 bg-blue-lavender/30 rounded-lg">
+                      <p className="text-xs text-dark-gray mb-1">Due Date</p>
+                      <p className="text-sm font-medium text-dark-blue-night" data-testid="text-due-date">
+                        {format(dueDateObj, "yyyy-MM-dd")}
+                      </p>
+                    </div>
+                  );
+                })()}
                 
                 {/* Render dynamic general_info fields from bundleFields */}
                 {(bundleFields ?? [])

@@ -1145,7 +1145,7 @@ export default function ServiceRequestsList() {
                     <TableHead>Job ID</TableHead>
                     <TableHead>Service</TableHead>
                     <TableHead>Method</TableHead>
-                    <TableHead>{isDistributor(currentUser?.role) ? "User" : "Customer"}</TableHead>
+                    <TableHead>{isDistributor(currentUser?.role) ? "User" : "Company"}</TableHead>
                     <TableHead>Due Date</TableHead>
                     {isDistributor(currentUser?.role) ? (
                       <TableHead>Price</TableHead>
