@@ -453,16 +453,6 @@ export default function VendorPaymentsReport() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={exportToCSV}
-                disabled={!jobsData?.jobs?.length}
-                data-testid="button-export-csv"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                CSV
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
                 onClick={exportToPDF}
                 disabled={!jobsData?.jobs?.length}
                 data-testid="button-export-pdf"
@@ -719,12 +709,12 @@ export default function VendorPaymentsReport() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() =>
-                                      handleSelectAllPending(vendor.jobs)
-                                    }
-                                    data-testid={`button-select-all-${vendor.vendorId}`}
+                                    onClick={exportToCSV}
+                                    disabled={!jobsData?.jobs?.length}
+                                    data-testid="button-export-csv"
                                   >
-                                    Select All Pending ({vendor.pendingCount})
+                                    <Download className="h-4 w-4 mr-2" />
+                                    CSV
                                   </Button>
                                 </div>
                                 <Table>
@@ -901,7 +891,19 @@ export default function VendorPaymentsReport() {
                         {/* Vendor: Individual Jobs (read-only, no checkboxes) */}
                         {vendor.jobs.length > 0 && (
                           <div className="mt-4 pt-4 border-t">
-                            <h4 className="text-sm font-medium text-dark-gray mb-3">Individual Jobs</h4>
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="text-sm font-medium text-dark-gray">Individual Jobs</h4>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={exportToCSV}
+                                disabled={!jobsData?.jobs?.length}
+                                data-testid="button-export-csv-vendor"
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                CSV
+                              </Button>
+                            </div>
                             <Table>
                               <TableHeader>
                                 <TableRow>
