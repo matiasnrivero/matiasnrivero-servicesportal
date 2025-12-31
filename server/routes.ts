@@ -978,6 +978,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const request = await storage.deliverRequest(req.params.id, sessionUserId);
+      
+      // Process payment based on client payment configuration
+      if (request) {
+        try {
+          const { paymentProcessor } = await import("./services/paymentProcessor");
+          const paymentResult = await paymentProcessor.processServiceRequestPayment(request, sessionUserId);
+          if (!paymentResult.success && paymentResult.error) {
+            console.warn("Payment processing warning:", paymentResult.error);
+          }
+        } catch (paymentError) {
+          console.error("Payment processing error (non-blocking):", paymentError);
+        }
+      }
+      
       res.json(request);
     } catch (error) {
       console.error("Error delivering request:", error);
@@ -4011,6 +4025,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { finalStoreUrl } = req.body || {};
       const request = await storage.deliverBundleRequest(req.params.id, sessionUserId, finalStoreUrl);
+      
+      // Process payment based on client payment configuration
+      if (request) {
+        try {
+          const { paymentProcessor } = await import("./services/paymentProcessor");
+          const paymentResult = await paymentProcessor.processBundleRequestPayment(request, sessionUserId);
+          if (!paymentResult.success && paymentResult.error) {
+            console.warn("Payment processing warning:", paymentResult.error);
+          }
+        } catch (paymentError) {
+          console.error("Payment processing error (non-blocking):", paymentError);
+        }
+      }
+      
       res.json(request);
     } catch (error) {
       console.error("Error delivering bundle request:", error);
@@ -6808,6 +6836,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== PHASE 7: STRIPE BILLING ROUTES ====================
+  // Note: Stripe webhook handler is defined in index.ts before express.json() middleware
+  // to ensure raw body parsing for signature verification. Endpoint: /api/stripe/webhook
 
   // Get client payment methods
   app.get("/api/billing/payment-methods", async (req, res) => {

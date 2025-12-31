@@ -13,6 +13,109 @@ declare module 'express-session' {
 }
 
 const app = express();
+
+// Stripe webhook must use raw body for signature verification - register before express.json()
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const { stripeService } = await import("./services/stripeService");
+  const { storage } = await import("./storage");
+  
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    console.error('Stripe webhook secret not configured');
+    return res.status(500).json({ error: 'Webhook secret not configured' });
+  }
+
+  if (!sig) {
+    return res.status(400).json({ error: 'Missing stripe-signature header' });
+  }
+
+  try {
+    const event = await stripeService.verifyWebhookSignature(
+      req.body,
+      sig as string,
+      webhookSecret
+    );
+
+    const existingEvent = await storage.getStripeEvent(event.id);
+    if (existingEvent?.processed) {
+      return res.json({ received: true, message: 'Event already processed' });
+    }
+
+    let stripeEventRecord;
+    if (existingEvent) {
+      stripeEventRecord = existingEvent;
+    } else {
+      stripeEventRecord = await storage.createStripeEvent({
+        stripeEventId: event.id,
+        eventType: event.type,
+        eventData: event.data as any,
+        processed: false,
+      });
+    }
+
+    let processingSuccessful = true;
+    try {
+      switch (event.type) {
+        case 'payment_intent.succeeded': {
+          const paymentIntent = event.data.object as any;
+          const payment = await storage.getPaymentByStripeId(paymentIntent.id);
+          if (payment) {
+            await storage.updatePayment(payment.id, {
+              status: 'succeeded',
+              paidAt: new Date(),
+            });
+          }
+          break;
+        }
+
+        case 'payment_intent.payment_failed': {
+          const paymentIntent = event.data.object as any;
+          const payment = await storage.getPaymentByStripeId(paymentIntent.id);
+          if (payment) {
+            await storage.updatePayment(payment.id, {
+              status: 'failed',
+              failureReason: paymentIntent.last_payment_error?.message || 'Payment failed',
+            });
+          }
+          break;
+        }
+
+        case 'charge.refunded': {
+          const charge = event.data.object as any;
+          const paymentIntent = charge.payment_intent;
+          if (paymentIntent) {
+            const payment = await storage.getPaymentByStripeId(paymentIntent);
+            if (payment) {
+              const refundedAmount = charge.amount_refunded;
+              const isFullRefund = refundedAmount >= payment.amountCents;
+              await storage.updatePayment(payment.id, {
+                status: isFullRefund ? 'refunded' : 'partially_refunded',
+                refundedAt: new Date(),
+                refundedAmount: refundedAmount,
+              });
+            }
+          }
+          break;
+        }
+      }
+    } catch (processingError) {
+      console.error('Error processing webhook event:', processingError);
+      processingSuccessful = false;
+    }
+
+    if (processingSuccessful) {
+      await storage.markStripeEventProcessed(stripeEventRecord.id);
+    }
+
+    res.json({ received: true });
+  } catch (err: any) {
+    console.error('Webhook signature verification failed:', err.message);
+    return res.status(400).json({ error: `Webhook Error: ${err.message}` });
+  }
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

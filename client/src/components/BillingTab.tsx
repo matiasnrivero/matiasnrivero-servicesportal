@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Loader2, CreditCard, Plus, Trash2, Star, CheckCircle2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, CreditCard, Plus, Trash2, Star, CheckCircle2, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { loadStripe } from "@stripe/stripe-js";
@@ -63,8 +64,8 @@ function AddPaymentMethodForm({ clientProfileId, onSuccess, onCancel }: AddPayme
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/billing/client-info"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/billing/payment-methods"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/client-info", clientProfileId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/payment-methods", clientProfileId] });
       toast({
         title: "Success",
         description: "Payment method added successfully",
@@ -260,6 +261,9 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
   const { toast } = useToast();
   const [addCardOpen, setAddCardOpen] = useState(false);
   const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
+  const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [paymentConfig, setPaymentConfig] = useState("pay_as_you_go");
+  const [invoiceDay, setInvoiceDay] = useState<number>(1);
 
   const { data: billingInfo, isLoading } = useQuery<BillingInfo>({
     queryKey: ["/api/billing/client-info", clientProfileId],
@@ -281,6 +285,7 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/billing/client-info", clientProfileId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/payment-methods", clientProfileId] });
       toast({
         title: "Success",
         description: "Default payment method updated",
@@ -302,6 +307,7 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/billing/client-info", clientProfileId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/payment-methods", clientProfileId] });
       toast({
         title: "Success",
         description: "Payment method removed",
@@ -316,6 +322,52 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
       });
     },
   });
+
+  const updateConfigMutation = useMutation({
+    mutationFn: async (data: { paymentConfiguration: string; invoiceDay?: number }) => {
+      if (data.paymentConfiguration === "monthly_payment") {
+        const day = data.invoiceDay ?? 1;
+        if (day < 1 || day > 28) {
+          throw new Error("Invoice day must be between 1 and 28");
+        }
+      }
+      const res = await apiRequest("PATCH", `/api/billing/client-config/${clientProfileId}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/billing/client-info", clientProfileId] });
+      toast({
+        title: "Success",
+        description: "Payment configuration updated",
+      });
+      setConfigDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update payment configuration",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleOpenConfigDialog = () => {
+    if (billingInfo) {
+      setPaymentConfig(billingInfo.paymentConfiguration || "pay_as_you_go");
+      setInvoiceDay(billingInfo.invoiceDay || 1);
+    }
+    setConfigDialogOpen(true);
+  };
+
+  const handleSaveConfig = () => {
+    const data: { paymentConfiguration: string; invoiceDay?: number } = {
+      paymentConfiguration: paymentConfig,
+    };
+    if (paymentConfig === "monthly_payment") {
+      data.invoiceDay = invoiceDay;
+    }
+    updateConfigMutation.mutate(data);
+  };
 
   const getPaymentConfigLabel = (config: string) => {
     switch (config) {
@@ -349,14 +401,22 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard className="h-5 w-5" />
-            Payment Configuration
-          </CardTitle>
-          <CardDescription>
-            Your current billing configuration
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Payment Configuration
+            </CardTitle>
+            <CardDescription>
+              {isAdmin ? "Manage client billing configuration" : "Your current billing configuration"}
+            </CardDescription>
+          </div>
+          {isAdmin && (
+            <Button variant="outline" size="sm" onClick={handleOpenConfigDialog} data-testid="button-edit-payment-config">
+              <Settings className="h-4 w-4 mr-2" />
+              Configure
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -392,6 +452,65 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Configure Payment Settings</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="paymentConfig">Payment Type</Label>
+              <Select value={paymentConfig} onValueChange={setPaymentConfig}>
+                <SelectTrigger data-testid="select-payment-config">
+                  <SelectValue placeholder="Select payment type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pay_as_you_go">Pay as You Go</SelectItem>
+                  <SelectItem value="monthly_payment">Monthly Payment</SelectItem>
+                  <SelectItem value="deduct_from_royalties">Deduct from Royalties</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                {paymentConfig === "pay_as_you_go" && "Client pays immediately upon job completion."}
+                {paymentConfig === "monthly_payment" && "Client is invoiced monthly for all completed jobs."}
+                {paymentConfig === "deduct_from_royalties" && "Job costs are deducted from the client's Tri-POD app royalties."}
+              </p>
+            </div>
+            {paymentConfig === "monthly_payment" && (
+              <div className="space-y-2">
+                <Label htmlFor="invoiceDay">Invoice Day of Month</Label>
+                <Select value={String(invoiceDay)} onValueChange={(v) => setInvoiceDay(parseInt(v))}>
+                  <SelectTrigger data-testid="select-invoice-day">
+                    <SelectValue placeholder="Select day" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 28 }, (_, i) => i + 1).map((day) => (
+                      <SelectItem key={day} value={String(day)}>
+                        {day}{day === 1 ? "st" : day === 2 ? "nd" : day === 3 ? "rd" : "th"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  Invoice will be generated on this day each month.
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfigDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveConfig} disabled={updateConfigMutation.isPending} data-testid="button-save-payment-config">
+              {updateConfigMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Save Configuration
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">

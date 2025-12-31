@@ -644,6 +644,11 @@ export const payments = pgTable("payments", {
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   stripeInvoiceId: text("stripe_invoice_id"),
   stripeRefundId: text("stripe_refund_id"),
+  // Payment timestamps and failure tracking
+  paidAt: timestamp("paid_at"),
+  failureReason: text("failure_reason"),
+  refundedAt: timestamp("refunded_at"),
+  refundedAmount: integer("refunded_amount"), // In cents
   // For deduct_from_royalties tracking
   royaltyDeductionNotes: text("royalty_deduction_notes"),
   // Who marked as paid (for royalty deductions)
