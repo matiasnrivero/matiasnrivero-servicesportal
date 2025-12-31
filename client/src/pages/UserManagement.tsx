@@ -54,7 +54,8 @@ const roleLabels: Record<string, string> = {
   internal_designer: "Internal Designer",
   vendor: "Vendor",
   vendor_designer: "Vendor Designer",
-  client: "Client",
+  client: "Client Admin",
+  client_member: "Client Member",
 };
 
 const roleBadgeVariants: Record<string, "default" | "secondary" | "outline"> = {
@@ -63,6 +64,7 @@ const roleBadgeVariants: Record<string, "default" | "secondary" | "outline"> = {
   vendor: "secondary",
   vendor_designer: "secondary",
   client: "default",
+  client_member: "outline",
 };
 
 const roleBadgeColors: Record<string, string> = {
@@ -71,6 +73,7 @@ const roleBadgeColors: Record<string, string> = {
   vendor: "",
   vendor_designer: "",
   client: "bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700",
+  client_member: "bg-teal-500 text-white hover:bg-teal-600 dark:bg-teal-500 dark:hover:bg-teal-600",
 };
 
 async function getDefaultUser(): Promise<User | null> {
