@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Users, UserPlus, Save, Pencil, Loader2, Crown, Trash2, CreditCard } from "lucide-react";
+import { Building2, Users, UserPlus, Save, Pencil, Loader2, Crown, Trash2 } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -35,7 +35,6 @@ import {
 } from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import type { User, ClientProfile } from "@shared/schema";
-import BillingTab from "@/components/BillingTab";
 
 async function getDefaultUser(): Promise<User | null> {
   const res = await fetch("/api/default-user");
@@ -120,6 +119,9 @@ export default function ClientTeamManagement() {
 
   const inviteTeamMemberMutation = useMutation({
     mutationFn: async (userData: typeof newUser) => {
+      if (currentUser?.role !== "client" || currentUser?.id !== clientProfile?.primaryUserId) {
+        throw new Error("Only client administrators can invite team members");
+      }
       const res = await apiRequest("POST", `/api/client-profiles/${clientProfileId}/invite`, userData);
       return res.json();
     },
@@ -143,6 +145,9 @@ export default function ClientTeamManagement() {
 
   const updateProfileMutation = useMutation({
     mutationFn: async (profileData: typeof companyInfo) => {
+      if (currentUser?.role !== "client" || currentUser?.id !== clientProfile?.primaryUserId) {
+        throw new Error("Only client administrators can update company profile");
+      }
       const res = await apiRequest("PATCH", `/api/client-profiles/${clientProfileId}`, profileData);
       return res.json();
     },
@@ -165,6 +170,9 @@ export default function ClientTeamManagement() {
 
   const toggleUserStatusMutation = useMutation({
     mutationFn: async ({ userId, isActive }: { userId: string; isActive: boolean }) => {
+      if (currentUser?.role !== "client" || currentUser?.id !== clientProfile?.primaryUserId) {
+        throw new Error("Only client administrators can update user status");
+      }
       const res = await apiRequest("PATCH", `/api/users/${userId}`, { isActive });
       return res.json();
     },
@@ -186,6 +194,9 @@ export default function ClientTeamManagement() {
 
   const updateUserMutation = useMutation({
     mutationFn: async (userData: typeof editUserData & { userId: string }) => {
+      if (currentUser?.role !== "client" || currentUser?.id !== clientProfile?.primaryUserId) {
+        throw new Error("Only client administrators can update team members");
+      }
       const { userId, ...data } = userData;
       const res = await apiRequest("PATCH", `/api/users/${userId}`, data);
       return res.json();
@@ -210,6 +221,9 @@ export default function ClientTeamManagement() {
 
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
+      if (currentUser?.role !== "client" || currentUser?.id !== clientProfile?.primaryUserId) {
+        throw new Error("Only client administrators can remove team members");
+      }
       return apiRequest("DELETE", `/api/users/${userId}`);
     },
     onSuccess: () => {
@@ -249,7 +263,12 @@ export default function ClientTeamManagement() {
     );
   }
 
-  if (currentUser?.role !== "client") {
+  const isClientAdmin = currentUser?.role === "client";
+  const isClientMember = currentUser?.role === "client_member";
+  const isAnyClient = isClientAdmin || isClientMember;
+  const canManageTeam = isClientAdmin && isPrimaryClient;
+  
+  if (!isAnyClient) {
     return (
       <div className="min-h-screen flex flex-col bg-gray-50">
         <Header />
@@ -328,7 +347,7 @@ export default function ClientTeamManagement() {
                     </p>
                   </div>
                 </div>
-                {isPrimaryClient && (
+                {canManageTeam && (
                   <Dialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen}>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -412,7 +431,7 @@ export default function ClientTeamManagement() {
                 <Users className="w-5 h-5" />
                 Team Members ({teamMembers.length})
               </CardTitle>
-              {isPrimaryClient && (
+              {canManageTeam && (
                 <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
                   <DialogTrigger asChild>
                     <Button size="sm" data-testid="button-invite-member">
@@ -514,7 +533,7 @@ export default function ClientTeamManagement() {
                         <div className="flex items-center gap-4">
                           <Switch
                             checked={member.isActive ?? true}
-                            disabled={isSelf || !isPrimaryClient}
+                            disabled={isSelf || !canManageTeam}
                             onCheckedChange={(checked) =>
                               toggleUserStatusMutation.mutate({ userId: member.id, isActive: checked })
                             }
@@ -548,7 +567,7 @@ export default function ClientTeamManagement() {
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          {isPrimaryClient && (
+                          {canManageTeam && (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
@@ -563,7 +582,7 @@ export default function ClientTeamManagement() {
                               <TooltipContent>Edit</TooltipContent>
                             </Tooltip>
                           )}
-                          {isPrimaryClient && !isSelf && !isPrimary && (
+                          {canManageTeam && !isSelf && !isPrimary && (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
@@ -589,19 +608,6 @@ export default function ClientTeamManagement() {
               )}
             </CardContent>
           </Card>
-
-          {isPrimaryClient && clientProfileId && (
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <CreditCard className="w-5 h-5" />
-                Billing & Payments
-              </h2>
-              <BillingTab 
-                clientProfileId={clientProfileId} 
-                isPrimaryClient={isPrimaryClient}
-              />
-            </div>
-          )}
 
           <Dialog open={editUserDialogOpen} onOpenChange={setEditUserDialogOpen}>
             <DialogContent>

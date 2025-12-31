@@ -152,6 +152,8 @@ export function Header() {
   const isVendor = currentUser?.role === "vendor";
   const isVendorDesigner = currentUser?.role === "vendor_designer";
   const isClient = currentUser?.role === "client";
+  const isClientMember = currentUser?.role === "client_member";
+  const isAnyClient = isClient || isClientMember;
   const canManageUsers = isAdmin || isInternalDesigner;
   const canViewVendorProfile = isVendor;
   const canViewVendorsList = isAdmin;
@@ -159,6 +161,8 @@ export function Header() {
   const canViewServices = !isVendor && !isVendorDesigner;
   // Reports visible to Admin, Client, Vendor (not Internal Designer or Vendor Designer for now)
   const canViewReports = isAdmin || isClient || isVendor;
+  // Payments visible only to Client Admin (not Client Member)
+  const canViewPayments = isClient;
 
   return (
     <>
@@ -229,7 +233,7 @@ export function Header() {
               </Button>
             </Link>
           )}
-          {isClient && (
+          {isAnyClient && (
             <Link href="/client-team">
               <Button
                 variant={location === "/client-team" ? "default" : "ghost"}
@@ -237,6 +241,17 @@ export function Header() {
                 data-testid="nav-client-team"
               >
                 Team
+              </Button>
+            </Link>
+          )}
+          {canViewPayments && (
+            <Link href="/payments">
+              <Button
+                variant={location === "/payments" ? "default" : "ghost"}
+                className={location === "/payments" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
+                data-testid="nav-payments"
+              >
+                Payments
               </Button>
             </Link>
           )}
@@ -359,6 +374,7 @@ export function Header() {
                 <SelectItem value="vendor">Vendor</SelectItem>
                 <SelectItem value="vendor_designer">Vendor Designer</SelectItem>
                 <SelectItem value="client">Client</SelectItem>
+                <SelectItem value="client_member">Client Member</SelectItem>
               </SelectContent>
             </Select>
           </div>

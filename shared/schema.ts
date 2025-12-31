@@ -3,8 +3,8 @@ import { pgTable, text, varchar, timestamp, decimal, integer, jsonb, boolean, un
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// User roles hierarchy: admin > internal_designer > vendor > vendor_designer > client
-export const userRoles = ["admin", "internal_designer", "vendor", "vendor_designer", "client"] as const;
+// User roles hierarchy: admin > internal_designer > vendor > vendor_designer > client > client_member
+export const userRoles = ["admin", "internal_designer", "vendor", "vendor_designer", "client", "client_member"] as const;
 export type UserRole = typeof userRoles[number];
 
 // Vendor payment statuses for jobs

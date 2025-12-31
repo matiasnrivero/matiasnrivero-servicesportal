@@ -24,6 +24,7 @@ import VendorPaymentsReport from "@/pages/VendorPaymentsReport";
 import VendorDesignerWorkloadReport from "@/pages/VendorDesignerWorkloadReport";
 import ClientTeamManagement from "@/pages/ClientTeamManagement";
 import AdminDashboard from "@/pages/AdminDashboard";
+import Payments from "@/pages/Payments";
 
 function Router() {
   return (
@@ -52,6 +53,7 @@ function Router() {
       <Route path="/reports/vendor-payments" component={VendorPaymentsReport} />
       <Route path="/reports/vendor-designer-workload" component={VendorDesignerWorkloadReport} />
       <Route path="/client-team" component={ClientTeamManagement} />
+      <Route path="/payments" component={Payments} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>
