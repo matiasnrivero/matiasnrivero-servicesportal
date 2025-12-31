@@ -966,10 +966,10 @@ export default function ServiceRequestForm() {
       
       return (
         <div key={field.id} className="space-y-2">
-          <Label htmlFor="coupon">
+          <Label htmlFor="coupon" className="flex items-center gap-1">
             {label}
           </Label>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <div className="flex-1 relative">
               <Input
                 id="coupon"
@@ -1112,7 +1112,7 @@ export default function ServiceRequestForm() {
           {/* Assignee Selector (Admin and Internal Designer only) */}
           {showAssigneeSelector && (
             <div className="space-y-2">
-              <Label htmlFor="assignee">
+              <Label htmlFor="assignee" className="flex items-center gap-1">
                 Assign To
               </Label>
               <Select value={selectedAssignee} onValueChange={setSelectedAssignee}>
