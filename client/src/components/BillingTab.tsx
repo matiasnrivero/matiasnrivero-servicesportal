@@ -217,13 +217,23 @@ function AddPaymentMethodForm({ clientProfileId, onSuccess, onCancel }: AddPayme
             </div>
             <div>
               <Label htmlFor="country">Country</Label>
-              <Input
-                id="country"
+              <Select
                 value={billingAddress.country || "US"}
-                onChange={(e) => setBillingAddress({ ...billingAddress, country: e.target.value })}
-                placeholder="US"
-                data-testid="input-billing-country"
-              />
+                onValueChange={(value) => setBillingAddress({ ...billingAddress, country: value })}
+              >
+                <SelectTrigger data-testid="select-billing-country">
+                  <SelectValue placeholder="Select country" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="US">United States</SelectItem>
+                  <SelectItem value="CA">Canada</SelectItem>
+                  <SelectItem value="GB">United Kingdom</SelectItem>
+                  <SelectItem value="AU">Australia</SelectItem>
+                  <SelectItem value="DE">Germany</SelectItem>
+                  <SelectItem value="FR">France</SelectItem>
+                  <SelectItem value="MX">Mexico</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>
