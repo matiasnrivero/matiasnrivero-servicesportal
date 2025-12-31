@@ -373,8 +373,12 @@ export function Header() {
                 <SelectItem value="internal_designer">Internal Designer</SelectItem>
                 <SelectItem value="vendor">Vendor</SelectItem>
                 <SelectItem value="vendor_designer">Vendor Designer</SelectItem>
-                <SelectItem value="client">Client</SelectItem>
-                <SelectItem value="client_member">Client Member</SelectItem>
+                <SelectItem value="client">Client 1</SelectItem>
+                <SelectItem value="client_member">Client Member 1</SelectItem>
+                <SelectItem value="client_2">Client 2</SelectItem>
+                <SelectItem value="client_member_2">Client Member 2</SelectItem>
+                <SelectItem value="client_3">Client 3</SelectItem>
+                <SelectItem value="client_member_3">Client Member 3</SelectItem>
               </SelectContent>
             </Select>
           </div>
