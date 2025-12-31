@@ -25,6 +25,8 @@ import VendorDesignerWorkloadReport from "@/pages/VendorDesignerWorkloadReport";
 import ClientTeamManagement from "@/pages/ClientTeamManagement";
 import AdminDashboard from "@/pages/AdminDashboard";
 import Payments from "@/pages/Payments";
+import ClientCompaniesList from "@/pages/ClientCompaniesList";
+import ClientCompanyDetail from "@/pages/ClientCompanyDetail";
 
 function Router() {
   return (
@@ -54,6 +56,9 @@ function Router() {
       <Route path="/reports/vendor-designer-workload" component={VendorDesignerWorkloadReport} />
       <Route path="/client-team" component={ClientTeamManagement} />
       <Route path="/payments" component={Payments} />
+      <Route path="/client-companies" component={ClientCompaniesList} />
+      <Route path="/client-companies/:id" component={ClientCompanyDetail} />
+      <Route path="/client-companies/:id/edit" component={ClientCompanyDetail} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>

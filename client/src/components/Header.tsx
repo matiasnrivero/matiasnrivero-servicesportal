@@ -157,6 +157,7 @@ export function Header() {
   const canManageUsers = isAdmin || isInternalDesigner;
   const canViewVendorProfile = isVendor;
   const canViewVendorsList = isAdmin;
+  const canViewClientCompanies = isAdmin;
   // Vendor and Vendor Designer should not see Services menu (they can't create new requests)
   const canViewServices = !isVendor && !isVendorDesigner;
   // Reports visible to Admin, Client, Vendor (not Internal Designer or Vendor Designer for now)
@@ -274,6 +275,17 @@ export function Header() {
                 data-testid="nav-vendors"
               >
                 Vendors
+              </Button>
+            </Link>
+          )}
+          {canViewClientCompanies && (
+            <Link href="/client-companies">
+              <Button
+                variant={location.startsWith("/client-companies") ? "default" : "ghost"}
+                className={location.startsWith("/client-companies") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
+                data-testid="nav-client-companies"
+              >
+                Clients
               </Button>
             </Link>
           )}

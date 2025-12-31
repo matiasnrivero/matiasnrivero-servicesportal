@@ -2560,6 +2560,221 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ======= CLIENT COMPANIES MANAGEMENT (Admin interface) =======
+  
+  // List all client companies with primary user details
+  app.get("/api/client-companies", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Only admins can access client companies" });
+      }
+
+      const profiles = await storage.getAllClientProfiles();
+      
+      // Enrich with primary user details
+      const enrichedProfiles = await Promise.all(
+        profiles.map(async (profile) => {
+          const primaryUser = profile.primaryUserId 
+            ? await storage.getUser(profile.primaryUserId)
+            : null;
+          
+          // Get team count
+          const teamMembers = await storage.getClientTeamMembers(profile.id);
+          
+          return {
+            ...profile,
+            primaryUser: primaryUser ? {
+              id: primaryUser.id,
+              username: primaryUser.username,
+              email: primaryUser.email,
+              isActive: primaryUser.isActive,
+              lastLoginAt: primaryUser.lastLoginAt,
+            } : null,
+            teamCount: teamMembers.length,
+          };
+        })
+      );
+
+      res.json(enrichedProfiles);
+    } catch (error) {
+      console.error("Error fetching client companies:", error);
+      res.status(500).json({ error: "Failed to fetch client companies" });
+    }
+  });
+
+  // Get single client company details (with primary user info)
+  app.get("/api/client-companies/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Only admins can access client companies" });
+      }
+
+      const profile = await storage.getClientProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Client company not found" });
+      }
+
+      // Enrich with primary user details
+      const primaryUser = profile.primaryUserId 
+        ? await storage.getUser(profile.primaryUserId)
+        : null;
+
+      res.json({
+        ...profile,
+        primaryUser: primaryUser ? {
+          id: primaryUser.id,
+          username: primaryUser.username,
+          email: primaryUser.email,
+          isActive: primaryUser.isActive,
+          lastLoginAt: primaryUser.lastLoginAt,
+        } : null,
+      });
+    } catch (error) {
+      console.error("Error fetching client company:", error);
+      res.status(500).json({ error: "Failed to fetch client company" });
+    }
+  });
+
+  // Update client company profile
+  app.patch("/api/client-companies/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Only admins can update client companies" });
+      }
+
+      const profile = await storage.getClientProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Client company not found" });
+      }
+
+      const { companyName, website, phone } = req.body;
+      const updated = await storage.updateClientProfile(req.params.id, {
+        companyName,
+        website,
+        phone,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating client company:", error);
+      res.status(500).json({ error: "Failed to update client company" });
+    }
+  });
+
+  // Toggle client company active status (affects all users in the company)
+  app.patch("/api/client-companies/:id/toggle-active", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Only admins can toggle client status" });
+      }
+
+      const profile = await storage.getClientProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Client company not found" });
+      }
+
+      const { isActive } = req.body;
+
+      // Update all users in this company
+      const teamMembers = await storage.getClientTeamMembers(req.params.id);
+      for (const member of teamMembers) {
+        await storage.updateUser(member.id, { isActive });
+      }
+
+      res.json({ success: true, message: `Client company ${isActive ? "activated" : "deactivated"}` });
+    } catch (error) {
+      console.error("Error toggling client company status:", error);
+      res.status(500).json({ error: "Failed to toggle client company status" });
+    }
+  });
+
+  // Delete client company and all associated users
+  app.delete("/api/client-companies/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Only admins can delete client companies" });
+      }
+
+      const profile = await storage.getClientProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Client company not found" });
+      }
+
+      // Deactivate and unlink all users from this company first
+      const teamMembers = await storage.getClientTeamMembers(req.params.id);
+      for (const member of teamMembers) {
+        await storage.updateUser(member.id, { 
+          isActive: false,
+          clientProfileId: null 
+        });
+      }
+
+      // Delete the profile
+      await storage.deleteClientProfile(req.params.id);
+
+      res.json({ success: true, message: "Client company deleted" });
+    } catch (error) {
+      console.error("Error deleting client company:", error);
+      res.status(500).json({ error: "Failed to delete client company" });
+    }
+  });
+
+  // Get team members for a client company
+  app.get("/api/client-companies/:id/team", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Only admins can access client team members" });
+      }
+
+      const profile = await storage.getClientProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Client company not found" });
+      }
+
+      const teamMembers = await storage.getClientTeamMembers(req.params.id);
+      res.json(teamMembers);
+    } catch (error) {
+      console.error("Error fetching client team members:", error);
+      res.status(500).json({ error: "Failed to fetch team members" });
+    }
+  });
+
   // System settings routes
   app.get("/api/system-settings/pricing", async (req, res) => {
     try {
