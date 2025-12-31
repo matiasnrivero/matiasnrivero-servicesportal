@@ -77,7 +77,7 @@ export default function Payments() {
           <p className="text-muted-foreground">Manage your billing and payment methods</p>
         </div>
 
-        <BillingTab clientProfileId={clientProfileId} />
+        <BillingTab clientProfileId={clientProfileId} isPrimaryClient={true} />
       </main>
     </div>
   );
