@@ -363,7 +363,7 @@ export function Header() {
           <div className="flex items-center gap-2">
             <Select
               value={(() => {
-                // Map username to switcher value for client roles
+                // Map username to switcher value for client and vendor roles
                 const usernameToValue: Record<string, string> = {
                   "default-user": "client",
                   "Client 2": "client_2",
@@ -371,6 +371,9 @@ export function Header() {
                   "Client Member 1": "client_member",
                   "Client Member 2": "client_member_2",
                   "Client Member 3": "client_member_3",
+                  "vendor-user": "vendor",
+                  "Creative Studio Co": "vendor_2",
+                  "Design Works LLC": "vendor_3",
                 };
                 if (currentUser.username && usernameToValue[currentUser.username]) {
                   return usernameToValue[currentUser.username];
@@ -385,7 +388,9 @@ export function Header() {
               <SelectContent>
                 <SelectItem value="admin">Admin</SelectItem>
                 <SelectItem value="internal_designer">Internal Designer</SelectItem>
-                <SelectItem value="vendor">Vendor</SelectItem>
+                <SelectItem value="vendor">Vendor 1</SelectItem>
+                <SelectItem value="vendor_2">Vendor 2</SelectItem>
+                <SelectItem value="vendor_3">Vendor 3</SelectItem>
                 <SelectItem value="vendor_designer">Vendor Designer</SelectItem>
                 <SelectItem value="client">Client 1</SelectItem>
                 <SelectItem value="client_member">Client Member 1</SelectItem>

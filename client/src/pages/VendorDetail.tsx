@@ -25,7 +25,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Users, DollarSign, Clock, UserPlus, Save, ArrowLeft, CalendarDays, Globe, Package, Layers, Eye, Zap, Plus, Loader2, Trash2 } from "lucide-react";
+import { Building2, Users, DollarSign, Clock, UserPlus, Save, ArrowLeft, CalendarDays, Globe, Package, Layers, Eye, Zap, Plus, Loader2, Trash2, Pencil } from "lucide-react";
 import { Link } from "wouter";
 import type { User, VendorProfile as VendorProfileType, Service, ServicePricingTier, Bundle, BundleItem, BundleLineItem, ServicePack, ServicePackItem, VendorBundleCost, VendorPackCost } from "@shared/schema";
 
@@ -101,6 +101,9 @@ export default function VendorDetail() {
   const params = useParams<{ id: string }>();
   const vendorId = params.id;
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [editMemberDialogOpen, setEditMemberDialogOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<User | null>(null);
+  const [editMemberForm, setEditMemberForm] = useState({ username: "", email: "", phone: "" });
   const [newUser, setNewUser] = useState({
     username: "",
     email: "",
@@ -372,8 +375,19 @@ export default function VendorDetail() {
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: any) => {
-      if (!vendorProfile?.id) throw new Error("No profile found");
-      return apiRequest("PATCH", `/api/vendor-profiles/${vendorProfile.id}`, data);
+      if (vendorProfile?.id) {
+        // Update existing profile
+        return apiRequest("PATCH", `/api/vendor-profiles/${vendorProfile.id}`, data);
+      } else if (vendorId) {
+        // Create new profile for this vendor if they don't have one
+        return apiRequest("POST", "/api/vendor-profiles", {
+          userId: vendorId,
+          companyName: profileForm.companyName || vendorUser?.username || "New Vendor",
+          ...data,
+        });
+      } else {
+        throw new Error("No vendor ID");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vendor-profiles/user"] });
@@ -420,6 +434,40 @@ export default function VendorDetail() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const updateMemberMutation = useMutation({
+    mutationFn: async ({ userId, data }: { userId: string; data: { username?: string; email?: string; phone?: string } }) => {
+      return apiRequest("PATCH", `/api/users/${userId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/vendor"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setEditMemberDialogOpen(false);
+      setEditingMember(null);
+      toast({ title: "Team member updated successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleEditMember = (member: User) => {
+    setEditingMember(member);
+    setEditMemberForm({
+      username: member.username,
+      email: member.email || "",
+      phone: member.phone || "",
+    });
+    setEditMemberDialogOpen(true);
+  };
+
+  const handleSaveMemberEdit = () => {
+    if (!editingMember) return;
+    updateMemberMutation.mutate({
+      userId: editingMember.id,
+      data: editMemberForm,
+    });
+  };
 
   const handleSaveProfile = () => {
     updateProfileMutation.mutate({
@@ -748,6 +796,14 @@ export default function VendorDetail() {
                             Primary
                           </Badge>
                         </div>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleEditMember(vendorUser)}
+                          data-testid={`button-edit-member-${vendorUser.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                       </div>
                     )}
                     {teamMembers.filter(m => m.id !== vendorUser?.id).length === 0 && !vendorUser ? (
@@ -793,10 +849,80 @@ export default function VendorDetail() {
                               </Badge>
                             )}
                           </div>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleEditMember(member)}
+                            data-testid={`button-edit-member-${member.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
                         </div>
                       ))
                     )}
                   </div>
+
+                  {/* Edit Member Dialog */}
+                  <Dialog open={editMemberDialogOpen} onOpenChange={setEditMemberDialogOpen}>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Edit Team Member</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 mt-4">
+                        <div className="space-y-2">
+                          <Label>Username<span className="text-destructive">*</span></Label>
+                          <Input
+                            value={editMemberForm.username}
+                            onChange={(e) =>
+                              setEditMemberForm({ ...editMemberForm, username: e.target.value })
+                            }
+                            placeholder="Enter username"
+                            data-testid="input-edit-member-username"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Email</Label>
+                          <Input
+                            type="email"
+                            value={editMemberForm.email}
+                            onChange={(e) =>
+                              setEditMemberForm({ ...editMemberForm, email: e.target.value })
+                            }
+                            placeholder="Enter email"
+                            data-testid="input-edit-member-email"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Phone</Label>
+                          <Input
+                            type="tel"
+                            value={editMemberForm.phone}
+                            onChange={(e) =>
+                              setEditMemberForm({ ...editMemberForm, phone: e.target.value })
+                            }
+                            placeholder="Enter phone"
+                            data-testid="input-edit-member-phone"
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2 pt-4">
+                          <Button
+                            variant="outline"
+                            onClick={() => setEditMemberDialogOpen(false)}
+                            data-testid="button-cancel-edit-member"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            onClick={handleSaveMemberEdit}
+                            disabled={updateMemberMutation.isPending}
+                            data-testid="button-save-edit-member"
+                          >
+                            {updateMemberMutation.isPending ? "Saving..." : "Save Changes"}
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </CardContent>
               </Card>
             </TabsContent>
