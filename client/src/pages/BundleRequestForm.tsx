@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/Header";
 import { DynamicFormField, type ServiceFieldWithInput } from "@/components/DynamicFormField";
 import { FileUploader } from "@/components/FileUploader";
-import { ArrowLeft, Package, Loader2, User, ClipboardList, CheckCircle, X } from "lucide-react";
+import { ArrowLeft, Package, Loader2, ClipboardList, CheckCircle, X } from "lucide-react";
 import { Link } from "wouter";
 import type { Bundle, Service, InputField, ServiceField, BundleField, InsertBundleRequest, User as UserType } from "@shared/schema";
 
@@ -600,10 +600,7 @@ export default function BundleRequestForm() {
               {showAssigneeSelector && (
                 <div className="space-y-2">
                   <Label htmlFor="assignee">
-                    <span className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      Assign To
-                    </span>
+                    Assign To
                   </Label>
                   <Select value={selectedAssignee} onValueChange={setSelectedAssignee}>
                     <SelectTrigger data-testid="select-bundle-assignee">

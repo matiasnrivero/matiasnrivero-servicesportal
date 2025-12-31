@@ -36,7 +36,6 @@ import {
 } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import type { Service, InsertServiceRequest, Bundle, BundleItem, ServicePack, ServicePackItem, InputField, ServiceField, User } from "@shared/schema";
-import { User as UserIcon } from "lucide-react";
 import { Header } from "@/components/Header";
 import { FileUploader } from "@/components/FileUploader";
 import { DynamicFormField, type ServiceFieldWithInput } from "@/components/DynamicFormField";
@@ -1109,15 +1108,12 @@ export default function ServiceRequestForm() {
     return (
       <>
         <h3 className="font-body-2-semibold text-dark-blue-night">General Info</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           {/* Assignee Selector (Admin and Internal Designer only) */}
           {showAssigneeSelector && (
             <div className="space-y-2">
               <Label htmlFor="assignee">
-                <span className="flex items-center gap-2">
-                  <UserIcon className="h-4 w-4" />
-                  Assign To
-                </span>
+                Assign To
               </Label>
               <Select value={selectedAssignee} onValueChange={setSelectedAssignee}>
                 <SelectTrigger data-testid="select-service-assignee">
