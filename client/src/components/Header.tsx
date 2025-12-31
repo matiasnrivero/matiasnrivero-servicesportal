@@ -362,7 +362,21 @@ export function Header() {
           </Popover>
           <div className="flex items-center gap-2">
             <Select
-              value={currentUser.role}
+              value={(() => {
+                // Map username to switcher value for client roles
+                const usernameToValue: Record<string, string> = {
+                  "default-user": "client",
+                  "Client 2": "client_2",
+                  "Client 3": "client_3",
+                  "Client Member 1": "client_member",
+                  "Client Member 2": "client_member_2",
+                  "Client Member 3": "client_member_3",
+                };
+                if (currentUser.username && usernameToValue[currentUser.username]) {
+                  return usernameToValue[currentUser.username];
+                }
+                return currentUser.role;
+              })()}
               onValueChange={(role) => switchRoleMutation.mutate(role)}
             >
               <SelectTrigger className="w-36" data-testid="select-role-switcher">
