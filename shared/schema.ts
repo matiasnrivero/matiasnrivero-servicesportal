@@ -68,6 +68,10 @@ export const vendorProfiles = pgTable("vendor_profiles", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Client payment configuration types
+export const clientPaymentConfigurations = ["pay_as_you_go", "monthly_payment", "deduct_from_royalties"] as const;
+export type ClientPaymentConfiguration = typeof clientPaymentConfigurations[number];
+
 // Client profiles with company info - links client users to their company
 export const clientProfiles = pgTable("client_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -79,6 +83,14 @@ export const clientProfiles = pgTable("client_profiles", {
   email: text("email"),
   phone: text("phone"),
   address: text("address"),
+  // Stripe integration fields
+  stripeCustomerId: text("stripe_customer_id"),
+  // Client payment configuration: pay_as_you_go (default), monthly_payment, deduct_from_royalties
+  paymentConfiguration: text("payment_configuration").notNull().default("pay_as_you_go"),
+  // For monthly payment clients - day of month for invoicing (1-28)
+  invoiceDay: integer("invoice_day"),
+  // Billing address (stored as JSON)
+  billingAddress: jsonb("billing_address"),
   // Soft delete timestamp - when set, client company is considered deleted
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -583,6 +595,68 @@ export const discountCoupons = pgTable("discount_coupons", {
 
 // ==================== END PHASE 6 TABLES ====================
 
+// ==================== PHASE 7: STRIPE PAYMENT INTEGRATION ====================
+
+// Client payment methods - stores saved cards linked to Stripe
+export const clientPaymentMethods = pgTable("client_payment_methods", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientProfileId: varchar("client_profile_id").notNull().references(() => clientProfiles.id, { onDelete: "cascade" }),
+  // Stripe payment method ID
+  stripePaymentMethodId: text("stripe_payment_method_id").notNull(),
+  // Card details (only store safe display info, never full card number)
+  brand: text("brand").notNull(), // visa, mastercard, amex, etc.
+  last4: text("last4").notNull(), // last 4 digits
+  expMonth: integer("exp_month").notNull(),
+  expYear: integer("exp_year").notNull(),
+  // Whether this is the default payment method
+  isDefault: boolean("is_default").notNull().default(false),
+  // Billing address for this specific card
+  billingAddress: jsonb("billing_address"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Stripe events - for webhook idempotency and audit trail
+export const stripeEvents = pgTable("stripe_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  stripeEventId: text("stripe_event_id").notNull().unique(),
+  eventType: text("event_type").notNull(),
+  eventData: jsonb("event_data"),
+  processed: boolean("processed").notNull().default(false),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Payments - tracks all payment transactions
+export const payments = pgTable("payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientProfileId: varchar("client_profile_id").notNull().references(() => clientProfiles.id),
+  // Link to the service request or bundle request that was paid
+  serviceRequestId: varchar("service_request_id").references(() => serviceRequests.id, { onDelete: "set null" }),
+  bundleRequestId: varchar("bundle_request_id").references(() => bundleRequests.id, { onDelete: "set null" }),
+  // Payment amount in cents to avoid floating point issues
+  amountCents: integer("amount_cents").notNull(),
+  currency: text("currency").notNull().default("usd"),
+  // Payment status: pending, succeeded, failed, refunded, partially_refunded
+  status: text("status").notNull().default("pending"),
+  // How this was paid: pay_as_you_go, monthly_invoice, deduct_from_royalties
+  paymentType: text("payment_type").notNull(),
+  // Stripe IDs (null if deduct_from_royalties)
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  stripeInvoiceId: text("stripe_invoice_id"),
+  stripeRefundId: text("stripe_refund_id"),
+  // For deduct_from_royalties tracking
+  royaltyDeductionNotes: text("royalty_deduction_notes"),
+  // Who marked as paid (for royalty deductions)
+  markedPaidBy: varchar("marked_paid_by").references(() => users.id, { onDelete: "set null" }),
+  markedPaidAt: timestamp("marked_paid_at"),
+  // Metadata for any extra info
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ==================== END PHASE 7 TABLES ====================
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -839,6 +913,29 @@ export const updateDiscountCouponSchema = createInsertSchema(discountCoupons).pa
   createdAt: true,
 });
 
+// Phase 7: Stripe Payment Integration schemas
+export const insertClientPaymentMethodSchema = createInsertSchema(clientPaymentMethods).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertStripeEventSchema = createInsertSchema(stripeEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertPaymentSchema = createInsertSchema(payments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updatePaymentSchema = createInsertSchema(payments).partial().omit({
+  id: true,
+  clientProfileId: true,
+  createdAt: true,
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type VendorProfile = typeof vendorProfiles.$inferSelect;
@@ -920,6 +1017,25 @@ export type InsertAutomationAssignmentLog = z.infer<typeof insertAutomationAssig
 export type DiscountCoupon = typeof discountCoupons.$inferSelect;
 export type InsertDiscountCoupon = z.infer<typeof insertDiscountCouponSchema>;
 export type UpdateDiscountCoupon = z.infer<typeof updateDiscountCouponSchema>;
+
+// Phase 7: Stripe Payment Integration types
+export type ClientPaymentMethod = typeof clientPaymentMethods.$inferSelect;
+export type InsertClientPaymentMethod = z.infer<typeof insertClientPaymentMethodSchema>;
+export type StripeEvent = typeof stripeEvents.$inferSelect;
+export type InsertStripeEvent = z.infer<typeof insertStripeEventSchema>;
+export type Payment = typeof payments.$inferSelect;
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+export type UpdatePayment = z.infer<typeof updatePaymentSchema>;
+
+// Billing address structure for Stripe integration
+export type BillingAddress = {
+  line1: string;
+  line2?: string;
+  city: string;
+  state?: string;
+  postalCode: string;
+  country: string;
+};
 
 // Helper type for dropdown options
 export type FieldOption = {

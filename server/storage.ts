@@ -73,6 +73,13 @@ import {
   type DiscountCoupon,
   type InsertDiscountCoupon,
   type UpdateDiscountCoupon,
+  type ClientPaymentMethod,
+  type InsertClientPaymentMethod,
+  type StripeEvent,
+  type InsertStripeEvent,
+  type Payment,
+  type InsertPayment,
+  type UpdatePayment,
   users,
   services,
   servicePricingTiers,
@@ -102,6 +109,9 @@ import {
   automationAssignmentLogs,
   clientProfiles,
   discountCoupons,
+  clientPaymentMethods,
+  stripeEvents,
+  payments,
 } from "@shared/schema";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -319,6 +329,28 @@ export interface IStorage {
   updateDiscountCoupon(id: string, data: UpdateDiscountCoupon): Promise<DiscountCoupon | undefined>;
   deleteDiscountCoupon(id: string): Promise<void>;
   incrementCouponUsage(id: string): Promise<DiscountCoupon | undefined>;
+
+  // Client Payment Method methods
+  getClientPaymentMethods(clientProfileId: string): Promise<ClientPaymentMethod[]>;
+  getClientPaymentMethod(id: string): Promise<ClientPaymentMethod | undefined>;
+  getDefaultPaymentMethod(clientProfileId: string): Promise<ClientPaymentMethod | undefined>;
+  createClientPaymentMethod(data: InsertClientPaymentMethod): Promise<ClientPaymentMethod>;
+  setDefaultPaymentMethod(clientProfileId: string, paymentMethodId: string): Promise<void>;
+  deleteClientPaymentMethod(id: string): Promise<void>;
+
+  // Stripe Event methods
+  getStripeEvent(stripeEventId: string): Promise<StripeEvent | undefined>;
+  createStripeEvent(data: InsertStripeEvent): Promise<StripeEvent>;
+  markStripeEventProcessed(id: string): Promise<void>;
+
+  // Payment methods
+  getPayment(id: string): Promise<Payment | undefined>;
+  getPaymentByStripeId(stripePaymentIntentId: string): Promise<Payment | undefined>;
+  getPaymentsByClientProfile(clientProfileId: string): Promise<Payment[]>;
+  getPaymentsByServiceRequest(serviceRequestId: string): Promise<Payment[]>;
+  getPaymentsByBundleRequest(bundleRequestId: string): Promise<Payment[]>;
+  createPayment(data: InsertPayment): Promise<Payment>;
+  updatePayment(id: string, data: UpdatePayment): Promise<Payment | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -1357,6 +1389,115 @@ export class DbStorage implements IStorage {
     const result = await db.update(discountCoupons)
       .set({ currentUses: coupon.currentUses + 1, updatedAt: new Date() })
       .where(eq(discountCoupons.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Client Payment Method methods
+  async getClientPaymentMethods(clientProfileId: string): Promise<ClientPaymentMethod[]> {
+    return await db.select().from(clientPaymentMethods)
+      .where(eq(clientPaymentMethods.clientProfileId, clientProfileId))
+      .orderBy(desc(clientPaymentMethods.createdAt));
+  }
+
+  async getClientPaymentMethod(id: string): Promise<ClientPaymentMethod | undefined> {
+    const result = await db.select().from(clientPaymentMethods)
+      .where(eq(clientPaymentMethods.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getDefaultPaymentMethod(clientProfileId: string): Promise<ClientPaymentMethod | undefined> {
+    const result = await db.select().from(clientPaymentMethods)
+      .where(and(
+        eq(clientPaymentMethods.clientProfileId, clientProfileId),
+        eq(clientPaymentMethods.isDefault, true)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async createClientPaymentMethod(data: InsertClientPaymentMethod): Promise<ClientPaymentMethod> {
+    const result = await db.insert(clientPaymentMethods).values(data).returning();
+    return result[0];
+  }
+
+  async setDefaultPaymentMethod(clientProfileId: string, paymentMethodId: string): Promise<void> {
+    // First, unset all defaults for this client
+    await db.update(clientPaymentMethods)
+      .set({ isDefault: false })
+      .where(eq(clientPaymentMethods.clientProfileId, clientProfileId));
+    // Then set the new default
+    await db.update(clientPaymentMethods)
+      .set({ isDefault: true })
+      .where(eq(clientPaymentMethods.id, paymentMethodId));
+  }
+
+  async deleteClientPaymentMethod(id: string): Promise<void> {
+    await db.delete(clientPaymentMethods).where(eq(clientPaymentMethods.id, id));
+  }
+
+  // Stripe Event methods
+  async getStripeEvent(stripeEventId: string): Promise<StripeEvent | undefined> {
+    const result = await db.select().from(stripeEvents)
+      .where(eq(stripeEvents.stripeEventId, stripeEventId))
+      .limit(1);
+    return result[0];
+  }
+
+  async createStripeEvent(data: InsertStripeEvent): Promise<StripeEvent> {
+    const result = await db.insert(stripeEvents).values(data).returning();
+    return result[0];
+  }
+
+  async markStripeEventProcessed(id: string): Promise<void> {
+    await db.update(stripeEvents)
+      .set({ processed: true, processedAt: new Date() })
+      .where(eq(stripeEvents.id, id));
+  }
+
+  // Payment methods
+  async getPayment(id: string): Promise<Payment | undefined> {
+    const result = await db.select().from(payments)
+      .where(eq(payments.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getPaymentByStripeId(stripePaymentIntentId: string): Promise<Payment | undefined> {
+    const result = await db.select().from(payments)
+      .where(eq(payments.stripePaymentIntentId, stripePaymentIntentId))
+      .limit(1);
+    return result[0];
+  }
+
+  async getPaymentsByClientProfile(clientProfileId: string): Promise<Payment[]> {
+    return await db.select().from(payments)
+      .where(eq(payments.clientProfileId, clientProfileId))
+      .orderBy(desc(payments.createdAt));
+  }
+
+  async getPaymentsByServiceRequest(serviceRequestId: string): Promise<Payment[]> {
+    return await db.select().from(payments)
+      .where(eq(payments.serviceRequestId, serviceRequestId))
+      .orderBy(desc(payments.createdAt));
+  }
+
+  async getPaymentsByBundleRequest(bundleRequestId: string): Promise<Payment[]> {
+    return await db.select().from(payments)
+      .where(eq(payments.bundleRequestId, bundleRequestId))
+      .orderBy(desc(payments.createdAt));
+  }
+
+  async createPayment(data: InsertPayment): Promise<Payment> {
+    const result = await db.insert(payments).values(data).returning();
+    return result[0];
+  }
+
+  async updatePayment(id: string, data: UpdatePayment): Promise<Payment | undefined> {
+    const result = await db.update(payments)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(payments.id, id))
       .returning();
     return result[0];
   }

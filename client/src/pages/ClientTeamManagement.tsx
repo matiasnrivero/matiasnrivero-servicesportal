@@ -25,8 +25,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Users, UserPlus, Save, Pencil, Loader2, Crown, Trash2 } from "lucide-react";
+import { Building2, Users, UserPlus, Save, Pencil, Loader2, Crown, Trash2, CreditCard } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -34,6 +35,7 @@ import {
 } from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import type { User, ClientProfile } from "@shared/schema";
+import BillingTab from "@/components/BillingTab";
 
 async function getDefaultUser(): Promise<User | null> {
   const res = await fetch("/api/default-user");
@@ -587,6 +589,19 @@ export default function ClientTeamManagement() {
               )}
             </CardContent>
           </Card>
+
+          {isPrimaryClient && clientProfileId && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <CreditCard className="w-5 h-5" />
+                Billing & Payments
+              </h2>
+              <BillingTab 
+                clientProfileId={clientProfileId} 
+                isPrimaryClient={isPrimaryClient}
+              />
+            </div>
+          )}
 
           <Dialog open={editUserDialogOpen} onOpenChange={setEditUserDialogOpen}>
             <DialogContent>

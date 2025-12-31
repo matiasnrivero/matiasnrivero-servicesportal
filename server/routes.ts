@@ -6807,6 +6807,284 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== PHASE 7: STRIPE BILLING ROUTES ====================
+
+  // Get client payment methods
+  app.get("/api/billing/payment-methods", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      // Get the client profile - user must be a client or admin viewing a client
+      let clientProfileId: string | null = null;
+      
+      if (sessionUser.role === "client" && sessionUser.clientProfileId) {
+        clientProfileId = sessionUser.clientProfileId;
+      } else if (sessionUser.role === "admin" && req.query.clientProfileId) {
+        clientProfileId = req.query.clientProfileId as string;
+      }
+
+      if (!clientProfileId) {
+        return res.status(400).json({ error: "No client profile found" });
+      }
+
+      const paymentMethods = await storage.getClientPaymentMethods(clientProfileId);
+      res.json(paymentMethods);
+    } catch (error) {
+      console.error("Error fetching payment methods:", error);
+      res.status(500).json({ error: "Failed to fetch payment methods" });
+    }
+  });
+
+  // Create setup intent for adding a new payment method
+  app.post("/api/billing/create-setup-intent", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      let clientProfileId: string | null = null;
+      
+      if (sessionUser.role === "client" && sessionUser.clientProfileId) {
+        clientProfileId = sessionUser.clientProfileId;
+      } else if (sessionUser.role === "admin" && req.body.clientProfileId) {
+        clientProfileId = req.body.clientProfileId;
+      }
+
+      if (!clientProfileId) {
+        return res.status(400).json({ error: "No client profile found" });
+      }
+
+      const { stripeService } = await import("./services/stripeService");
+      const result = await stripeService.createSetupIntent(clientProfileId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error creating setup intent:", error);
+      res.status(500).json({ error: "Failed to create setup intent" });
+    }
+  });
+
+  // Save a payment method after setup intent confirmation
+  app.post("/api/billing/save-payment-method", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      let clientProfileId: string | null = null;
+      
+      if (sessionUser.role === "client" && sessionUser.clientProfileId) {
+        clientProfileId = sessionUser.clientProfileId;
+      } else if (sessionUser.role === "admin" && req.body.clientProfileId) {
+        clientProfileId = req.body.clientProfileId;
+      }
+
+      if (!clientProfileId) {
+        return res.status(400).json({ error: "No client profile found" });
+      }
+
+      const { paymentMethodId, billingAddress, setAsDefault } = req.body;
+      if (!paymentMethodId) {
+        return res.status(400).json({ error: "Payment method ID is required" });
+      }
+
+      const { stripeService } = await import("./services/stripeService");
+      await stripeService.savePaymentMethod(
+        clientProfileId,
+        paymentMethodId,
+        billingAddress,
+        setAsDefault !== false
+      );
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error saving payment method:", error);
+      res.status(500).json({ error: "Failed to save payment method" });
+    }
+  });
+
+  // Set default payment method
+  app.post("/api/billing/set-default-payment-method", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      let clientProfileId: string | null = null;
+      
+      if (sessionUser.role === "client" && sessionUser.clientProfileId) {
+        clientProfileId = sessionUser.clientProfileId;
+      } else if (sessionUser.role === "admin" && req.body.clientProfileId) {
+        clientProfileId = req.body.clientProfileId;
+      }
+
+      if (!clientProfileId) {
+        return res.status(400).json({ error: "No client profile found" });
+      }
+
+      const { paymentMethodId } = req.body;
+      if (!paymentMethodId) {
+        return res.status(400).json({ error: "Payment method ID is required" });
+      }
+
+      await storage.setDefaultPaymentMethod(clientProfileId, paymentMethodId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error setting default payment method:", error);
+      res.status(500).json({ error: "Failed to set default payment method" });
+    }
+  });
+
+  // Delete payment method
+  app.delete("/api/billing/payment-methods/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const paymentMethod = await storage.getClientPaymentMethod(req.params.id);
+      if (!paymentMethod) {
+        return res.status(404).json({ error: "Payment method not found" });
+      }
+
+      // Verify ownership
+      let hasAccess = false;
+      if (sessionUser.role === "admin") {
+        hasAccess = true;
+      } else if (sessionUser.role === "client" && sessionUser.clientProfileId === paymentMethod.clientProfileId) {
+        hasAccess = true;
+      }
+
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { stripeService } = await import("./services/stripeService");
+      await stripeService.removePaymentMethod(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting payment method:", error);
+      res.status(500).json({ error: "Failed to delete payment method" });
+    }
+  });
+
+  // Update client payment configuration (admin only)
+  app.patch("/api/billing/client-config/:clientProfileId", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+
+      const { clientProfileId } = req.params;
+      const { paymentConfiguration, invoiceDay, billingAddress } = req.body;
+
+      const updates: any = {};
+      if (paymentConfiguration) {
+        const validConfigs = ["pay_as_you_go", "monthly_payment", "deduct_from_royalties"];
+        if (!validConfigs.includes(paymentConfiguration)) {
+          return res.status(400).json({ error: "Invalid payment configuration" });
+        }
+        updates.paymentConfiguration = paymentConfiguration;
+      }
+      if (invoiceDay !== undefined) {
+        if (invoiceDay < 1 || invoiceDay > 28) {
+          return res.status(400).json({ error: "Invoice day must be between 1 and 28" });
+        }
+        updates.invoiceDay = invoiceDay;
+      }
+      if (billingAddress !== undefined) {
+        updates.billingAddress = billingAddress;
+      }
+
+      const updated = await storage.updateClientProfile(clientProfileId, updates);
+      if (!updated) {
+        return res.status(404).json({ error: "Client profile not found" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating client payment configuration:", error);
+      res.status(500).json({ error: "Failed to update client payment configuration" });
+    }
+  });
+
+  // Get client billing info (for client profile page)
+  app.get("/api/billing/client-info", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      let clientProfileId: string | null = null;
+      
+      if (sessionUser.role === "client" && sessionUser.clientProfileId) {
+        clientProfileId = sessionUser.clientProfileId;
+      } else if (sessionUser.role === "admin" && req.query.clientProfileId) {
+        clientProfileId = req.query.clientProfileId as string;
+      }
+
+      if (!clientProfileId) {
+        return res.status(400).json({ error: "No client profile found" });
+      }
+
+      const clientProfile = await storage.getClientProfileById(clientProfileId);
+      if (!clientProfile) {
+        return res.status(404).json({ error: "Client profile not found" });
+      }
+
+      const paymentMethods = await storage.getClientPaymentMethods(clientProfileId);
+
+      res.json({
+        paymentConfiguration: clientProfile.paymentConfiguration,
+        invoiceDay: clientProfile.invoiceDay,
+        billingAddress: clientProfile.billingAddress,
+        stripeCustomerId: clientProfile.stripeCustomerId,
+        paymentMethods,
+      });
+    } catch (error) {
+      console.error("Error fetching client billing info:", error);
+      res.status(500).json({ error: "Failed to fetch client billing info" });
+    }
+  });
+
+  // ==================== END PHASE 7 ROUTES ====================
+
   const httpServer = createServer(app);
 
   return httpServer;
