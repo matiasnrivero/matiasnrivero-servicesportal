@@ -958,6 +958,72 @@ export default function ServiceRequestForm() {
       );
     }
     
+    // Special case: Discount Coupon field - render with Apply button and validation
+    if (fieldKey === "discount_coupon") {
+      // Only show to clients and admins when pricing is visible
+      if (!showPricing) return null;
+      
+      const label = field.displayLabelOverride || field.inputField.label;
+      
+      return (
+        <div key={field.id} className="space-y-2">
+          <Label htmlFor="coupon">
+            {label}
+          </Label>
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <Input
+                id="coupon"
+                placeholder={field.inputField.description || "Enter coupon code"}
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                disabled={!!validatedCoupon}
+                className={`${validatedCoupon ? "pr-8 border-green-500 bg-green-50 dark:bg-green-900/20" : ""} ${couponError ? "border-destructive" : ""}`}
+                data-testid="input-coupon-code"
+              />
+              {validatedCoupon && (
+                <CheckCircle className="h-4 w-4 text-green-500 absolute right-2 top-1/2 -translate-y-1/2" />
+              )}
+            </div>
+            {validatedCoupon ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={clearCoupon}
+                data-testid="button-clear-coupon"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={validateCoupon}
+                disabled={isValidatingCoupon || !couponCode.trim()}
+                data-testid="button-apply-coupon"
+              >
+                {isValidatingCoupon ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Apply"
+                )}
+              </Button>
+            )}
+          </div>
+          {couponError && (
+            <p className="text-sm text-destructive">{couponError}</p>
+          )}
+          {validatedCoupon && (
+            <p className="text-sm text-green-600">
+              Discount applied: {validatedCoupon.discountType === "percentage" 
+                ? `${validatedCoupon.discountValue}% off` 
+                : `$${parseFloat(validatedCoupon.discountValue).toFixed(2)} off`}
+            </p>
+          )}
+        </div>
+      );
+    }
+    
     // Special case: Vectorization checkbox for Embroidery Digitization
     if (selectedService?.title === "Embroidery Digitization" && fieldKey === "vectorizationNeeded") {
       // Find the Add Vectorization child service to get its price dynamically
@@ -1037,7 +1103,7 @@ export default function ServiceRequestForm() {
   const renderGeneralInfoFromDatabase = () => {
     const { generalInfoFields } = groupFieldsBySection(serviceFormFields);
     
-    const hasContent = generalInfoFields.length > 0 || showAssigneeSelector || showPricing;
+    const hasContent = generalInfoFields.length > 0 || showAssigneeSelector;
     if (!hasContent) return null;
     
     return (
@@ -1068,68 +1134,6 @@ export default function ServiceRequestForm() {
             </div>
           )}
           {generalInfoFields.map(field => renderDynamicField(field))}
-
-          {/* Discount Coupon Field (visible to clients and admins when pricing is shown) */}
-          {showPricing && (
-            <div className="space-y-2">
-              <Label htmlFor="coupon">
-                <span className="flex items-center gap-2">
-                  <Percent className="h-4 w-4" />
-                  Discount Code
-                </span>
-              </Label>
-              <div className="flex gap-2">
-                <div className="flex-1 relative">
-                  <Input
-                    id="coupon"
-                    placeholder="Enter coupon code"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                    disabled={!!validatedCoupon}
-                    className={`${validatedCoupon ? "pr-8 border-green-500 bg-green-50 dark:bg-green-900/20" : ""} ${couponError ? "border-destructive" : ""}`}
-                    data-testid="input-coupon-code"
-                  />
-                  {validatedCoupon && (
-                    <CheckCircle className="h-4 w-4 text-green-500 absolute right-2 top-1/2 -translate-y-1/2" />
-                  )}
-                </div>
-                {validatedCoupon ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={clearCoupon}
-                    data-testid="button-clear-coupon"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={validateCoupon}
-                    disabled={isValidatingCoupon || !couponCode.trim()}
-                    data-testid="button-apply-coupon"
-                  >
-                    {isValidatingCoupon ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      "Apply"
-                    )}
-                  </Button>
-                )}
-              </div>
-              {couponError && (
-                <p className="text-sm text-destructive">{couponError}</p>
-              )}
-              {validatedCoupon && (
-                <p className="text-sm text-green-600">
-                  Discount applied: {validatedCoupon.discountType === "percentage" 
-                    ? `${validatedCoupon.discountValue}% off` 
-                    : `$${parseFloat(validatedCoupon.discountValue).toFixed(2)} off`}
-                </p>
-              )}
-            </div>
-          )}
         </div>
       </>
     );
