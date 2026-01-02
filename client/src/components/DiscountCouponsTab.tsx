@@ -333,18 +333,14 @@ export function DiscountCouponsTab() {
                       <TableCell className="capitalize">{coupon.discountType}</TableCell>
                       <TableCell>{formatDiscountValue(coupon)}</TableCell>
                       <TableCell>
-                        {coupon.serviceId || coupon.bundleId ? (
-                          <div className="flex flex-col gap-1">
-                            {coupon.serviceId && (
-                              <Badge variant="outline">{getServiceName(coupon.serviceId)}</Badge>
-                            )}
-                            {coupon.bundleId && (
-                              <Badge variant="outline">{getBundleName(coupon.bundleId)}</Badge>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-dark-gray text-sm">All</span>
-                        )}
+                        <div className="flex flex-col gap-1">
+                          <Badge variant="outline">
+                            {coupon.serviceId ? getServiceName(coupon.serviceId) : "All Services"}
+                          </Badge>
+                          <Badge variant="outline">
+                            {coupon.bundleId ? getBundleName(coupon.bundleId) : "All Bundles"}
+                          </Badge>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <span className={coupon.currentUses >= coupon.maxUses ? "text-red-500 font-medium" : ""}>
@@ -526,7 +522,6 @@ export function DiscountCouponsTab() {
                       <Select
                         onValueChange={(value) => {
                           field.onChange(value === "all" ? null : value);
-                          if (value !== "all") form.setValue("bundleId", null);
                         }}
                         value={field.value || "all"}
                       >
@@ -558,7 +553,6 @@ export function DiscountCouponsTab() {
                       <Select
                         onValueChange={(value) => {
                           field.onChange(value === "all" ? null : value);
-                          if (value !== "all") form.setValue("serviceId", null);
                         }}
                         value={field.value || "all"}
                       >
@@ -727,13 +721,14 @@ export function DiscountCouponsTab() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-dark-gray">Applies To</span>
-                <span>
-                  {viewingCoupon.serviceId
-                    ? getServiceName(viewingCoupon.serviceId)
-                    : viewingCoupon.bundleId
-                    ? getBundleName(viewingCoupon.bundleId)
-                    : "All"}
-                </span>
+                <div className="flex flex-col gap-1 items-end">
+                  <Badge variant="outline">
+                    {viewingCoupon.serviceId ? getServiceName(viewingCoupon.serviceId) : "All Services"}
+                  </Badge>
+                  <Badge variant="outline">
+                    {viewingCoupon.bundleId ? getBundleName(viewingCoupon.bundleId) : "All Bundles"}
+                  </Badge>
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-dark-gray">Client</span>
