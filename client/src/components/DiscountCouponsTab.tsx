@@ -182,6 +182,18 @@ export function DiscountCouponsTab() {
     },
   });
 
+  const toggleStatusMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      return apiRequest("PATCH", `/api/discount-coupons/${id}`, { isActive });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/discount-coupons"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleEdit = (coupon: DiscountCoupon) => {
     setEditingCoupon(coupon);
     form.reset({
@@ -290,8 +302,8 @@ export function DiscountCouponsTab() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Code</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Code</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Value</TableHead>
                     <TableHead>Applies To</TableHead>
@@ -306,22 +318,30 @@ export function DiscountCouponsTab() {
                   {coupons.map((coupon) => (
                     <TableRow key={coupon.id} data-testid={`row-coupon-${coupon.id}`}>
                       <TableCell>
+                        <Switch
+                          checked={coupon.isActive}
+                          onCheckedChange={(checked) => toggleStatusMutation.mutate({ id: coupon.id, isActive: checked })}
+                          disabled={toggleStatusMutation.isPending}
+                          data-testid={`switch-coupon-status-${coupon.id}`}
+                        />
+                      </TableCell>
+                      <TableCell>
                         <code className="px-2 py-1 bg-muted rounded text-sm font-mono">
                           {coupon.code}
                         </code>
                       </TableCell>
-                      <TableCell>
-                        <Badge variant={coupon.isActive ? "default" : "secondary"}>
-                          {coupon.isActive ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
                       <TableCell className="capitalize">{coupon.discountType}</TableCell>
                       <TableCell>{formatDiscountValue(coupon)}</TableCell>
                       <TableCell>
-                        {coupon.serviceId ? (
-                          <Badge variant="outline">{getServiceName(coupon.serviceId)}</Badge>
-                        ) : coupon.bundleId ? (
-                          <Badge variant="outline">{getBundleName(coupon.bundleId)}</Badge>
+                        {coupon.serviceId || coupon.bundleId ? (
+                          <div className="flex flex-col gap-1">
+                            {coupon.serviceId && (
+                              <Badge variant="outline">{getServiceName(coupon.serviceId)}</Badge>
+                            )}
+                            {coupon.bundleId && (
+                              <Badge variant="outline">{getBundleName(coupon.bundleId)}</Badge>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-dark-gray text-sm">All</span>
                         )}

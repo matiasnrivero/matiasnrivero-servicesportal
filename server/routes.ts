@@ -6841,11 +6841,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "A coupon with this code already exists" });
       }
 
-      // Prevent setting both serviceId and bundleId - coupons must be either service-only, bundle-only, or global
-      if (serviceId && bundleId) {
-        return res.status(400).json({ error: "A coupon cannot be restricted to both a service and a bundle. Choose one or neither (for a global coupon)." });
-      }
-
       // Convert date strings to Date objects for Drizzle
       const couponData = { ...req.body };
       if (couponData.validFrom && typeof couponData.validFrom === 'string') {
@@ -6881,17 +6876,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const existingCoupon = await storage.getDiscountCouponByCode(code);
         if (existingCoupon && existingCoupon.id !== req.params.id) {
           return res.status(400).json({ error: "A coupon with this code already exists" });
-        }
-      }
-
-      // Prevent setting both serviceId and bundleId - coupons must be either service-only, bundle-only, or global
-      // Need to check what the final state would be after the update
-      const existingCouponToUpdate = await storage.getDiscountCoupon(req.params.id);
-      if (existingCouponToUpdate) {
-        const finalServiceId = serviceId !== undefined ? serviceId : existingCouponToUpdate.serviceId;
-        const finalBundleId = bundleId !== undefined ? bundleId : existingCouponToUpdate.bundleId;
-        if (finalServiceId && finalBundleId) {
-          return res.status(400).json({ error: "A coupon cannot be restricted to both a service and a bundle. Choose one or neither (for a global coupon)." });
         }
       }
 
