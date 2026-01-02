@@ -6846,7 +6846,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "A coupon cannot be restricted to both a service and a bundle. Choose one or neither (for a global coupon)." });
       }
 
-      const coupon = await storage.createDiscountCoupon(req.body);
+      // Convert date strings to Date objects for Drizzle
+      const couponData = { ...req.body };
+      if (couponData.validFrom && typeof couponData.validFrom === 'string') {
+        couponData.validFrom = new Date(couponData.validFrom);
+      }
+      if (couponData.validTo && typeof couponData.validTo === 'string') {
+        couponData.validTo = new Date(couponData.validTo);
+      }
+
+      const coupon = await storage.createDiscountCoupon(couponData);
       res.status(201).json(coupon);
     } catch (error) {
       console.error("Error creating discount coupon:", error);
@@ -6886,7 +6895,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const coupon = await storage.updateDiscountCoupon(req.params.id, req.body);
+      // Convert date strings to Date objects for Drizzle
+      const couponData = { ...req.body };
+      if (couponData.validFrom && typeof couponData.validFrom === 'string') {
+        couponData.validFrom = new Date(couponData.validFrom);
+      }
+      if (couponData.validTo && typeof couponData.validTo === 'string') {
+        couponData.validTo = new Date(couponData.validTo);
+      }
+
+      const coupon = await storage.updateDiscountCoupon(req.params.id, couponData);
       if (!coupon) {
         return res.status(404).json({ error: "Discount coupon not found" });
       }
