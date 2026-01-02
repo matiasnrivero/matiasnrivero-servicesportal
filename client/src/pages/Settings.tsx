@@ -1086,6 +1086,18 @@ function InputFieldsTabContent() {
     },
   });
 
+  const toggleFieldStatusMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      return apiRequest("PATCH", `/api/input-fields/${id}`, { isActive });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/input-fields"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to update status", description: error.message, variant: "destructive" });
+    },
+  });
+
   const form = useForm<InputFieldFormData>({
     resolver: zodResolver(inputFieldFormSchema),
     defaultValues: {
@@ -1434,19 +1446,27 @@ function InputFieldsTabContent() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Status</TableHead>
                 <TableHead className="w-[180px]">Field Key</TableHead>
                 <TableHead>Label</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Mode</TableHead>
                 <TableHead>Assign To</TableHead>
                 <TableHead>Input For</TableHead>
-                <TableHead className="text-center">Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {inputFieldsList.map((field) => (
                 <TableRow key={field.id} data-testid={`row-input-field-${field.id}`}>
+                  <TableCell>
+                    <Switch
+                      checked={field.isActive}
+                      onCheckedChange={(checked) => toggleFieldStatusMutation.mutate({ id: field.id, isActive: checked })}
+                      disabled={toggleFieldStatusMutation.isPending}
+                      data-testid={`switch-field-status-${field.id}`}
+                    />
+                  </TableCell>
                   <TableCell className="font-mono text-sm">{field.fieldKey}</TableCell>
                   <TableCell>{field.label}</TableCell>
                   <TableCell>
@@ -1462,13 +1482,6 @@ function InputFieldsTabContent() {
                     <Badge variant={field.inputFor === "delivery" ? "secondary" : "outline"} data-testid={`badge-input-for-${field.id}`}>
                       {field.inputFor === "delivery" ? "Delivery" : "Request"}
                     </Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {field.isActive ? (
-                      <Badge variant="default">Active</Badge>
-                    ) : (
-                      <Badge variant="secondary">Inactive</Badge>
-                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
