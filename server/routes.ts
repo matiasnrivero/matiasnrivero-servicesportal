@@ -1962,7 +1962,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                  ["vendor", "vendor_designer"].includes(targetUser.role);
         }
         // Primary client can modify client team members in their company
-        if (sessionUser.role === "client" && sessionUser.clientProfileId && targetUser.role === "client") {
+        if (sessionUser.role === "client" && sessionUser.clientProfileId && ["client", "client_member"].includes(targetUser.role)) {
           const clientProfile = await storage.getClientProfileById(sessionUser.clientProfileId);
           if (clientProfile && clientProfile.primaryUserId === sessionUserId) {
             // Primary client can modify team members (same clientProfileId) but not themselves
