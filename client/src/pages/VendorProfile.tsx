@@ -524,8 +524,12 @@ export default function VendorProfile() {
     mutationFn: async ({ userId, data }: { userId: string; data: typeof editForm }) => {
       return apiRequest("PATCH", `/api/vendor/users/${userId}`, data);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/users/vendor", vendorStructureId] });
+      // If editing the current user, also invalidate the default-user query
+      if (variables.userId === currentUser?.id) {
+        queryClient.invalidateQueries({ queryKey: ["/api/default-user"] });
+      }
       setEditDialogOpen(false);
       setEditingMember(null);
       toast({ title: "Team member updated successfully" });

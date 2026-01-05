@@ -1744,6 +1744,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updatedUser = await storage.updateUser(req.params.id, updateData);
+      
+      // If updating the primary vendor's email, also sync to vendor profile
+      if (email !== undefined && targetUser.role === "vendor" && targetUser.id === vendorStructureId) {
+        const vendorProfile = await storage.getVendorProfile(vendorStructureId);
+        if (vendorProfile) {
+          await storage.updateVendorProfile(vendorProfile.id, { email });
+        }
+      }
+      
       res.json(updatedUser);
     } catch (error) {
       console.error("Error updating team member:", error);
