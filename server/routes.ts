@@ -1961,13 +1961,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return targetUser.vendorId === vendorStructureId && 
                  ["vendor", "vendor_designer"].includes(targetUser.role);
         }
-        // Primary client can modify client team members in their company
+        // Primary client can modify themselves and team members in their company
         if (sessionUser.role === "client" && sessionUser.clientProfileId && ["client", "client_member"].includes(targetUser.role)) {
           const clientProfile = await storage.getClientProfileById(sessionUser.clientProfileId);
           if (clientProfile && clientProfile.primaryUserId === sessionUserId) {
-            // Primary client can modify team members (same clientProfileId) but not themselves
-            return targetUser.clientProfileId === sessionUser.clientProfileId && 
-                   targetUser.id !== sessionUserId;
+            // Primary client can modify themselves and team members (same clientProfileId)
+            return targetUser.clientProfileId === sessionUser.clientProfileId;
           }
         }
         return false;
@@ -1987,7 +1986,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (username !== undefined) updateData.username = username;
       if (email !== undefined) updateData.email = email;
       if (phone !== undefined) updateData.phone = phone;
-      if (isActive !== undefined) updateData.isActive = isActive;
+      // Users cannot deactivate themselves (except admins can toggle anyone)
+      if (isActive !== undefined && (sessionUser.role === "admin" || targetUser.id !== sessionUserId)) {
+        updateData.isActive = isActive;
+      }
       
       // Role and payment type can only be edited by admins
       if (sessionUser.role === "admin") {
