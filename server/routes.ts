@@ -1561,6 +1561,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Map role switcher values to specific usernames
       const roleToUsername: Record<string, string> = {
+        "admin": "Matias Rivero",           // Main Platform Admin
         "client": "Ross Adams",             // Client 1 (Pay as you go - Fusion Brands)
         "client_member": "Client Member 1", // Client Member 1 (Fusion Brands team)
         "client_2": "Leighton Kountz",       // Client 2 (Monthly Payment - Marketlink)
