@@ -2012,6 +2012,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const canModify = async () => {
         // Admin can modify anyone
         if (sessionUser.role === "admin") return true;
+        // Internal Designer can modify anyone (same as admin for user management)
+        if (sessionUser.role === "internal_designer") return true;
         // Vendor can modify vendors/vendor_designers under their structure
         if (sessionUser.role === "vendor") {
           const vendorStructureId = sessionUser.vendorId || sessionUserId;
