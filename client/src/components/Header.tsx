@@ -378,11 +378,12 @@ export function Header() {
                 // Map username to switcher value for client and vendor roles
                 const usernameToValue: Record<string, string> = {
                   "default-user": "client",
+                  "Ross Adams": "client",
                   "Client 2": "client_2",
-                  "Client 3": "client_3",
+                  "Tatiana Phelan": "client_3",
                   "Client Member 1": "client_member",
                   "Client Member 2": "client_member_2",
-                  "Client Member 3": "client_member_3",
+                  "Santiago Phelan": "client_member_3",
                   "Javier Rubianes": "vendor",
                   "Simon Doe": "vendor_2",
                   "Pablo Frabotta": "vendor_designer",
