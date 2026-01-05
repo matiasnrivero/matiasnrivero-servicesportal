@@ -2066,11 +2066,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "You don't have permission to delete this user" });
       }
 
-      await storage.deleteUser(req.params.id);
+      // Instead of hard delete, deactivate the user to preserve referential integrity
+      // This prevents foreign key constraint violations from service_requests, bundle_requests, etc.
+      await storage.updateUser(req.params.id, { 
+        isActive: false,
+        clientProfileId: null  // Remove from company team
+      });
       res.json({ success: true });
     } catch (error) {
-      console.error("Error deleting user:", error);
-      res.status(500).json({ error: "Failed to delete user" });
+      console.error("Error removing user:", error);
+      res.status(500).json({ error: "Failed to remove user" });
     }
   });
 

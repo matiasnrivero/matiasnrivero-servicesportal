@@ -555,9 +555,9 @@ export default function ClientTeamManagement() {
                             </div>
                             <p className="text-sm text-gray-500">{member.email || "No email"}</p>
                           </div>
-                          <Badge variant={isPrimary ? "default" : "secondary"}>
+                          <Badge variant={member.role === "client" ? "default" : "secondary"}>
                             {isPrimary && <Crown className="w-3 h-3 mr-1" />}
-                            {member.role === "client" ? (isPrimary ? "Admin" : "Member") : member.role}
+                            {member.role === "client" ? "Admin" : "Member"}
                           </Badge>
                           <span className="text-sm text-gray-500" data-testid={`text-created-${member.id}`}>
                             {member.createdAt ? format(new Date(member.createdAt), "MMM d, yyyy") : "N/A"}
