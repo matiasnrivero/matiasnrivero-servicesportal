@@ -375,19 +375,22 @@ export function Header() {
           <div className="flex items-center gap-2">
             <Select
               value={(() => {
-                // Map username to switcher value for client and vendor roles
+                // Map username to switcher value for all roles
                 const usernameToValue: Record<string, string> = {
+                  "Matias Rivero": "admin",
+                  "Federico Chami": "internal_designer",
+                  "Marina Siarri": "internal_designer_2",
+                  "Javier Rubianes": "vendor",
+                  "Pablo Frabotta": "vendor_designer",
+                  "Simon Doe": "vendor_2",
+                  "Richard Smith": "vendor_designer_2",
                   "default-user": "client",
                   "Ross Adams": "client",
+                  "Lourdes LaBelle": "client_member",
                   "Leighton Kountz": "client_2",
-                  "Tatiana Phelan": "client_3",
-                  "Client Member 1": "client_member",
                   "Joe Ledbetter": "client_member_2",
+                  "Tatiana Phelan": "client_3",
                   "Santiago Phelan": "client_member_3",
-                  "Javier Rubianes": "vendor",
-                  "Simon Doe": "vendor_2",
-                  "Pablo Frabotta": "vendor_designer",
-                  "Richard Smith": "vendor_designer_2",
                 };
                 if (currentUser.username && usernameToValue[currentUser.username]) {
                   return usernameToValue[currentUser.username];
@@ -401,10 +404,11 @@ export function Header() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="internal_designer">Internal Designer</SelectItem>
+                <SelectItem value="internal_designer">Internal Designer 1</SelectItem>
+                <SelectItem value="internal_designer_2">Internal Designer 2</SelectItem>
                 <SelectItem value="vendor">Vendor 1</SelectItem>
-                <SelectItem value="vendor_2">Vendor 2</SelectItem>
                 <SelectItem value="vendor_designer">Vendor Designer 1</SelectItem>
+                <SelectItem value="vendor_2">Vendor 2</SelectItem>
                 <SelectItem value="vendor_designer_2">Vendor Designer 2</SelectItem>
                 <SelectItem value="client">Client 1</SelectItem>
                 <SelectItem value="client_member">Client Member 1</SelectItem>

@@ -1552,7 +1552,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/switch-role", async (req, res) => {
     try {
       const { role } = req.body;
-      const validRoles = ["admin", "internal_designer", "vendor", "vendor_2", "vendor_designer", "vendor_designer_2", "client", "client_member", "client_2", "client_member_2", "client_3", "client_member_3", "designer"];
+      const validRoles = ["admin", "internal_designer", "internal_designer_2", "vendor", "vendor_2", "vendor_designer", "vendor_designer_2", "client", "client_member", "client_2", "client_member_2", "client_3", "client_member_3", "designer"];
       if (!role || !validRoles.includes(role)) {
         return res.status(400).json({ error: `role must be one of: ${validRoles.join(", ")}` });
       }
@@ -1561,17 +1561,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Map role switcher values to specific usernames
       const roleToUsername: Record<string, string> = {
-        "admin": "Matias Rivero",           // Main Platform Admin
-        "client": "Ross Adams",             // Client 1 (Pay as you go - Fusion Brands)
-        "client_member": "Client Member 1", // Client Member 1 (Fusion Brands team)
-        "client_2": "Leighton Kountz",       // Client 2 (Monthly Payment - Marketlink)
-        "client_member_2": "Joe Ledbetter",   // Client Member 2 (Marketlink team)
-        "client_3": "Tatiana Phelan",        // Client 3 (Deduct from Royalties - Shirt Mommy Company)
-        "client_member_3": "Santiago Phelan", // Client Member 3 (Shirt Mommy Company team)
-        "vendor": "Javier Rubianes",        // Vendor 1 (Pixel's Hive)
-        "vendor_2": "Simon Doe",            // Vendor 2 (Artwork Service Co)
-        "vendor_designer": "Pablo Frabotta", // Vendor Designer 1 (Pixel's Hive)
-        "vendor_designer_2": "Richard Smith", // Vendor Designer 2 (Artwork Service Co)
+        "admin": "Matias Rivero",              // Main Platform Admin
+        "internal_designer": "Federico Chami", // Internal Designer 1
+        "internal_designer_2": "Marina Siarri", // Internal Designer 2
+        "vendor": "Javier Rubianes",           // Vendor 1 (Pixel's Hive)
+        "vendor_designer": "Pablo Frabotta",   // Vendor Designer 1 (Pixel's Hive)
+        "vendor_2": "Simon Doe",               // Vendor 2 (Artwork Service Co)
+        "vendor_designer_2": "Richard Smith",  // Vendor Designer 2 (Artwork Service Co)
+        "client": "Ross Adams",                // Client 1 (Pay as you go - Fusion Brands)
+        "client_member": "Lourdes LaBelle",    // Client Member 1 (Fusion Brands team)
+        "client_2": "Leighton Kountz",         // Client 2 (Monthly Payment - Marketlink)
+        "client_member_2": "Joe Ledbetter",    // Client Member 2 (Marketlink team)
+        "client_3": "Tatiana Phelan",          // Client 3 (Deduct from Royalties - Shirt Mommy Company)
+        "client_member_3": "Santiago Phelan",  // Client Member 3 (Shirt Mommy Company team)
       };
       
       // For client roles, switch to specific test users
