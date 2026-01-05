@@ -1505,7 +1505,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/switch-role", async (req, res) => {
     try {
       const { role } = req.body;
-      const validRoles = ["admin", "internal_designer", "vendor", "vendor_2", "vendor_3", "vendor_designer", "client", "client_member", "client_2", "client_member_2", "client_3", "client_member_3", "designer"];
+      const validRoles = ["admin", "internal_designer", "vendor", "vendor_2", "vendor_designer", "vendor_designer_2", "client", "client_member", "client_2", "client_member_2", "client_3", "client_member_3", "designer"];
       if (!role || !validRoles.includes(role)) {
         return res.status(400).json({ error: `role must be one of: ${validRoles.join(", ")}` });
       }
@@ -1520,9 +1520,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "client_member_2": "Client Member 2", // Client Member 2 (Monthly Co team)
         "client_3": "Client 3",             // Client 3 (Deduct from Royalties - Royalty Inc)
         "client_member_3": "Client Member 3", // Client Member 3 (Royalty Inc team)
-        "vendor": "vendor-user",            // Vendor 1 (Artwork Service Co)
-        "vendor_2": "Creative Studio Co",   // Vendor 2
-        "vendor_3": "Design Works LLC",     // Vendor 3
+        "vendor": "Javier Rubianes",        // Vendor 1 (Pixel's Hive)
+        "vendor_2": "Simon Doe",            // Vendor 2 (Artwork Service Co)
+        "vendor_designer": "Pablo Frabotta", // Vendor Designer 1 (Pixel's Hive)
+        "vendor_designer_2": "Richard Smith", // Vendor Designer 2 (Artwork Service Co)
       };
       
       // For client roles, switch to specific test users
