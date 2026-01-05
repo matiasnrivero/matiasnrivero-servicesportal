@@ -2051,7 +2051,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Primary client can delete non-primary client team members
-        if (sessionUser.role === "client" && sessionUser.clientProfileId && targetUser.role === "client") {
+        if (sessionUser.role === "client" && sessionUser.clientProfileId && ["client", "client_member"].includes(targetUser.role)) {
           const clientProfile = await storage.getClientProfileById(sessionUser.clientProfileId);
           if (clientProfile && clientProfile.primaryUserId === sessionUserId) {
             // Primary client can delete team members (same clientProfileId) but not themselves
