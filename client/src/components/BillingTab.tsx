@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, CreditCard, Plus, Trash2, Star, CheckCircle2, Settings } from "lucide-react";
+import { Loader2, CreditCard, Plus, Trash2, Star, CheckCircle2, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { loadStripe } from "@stripe/stripe-js";
@@ -423,8 +423,8 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
           </div>
           {isAdmin && (
             <Button variant="outline" size="sm" onClick={handleOpenConfigDialog} data-testid="button-edit-payment-config">
-              <Settings className="h-4 w-4 mr-2" />
-              Configure
+              <Pencil className="h-4 w-4 mr-2" />
+              Edit
             </Button>
           )}
         </CardHeader>
