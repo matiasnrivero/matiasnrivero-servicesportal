@@ -379,10 +379,10 @@ export function Header() {
                 const usernameToValue: Record<string, string> = {
                   "default-user": "client",
                   "Ross Adams": "client",
-                  "Client 2": "client_2",
+                  "Leighton Kountz": "client_2",
                   "Tatiana Phelan": "client_3",
                   "Client Member 1": "client_member",
-                  "Client Member 2": "client_member_2",
+                  "Joe Ledbetter": "client_member_2",
                   "Santiago Phelan": "client_member_3",
                   "Javier Rubianes": "vendor",
                   "Simon Doe": "vendor_2",

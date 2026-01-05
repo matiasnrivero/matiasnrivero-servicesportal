@@ -1563,8 +1563,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const roleToUsername: Record<string, string> = {
         "client": "Ross Adams",             // Client 1 (Pay as you go - Fusion Brands)
         "client_member": "Client Member 1", // Client Member 1 (Fusion Brands team)
-        "client_2": "Client 2",             // Client 2 (Monthly Payment - Monthly Co)
-        "client_member_2": "Client Member 2", // Client Member 2 (Monthly Co team)
+        "client_2": "Leighton Kountz",       // Client 2 (Monthly Payment - Marketlink)
+        "client_member_2": "Joe Ledbetter",   // Client Member 2 (Marketlink team)
         "client_3": "Tatiana Phelan",        // Client 3 (Deduct from Royalties - Shirt Mommy Company)
         "client_member_3": "Santiago Phelan", // Client Member 3 (Shirt Mommy Company team)
         "vendor": "Javier Rubianes",        // Vendor 1 (Pixel's Hive)
