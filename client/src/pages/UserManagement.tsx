@@ -758,6 +758,9 @@ export default function UserManagement() {
                       >
                         {roleLabels[user.role] || user.role}
                       </Badge>
+                      {user.id === currentUser?.id && (
+                        <Badge variant="outline">You</Badge>
+                      )}
                       {!user.isActive && (
                         <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
                           Inactive
