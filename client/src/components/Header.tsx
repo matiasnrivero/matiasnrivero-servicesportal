@@ -234,7 +234,7 @@ export function Header() {
               </Button>
             </Link>
           )}
-          {isAnyClient && (
+          {isClient && (
             <Link href="/client-team">
               <Button
                 variant={location === "/client-team" ? "default" : "ghost"}
