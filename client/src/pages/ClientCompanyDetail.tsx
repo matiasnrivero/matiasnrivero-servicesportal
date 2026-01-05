@@ -481,7 +481,7 @@ export default function ClientCompanyDetail() {
           </TabsContent>
 
           <TabsContent value="payment">
-            <BillingTab clientProfileId={clientProfileId!} isPrimaryClient={false} />
+            <BillingTab clientProfileId={clientProfileId!} isPrimaryClient={false} isAdmin={currentUser?.role === "admin"} />
           </TabsContent>
         </Tabs>
 
