@@ -1028,6 +1028,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Only the requester can request changes" });
       }
 
+      // Check if the currently assigned designer is still active
+      // If not, reassign to the appropriate admin before processing the change request
+      let reassignmentInfo = null;
+      if (existingRequest.assigneeId) {
+        const assignee = await storage.getUser(existingRequest.assigneeId);
+        if (assignee && !assignee.isActive) {
+          // Designer is deactivated, need to reassign
+          if (assignee.role === "vendor_designer" && assignee.vendorId) {
+            const vendorAdmin = await storage.getPrimaryVendorAdmin(assignee.vendorId);
+            if (vendorAdmin) {
+              await storage.updateServiceRequest(req.params.id, { 
+                assigneeId: vendorAdmin.id, 
+                assignedAt: new Date() 
+              });
+              reassignmentInfo = { reassignedTo: vendorAdmin.username, reason: "Original designer is no longer active" };
+              console.log(`Change request: Reassigned service request ${req.params.id} from inactive vendor designer ${assignee.username} to vendor admin ${vendorAdmin.username}`);
+            } else {
+              // Fallback to platform admin
+              const platformAdmin = await storage.getPrimaryPlatformAdmin();
+              if (platformAdmin) {
+                await storage.updateServiceRequest(req.params.id, { 
+                  assigneeId: platformAdmin.id, 
+                  assignedAt: new Date() 
+                });
+                reassignmentInfo = { reassignedTo: platformAdmin.username, reason: "Original designer and vendor admin are no longer active" };
+                console.log(`Change request: Reassigned service request ${req.params.id} from inactive vendor designer ${assignee.username} to platform admin ${platformAdmin.username} (vendor admin unavailable)`);
+              }
+            }
+          } else if (assignee.role === "internal_designer") {
+            const platformAdmin = await storage.getPrimaryPlatformAdmin();
+            if (platformAdmin) {
+              await storage.updateServiceRequest(req.params.id, { 
+                assigneeId: platformAdmin.id, 
+                assignedAt: new Date() 
+              });
+              reassignmentInfo = { reassignedTo: platformAdmin.username, reason: "Original designer is no longer active" };
+              console.log(`Change request: Reassigned service request ${req.params.id} from inactive internal designer ${assignee.username} to platform admin ${platformAdmin.username}`);
+            }
+          }
+        }
+      }
+
       const request = await storage.requestChange(req.params.id, changeNote);
       
       // Also add the change note as a comment with "[Change Request]" prefix
@@ -1038,7 +1080,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         visibility: "public",
       });
       
-      res.json(request);
+      res.json({ ...request, reassignmentInfo });
     } catch (error) {
       console.error("Error requesting changes:", error);
       res.status(500).json({ error: "Failed to request changes" });
@@ -2006,8 +2048,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // If deactivating a designer, reassign their undelivered jobs
+      let reassignmentInfo = null;
+      if (isActive === false && targetUser.isActive === true) {
+        // Check if designer has undelivered jobs first
+        const undeliveredJobs = await storage.getUndeliveredJobsByDesigner(targetUser.id);
+        const hasUndeliveredJobs = undeliveredJobs.serviceRequests.length > 0 || undeliveredJobs.bundleRequests.length > 0;
+
+        if (hasUndeliveredJobs) {
+          if (targetUser.role === "vendor_designer" && targetUser.vendorId) {
+            // Vendor designer being deactivated - reassign to Primary Vendor Admin
+            const vendorAdmin = await storage.getPrimaryVendorAdmin(targetUser.vendorId);
+            if (vendorAdmin) {
+              // For vendor designers, also update vendorAssigneeId to the vendor admin
+              reassignmentInfo = await storage.reassignOrphanedJobsFromDesigner(targetUser.id, vendorAdmin.id, {
+                updateVendorAssignee: true,
+                newVendorAssigneeId: vendorAdmin.id
+              });
+              console.log(`Reassigned ${reassignmentInfo.serviceRequests} service requests and ${reassignmentInfo.bundleRequests} bundle requests from vendor designer ${targetUser.username} to vendor admin ${vendorAdmin.username}`);
+            } else {
+              // No active vendor admin found - fallback to platform admin
+              const platformAdmin = await storage.getPrimaryPlatformAdmin();
+              if (platformAdmin) {
+                reassignmentInfo = await storage.reassignOrphanedJobsFromDesigner(targetUser.id, platformAdmin.id);
+                console.log(`No active vendor admin found. Reassigned ${reassignmentInfo.serviceRequests} service requests and ${reassignmentInfo.bundleRequests} bundle requests from vendor designer ${targetUser.username} to platform admin ${platformAdmin.username}`);
+              } else {
+                // No admin available - cannot deactivate
+                return res.status(409).json({ 
+                  error: `Cannot deactivate ${targetUser.username}: They have ${undeliveredJobs.serviceRequests.length + undeliveredJobs.bundleRequests.length} undelivered job(s) and no active admin is available for reassignment` 
+                });
+              }
+            }
+          } else if (targetUser.role === "internal_designer") {
+            // Internal designer being deactivated - reassign to Primary Platform Admin
+            const platformAdmin = await storage.getPrimaryPlatformAdmin();
+            if (platformAdmin) {
+              reassignmentInfo = await storage.reassignOrphanedJobsFromDesigner(targetUser.id, platformAdmin.id);
+              console.log(`Reassigned ${reassignmentInfo.serviceRequests} service requests and ${reassignmentInfo.bundleRequests} bundle requests from internal designer ${targetUser.username} to platform admin ${platformAdmin.username}`);
+            } else {
+              // No admin available - cannot deactivate
+              return res.status(409).json({ 
+                error: `Cannot deactivate ${targetUser.username}: They have ${undeliveredJobs.serviceRequests.length + undeliveredJobs.bundleRequests.length} undelivered job(s) and no active platform admin is available for reassignment` 
+              });
+            }
+          }
+        }
+      }
+
       const updatedUser = await storage.updateUser(req.params.id, updateData);
-      res.json(updatedUser);
+      res.json({ ...updatedUser, reassignmentInfo });
     } catch (error) {
       console.error("Error updating user:", error);
       res.status(500).json({ error: "Failed to update user" });
@@ -2066,13 +2155,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "You don't have permission to delete this user" });
       }
 
+      // If deleting/deactivating a designer, reassign their undelivered jobs first
+      let reassignmentInfo = null;
+      if (targetUser.isActive) {
+        // Check if designer has undelivered jobs first
+        const undeliveredJobs = await storage.getUndeliveredJobsByDesigner(targetUser.id);
+        const hasUndeliveredJobs = undeliveredJobs.serviceRequests.length > 0 || undeliveredJobs.bundleRequests.length > 0;
+
+        if (hasUndeliveredJobs) {
+          if (targetUser.role === "vendor_designer" && targetUser.vendorId) {
+            // Vendor designer being deleted - reassign to Primary Vendor Admin
+            const vendorAdmin = await storage.getPrimaryVendorAdmin(targetUser.vendorId);
+            if (vendorAdmin) {
+              // For vendor designers, also update vendorAssigneeId to the vendor admin
+              reassignmentInfo = await storage.reassignOrphanedJobsFromDesigner(targetUser.id, vendorAdmin.id, {
+                updateVendorAssignee: true,
+                newVendorAssigneeId: vendorAdmin.id
+              });
+              console.log(`Reassigned ${reassignmentInfo.serviceRequests} service requests and ${reassignmentInfo.bundleRequests} bundle requests from vendor designer ${targetUser.username} to vendor admin ${vendorAdmin.username}`);
+            } else {
+              // No active vendor admin found - fallback to platform admin
+              const platformAdmin = await storage.getPrimaryPlatformAdmin();
+              if (platformAdmin) {
+                reassignmentInfo = await storage.reassignOrphanedJobsFromDesigner(targetUser.id, platformAdmin.id);
+                console.log(`No active vendor admin found. Reassigned ${reassignmentInfo.serviceRequests} service requests and ${reassignmentInfo.bundleRequests} bundle requests from vendor designer ${targetUser.username} to platform admin ${platformAdmin.username}`);
+              } else {
+                // No admin available - cannot delete
+                return res.status(409).json({ 
+                  error: `Cannot delete ${targetUser.username}: They have ${undeliveredJobs.serviceRequests.length + undeliveredJobs.bundleRequests.length} undelivered job(s) and no active admin is available for reassignment` 
+                });
+              }
+            }
+          } else if (targetUser.role === "internal_designer") {
+            // Internal designer being deleted - reassign to Primary Platform Admin
+            const platformAdmin = await storage.getPrimaryPlatformAdmin();
+            if (platformAdmin) {
+              reassignmentInfo = await storage.reassignOrphanedJobsFromDesigner(targetUser.id, platformAdmin.id);
+              console.log(`Reassigned ${reassignmentInfo.serviceRequests} service requests and ${reassignmentInfo.bundleRequests} bundle requests from internal designer ${targetUser.username} to platform admin ${platformAdmin.username}`);
+            } else {
+              // No admin available - cannot delete
+              return res.status(409).json({ 
+                error: `Cannot delete ${targetUser.username}: They have ${undeliveredJobs.serviceRequests.length + undeliveredJobs.bundleRequests.length} undelivered job(s) and no active platform admin is available for reassignment` 
+              });
+            }
+          }
+        }
+      }
+
       // Instead of hard delete, deactivate the user to preserve referential integrity
       // This prevents foreign key constraint violations from service_requests, bundle_requests, etc.
       await storage.updateUser(req.params.id, { 
         isActive: false,
         clientProfileId: null  // Remove from company team
       });
-      res.json({ success: true });
+      res.json({ success: true, reassignmentInfo });
     } catch (error) {
       console.error("Error removing user:", error);
       res.status(500).json({ error: "Failed to remove user" });
@@ -4293,8 +4429,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "changeNote is required" });
       }
 
+      // Check if the currently assigned designer is still active
+      // If not, reassign to the appropriate admin before processing the change request
+      let reassignmentInfo = null;
+      if (existingRequest.assigneeId) {
+        const assignee = await storage.getUser(existingRequest.assigneeId);
+        if (assignee && !assignee.isActive) {
+          // Designer is deactivated, need to reassign
+          if (assignee.role === "vendor_designer" && assignee.vendorId) {
+            const vendorAdmin = await storage.getPrimaryVendorAdmin(assignee.vendorId);
+            if (vendorAdmin) {
+              // For vendor designers, also update vendorAssigneeId to the vendor admin
+              await storage.updateBundleRequest(req.params.id, { 
+                assigneeId: vendorAdmin.id, 
+                vendorAssigneeId: vendorAdmin.id,
+                assignedAt: new Date() 
+              });
+              reassignmentInfo = { reassignedTo: vendorAdmin.username, reason: "Original designer is no longer active" };
+              console.log(`Change request: Reassigned bundle request ${req.params.id} from inactive vendor designer ${assignee.username} to vendor admin ${vendorAdmin.username}`);
+            } else {
+              // Fallback to platform admin
+              const platformAdmin = await storage.getPrimaryPlatformAdmin();
+              if (platformAdmin) {
+                await storage.updateBundleRequest(req.params.id, { 
+                  assigneeId: platformAdmin.id, 
+                  assignedAt: new Date() 
+                });
+                reassignmentInfo = { reassignedTo: platformAdmin.username, reason: "Original designer and vendor admin are no longer active" };
+                console.log(`Change request: Reassigned bundle request ${req.params.id} from inactive vendor designer ${assignee.username} to platform admin ${platformAdmin.username} (vendor admin unavailable)`);
+              }
+            }
+          } else if (assignee.role === "internal_designer") {
+            const platformAdmin = await storage.getPrimaryPlatformAdmin();
+            if (platformAdmin) {
+              await storage.updateBundleRequest(req.params.id, { 
+                assigneeId: platformAdmin.id, 
+                assignedAt: new Date() 
+              });
+              reassignmentInfo = { reassignedTo: platformAdmin.username, reason: "Original designer is no longer active" };
+              console.log(`Change request: Reassigned bundle request ${req.params.id} from inactive internal designer ${assignee.username} to platform admin ${platformAdmin.username}`);
+            }
+          }
+        }
+      }
+
       const request = await storage.requestBundleChange(req.params.id, changeNote);
-      res.json(request);
+      res.json({ ...request, reassignmentInfo });
     } catch (error) {
       console.error("Error requesting change on bundle request:", error);
       res.status(500).json({ error: "Failed to request change" });

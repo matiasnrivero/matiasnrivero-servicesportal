@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { eq, desc, and, or, isNull } from "drizzle-orm";
+import { eq, desc, and, or, isNull, inArray } from "drizzle-orm";
 import {
   type User,
   type InsertUser,
@@ -351,6 +351,16 @@ export interface IStorage {
   getPaymentsByBundleRequest(bundleRequestId: string): Promise<Payment[]>;
   createPayment(data: InsertPayment): Promise<Payment>;
   updatePayment(id: string, data: UpdatePayment): Promise<Payment | undefined>;
+
+  // Designer reassignment helper methods
+  getPrimaryVendorAdmin(vendorId: string): Promise<User | undefined>;
+  getPrimaryPlatformAdmin(): Promise<User | undefined>;
+  reassignOrphanedJobsFromDesigner(
+    designerId: string, 
+    newAssigneeId: string, 
+    options?: { updateVendorAssignee?: boolean; newVendorAssigneeId?: string }
+  ): Promise<{ serviceRequests: number; bundleRequests: number }>;
+  getUndeliveredJobsByDesigner(designerId: string): Promise<{ serviceRequests: ServiceRequest[]; bundleRequests: BundleRequest[] }>;
 }
 
 export class DbStorage implements IStorage {
@@ -1500,6 +1510,118 @@ export class DbStorage implements IStorage {
       .where(eq(payments.id, id))
       .returning();
     return result[0];
+  }
+
+  // Designer reassignment helper methods
+
+  // Get the primary admin of a vendor company (the user linked to vendorProfiles.userId)
+  async getPrimaryVendorAdmin(vendorId: string): Promise<User | undefined> {
+    // vendorId could be either a vendorProfiles.userId (the vendor admin) or vendorProfiles.id
+    // First try to get the vendor profile by userId
+    let profile = await db.select().from(vendorProfiles)
+      .where(and(eq(vendorProfiles.userId, vendorId), isNull(vendorProfiles.deletedAt)))
+      .limit(1);
+    
+    if (profile.length === 0) {
+      // Try by profile id
+      profile = await db.select().from(vendorProfiles)
+        .where(and(eq(vendorProfiles.id, vendorId), isNull(vendorProfiles.deletedAt)))
+        .limit(1);
+    }
+
+    if (profile.length === 0) return undefined;
+
+    // Get the vendor admin user
+    const vendorAdmin = await db.select().from(users)
+      .where(and(eq(users.id, profile[0].userId), eq(users.isActive, true)))
+      .limit(1);
+    
+    return vendorAdmin[0];
+  }
+
+  // Get the first active admin user of the platform
+  async getPrimaryPlatformAdmin(): Promise<User | undefined> {
+    const admins = await db.select().from(users)
+      .where(and(eq(users.role, "admin"), eq(users.isActive, true)))
+      .orderBy(users.createdAt)
+      .limit(1);
+    return admins[0];
+  }
+
+  // Get all undelivered jobs (in-progress or change-request status) assigned to a designer
+  async getUndeliveredJobsByDesigner(designerId: string): Promise<{ serviceRequests: ServiceRequest[]; bundleRequests: BundleRequest[] }> {
+    const undeliveredStatuses = ["in-progress", "change-request"];
+    
+    const serviceReqs = await db.select().from(serviceRequests)
+      .where(and(
+        eq(serviceRequests.assigneeId, designerId),
+        inArray(serviceRequests.status, undeliveredStatuses)
+      ));
+    
+    const bundleReqs = await db.select().from(bundleRequests)
+      .where(and(
+        eq(bundleRequests.assigneeId, designerId),
+        inArray(bundleRequests.status, undeliveredStatuses)
+      ));
+
+    return { serviceRequests: serviceReqs, bundleRequests: bundleReqs };
+  }
+
+  // Reassign all undelivered jobs from one designer to another
+  // If the designer was a vendor_designer, also update vendorAssigneeId for bundle requests where applicable
+  async reassignOrphanedJobsFromDesigner(
+    designerId: string, 
+    newAssigneeId: string, 
+    options?: { updateVendorAssignee?: boolean; newVendorAssigneeId?: string }
+  ): Promise<{ serviceRequests: number; bundleRequests: number }> {
+    const undeliveredStatuses = ["in-progress", "change-request"];
+    
+    // Reassign service requests where assigneeId matches
+    const serviceResult = await db.update(serviceRequests)
+      .set({ assigneeId: newAssigneeId, assignedAt: new Date() })
+      .where(and(
+        eq(serviceRequests.assigneeId, designerId),
+        inArray(serviceRequests.status, undeliveredStatuses)
+      ))
+      .returning();
+    
+    // Build bundle update object - always update assigneeId
+    const bundleUpdateData: Record<string, any> = { 
+      assigneeId: newAssigneeId, 
+      assignedAt: new Date() 
+    };
+    
+    // If the new assignee is a vendor admin, update vendorAssigneeId as well
+    if (options?.updateVendorAssignee && options.newVendorAssigneeId) {
+      bundleUpdateData.vendorAssigneeId = options.newVendorAssigneeId;
+    }
+    
+    // Reassign bundle requests where assigneeId matches the designer
+    const bundleResultByAssignee = await db.update(bundleRequests)
+      .set(bundleUpdateData)
+      .where(and(
+        eq(bundleRequests.assigneeId, designerId),
+        inArray(bundleRequests.status, undeliveredStatuses)
+      ))
+      .returning();
+
+    // Also update bundle requests where vendorAssigneeId matches the designer
+    // (in case the vendor designer was set as vendorAssignee but different person was assignee)
+    let bundleResultByVendorAssignee: any[] = [];
+    if (options?.updateVendorAssignee && options.newVendorAssigneeId) {
+      bundleResultByVendorAssignee = await db.update(bundleRequests)
+        .set({ vendorAssigneeId: options.newVendorAssigneeId })
+        .where(and(
+          eq(bundleRequests.vendorAssigneeId, designerId),
+          inArray(bundleRequests.status, undeliveredStatuses)
+        ))
+        .returning();
+    }
+
+    return { 
+      serviceRequests: serviceResult.length, 
+      bundleRequests: bundleResultByAssignee.length + bundleResultByVendorAssignee.length 
+    };
   }
 }
 
