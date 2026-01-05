@@ -1522,7 +1522,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      let user = await storage.getUserByUsername("default-user");
+      // Default user is Ross Adams (Client 1 - Fusion Brands)
+      let user = await storage.getUserByUsername("Ross Adams");
+      if (!user) {
+        // Fallback to default-user for backwards compatibility
+        user = await storage.getUserByUsername("default-user");
+      }
       if (!user) {
         user = await storage.createUser({
           username: "default-user",
@@ -1556,7 +1561,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Map role switcher values to specific usernames
       const roleToUsername: Record<string, string> = {
-        "client": "default-user",           // Client 1 (Pay as you go - Fusion Brands)
+        "client": "Ross Adams",             // Client 1 (Pay as you go - Fusion Brands)
         "client_member": "Client Member 1", // Client Member 1 (Fusion Brands team)
         "client_2": "Client 2",             // Client 2 (Monthly Payment - Monthly Co)
         "client_member_2": "Client Member 2", // Client Member 2 (Monthly Co team)
