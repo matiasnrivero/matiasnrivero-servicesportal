@@ -7,12 +7,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, CreditCard, Plus, Trash2, Star, CheckCircle2, Pencil } from "lucide-react";
+import { Loader2, CreditCard, Plus, Trash2, Star, CheckCircle2, Pencil, Package, Calendar, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import type { ClientPaymentMethod, BillingAddress } from "@shared/schema";
+import type { ClientPaymentMethod, BillingAddress, MonthlyPack, MonthlyPackService, ClientMonthlyPackSubscription, MonthlyPackUsage } from "@shared/schema";
+import { format } from "date-fns";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "");
 
@@ -267,6 +268,15 @@ interface BillingTabProps {
   isPrimaryClient?: boolean;
 }
 
+interface PackWithServices extends MonthlyPack {
+  services: MonthlyPackService[];
+}
+
+interface SubscriptionWithUsage extends ClientMonthlyPackSubscription {
+  pack?: PackWithServices;
+  usage?: MonthlyPackUsage[];
+}
+
 export default function BillingTab({ clientProfileId, isAdmin = false, isPrimaryClient = false }: BillingTabProps) {
   const { toast } = useToast();
   const [addCardOpen, setAddCardOpen] = useState(false);
@@ -274,6 +284,9 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [paymentConfig, setPaymentConfig] = useState("pay_as_you_go");
   const [invoiceDay, setInvoiceDay] = useState<number>(1);
+  const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
+  const [selectedPackForSubscribe, setSelectedPackForSubscribe] = useState<PackWithServices | null>(null);
+  const [cancelSubscriptionId, setCancelSubscriptionId] = useState<string | null>(null);
 
   const { data: billingInfo, isLoading } = useQuery<BillingInfo>({
     queryKey: ["/api/billing/client-info", clientProfileId],
@@ -283,6 +296,82 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
       return res.json();
     },
     enabled: !!clientProfileId,
+  });
+
+  // Fetch available monthly packs (active only)
+  const { data: availablePacks = [] } = useQuery<PackWithServices[]>({
+    queryKey: ["/api/monthly-packs"],
+    queryFn: async () => {
+      const res = await fetch("/api/monthly-packs");
+      if (!res.ok) throw new Error("Failed to fetch packs");
+      return res.json();
+    },
+  });
+
+  // Fetch client's current subscriptions
+  const { data: subscriptions = [], isLoading: subscriptionsLoading } = useQuery<SubscriptionWithUsage[]>({
+    queryKey: ["/api/monthly-pack-subscriptions", clientProfileId],
+    queryFn: async () => {
+      const res = await fetch(`/api/monthly-pack-subscriptions?clientProfileId=${clientProfileId}`);
+      if (!res.ok) throw new Error("Failed to fetch subscriptions");
+      return res.json();
+    },
+    enabled: !!clientProfileId,
+  });
+
+  // Filter active packs (only show those not already subscribed)
+  const activePacks = availablePacks.filter(pack => 
+    pack.isActive && !subscriptions.some(sub => sub.packId === pack.id && sub.isActive)
+  );
+
+  // Subscribe to a pack mutation
+  const subscribeMutation = useMutation({
+    mutationFn: async (packId: string) => {
+      const res = await apiRequest("POST", "/api/monthly-pack-subscriptions", {
+        clientProfileId,
+        packId,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/monthly-pack-subscriptions", clientProfileId] });
+      toast({
+        title: "Success",
+        description: "Successfully subscribed to the monthly pack",
+      });
+      setSubscribeDialogOpen(false);
+      setSelectedPackForSubscribe(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to subscribe to pack",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Cancel subscription mutation
+  const cancelSubscriptionMutation = useMutation({
+    mutationFn: async (subscriptionId: string) => {
+      const res = await apiRequest("PATCH", `/api/monthly-pack-subscriptions/${subscriptionId}/cancel`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/monthly-pack-subscriptions", clientProfileId] });
+      toast({
+        title: "Success",
+        description: "Subscription cancelled successfully",
+      });
+      setCancelSubscriptionId(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to cancel subscription",
+        variant: "destructive",
+      });
+    },
   });
 
   const setDefaultMutation = useMutation({
@@ -517,6 +606,201 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : null}
               Save Configuration
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Monthly Pack Subscriptions Section */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Monthly Pack Subscriptions
+            </CardTitle>
+            <CardDescription>
+              Subscribe to monthly packs for discounted service rates
+            </CardDescription>
+          </div>
+          {(isAdmin || isPrimaryClient) && activePacks.length > 0 && (
+            <Dialog open={subscribeDialogOpen} onOpenChange={setSubscribeDialogOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-subscribe-pack">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Subscribe to Pack
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Subscribe to Monthly Pack</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <p className="text-sm text-muted-foreground">
+                    Choose a monthly pack to subscribe to. You will be charged the pack price each month and receive the included service quantities.
+                  </p>
+                  <div className="space-y-3">
+                    {activePacks.map((pack) => {
+                      const totalQty = pack.services?.reduce((sum, s) => sum + s.includedQuantity, 0) || 0;
+                      const perUnitRate = totalQty > 0 ? parseFloat(pack.price) / totalQty : 0;
+                      return (
+                        <div
+                          key={pack.id}
+                          className={`p-4 border rounded-md cursor-pointer transition-colors ${
+                            selectedPackForSubscribe?.id === pack.id ? "border-primary bg-primary/5" : ""
+                          }`}
+                          onClick={() => setSelectedPackForSubscribe(pack)}
+                          data-testid={`pack-option-${pack.id}`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="font-medium">{pack.name}</p>
+                              {pack.description && (
+                                <p className="text-sm text-muted-foreground">{pack.description}</p>
+                              )}
+                              <div className="mt-2 text-sm">
+                                <span className="font-semibold">${pack.price}/month</span>
+                                <span className="text-muted-foreground ml-2">
+                                  ({totalQty} services included)
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Per-unit rate: ${perUnitRate.toFixed(2)}
+                              </p>
+                            </div>
+                            {selectedPackForSubscribe?.id === pack.id && (
+                              <CheckCircle2 className="h-5 w-5 text-primary" />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => {
+                    setSubscribeDialogOpen(false);
+                    setSelectedPackForSubscribe(null);
+                  }}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => selectedPackForSubscribe && subscribeMutation.mutate(selectedPackForSubscribe.id)}
+                    disabled={!selectedPackForSubscribe || subscribeMutation.isPending}
+                    data-testid="button-confirm-subscribe"
+                  >
+                    {subscribeMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : null}
+                    Subscribe
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+        </CardHeader>
+        <CardContent>
+          {subscriptionsLoading ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : subscriptions.filter(s => s.isActive).length === 0 ? (
+            <div className="text-center py-6 text-muted-foreground">
+              <Package className="mx-auto h-12 w-12 mb-2 opacity-50" />
+              <p>No active pack subscriptions</p>
+              {(isAdmin || isPrimaryClient) && activePacks.length > 0 && (
+                <p className="text-sm mt-1">Subscribe to a pack to get discounted rates</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {subscriptions.filter(s => s.isActive).map((subscription) => {
+                const pack = availablePacks.find(p => p.id === subscription.packId);
+                const totalQty = pack?.services?.reduce((sum, s) => sum + s.includedQuantity, 0) || 0;
+                const perUnitRate = totalQty > 0 ? parseFloat(subscription.priceAtSubscription || pack?.price || "0") / totalQty : 0;
+                
+                return (
+                  <div
+                    key={subscription.id}
+                    className="p-4 border rounded-md"
+                    data-testid={`subscription-${subscription.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium">{pack?.name || "Unknown Pack"}</p>
+                          <Badge variant="secondary">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Active
+                          </Badge>
+                        </div>
+                        {pack?.description && (
+                          <p className="text-sm text-muted-foreground mt-1">{pack.description}</p>
+                        )}
+                        <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Monthly Price</p>
+                            <p className="font-medium">${subscription.priceAtSubscription || pack?.price || "0"}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Per-Unit Rate</p>
+                            <p className="font-medium">${perUnitRate.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Subscribed Since</p>
+                            <p className="font-medium">
+                              {subscription.startDate ? format(new Date(subscription.startDate), "MMM d, yyyy") : "-"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Included Services</p>
+                            <p className="font-medium">{totalQty} per month</p>
+                          </div>
+                        </div>
+                      </div>
+                      {(isAdmin || isPrimaryClient) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setCancelSubscriptionId(subscription.id)}
+                          data-testid={`button-cancel-subscription-${subscription.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Cancel Subscription Dialog */}
+      <Dialog open={!!cancelSubscriptionId} onOpenChange={() => setCancelSubscriptionId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel Subscription</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground">
+            Are you sure you want to cancel this subscription? You will lose access to the discounted pack rates at the end of the billing period.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelSubscriptionId(null)}>
+              Keep Subscription
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => cancelSubscriptionId && cancelSubscriptionMutation.mutate(cancelSubscriptionId)}
+              disabled={cancelSubscriptionMutation.isPending}
+              data-testid="button-confirm-cancel-subscription"
+            >
+              {cancelSubscriptionMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Cancel Subscription"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -395,6 +395,7 @@ export interface IStorage {
   // Client Monthly Pack Subscription methods
   getClientMonthlyPackSubscriptions(clientProfileId: string): Promise<ClientMonthlyPackSubscription[]>;
   getActiveClientMonthlyPackSubscription(clientProfileId: string): Promise<ClientMonthlyPackSubscription | undefined>;
+  getActiveClientSubscriptions(clientProfileId: string): Promise<ClientMonthlyPackSubscription[]>;
   getClientMonthlyPackSubscription(id: string): Promise<ClientMonthlyPackSubscription | undefined>;
   createClientMonthlyPackSubscription(data: InsertClientMonthlyPackSubscription): Promise<ClientMonthlyPackSubscription>;
   updateClientMonthlyPackSubscription(id: string, data: UpdateClientMonthlyPackSubscription): Promise<ClientMonthlyPackSubscription | undefined>;
@@ -1753,6 +1754,15 @@ export class DbStorage implements IStorage {
       ))
       .limit(1);
     return result[0];
+  }
+
+  async getActiveClientSubscriptions(clientProfileId: string): Promise<ClientMonthlyPackSubscription[]> {
+    return await db.select().from(clientMonthlyPackSubscriptions)
+      .where(and(
+        eq(clientMonthlyPackSubscriptions.clientProfileId, clientProfileId),
+        eq(clientMonthlyPackSubscriptions.isActive, true)
+      ))
+      .orderBy(desc(clientMonthlyPackSubscriptions.createdAt));
   }
 
   async getClientMonthlyPackSubscription(id: string): Promise<ClientMonthlyPackSubscription | undefined> {

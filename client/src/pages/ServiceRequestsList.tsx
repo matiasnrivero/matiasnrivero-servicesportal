@@ -546,6 +546,11 @@ export default function ServiceRequestsList() {
   };
 
   const getServicePrice = (request: ServiceRequest) => {
+    // For clients, if the request has pack-based pricing, show that
+    if (isDistributor(currentUser?.role) && request.monthlyPackUnitPrice) {
+      return `$ ${parseFloat(request.monthlyPackUnitPrice).toFixed(2)}`;
+    }
+    
     const service = services.find(s => s.id === request.serviceId);
     const formData = request.formData as Record<string, any> | null;
     

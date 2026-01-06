@@ -556,6 +556,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         delete requestData.vendorAssigneeId;
       }
 
+      // Check for active monthly pack subscription for pack-based pricing
+      if (sessionUser.clientProfileId && req.body.serviceId) {
+        try {
+          // Get service to find the parent service (father service)
+          const service = await storage.getService(req.body.serviceId);
+          const fatherServiceId = service?.parentServiceId || req.body.serviceId;
+          
+          // Get active subscriptions for this client
+          const activeSubscriptions = await storage.getActiveClientSubscriptions(sessionUser.clientProfileId);
+          
+          // Find a subscription that includes this service
+          for (const subscription of activeSubscriptions) {
+            const pack = await storage.getMonthlyPack(subscription.packId);
+            if (pack && pack.services) {
+              const packService = pack.services.find(ps => ps.serviceId === fatherServiceId);
+              if (packService) {
+                // Calculate per-unit price from pack
+                const totalQty = pack.services.reduce((sum, s) => sum + s.includedQuantity, 0);
+                const priceToUse = subscription.priceAtSubscription || pack.price;
+                const perUnitPrice = totalQty > 0 ? parseFloat(priceToUse) / totalQty : 0;
+                
+                // Set pack pricing on the request
+                requestData.monthlyPackSubscriptionId = subscription.id;
+                requestData.monthlyPackUnitPrice = perUnitPrice.toFixed(2);
+                
+                // Also set the finalPrice based on pack unit price
+                if (!requestData.finalPrice) {
+                  requestData.finalPrice = perUnitPrice.toFixed(2);
+                }
+                
+                console.log(`Applied monthly pack pricing: subscription=${subscription.id}, unitPrice=${perUnitPrice.toFixed(2)}`);
+                break; // Use the first matching subscription
+              }
+            }
+          }
+        } catch (packError) {
+          console.error("Error checking monthly pack subscription:", packError);
+          // Continue without pack pricing if there's an error
+        }
+      }
+
       let request = await storage.createServiceRequest(requestData);
 
       // If a discount coupon was used, increment the usage counter
@@ -564,6 +605,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.incrementCouponUsage(request.discountCouponId);
         } catch (couponError) {
           console.error("Failed to increment coupon usage:", couponError);
+        }
+      }
+
+      // If pack pricing was applied, increment the usage counter
+      if (request.monthlyPackSubscriptionId) {
+        try {
+          const service = await storage.getService(request.serviceId);
+          const fatherServiceId = service?.parentServiceId || request.serviceId;
+          await storage.incrementMonthlyPackUsage(request.monthlyPackSubscriptionId, fatherServiceId);
+          console.log(`Incremented monthly pack usage for subscription ${request.monthlyPackSubscriptionId}`);
+        } catch (usageError) {
+          console.error("Failed to increment monthly pack usage:", usageError);
         }
       }
 
