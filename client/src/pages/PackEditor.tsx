@@ -412,7 +412,7 @@ export default function PackEditor() {
                         {displayItems.length === 0 ? (
                           <p className="text-muted-foreground text-center py-4">No services added yet</p>
                         ) : (
-                          <ScrollArea className="max-h-[250px]">
+                          <ScrollArea className="max-h-[400px]">
                             <Table>
                               <TableHeader>
                                 <TableRow>
