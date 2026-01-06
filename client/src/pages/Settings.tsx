@@ -59,6 +59,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap, Percent } from "lucide-react";
 import { AutomationSettingsTab } from "@/components/AutomationSettings";
 import { DiscountCouponsTab } from "@/components/DiscountCouponsTab";
+import { MonthlyPacksTab } from "@/components/MonthlyPacksTab";
 import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem, InputField, ServiceField, BundleField, ServicePricingTier, LineItemField } from "@shared/schema";
 import { insertBundleLineItemSchema, inputFieldTypes, valueModes, pricingStructures, assignToModes, inputForTypes } from "@shared/schema";
 
@@ -4155,6 +4156,10 @@ export default function Settings() {
                     <Percent className="h-4 w-4 mr-1" />
                     Discounts
                   </TabsTrigger>
+                  <TabsTrigger value="monthly-packs" data-testid="tab-monthly-packs">
+                    <Package className="h-4 w-4 mr-1" />
+                    Monthly Packs
+                  </TabsTrigger>
                 </>
               )}
               <TabsTrigger value="input-fields" data-testid="tab-input-fields">
@@ -4196,6 +4201,10 @@ export default function Settings() {
 
                 <TabsContent value="discount-coupons">
                   <DiscountCouponsTab />
+                </TabsContent>
+
+                <TabsContent value="monthly-packs">
+                  <MonthlyPacksTab />
                 </TabsContent>
               </>
             )}
