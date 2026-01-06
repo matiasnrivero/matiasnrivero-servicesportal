@@ -274,6 +274,7 @@ export const clientMonthlyPackSubscriptions = pgTable("client_monthly_pack_subsc
   isActive: boolean("is_active").notNull().default(true),
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date"),
+  priceAtSubscription: decimal("price_at_subscription", { precision: 10, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

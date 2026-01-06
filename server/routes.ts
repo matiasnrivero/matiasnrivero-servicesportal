@@ -7563,6 +7563,430 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== END PHASE 7 ROUTES ====================
 
+  // ==================== MONTHLY PACKS ROUTES ====================
+
+  // Get all monthly packs (admin only)
+  app.get("/api/monthly-packs", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+
+      const packs = await storage.getAllMonthlyPacks();
+      
+      // Fetch services for each pack
+      const packsWithServices = await Promise.all(
+        packs.map(async (pack) => {
+          const packServices = await storage.getMonthlyPackServices(pack.id);
+          return { ...pack, services: packServices };
+        })
+      );
+      
+      res.json(packsWithServices);
+    } catch (error) {
+      console.error("Error fetching monthly packs:", error);
+      res.status(500).json({ error: "Failed to fetch monthly packs" });
+    }
+  });
+
+  // Get active monthly packs (for client subscription)
+  app.get("/api/monthly-packs/active", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const packs = await storage.getActiveMonthlyPacks();
+      
+      // Fetch services for each pack
+      const packsWithServices = await Promise.all(
+        packs.map(async (pack) => {
+          const packServices = await storage.getMonthlyPackServices(pack.id);
+          return { ...pack, services: packServices };
+        })
+      );
+      
+      res.json(packsWithServices);
+    } catch (error) {
+      console.error("Error fetching active monthly packs:", error);
+      res.status(500).json({ error: "Failed to fetch active monthly packs" });
+    }
+  });
+
+  // Get single monthly pack
+  app.get("/api/monthly-packs/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+
+      const pack = await storage.getMonthlyPack(req.params.id);
+      if (!pack) {
+        return res.status(404).json({ error: "Monthly pack not found" });
+      }
+      
+      const packServices = await storage.getMonthlyPackServices(pack.id);
+      res.json({ ...pack, services: packServices });
+    } catch (error) {
+      console.error("Error fetching monthly pack:", error);
+      res.status(500).json({ error: "Failed to fetch monthly pack" });
+    }
+  });
+
+  // Create monthly pack (admin only)
+  app.post("/api/monthly-packs", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+
+      const { services, ...packData } = req.body;
+      
+      // Create the pack
+      const pack = await storage.createMonthlyPack({
+        ...packData,
+        createdBy: sessionUserId,
+      });
+      
+      // Create pack services
+      if (services && Array.isArray(services)) {
+        for (const service of services) {
+          await storage.createMonthlyPackService({
+            packId: pack.id,
+            serviceId: service.serviceId,
+            includedQuantity: service.includedQuantity,
+          });
+        }
+      }
+      
+      const packServices = await storage.getMonthlyPackServices(pack.id);
+      res.status(201).json({ ...pack, services: packServices });
+    } catch (error) {
+      console.error("Error creating monthly pack:", error);
+      res.status(500).json({ error: "Failed to create monthly pack" });
+    }
+  });
+
+  // Update monthly pack (admin only)
+  app.patch("/api/monthly-packs/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+
+      const { services, ...packData } = req.body;
+      
+      // Update the pack
+      const pack = await storage.updateMonthlyPack(req.params.id, packData);
+      if (!pack) {
+        return res.status(404).json({ error: "Monthly pack not found" });
+      }
+      
+      // Update services if provided
+      if (services && Array.isArray(services)) {
+        // Delete existing services and recreate
+        await storage.deleteMonthlyPackServicesByPack(pack.id);
+        for (const service of services) {
+          await storage.createMonthlyPackService({
+            packId: pack.id,
+            serviceId: service.serviceId,
+            includedQuantity: service.includedQuantity,
+          });
+        }
+      }
+      
+      const packServices = await storage.getMonthlyPackServices(pack.id);
+      res.json({ ...pack, services: packServices });
+    } catch (error) {
+      console.error("Error updating monthly pack:", error);
+      res.status(500).json({ error: "Failed to update monthly pack" });
+    }
+  });
+
+  // Delete monthly pack (admin only)
+  app.delete("/api/monthly-packs/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+
+      // Delete associated services first
+      await storage.deleteMonthlyPackServicesByPack(req.params.id);
+      await storage.deleteMonthlyPack(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting monthly pack:", error);
+      res.status(500).json({ error: "Failed to delete monthly pack" });
+    }
+  });
+
+  // ==================== CLIENT MONTHLY PACK SUBSCRIPTION ROUTES ====================
+
+  // Get client's subscriptions
+  app.get("/api/monthly-pack-subscriptions", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      let clientProfileId: string | null = null;
+      
+      if (sessionUser.role === "admin" && req.query.clientProfileId) {
+        clientProfileId = req.query.clientProfileId as string;
+      } else if ((sessionUser.role === "client" || sessionUser.role === "client_member") && sessionUser.clientProfileId) {
+        clientProfileId = sessionUser.clientProfileId;
+      }
+
+      if (!clientProfileId) {
+        return res.status(400).json({ error: "Client profile not found" });
+      }
+
+      const subscriptions = await storage.getClientMonthlyPackSubscriptions(clientProfileId);
+      
+      // Enrich with pack details
+      const enrichedSubscriptions = await Promise.all(
+        subscriptions.map(async (sub) => {
+          const pack = await storage.getMonthlyPack(sub.packId);
+          const packServices = pack ? await storage.getMonthlyPackServices(pack.id) : [];
+          
+          // Get current month usage
+          const now = new Date();
+          const usage = await storage.getMonthlyPackUsageBySubscription(sub.id, now.getMonth() + 1, now.getFullYear());
+          
+          return {
+            ...sub,
+            pack: pack ? { ...pack, services: packServices } : null,
+            currentMonthUsage: usage,
+          };
+        })
+      );
+      
+      res.json(enrichedSubscriptions);
+    } catch (error) {
+      console.error("Error fetching monthly pack subscriptions:", error);
+      res.status(500).json({ error: "Failed to fetch monthly pack subscriptions" });
+    }
+  });
+
+  // Get client's active subscription
+  app.get("/api/monthly-pack-subscriptions/active", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      let clientProfileId: string | null = null;
+      
+      if (sessionUser.role === "admin" && req.query.clientProfileId) {
+        clientProfileId = req.query.clientProfileId as string;
+      } else if ((sessionUser.role === "client" || sessionUser.role === "client_member") && sessionUser.clientProfileId) {
+        clientProfileId = sessionUser.clientProfileId;
+      }
+
+      if (!clientProfileId) {
+        return res.status(400).json({ error: "Client profile not found" });
+      }
+
+      const subscription = await storage.getActiveClientMonthlyPackSubscription(clientProfileId);
+      
+      if (!subscription) {
+        return res.json(null);
+      }
+      
+      const pack = await storage.getMonthlyPack(subscription.packId);
+      const packServices = pack ? await storage.getMonthlyPackServices(pack.id) : [];
+      
+      // Get current month usage
+      const now = new Date();
+      const usage = await storage.getMonthlyPackUsageBySubscription(subscription.id, now.getMonth() + 1, now.getFullYear());
+      
+      res.json({
+        ...subscription,
+        pack: pack ? { ...pack, services: packServices } : null,
+        currentMonthUsage: usage,
+      });
+    } catch (error) {
+      console.error("Error fetching active monthly pack subscription:", error);
+      res.status(500).json({ error: "Failed to fetch active monthly pack subscription" });
+    }
+  });
+
+  // Subscribe to a monthly pack
+  app.post("/api/monthly-pack-subscriptions", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      // Only admin can subscribe clients
+      if (sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+
+      const { clientProfileId, packId, startDate } = req.body;
+      
+      if (!clientProfileId || !packId) {
+        return res.status(400).json({ error: "Client profile ID and pack ID are required" });
+      }
+
+      // Verify pack exists and is active
+      const pack = await storage.getMonthlyPack(packId);
+      if (!pack || !pack.isActive) {
+        return res.status(400).json({ error: "Invalid or inactive monthly pack" });
+      }
+
+      // Check if client already has an active subscription
+      const existingActive = await storage.getActiveClientMonthlyPackSubscription(clientProfileId);
+      if (existingActive) {
+        return res.status(400).json({ error: "Client already has an active monthly pack subscription. Please cancel it first." });
+      }
+
+      const subscription = await storage.createClientMonthlyPackSubscription({
+        clientProfileId,
+        packId,
+        startDate: startDate ? new Date(startDate) : new Date(),
+        priceAtSubscription: pack.price,
+      });
+      
+      res.status(201).json(subscription);
+    } catch (error) {
+      console.error("Error creating monthly pack subscription:", error);
+      res.status(500).json({ error: "Failed to create monthly pack subscription" });
+    }
+  });
+
+  // Cancel subscription
+  app.patch("/api/monthly-pack-subscriptions/:id/cancel", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+
+      const subscription = await storage.getClientMonthlyPackSubscription(req.params.id);
+      if (!subscription) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+
+      const updated = await storage.updateClientMonthlyPackSubscription(req.params.id, {
+        isActive: false,
+        endDate: new Date(),
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error canceling monthly pack subscription:", error);
+      res.status(500).json({ error: "Failed to cancel monthly pack subscription" });
+    }
+  });
+
+  // Get usage for a subscription
+  app.get("/api/monthly-pack-subscriptions/:id/usage", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const subscription = await storage.getClientMonthlyPackSubscription(req.params.id);
+      if (!subscription) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+
+      // Verify access
+      const hasAccess = sessionUser.role === "admin" || 
+        (sessionUser.clientProfileId === subscription.clientProfileId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { month, year } = req.query;
+      const now = new Date();
+      const targetMonth = month ? parseInt(month as string) : now.getMonth() + 1;
+      const targetYear = year ? parseInt(year as string) : now.getFullYear();
+
+      const usage = await storage.getMonthlyPackUsageBySubscription(req.params.id, targetMonth, targetYear);
+      
+      // Enrich with pack service details
+      const pack = await storage.getMonthlyPack(subscription.packId);
+      const packServices = pack ? await storage.getMonthlyPackServices(pack.id) : [];
+      
+      // Build usage summary with included quantities
+      const usageSummary = packServices.map((ps) => {
+        const usageRecord = usage.find((u) => u.serviceId === ps.serviceId);
+        return {
+          serviceId: ps.serviceId,
+          includedQuantity: ps.includedQuantity,
+          usedQuantity: usageRecord?.usedQuantity ?? 0,
+          remaining: Math.max(0, ps.includedQuantity - (usageRecord?.usedQuantity ?? 0)),
+          overageQuantity: Math.max(0, (usageRecord?.usedQuantity ?? 0) - ps.includedQuantity),
+        };
+      });
+      
+      res.json({
+        subscriptionId: subscription.id,
+        month: targetMonth,
+        year: targetYear,
+        usage: usageSummary,
+      });
+    } catch (error) {
+      console.error("Error fetching monthly pack usage:", error);
+      res.status(500).json({ error: "Failed to fetch monthly pack usage" });
+    }
+  });
+
+  // ==================== END MONTHLY PACKS ROUTES ====================
+
   const httpServer = createServer(app);
 
   return httpServer;
