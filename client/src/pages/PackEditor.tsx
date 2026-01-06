@@ -384,7 +384,16 @@ export default function PackEditor() {
                                 <SelectValue placeholder="Select a service" />
                               </SelectTrigger>
                               <SelectContent>
-                                {services.filter(s => s.isActive).map((service) => (
+                                {services
+                                  .filter(s => s.isActive)
+                                  .filter(s => {
+                                    // Filter out services already added to this pack
+                                    const addedServiceIds = displayItems.map(item => 
+                                      'serviceId' in item ? item.serviceId : (item as any).service_id
+                                    );
+                                    return !addedServiceIds.includes(s.id);
+                                  })
+                                  .map((service) => (
                                   <SelectItem key={service.id} value={service.id}>
                                     {service.title} - ${parseFloat(service.basePrice).toFixed(2)}
                                   </SelectItem>
