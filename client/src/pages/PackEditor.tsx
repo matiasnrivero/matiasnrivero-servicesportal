@@ -101,7 +101,7 @@ export default function PackEditor() {
       if (!res.ok) throw new Error("Pack not found");
       return res.json();
     },
-    enabled: isEditing,
+    enabled: isEditing && !!currentUser,
   });
 
   const { data: packItems = [], refetch: refetchItems } = useQuery<ServicePackItem[]>({
@@ -112,7 +112,7 @@ export default function PackEditor() {
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: isEditing,
+    enabled: isEditing && !!currentUser,
   });
 
   const { data: services = [] } = useQuery<Service[]>({
