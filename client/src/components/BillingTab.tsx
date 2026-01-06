@@ -668,12 +668,25 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                               {pack.description && (
                                 <p className="text-sm text-muted-foreground">{pack.description}</p>
                               )}
-                              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                              <div className="mt-2">
                                 <span className="text-sm font-semibold">${pack.price}/month</span>
-                                <Badge variant="secondary">
-                                  {totalQty} services included
-                                </Badge>
                               </div>
+                              {packItems.length > 0 && (
+                                <div className="flex flex-col gap-2 mt-2">
+                                  <p className="text-xs font-medium text-muted-foreground uppercase">Monthly Allowance:</p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {packItems.map((item: any) => (
+                                      <Badge 
+                                        key={item.id} 
+                                        variant="secondary" 
+                                        className="text-xs"
+                                      >
+                                        {item.service?.title || "Service"} x{item.quantity}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                               {savings > 0 && (
                                 <div className="mt-2">
                                   <Badge variant="outline" className="text-green-600 border-green-600">
