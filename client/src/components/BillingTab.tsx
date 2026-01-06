@@ -646,9 +646,9 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                     {activePacks.map((pack) => {
                       const packItems = pack.items || pack.packItems || [];
                       const packPrice = parseFloat(pack.price) || 0;
-                      // Calculate full price based on individual service prices * quantities
+                      // Calculate full price based on individual service basePrice * quantities (matches Monthly Packs tab)
                       const fullPrice = packItems.reduce((sum: number, item: any) => {
-                        const servicePrice = parseFloat(item.service?.price || "0");
+                        const servicePrice = parseFloat(item.service?.basePrice || "0");
                         return sum + (servicePrice * item.quantity);
                       }, 0);
                       const savings = fullPrice > 0 ? fullPrice - packPrice : 0;
@@ -672,9 +672,9 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                                   ${packPrice.toFixed(2)}/mo
                                 </span>
                                 {fullPrice > 0 && savings > 0 && (
-                                  <span className="text-xs text-muted-foreground line-through">
+                                  <Badge variant="secondary" className="text-xs line-through">
                                     ${fullPrice.toFixed(2)}/mo
-                                  </span>
+                                  </Badge>
                                 )}
                               </div>
                               {packItems.length > 0 && (
