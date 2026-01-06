@@ -668,18 +668,13 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                                 <p className="text-sm text-muted-foreground">{pack.description}</p>
                               )}
                               <div className="mt-2 flex items-center gap-2 flex-wrap">
-                                <Badge variant="secondary">
+                                <span className="font-semibold text-sky-blue-accent">
                                   ${packPrice.toFixed(2)}/mo
-                                </Badge>
-                                {fullPrice > 0 && (
-                                  <span className="text-sm text-muted-foreground line-through">
+                                </span>
+                                {fullPrice > 0 && savings > 0 && (
+                                  <span className="text-xs text-muted-foreground line-through">
                                     ${fullPrice.toFixed(2)}/mo
                                   </span>
-                                )}
-                                {savings > 0 && (
-                                  <Badge variant="outline" className="text-green-600 border-green-600">
-                                    Save ${savings.toFixed(2)}/mo
-                                  </Badge>
                                 )}
                               </div>
                               {packItems.length > 0 && (
@@ -696,6 +691,13 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                                       </Badge>
                                     ))}
                                   </div>
+                                </div>
+                              )}
+                              {savings > 0 && (
+                                <div className="mt-2">
+                                  <Badge variant="outline" className="text-green-600 border-green-600">
+                                    Save ${savings.toFixed(2)}/mo
+                                  </Badge>
                                 </div>
                               )}
                             </div>
