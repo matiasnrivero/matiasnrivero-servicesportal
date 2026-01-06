@@ -3511,6 +3511,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!sessionUser || sessionUser.role !== "admin") {
         return res.status(403).json({ error: "Admin access required" });
       }
+      
+      // Check if this service already exists in the pack
+      const existingItems = await storage.getServicePackItems(req.params.id);
+      const serviceAlreadyExists = existingItems.some(item => item.serviceId === req.body.serviceId);
+      if (serviceAlreadyExists) {
+        return res.status(400).json({ error: "This service is already in the pack. Please edit the existing item's quantity instead." });
+      }
+      
       const item = await storage.addServicePackItem({ ...req.body, packId: req.params.id });
       res.status(201).json(item);
     } catch (error) {
