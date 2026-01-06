@@ -270,6 +270,7 @@ interface BillingTabProps {
 
 interface PackWithItems extends ServicePack {
   packItems?: ServicePackItem[];
+  items?: ServicePackItem[];
 }
 
 interface SubscriptionWithUsage extends ClientPackSubscription {
@@ -643,7 +644,7 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                   </p>
                   <div className="space-y-3">
                     {activePacks.map((pack) => {
-                      const totalQty = pack.packItems?.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0) || 0;
+                      const totalQty = (pack.items || pack.packItems)?.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0) || 0;
                       const perUnitRate = totalQty > 0 ? parseFloat(pack.price) / totalQty : 0;
                       return (
                         <div
@@ -718,7 +719,7 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
             <div className="space-y-4">
               {subscriptions.filter(s => s.isActive).map((subscription) => {
                 const pack = subscription.pack || availablePacks.find(p => p.id === subscription.packId);
-                const packItems = subscription.packItems || (pack as PackWithItems)?.packItems || [];
+                const packItems = subscription.packItems || (pack as PackWithItems)?.packItems || (pack as PackWithItems)?.items || [];
                 const totalQty = subscription.totalIncluded || packItems.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0) || 0;
                 const perUnitRate = totalQty > 0 ? parseFloat(subscription.priceAtSubscription || pack?.price || "0") / totalQty : 0;
                 
@@ -763,12 +764,12 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                       </div>
                       {(isAdmin || isPrimaryClient) && (
                         <Button
-                          variant="ghost"
-                          size="icon"
+                          variant="outline"
+                          size="sm"
                           onClick={() => setCancelSubscriptionId(subscription.id)}
                           data-testid={`button-cancel-subscription-${subscription.id}`}
                         >
-                          <Trash2 className="h-4 w-4 text-destructive" />
+                          Unsubscribe
                         </Button>
                       )}
                     </div>
