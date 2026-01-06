@@ -795,13 +795,13 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                             <p className="font-medium text-green-600">${savings.toFixed(2)}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">Subscribed Since</p>
+                            <p className="text-muted-foreground whitespace-nowrap">Subscribed Since</p>
                             <p className="font-medium">
                               {subscription.startDate ? format(new Date(subscription.startDate), "MMM d, yyyy") : "-"}
                             </p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">Included Services</p>
+                            <p className="text-muted-foreground whitespace-nowrap">Included Services</p>
                             <p className="font-medium">{totalQty} per month</p>
                           </div>
                         </div>
