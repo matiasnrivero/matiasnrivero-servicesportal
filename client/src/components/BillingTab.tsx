@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import type { ClientPaymentMethod, BillingAddress, MonthlyPack, MonthlyPackService, ClientMonthlyPackSubscription, MonthlyPackUsage } from "@shared/schema";
+import type { ClientPaymentMethod, BillingAddress, ServicePack, ServicePackItem, ClientPackSubscription, ServicePackUsage } from "@shared/schema";
 import { format } from "date-fns";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "");
@@ -268,13 +268,15 @@ interface BillingTabProps {
   isPrimaryClient?: boolean;
 }
 
-interface PackWithServices extends MonthlyPack {
-  services: MonthlyPackService[];
+interface PackWithItems extends ServicePack {
+  packItems?: ServicePackItem[];
 }
 
-interface SubscriptionWithUsage extends ClientMonthlyPackSubscription {
-  pack?: PackWithServices;
-  usage?: MonthlyPackUsage[];
+interface SubscriptionWithUsage extends ClientPackSubscription {
+  pack?: ServicePack;
+  packItems?: ServicePackItem[];
+  totalIncluded?: number;
+  totalUsed?: number;
 }
 
 export default function BillingTab({ clientProfileId, isAdmin = false, isPrimaryClient = false }: BillingTabProps) {
@@ -285,7 +287,7 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
   const [paymentConfig, setPaymentConfig] = useState("pay_as_you_go");
   const [invoiceDay, setInvoiceDay] = useState<number>(1);
   const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
-  const [selectedPackForSubscribe, setSelectedPackForSubscribe] = useState<PackWithServices | null>(null);
+  const [selectedPackForSubscribe, setSelectedPackForSubscribe] = useState<PackWithItems | null>(null);
   const [cancelSubscriptionId, setCancelSubscriptionId] = useState<string | null>(null);
 
   const { data: billingInfo, isLoading } = useQuery<BillingInfo>({
@@ -298,11 +300,11 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
     enabled: !!clientProfileId,
   });
 
-  // Fetch available monthly packs (active only)
-  const { data: availablePacks = [] } = useQuery<PackWithServices[]>({
-    queryKey: ["/api/monthly-packs"],
+  // Fetch available service packs (active only)
+  const { data: availablePacks = [] } = useQuery<PackWithItems[]>({
+    queryKey: ["/api/public/service-packs"],
     queryFn: async () => {
-      const res = await fetch("/api/monthly-packs");
+      const res = await fetch("/api/public/service-packs");
       if (!res.ok) throw new Error("Failed to fetch packs");
       return res.json();
     },
@@ -310,9 +312,9 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
 
   // Fetch client's current subscriptions
   const { data: subscriptions = [], isLoading: subscriptionsLoading } = useQuery<SubscriptionWithUsage[]>({
-    queryKey: ["/api/monthly-pack-subscriptions", clientProfileId],
+    queryKey: ["/api/service-pack-subscriptions", clientProfileId],
     queryFn: async () => {
-      const res = await fetch(`/api/monthly-pack-subscriptions?clientProfileId=${clientProfileId}`);
+      const res = await fetch(`/api/service-pack-subscriptions?clientProfileId=${clientProfileId}`);
       if (!res.ok) throw new Error("Failed to fetch subscriptions");
       return res.json();
     },
@@ -327,17 +329,17 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
   // Subscribe to a pack mutation
   const subscribeMutation = useMutation({
     mutationFn: async (packId: string) => {
-      const res = await apiRequest("POST", "/api/monthly-pack-subscriptions", {
+      const res = await apiRequest("POST", "/api/service-pack-subscriptions", {
         clientProfileId,
         packId,
       });
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/monthly-pack-subscriptions", clientProfileId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-pack-subscriptions", clientProfileId] });
       toast({
         title: "Success",
-        description: "Successfully subscribed to the monthly pack",
+        description: "Successfully subscribed to the pack",
       });
       setSubscribeDialogOpen(false);
       setSelectedPackForSubscribe(null);
@@ -354,11 +356,11 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
   // Cancel subscription mutation
   const cancelSubscriptionMutation = useMutation({
     mutationFn: async (subscriptionId: string) => {
-      const res = await apiRequest("PATCH", `/api/monthly-pack-subscriptions/${subscriptionId}/cancel`);
+      const res = await apiRequest("PATCH", `/api/service-pack-subscriptions/${subscriptionId}/cancel`);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/monthly-pack-subscriptions", clientProfileId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-pack-subscriptions", clientProfileId] });
       toast({
         title: "Success",
         description: "Subscription cancelled successfully",
@@ -641,7 +643,7 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                   </p>
                   <div className="space-y-3">
                     {activePacks.map((pack) => {
-                      const totalQty = pack.services?.reduce((sum, s) => sum + s.includedQuantity, 0) || 0;
+                      const totalQty = pack.packItems?.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0) || 0;
                       const perUnitRate = totalQty > 0 ? parseFloat(pack.price) / totalQty : 0;
                       return (
                         <div
@@ -715,8 +717,9 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
           ) : (
             <div className="space-y-4">
               {subscriptions.filter(s => s.isActive).map((subscription) => {
-                const pack = availablePacks.find(p => p.id === subscription.packId);
-                const totalQty = pack?.services?.reduce((sum, s) => sum + s.includedQuantity, 0) || 0;
+                const pack = subscription.pack || availablePacks.find(p => p.id === subscription.packId);
+                const packItems = subscription.packItems || (pack as PackWithItems)?.packItems || [];
+                const totalQty = subscription.totalIncluded || packItems.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0) || 0;
                 const perUnitRate = totalQty > 0 ? parseFloat(subscription.priceAtSubscription || pack?.price || "0") / totalQty : 0;
                 
                 return (

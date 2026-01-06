@@ -33,6 +33,10 @@ import {
   type InsertServicePack,
   type ServicePackItem,
   type InsertServicePackItem,
+  type ClientPackSubscription,
+  type InsertClientPackSubscription,
+  type ServicePackUsage,
+  type InsertServicePackUsage,
   type InputField,
   type InsertInputField,
   type UpdateInputField,
@@ -105,6 +109,8 @@ import {
   bundleItems,
   servicePacks,
   servicePackItems,
+  clientPackSubscriptions,
+  servicePackUsage,
   inputFields,
   serviceFields,
   lineItemFields,
@@ -239,6 +245,15 @@ export interface IStorage {
   getServicePackItems(packId: string): Promise<ServicePackItem[]>;
   addServicePackItem(data: InsertServicePackItem): Promise<ServicePackItem>;
   removeServicePackItem(id: string): Promise<void>;
+
+  // Service Pack Subscription methods
+  getClientPackSubscriptions(clientProfileId: string): Promise<ClientPackSubscription[]>;
+  getActiveClientPackSubscriptions(clientProfileId: string): Promise<ClientPackSubscription[]>;
+  getClientPackSubscription(id: string): Promise<ClientPackSubscription | undefined>;
+  createClientPackSubscription(data: InsertClientPackSubscription): Promise<ClientPackSubscription>;
+  updateClientPackSubscription(id: string, data: Partial<InsertClientPackSubscription>): Promise<ClientPackSubscription | undefined>;
+  getServicePackUsage(subscriptionId: string, serviceId: string, month: number, year: number): Promise<ServicePackUsage | undefined>;
+  incrementServicePackUsage(subscriptionId: string, serviceId: string, month: number, year: number): Promise<ServicePackUsage>;
 
   // Input Field methods
   getAllInputFields(): Promise<InputField[]>;
@@ -931,6 +946,73 @@ export class DbStorage implements IStorage {
 
   async removeServicePackItem(id: string): Promise<void> {
     await db.delete(servicePackItems).where(eq(servicePackItems.id, id));
+  }
+
+  // Service Pack Subscription methods
+  async getClientPackSubscriptions(clientProfileId: string): Promise<ClientPackSubscription[]> {
+    return await db.select().from(clientPackSubscriptions)
+      .where(eq(clientPackSubscriptions.clientProfileId, clientProfileId))
+      .orderBy(desc(clientPackSubscriptions.createdAt));
+  }
+
+  async getActiveClientPackSubscriptions(clientProfileId: string): Promise<ClientPackSubscription[]> {
+    return await db.select().from(clientPackSubscriptions)
+      .where(and(
+        eq(clientPackSubscriptions.clientProfileId, clientProfileId),
+        eq(clientPackSubscriptions.isActive, true)
+      ))
+      .orderBy(desc(clientPackSubscriptions.createdAt));
+  }
+
+  async getClientPackSubscription(id: string): Promise<ClientPackSubscription | undefined> {
+    const result = await db.select().from(clientPackSubscriptions)
+      .where(eq(clientPackSubscriptions.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createClientPackSubscription(data: InsertClientPackSubscription): Promise<ClientPackSubscription> {
+    const result = await db.insert(clientPackSubscriptions).values(data).returning();
+    return result[0];
+  }
+
+  async updateClientPackSubscription(id: string, data: Partial<InsertClientPackSubscription>): Promise<ClientPackSubscription | undefined> {
+    const result = await db.update(clientPackSubscriptions)
+      .set(data)
+      .where(eq(clientPackSubscriptions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getServicePackUsage(subscriptionId: string, serviceId: string, month: number, year: number): Promise<ServicePackUsage | undefined> {
+    const result = await db.select().from(servicePackUsage)
+      .where(and(
+        eq(servicePackUsage.subscriptionId, subscriptionId),
+        eq(servicePackUsage.serviceId, serviceId),
+        eq(servicePackUsage.periodMonth, month),
+        eq(servicePackUsage.periodYear, year)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async incrementServicePackUsage(subscriptionId: string, serviceId: string, month: number, year: number): Promise<ServicePackUsage> {
+    const existing = await this.getServicePackUsage(subscriptionId, serviceId, month, year);
+    if (existing) {
+      const result = await db.update(servicePackUsage)
+        .set({ usedQuantity: existing.usedQuantity + 1, updatedAt: new Date() })
+        .where(eq(servicePackUsage.id, existing.id))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(servicePackUsage).values({
+        subscriptionId,
+        serviceId,
+        periodMonth: month,
+        periodYear: year,
+        usedQuantity: 1,
+      }).returning();
+      return result[0];
+    }
   }
 
   // Input Field methods

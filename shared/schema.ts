@@ -313,13 +313,27 @@ export const servicePackItems = pgTable("service_pack_items", {
 // Client pack subscriptions - tracks client's active packs and consumption
 export const clientPackSubscriptions = pgTable("client_pack_subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: varchar("user_id").references(() => users.id),
+  clientProfileId: varchar("client_profile_id").references(() => clientProfiles.id),
   packId: varchar("pack_id").notNull().references(() => servicePacks.id),
   startDate: timestamp("start_date").notNull(),
-  endDate: timestamp("end_date").notNull(),
+  endDate: timestamp("end_date"),
+  priceAtSubscription: decimal("price_at_subscription", { precision: 10, scale: 2 }),
   consumedQuantities: jsonb("consumed_quantities"), // { serviceId: consumedCount }
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Service pack usage - tracks per-service usage per month
+export const servicePackUsage = pgTable("service_pack_usage", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subscriptionId: varchar("subscription_id").notNull().references(() => clientPackSubscriptions.id, { onDelete: "cascade" }),
+  serviceId: varchar("service_id").notNull().references(() => services.id),
+  periodMonth: integer("period_month").notNull(),
+  periodYear: integer("period_year").notNull(),
+  usedQuantity: integer("used_quantity").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Vendor bundle costs - vendor-specific pricing for bundles
@@ -828,6 +842,12 @@ export const insertClientPackSubscriptionSchema = createInsertSchema(clientPackS
   createdAt: true,
 });
 
+export const insertServicePackUsageSchema = createInsertSchema(servicePackUsage).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Monthly Pack schemas
 export const insertMonthlyPackSchema = createInsertSchema(monthlyPacks).omit({
   id: true,
@@ -1062,6 +1082,8 @@ export type ServicePackItem = typeof servicePackItems.$inferSelect;
 export type InsertServicePackItem = z.infer<typeof insertServicePackItemSchema>;
 export type ClientPackSubscription = typeof clientPackSubscriptions.$inferSelect;
 export type InsertClientPackSubscription = z.infer<typeof insertClientPackSubscriptionSchema>;
+export type ServicePackUsage = typeof servicePackUsage.$inferSelect;
+export type InsertServicePackUsage = z.infer<typeof insertServicePackUsageSchema>;
 
 // Monthly Pack types
 export type MonthlyPack = typeof monthlyPacks.$inferSelect;

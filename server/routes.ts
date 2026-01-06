@@ -556,7 +556,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         delete requestData.vendorAssigneeId;
       }
 
-      // Check for active monthly pack subscription for pack-based pricing
+      // Check for active service pack subscription for pack-based pricing
       if (sessionUser.clientProfileId && req.body.serviceId) {
         try {
           // Get service to find the parent service (father service)
@@ -564,16 +564,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const fatherServiceId = service?.parentServiceId || req.body.serviceId;
           
           // Get active subscriptions for this client
-          const activeSubscriptions = await storage.getActiveClientSubscriptions(sessionUser.clientProfileId);
+          const activeSubscriptions = await storage.getActiveClientPackSubscriptions(sessionUser.clientProfileId);
           
           // Find a subscription that includes this service
           for (const subscription of activeSubscriptions) {
-            const pack = await storage.getMonthlyPack(subscription.packId);
-            if (pack && pack.services) {
-              const packService = pack.services.find(ps => ps.serviceId === fatherServiceId);
+            const pack = await storage.getServicePack(subscription.packId);
+            if (pack) {
+              const packItems = await storage.getServicePackItems(pack.id);
+              const packService = packItems.find((item: { serviceId: string }) => item.serviceId === fatherServiceId);
               if (packService) {
                 // Calculate per-unit price from pack
-                const totalQty = pack.services.reduce((sum, s) => sum + s.includedQuantity, 0);
+                const totalQty = packItems.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0);
                 const priceToUse = subscription.priceAtSubscription || pack.price;
                 const perUnitPrice = totalQty > 0 ? parseFloat(priceToUse) / totalQty : 0;
                 
@@ -586,13 +587,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   requestData.finalPrice = perUnitPrice.toFixed(2);
                 }
                 
-                console.log(`Applied monthly pack pricing: subscription=${subscription.id}, unitPrice=${perUnitPrice.toFixed(2)}`);
+                console.log(`Applied service pack pricing: subscription=${subscription.id}, unitPrice=${perUnitPrice.toFixed(2)}`);
                 break; // Use the first matching subscription
               }
             }
           }
         } catch (packError) {
-          console.error("Error checking monthly pack subscription:", packError);
+          console.error("Error checking service pack subscription:", packError);
           // Continue without pack pricing if there's an error
         }
       }
@@ -613,10 +614,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const service = await storage.getService(request.serviceId);
           const fatherServiceId = service?.parentServiceId || request.serviceId;
-          await storage.incrementMonthlyPackUsage(request.monthlyPackSubscriptionId, fatherServiceId);
-          console.log(`Incremented monthly pack usage for subscription ${request.monthlyPackSubscriptionId}`);
+          const now = new Date();
+          await storage.incrementServicePackUsage(
+            request.monthlyPackSubscriptionId, 
+            fatherServiceId,
+            now.getMonth() + 1,
+            now.getFullYear()
+          );
+          console.log(`Incremented service pack usage for subscription ${request.monthlyPackSubscriptionId}`);
         } catch (usageError) {
-          console.error("Failed to increment monthly pack usage:", usageError);
+          console.error("Failed to increment service pack usage:", usageError);
         }
       }
 
@@ -3527,6 +3534,193 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error removing service pack item:", error);
       res.status(500).json({ error: "Failed to remove service pack item" });
+    }
+  });
+
+  // ==================== SERVICE PACK SUBSCRIPTION ROUTES ====================
+
+  // Get client's pack subscriptions
+  app.get("/api/service-pack-subscriptions", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      let clientProfileId: string | null = null;
+      
+      if (sessionUser.role === "admin" && req.query.clientProfileId) {
+        clientProfileId = req.query.clientProfileId as string;
+      } else if ((sessionUser.role === "client" || sessionUser.role === "client_member") && sessionUser.clientProfileId) {
+        clientProfileId = sessionUser.clientProfileId;
+      }
+
+      if (!clientProfileId) {
+        return res.status(400).json({ error: "Client profile not found" });
+      }
+
+      const subscriptions = await storage.getClientPackSubscriptions(clientProfileId);
+      
+      // Enrich with pack data and usage
+      const enrichedSubscriptions = await Promise.all(subscriptions.map(async (sub) => {
+        const pack = await storage.getServicePack(sub.packId);
+        const packItems = pack ? await storage.getServicePackItems(pack.id) : [];
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1;
+        const currentYear = now.getFullYear();
+        
+        // Calculate total included quantity and current usage
+        let totalIncluded = 0;
+        let totalUsed = 0;
+        for (const item of packItems) {
+          totalIncluded += item.quantity;
+          const usage = await storage.getServicePackUsage(sub.id, item.serviceId, currentMonth, currentYear);
+          if (usage) {
+            totalUsed += usage.usedQuantity;
+          }
+        }
+        
+        return {
+          ...sub,
+          pack,
+          packItems,
+          currentMonth,
+          currentYear,
+          totalIncluded,
+          totalUsed,
+        };
+      }));
+
+      res.json(enrichedSubscriptions);
+    } catch (error) {
+      console.error("Error fetching pack subscriptions:", error);
+      res.status(500).json({ error: "Failed to fetch pack subscriptions" });
+    }
+  });
+
+  // Get active subscriptions for a client
+  app.get("/api/service-pack-subscriptions/active", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      let clientProfileId: string | null = null;
+      
+      if (sessionUser.role === "admin" && req.query.clientProfileId) {
+        clientProfileId = req.query.clientProfileId as string;
+      } else if ((sessionUser.role === "client" || sessionUser.role === "client_member") && sessionUser.clientProfileId) {
+        clientProfileId = sessionUser.clientProfileId;
+      }
+
+      if (!clientProfileId) {
+        return res.status(400).json({ error: "Client profile not found" });
+      }
+
+      const subscriptions = await storage.getActiveClientPackSubscriptions(clientProfileId);
+      res.json(subscriptions);
+    } catch (error) {
+      console.error("Error fetching active pack subscriptions:", error);
+      res.status(500).json({ error: "Failed to fetch active pack subscriptions" });
+    }
+  });
+
+  // Subscribe to a pack
+  app.post("/api/service-pack-subscriptions", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const { clientProfileId, packId } = req.body;
+
+      // Verify permissions
+      const isAdmin = sessionUser.role === "admin";
+      const isClient = (sessionUser.role === "client" || sessionUser.role === "client_member") && sessionUser.clientProfileId === clientProfileId;
+
+      if (!isAdmin && !isClient) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+
+      // Get the pack to record price at subscription
+      const pack = await storage.getServicePack(packId);
+      if (!pack) {
+        return res.status(404).json({ error: "Pack not found" });
+      }
+      if (!pack.isActive) {
+        return res.status(400).json({ error: "Pack is not active" });
+      }
+
+      // Check if already subscribed to this pack
+      const existingSubs = await storage.getActiveClientPackSubscriptions(clientProfileId);
+      const alreadySubscribed = existingSubs.some(s => s.packId === packId);
+      if (alreadySubscribed) {
+        return res.status(400).json({ error: "Already subscribed to this pack" });
+      }
+
+      const subscription = await storage.createClientPackSubscription({
+        clientProfileId,
+        packId,
+        startDate: new Date(),
+        priceAtSubscription: pack.price,
+        isActive: true,
+      });
+
+      res.status(201).json(subscription);
+    } catch (error) {
+      console.error("Error creating pack subscription:", error);
+      res.status(500).json({ error: "Failed to create pack subscription" });
+    }
+  });
+
+  // Cancel a subscription
+  app.patch("/api/service-pack-subscriptions/:id/cancel", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const subscription = await storage.getClientPackSubscription(req.params.id);
+      if (!subscription) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+
+      // Verify permissions
+      const isAdmin = sessionUser.role === "admin";
+      const isClient = (sessionUser.role === "client" || sessionUser.role === "client_member") && sessionUser.clientProfileId === subscription.clientProfileId;
+
+      if (!isAdmin && !isClient) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+
+      const updated = await storage.updateClientPackSubscription(req.params.id, {
+        isActive: false,
+        endDate: new Date(),
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error canceling pack subscription:", error);
+      res.status(500).json({ error: "Failed to cancel pack subscription" });
     }
   });
 
