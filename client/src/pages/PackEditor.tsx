@@ -113,6 +113,8 @@ export default function PackEditor() {
       return res.json();
     },
     enabled: isEditing && !!currentUser,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const { data: services = [] } = useQuery<Service[]>({
