@@ -72,7 +72,7 @@ interface CurrentUser {
 }
 
 function isDistributor(role: string | undefined): boolean {
-  return role === "client" || role === "distributor";
+  return role === "client" || role === "client_member" || role === "distributor";
 }
 
 function isInternalRole(role: string | undefined): boolean {
@@ -590,8 +590,9 @@ export default function ServiceRequestsList() {
 
   const getCustomerDisplayName = (userId: string, customerName: string): string => {
     if (isDistributor(currentUser?.role)) {
+      // For client/client_member, always show the actual username (the requester)
       const user = userMap[userId];
-      return user?.username || customerName || "Unknown";
+      return user?.username || "Unknown";
     }
     const companyName = getClientCompanyName(userId);
     return companyName || customerName || "Unknown";
@@ -1149,7 +1150,7 @@ export default function ServiceRequestsList() {
                     <TableHead>Job ID</TableHead>
                     <TableHead>Service</TableHead>
                     <TableHead>Method</TableHead>
-                    <TableHead>{isDistributor(currentUser?.role) ? "User" : "Company"}</TableHead>
+                    <TableHead>{isDistributor(currentUser?.role) ? "Requester" : "Company"}</TableHead>
                     <TableHead>Due Date</TableHead>
                     {isDistributor(currentUser?.role) ? (
                       <TableHead>Price</TableHead>
