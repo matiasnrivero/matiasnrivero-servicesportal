@@ -275,11 +275,11 @@ function PacksTab(): JSX.Element {
         return (
           <Card 
             key={pack.id} 
-            className="border border-[#f0f0f5] rounded-2xl overflow-hidden bg-white h-full"
+            className="border border-[#f0f0f5] rounded-2xl overflow-hidden bg-white h-full flex flex-col"
             data-testid={`card-pack-${pack.id}`}
           >
-            <CardContent className="p-6">
-              <div className="flex flex-col gap-3">
+            <CardContent className="p-6 flex flex-col flex-1">
+              <div className="flex flex-col gap-3 flex-1">
                 <div className="flex items-start justify-between gap-4">
                   <h3 className="flex-1 font-semibold text-dark-blue-night">
                     {pack.name}
@@ -326,31 +326,31 @@ function PacksTab(): JSX.Element {
                     </Badge>
                   </div>
                 )}
-
-                {isClientAdmin && (
-                  <div className="mt-3 pt-3 border-t border-border">
-                    {alreadySubscribed ? (
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        disabled
-                        data-testid={`button-subscribed-pack-${pack.id}`}
-                      >
-                        <Check className="h-4 w-4 mr-2" />
-                        Subscribed
-                      </Button>
-                    ) : (
-                      <Button
-                        className="w-full"
-                        onClick={() => handleSubscribeClick(pack)}
-                        data-testid={`button-subscribe-pack-${pack.id}`}
-                      >
-                        Subscribe
-                      </Button>
-                    )}
-                  </div>
-                )}
               </div>
+
+              {isClientAdmin && (
+                <div className="mt-auto pt-3 border-t border-border">
+                  {alreadySubscribed ? (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      disabled
+                      data-testid={`button-subscribed-pack-${pack.id}`}
+                    >
+                      <Check className="h-4 w-4 mr-2" />
+                      Subscribed
+                    </Button>
+                  ) : (
+                    <Button
+                      className="w-full"
+                      onClick={() => handleSubscribeClick(pack)}
+                      data-testid={`button-subscribe-pack-${pack.id}`}
+                    >
+                      Subscribe
+                    </Button>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         );
