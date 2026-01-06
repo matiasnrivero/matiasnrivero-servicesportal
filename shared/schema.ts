@@ -72,6 +72,18 @@ export const vendorProfiles = pgTable("vendor_profiles", {
 export const clientPaymentConfigurations = ["pay_as_you_go", "monthly_payment", "deduct_from_royalties"] as const;
 export type ClientPaymentConfiguration = typeof clientPaymentConfigurations[number];
 
+// Tri-POD product discount tiers
+export const tripodDiscountTiers = ["none", "power_level", "oms_subscription", "enterprise"] as const;
+export type TripodDiscountTier = typeof tripodDiscountTiers[number];
+
+// Discount percentages for each tier
+export const tripodDiscountPercentages: Record<TripodDiscountTier, number> = {
+  none: 0,
+  power_level: 10,
+  oms_subscription: 15,
+  enterprise: 20,
+};
+
 // Client profiles with company info - links client users to their company
 export const clientProfiles = pgTable("client_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -91,6 +103,8 @@ export const clientProfiles = pgTable("client_profiles", {
   invoiceDay: integer("invoice_day"),
   // Billing address (stored as JSON)
   billingAddress: jsonb("billing_address"),
+  // Tri-POD product discount tier: none (default), power_level (10%), oms_subscription (15%), enterprise (20%)
+  tripodDiscountTier: text("tripod_discount_tier").notNull().default("none"),
   // Soft delete timestamp - when set, client company is considered deleted
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
