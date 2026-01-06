@@ -18,7 +18,13 @@ import { ServicesListSection } from "./sections/ServicesListSection";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Loader2, Check, Package } from "lucide-react";
-import type { Bundle, BundleItem, BundleLineItem, ServicePack, ServicePackItem, Service, ClientPackSubscription } from "@shared/schema";
+import type { Bundle, BundleItem, BundleLineItem, ServicePack, ServicePackItem, Service, ClientPackSubscription, ClientPaymentMethod } from "@shared/schema";
+
+interface BillingInfo {
+  paymentConfiguration: string;
+  invoiceDay?: number;
+  paymentMethods: ClientPaymentMethod[];
+}
 
 interface CurrentUser {
   userId: string;
@@ -177,6 +183,7 @@ function PacksTab(): JSX.Element {
   const { toast } = useToast();
   const [subscribingPackId, setSubscribingPackId] = useState<string | null>(null);
   const [confirmingPack, setConfirmingPack] = useState<PackWithItems | null>(null);
+  const [showPaymentRequired, setShowPaymentRequired] = useState(false);
   
   const { data: packs = [], isLoading } = useQuery({
     queryKey: ["/api/public/service-packs"],
@@ -190,6 +197,17 @@ function PacksTab(): JSX.Element {
 
   const clientProfileId = currentUser?.clientProfileId;
   const isClientAdmin = currentUser?.role === "client" && clientProfileId;
+  
+  // Fetch billing info for payment validation
+  const { data: billingInfo, isLoading: billingLoading } = useQuery<BillingInfo>({
+    queryKey: ["/api/billing/client-info", clientProfileId],
+    queryFn: async () => {
+      const res = await fetch(`/api/billing/client-info?clientProfileId=${clientProfileId}`);
+      if (!res.ok) throw new Error("Failed to fetch billing info");
+      return res.json();
+    },
+    enabled: !!clientProfileId,
+  });
   
   const { data: existingSubscriptions = [], isError: subscriptionsError } = useQuery<ClientPackSubscription[]>({
     queryKey: ["/api/service-pack-subscriptions", clientProfileId],
@@ -229,10 +247,26 @@ function PacksTab(): JSX.Element {
   };
   
   const handleConfirmSubscribe = () => {
-    if (confirmingPack) {
-      subscribeMutation.mutate(confirmingPack.id);
+    if (!confirmingPack) return;
+    
+    // Only validate payment if billing info is loaded
+    if (billingInfo) {
+      // Check if payment method is required (not deduct_from_royalties)
+      const requiresPaymentMethod = billingInfo.paymentConfiguration !== "deduct_from_royalties";
+      const hasPaymentMethod = billingInfo.paymentMethods && billingInfo.paymentMethods.length > 0;
+      
+      if (requiresPaymentMethod && !hasPaymentMethod) {
+        setConfirmingPack(null);
+        setShowPaymentRequired(true);
+        return;
+      }
     }
+    
+    subscribeMutation.mutate(confirmingPack.id);
   };
+  
+  // Disable subscribe button while billing info is loading
+  const isSubscribeDisabled = subscribeMutation.isPending || (!!isClientAdmin && billingLoading);
 
   const isSubscribed = (packId: string) => {
     return existingSubscriptions.some(sub => sub.packId === packId && sub.isActive);
@@ -404,21 +438,47 @@ function PacksTab(): JSX.Element {
             <Button
               variant="outline"
               onClick={() => setConfirmingPack(null)}
-              disabled={subscribeMutation.isPending}
+              disabled={isSubscribeDisabled}
               data-testid="button-cancel-subscription"
             >
               Cancel
             </Button>
             <Button
               onClick={handleConfirmSubscribe}
-              disabled={subscribeMutation.isPending}
+              disabled={isSubscribeDisabled}
               data-testid="button-confirm-subscription"
             >
-              {subscribeMutation.isPending ? (
+              {isSubscribeDisabled ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : null}
               Subscribe
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Payment Method Required Dialog */}
+      <Dialog open={showPaymentRequired} onOpenChange={setShowPaymentRequired}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Payment Method Required</DialogTitle>
+            <DialogDescription>
+              A credit card is required to subscribe to a monthly pack. Please add a payment method first.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowPaymentRequired(false)}
+              data-testid="button-cancel-payment-required"
+            >
+              Cancel
+            </Button>
+            <Link href="/payments">
+              <Button data-testid="button-go-to-payments">
+                Go to Payments
+              </Button>
+            </Link>
           </DialogFooter>
         </DialogContent>
       </Dialog>

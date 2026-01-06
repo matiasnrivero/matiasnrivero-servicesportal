@@ -718,7 +718,27 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                     Cancel
                   </Button>
                   <Button
-                    onClick={() => selectedPackForSubscribe && subscribeMutation.mutate(selectedPackForSubscribe.id)}
+                    onClick={() => {
+                      if (!selectedPackForSubscribe) return;
+                      
+                      // Check if payment method is required (not deduct_from_royalties)
+                      const requiresPaymentMethod = billingInfo?.paymentConfiguration !== "deduct_from_royalties";
+                      const hasPaymentMethod = billingInfo?.paymentMethods && billingInfo.paymentMethods.length > 0;
+                      
+                      if (requiresPaymentMethod && !hasPaymentMethod) {
+                        toast({
+                          title: "Payment Method Required",
+                          description: "Please add a credit card before subscribing to a pack.",
+                          variant: "destructive",
+                        });
+                        setSubscribeDialogOpen(false);
+                        setSelectedPackForSubscribe(null);
+                        setAddCardOpen(true);
+                        return;
+                      }
+                      
+                      subscribeMutation.mutate(selectedPackForSubscribe.id);
+                    }}
                     disabled={!selectedPackForSubscribe || subscribeMutation.isPending}
                     data-testid="button-confirm-subscribe"
                   >
