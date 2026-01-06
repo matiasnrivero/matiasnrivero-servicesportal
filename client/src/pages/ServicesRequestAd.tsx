@@ -275,7 +275,7 @@ function PacksTab(): JSX.Element {
         return (
           <Card 
             key={pack.id} 
-            className="border border-[#f0f0f5] rounded-2xl overflow-hidden bg-white h-full flex flex-col"
+            className="border border-[#f0f0f5] rounded-2xl overflow-hidden bg-white h-full flex flex-col min-h-[320px]"
             data-testid={`card-pack-${pack.id}`}
           >
             <CardContent className="p-6 flex flex-col flex-1">
@@ -320,7 +320,7 @@ function PacksTab(): JSX.Element {
                 </div>
 
                 {showPricing && savings > 0 && (
-                  <div className="mt-2">
+                  <div className="mt-2 mb-4">
                     <Badge variant="outline" className="text-green-600 border-green-600">
                       Save ${savings.toFixed(2)}/mo
                     </Badge>
@@ -329,7 +329,7 @@ function PacksTab(): JSX.Element {
               </div>
 
               {isClientAdmin && (
-                <div className="mt-auto pt-3 border-t border-border">
+                <div className="mt-auto pt-4 border-t border-border">
                   {alreadySubscribed ? (
                     <Button
                       variant="outline"
