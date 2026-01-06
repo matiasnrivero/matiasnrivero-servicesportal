@@ -164,6 +164,9 @@ export const serviceRequests = pgTable("service_requests", {
   vendorPaymentMarkedAt: timestamp("vendor_payment_marked_at"),
   vendorPaymentMarkedBy: varchar("vendor_payment_marked_by").references(() => users.id),
   vendorCost: decimal("vendor_cost", { precision: 10, scale: 2 }),
+  // Monthly pack pricing tracking
+  monthlyPackSubscriptionId: varchar("monthly_pack_subscription_id"),
+  monthlyPackUnitPrice: decimal("monthly_pack_unit_price", { precision: 10, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -244,7 +247,50 @@ export const bundleItems = pgTable("bundle_items", {
   quantity: integer("quantity").notNull().default(1),
 });
 
-// Service Packs - monthly subscription packs with service quantities
+// Monthly Packs - subscription packs with included service quantities per month
+export const monthlyPacks = pgTable("monthly_packs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Monthly pack services - links packs to services with included quantities
+export const monthlyPackServices = pgTable("monthly_pack_services", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  packId: varchar("pack_id").notNull().references(() => monthlyPacks.id, { onDelete: "cascade" }),
+  serviceId: varchar("service_id").notNull().references(() => services.id),
+  includedQuantity: integer("included_quantity").notNull(),
+});
+
+// Client monthly pack subscriptions - tracks which client companies have active packs
+export const clientMonthlyPackSubscriptions = pgTable("client_monthly_pack_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientProfileId: varchar("client_profile_id").notNull().references(() => clientProfiles.id),
+  packId: varchar("pack_id").notNull().references(() => monthlyPacks.id),
+  isActive: boolean("is_active").notNull().default(true),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Monthly pack usage - tracks consumption per month per service per subscription
+export const monthlyPackUsage = pgTable("monthly_pack_usage", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subscriptionId: varchar("subscription_id").notNull().references(() => clientMonthlyPackSubscriptions.id, { onDelete: "cascade" }),
+  serviceId: varchar("service_id").notNull().references(() => services.id),
+  periodMonth: integer("period_month").notNull(),
+  periodYear: integer("period_year").notNull(),
+  usedQuantity: integer("used_quantity").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Service Packs - legacy table (keeping for backwards compatibility)
 export const servicePacks = pgTable("service_packs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -781,6 +827,44 @@ export const insertClientPackSubscriptionSchema = createInsertSchema(clientPackS
   createdAt: true,
 });
 
+// Monthly Pack schemas
+export const insertMonthlyPackSchema = createInsertSchema(monthlyPacks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateMonthlyPackSchema = createInsertSchema(monthlyPacks).partial().omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertMonthlyPackServiceSchema = createInsertSchema(monthlyPackServices).omit({
+  id: true,
+});
+
+export const insertClientMonthlyPackSubscriptionSchema = createInsertSchema(clientMonthlyPackSubscriptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateClientMonthlyPackSubscriptionSchema = createInsertSchema(clientMonthlyPackSubscriptions).partial().omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertMonthlyPackUsageSchema = createInsertSchema(monthlyPackUsage).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateMonthlyPackUsageSchema = createInsertSchema(monthlyPackUsage).partial().omit({
+  id: true,
+  createdAt: true,
+});
+
 // Phase 3: Input Fields schemas
 export const insertInputFieldSchema = createInsertSchema(inputFields).omit({
   id: true,
@@ -977,6 +1061,19 @@ export type ServicePackItem = typeof servicePackItems.$inferSelect;
 export type InsertServicePackItem = z.infer<typeof insertServicePackItemSchema>;
 export type ClientPackSubscription = typeof clientPackSubscriptions.$inferSelect;
 export type InsertClientPackSubscription = z.infer<typeof insertClientPackSubscriptionSchema>;
+
+// Monthly Pack types
+export type MonthlyPack = typeof monthlyPacks.$inferSelect;
+export type InsertMonthlyPack = z.infer<typeof insertMonthlyPackSchema>;
+export type UpdateMonthlyPack = z.infer<typeof updateMonthlyPackSchema>;
+export type MonthlyPackService = typeof monthlyPackServices.$inferSelect;
+export type InsertMonthlyPackService = z.infer<typeof insertMonthlyPackServiceSchema>;
+export type ClientMonthlyPackSubscription = typeof clientMonthlyPackSubscriptions.$inferSelect;
+export type InsertClientMonthlyPackSubscription = z.infer<typeof insertClientMonthlyPackSubscriptionSchema>;
+export type UpdateClientMonthlyPackSubscription = z.infer<typeof updateClientMonthlyPackSubscriptionSchema>;
+export type MonthlyPackUsage = typeof monthlyPackUsage.$inferSelect;
+export type InsertMonthlyPackUsage = z.infer<typeof insertMonthlyPackUsageSchema>;
+export type UpdateMonthlyPackUsage = z.infer<typeof updateMonthlyPackUsageSchema>;
 
 // Phase 3: Input Fields types
 export type InputField = typeof inputFields.$inferSelect;
