@@ -4028,7 +4028,16 @@ function BundleFieldsAssignmentsManager() {
 
 export default function Settings() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("pricing");
+  const [location] = useLocation();
+  
+  // Read tab from URL query params
+  const getInitialTab = () => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    return tab || "pricing";
+  };
+  
+  const [activeTab, setActiveTab] = useState(getInitialTab);
   const [preselectedServiceId, setPreselectedServiceId] = useState<string>("");
 
   const { data: currentUser } = useQuery<User | null>({
