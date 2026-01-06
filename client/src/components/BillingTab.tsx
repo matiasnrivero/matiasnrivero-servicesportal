@@ -748,14 +748,15 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
           ) : (
             <div className="space-y-4">
               {subscriptions.filter(s => s.isActive).map((subscription) => {
-                const pack = subscription.pack || availablePacks.find(p => p.id === subscription.packId);
+                // Use availablePacks (not activePacks which filters out subscribed packs)
+                const packFromApi = availablePacks.find(p => p.id === subscription.packId);
+                const pack = subscription.pack || packFromApi;
                 const packItemsForQty = subscription.packItems || (pack as PackWithItems)?.packItems || (pack as PackWithItems)?.items || [];
                 const totalQty = subscription.totalIncluded || packItemsForQty.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0) || 0;
                 const packPrice = parseFloat(subscription.priceAtSubscription || pack?.price || "0");
                 
-                // Use activePacks items for total price calculation (has full service.basePrice data)
-                const activePack = activePacks.find(p => p.id === subscription.packId);
-                const packItemsWithPricing = activePack?.items || (pack as PackWithItems)?.items || [];
+                // Use availablePacks items for total price calculation (has full service.basePrice data)
+                const packItemsWithPricing = packFromApi?.items || (pack as PackWithItems)?.items || [];
                 const totalPrice = packItemsWithPricing.reduce((sum: number, item: any) => {
                   const servicePrice = parseFloat(item.service?.basePrice || "0");
                   return sum + (servicePrice * item.quantity);
@@ -780,7 +781,7 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                         {pack?.description && (
                           <p className="text-sm text-muted-foreground mt-1">{pack.description}</p>
                         )}
-                        <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                        <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-6 text-sm">
                           <div>
                             <p className="text-muted-foreground">Pack Price</p>
                             <p className="font-medium">${packPrice.toFixed(2)}</p>
