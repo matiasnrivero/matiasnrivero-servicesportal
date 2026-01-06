@@ -6,10 +6,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { ServicesListSection } from "./sections/ServicesListSection";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Loader2, Check } from "lucide-react";
+import { Loader2, Check, Package } from "lucide-react";
 import type { Bundle, BundleItem, BundleLineItem, ServicePack, ServicePackItem, Service, ClientPackSubscription } from "@shared/schema";
 
 interface CurrentUser {
@@ -168,6 +176,7 @@ function BundlesTab(): JSX.Element {
 function PacksTab(): JSX.Element {
   const { toast } = useToast();
   const [subscribingPackId, setSubscribingPackId] = useState<string | null>(null);
+  const [confirmingPack, setConfirmingPack] = useState<PackWithItems | null>(null);
   
   const { data: packs = [], isLoading } = useQuery({
     queryKey: ["/api/public/service-packs"],
@@ -207,12 +216,23 @@ function PacksTab(): JSX.Element {
       queryClient.invalidateQueries({ queryKey: ["/api/service-pack-subscriptions", clientProfileId] });
       toast({ title: "Successfully subscribed to pack!" });
       setSubscribingPackId(null);
+      setConfirmingPack(null);
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
       setSubscribingPackId(null);
     },
   });
+  
+  const handleSubscribeClick = (pack: PackWithItems) => {
+    setConfirmingPack(pack);
+  };
+  
+  const handleConfirmSubscribe = () => {
+    if (confirmingPack) {
+      subscribeMutation.mutate(confirmingPack.id);
+    }
+  };
 
   const isSubscribed = (packId: string) => {
     return existingSubscriptions.some(sub => sub.packId === packId && sub.isActive);
@@ -322,13 +342,9 @@ function PacksTab(): JSX.Element {
                     ) : (
                       <Button
                         className="w-full"
-                        onClick={() => subscribeMutation.mutate(pack.id)}
-                        disabled={isSubscribing(pack.id)}
+                        onClick={() => handleSubscribeClick(pack)}
                         data-testid={`button-subscribe-pack-${pack.id}`}
                       >
-                        {isSubscribing(pack.id) ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : null}
                         Subscribe
                       </Button>
                     )}
@@ -339,6 +355,73 @@ function PacksTab(): JSX.Element {
           </Card>
         );
       })}
+
+      <Dialog open={!!confirmingPack} onOpenChange={(open) => !open && setConfirmingPack(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Confirm Subscription
+            </DialogTitle>
+            <DialogDescription>
+              You are about to subscribe to a monthly pack. This will be a recurring charge each month.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {confirmingPack && (
+            <div className="space-y-4 py-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="font-semibold text-lg">{confirmingPack.name}</h3>
+                  {confirmingPack.description && (
+                    <p className="text-sm text-muted-foreground mt-1">{confirmingPack.description}</p>
+                  )}
+                </div>
+                <div className="text-right">
+                  <span className="text-xl font-bold text-primary">
+                    ${parseFloat(confirmingPack.price || "0").toFixed(2)}
+                  </span>
+                  <span className="text-muted-foreground">/mo</span>
+                </div>
+              </div>
+              
+              <div className="border-t pt-4">
+                <p className="text-sm font-medium text-muted-foreground uppercase mb-2">
+                  Included Services:
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {confirmingPack.items.map((item) => (
+                    <Badge key={item.id} variant="secondary" className="text-xs">
+                      {item.service?.title || "Service"} x{item.quantity}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmingPack(null)}
+              disabled={subscribeMutation.isPending}
+              data-testid="button-cancel-subscription"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmSubscribe}
+              disabled={subscribeMutation.isPending}
+              data-testid="button-confirm-subscription"
+            >
+              {subscribeMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Subscribe
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
