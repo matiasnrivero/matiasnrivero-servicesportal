@@ -644,8 +644,15 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                   </p>
                   <div className="space-y-3">
                     {activePacks.map((pack) => {
-                      const totalQty = (pack.items || pack.packItems)?.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0) || 0;
-                      const perUnitRate = totalQty > 0 ? parseFloat(pack.price) / totalQty : 0;
+                      const packItems = pack.items || pack.packItems || [];
+                      const totalQty = packItems.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0) || 0;
+                      const packPrice = parseFloat(pack.price) || 0;
+                      // Calculate full price based on individual service prices * quantities
+                      const fullPrice = packItems.reduce((sum: number, item: any) => {
+                        const servicePrice = parseFloat(item.service?.price || "0");
+                        return sum + (servicePrice * item.quantity);
+                      }, 0);
+                      const savings = fullPrice > 0 ? fullPrice - packPrice : 0;
                       return (
                         <div
                           key={pack.id}
@@ -667,9 +674,13 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                                   ({totalQty} services included)
                                 </span>
                               </div>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Per-unit rate: ${perUnitRate.toFixed(2)}
-                              </p>
+                              {savings > 0 && (
+                                <div className="mt-1">
+                                  <Badge variant="outline" className="text-green-600 border-green-600">
+                                    Save ${savings.toFixed(2)}/mo
+                                  </Badge>
+                                </div>
+                              )}
                             </div>
                             {selectedPackForSubscribe?.id === pack.id && (
                               <CheckCircle2 className="h-5 w-5 text-primary" />
