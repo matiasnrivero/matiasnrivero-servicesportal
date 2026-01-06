@@ -33,6 +33,7 @@ function Router() {
     <Switch>
       {/* Add pages below */}
       <Route path="/" component={ServicesRequestAd} />
+      <Route path="/services" component={ServicesRequestAd} />
       <Route path="/dashboard" component={AdminDashboard} />
       <Route path="/service-requests" component={ServiceRequestsList} />
       <Route path="/jobs" component={ServiceRequestsList} />
