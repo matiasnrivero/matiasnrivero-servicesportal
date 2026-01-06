@@ -642,10 +642,9 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                   <p className="text-sm text-muted-foreground">
                     Choose a monthly pack to subscribe to. You will be charged the pack price each month and receive the included service quantities.
                   </p>
-                  <div className="space-y-3">
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
                     {activePacks.map((pack) => {
                       const packItems = pack.items || pack.packItems || [];
-                      const totalQty = packItems.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0) || 0;
                       const packPrice = parseFloat(pack.price) || 0;
                       // Calculate full price based on individual service prices * quantities
                       const fullPrice = packItems.reduce((sum: number, item: any) => {
@@ -663,16 +662,28 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                           data-testid={`pack-option-${pack.id}`}
                         >
                           <div className="flex items-start justify-between gap-2">
-                            <div>
+                            <div className="flex-1">
                               <p className="font-medium">{pack.name}</p>
                               {pack.description && (
                                 <p className="text-sm text-muted-foreground">{pack.description}</p>
                               )}
-                              <div className="mt-2">
-                                <span className="text-sm font-semibold">${pack.price}/month</span>
+                              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                                <Badge variant="secondary">
+                                  ${packPrice.toFixed(2)}/mo
+                                </Badge>
+                                {fullPrice > 0 && (
+                                  <span className="text-sm text-muted-foreground line-through">
+                                    ${fullPrice.toFixed(2)}/mo
+                                  </span>
+                                )}
+                                {savings > 0 && (
+                                  <Badge variant="outline" className="text-green-600 border-green-600">
+                                    Save ${savings.toFixed(2)}/mo
+                                  </Badge>
+                                )}
                               </div>
                               {packItems.length > 0 && (
-                                <div className="flex flex-col gap-2 mt-2">
+                                <div className="flex flex-col gap-2 mt-3">
                                   <p className="text-xs font-medium text-muted-foreground uppercase">Monthly Allowance:</p>
                                   <div className="flex flex-wrap gap-1">
                                     {packItems.map((item: any) => (
@@ -687,16 +698,9 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                                   </div>
                                 </div>
                               )}
-                              {savings > 0 && (
-                                <div className="mt-2">
-                                  <Badge variant="outline" className="text-green-600 border-green-600">
-                                    Save ${savings.toFixed(2)}/mo
-                                  </Badge>
-                                </div>
-                              )}
                             </div>
                             {selectedPackForSubscribe?.id === pack.id && (
-                              <CheckCircle2 className="h-5 w-5 text-primary" />
+                              <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" />
                             )}
                           </div>
                         </div>
