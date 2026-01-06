@@ -166,6 +166,7 @@ export interface IStorage {
   getAllServiceRequests(): Promise<ServiceRequest[]>;
   getServiceRequest(id: string): Promise<ServiceRequest | undefined>;
   getServiceRequestsByUser(userId: string): Promise<ServiceRequest[]>;
+  getServiceRequestsByClientProfile(clientProfileId: string): Promise<ServiceRequest[]>;
   getServiceRequestsByAssignee(assigneeId: string): Promise<ServiceRequest[]>;
   getServiceRequestsByStatus(status: string): Promise<ServiceRequest[]>;
   createServiceRequest(request: InsertServiceRequest): Promise<ServiceRequest>;
@@ -271,6 +272,7 @@ export interface IStorage {
   getAllBundleRequests(): Promise<BundleRequest[]>;
   getBundleRequest(id: string): Promise<BundleRequest | undefined>;
   getBundleRequestsByUser(userId: string): Promise<BundleRequest[]>;
+  getBundleRequestsByClientProfile(clientProfileId: string): Promise<BundleRequest[]>;
   getBundleRequestsByAssignee(assigneeId: string): Promise<BundleRequest[]>;
   getBundleRequestsByStatus(status: string): Promise<BundleRequest[]>;
   createBundleRequest(request: InsertBundleRequest): Promise<BundleRequest>;
@@ -584,6 +586,17 @@ export class DbStorage implements IStorage {
   async getServiceRequestsByUser(userId: string): Promise<ServiceRequest[]> {
     return await db.select().from(serviceRequests)
       .where(eq(serviceRequests.userId, userId))
+      .orderBy(desc(serviceRequests.createdAt));
+  }
+
+  async getServiceRequestsByClientProfile(clientProfileId: string): Promise<ServiceRequest[]> {
+    const teamMembers = await this.getClientTeamMembers(clientProfileId);
+    const teamMemberIds = teamMembers.map(u => u.id);
+    if (teamMemberIds.length === 0) {
+      return [];
+    }
+    return await db.select().from(serviceRequests)
+      .where(inArray(serviceRequests.userId, teamMemberIds))
       .orderBy(desc(serviceRequests.createdAt));
   }
 
@@ -1090,6 +1103,17 @@ export class DbStorage implements IStorage {
     return await db.select().from(bundleRequests)
       .where(eq(bundleRequests.userId, userId))
       .orderBy(bundleRequests.createdAt);
+  }
+
+  async getBundleRequestsByClientProfile(clientProfileId: string): Promise<BundleRequest[]> {
+    const teamMembers = await this.getClientTeamMembers(clientProfileId);
+    const teamMemberIds = teamMembers.map(u => u.id);
+    if (teamMemberIds.length === 0) {
+      return [];
+    }
+    return await db.select().from(bundleRequests)
+      .where(inArray(bundleRequests.userId, teamMemberIds))
+      .orderBy(desc(bundleRequests.createdAt));
   }
 
   async getBundleRequestsByAssignee(assigneeId: string): Promise<BundleRequest[]> {
