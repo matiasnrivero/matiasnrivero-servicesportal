@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -39,6 +40,12 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, CalendarRange, Plus, Trash2, DollarSign, Save } from "lucide-react";
 import type { User, Service, ServicePack, ServicePackItem } from "@shared/schema";
 import { insertServicePackSchema } from "@shared/schema";
+
+interface LocalPackItem {
+  id: string;
+  serviceId: string;
+  quantity: number;
+}
 
 const packFormSchema = insertServicePackSchema.extend({
   name: z.string().min(1, "Pack name is required"),
@@ -68,6 +75,9 @@ export default function PackEditor() {
     serviceId: "",
     quantity: "1",
   });
+  
+  // Local items for Create mode (before pack is saved)
+  const [localItems, setLocalItems] = useState<LocalPackItem[]>([]);
 
   const form = useForm<PackFormValues>({
     resolver: zodResolver(packFormSchema),
@@ -122,20 +132,42 @@ export default function PackEditor() {
 
   const createPackMutation = useMutation({
     mutationFn: async (data: PackFormValues) => {
+      // Create the pack first
       const res = await apiRequest("POST", "/api/service-packs", {
         name: data.name,
         description: data.description || null,
         price: data.price,
         isActive: data.isActive,
       });
-      return res.json();
+      const newPack = await res.json();
+      
+      // If no local items, just return the pack
+      if (localItems.length === 0) {
+        return { pack: newPack, allSucceeded: true };
+      }
+      
+      // Add all local items to the pack - must all succeed
+      const itemPromises = localItems.map(item => 
+        apiRequest("POST", `/api/service-packs/${newPack.id}/items`, {
+          serviceId: item.serviceId,
+          quantity: item.quantity,
+        })
+      );
+      
+      // Use Promise.all so any failure rejects immediately
+      await Promise.all(itemPromises);
+      
+      return { pack: newPack, allSucceeded: true };
     },
-    onSuccess: (newPack) => {
+    onSuccess: ({ pack }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/service-packs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-packs", pack.id, "items"] });
+      setLocalItems([]); // Clear local items after successful creation
       toast({ title: "Pack created successfully" });
-      navigate(`/settings/packs/${newPack.id}/edit`);
+      navigate(`/settings/packs/${pack.id}/edit`);
     },
     onError: (error: Error) => {
+      // Keep local items intact so user can retry
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -198,33 +230,61 @@ export default function PackEditor() {
   };
 
   const handleAddItem = () => {
-    if (!params.id) {
-      toast({ title: "Please save the pack first", variant: "destructive" });
-      return;
-    }
     if (!newItemData.serviceId) {
       toast({ title: "Please select a service", variant: "destructive" });
       return;
     }
-    addItemMutation.mutate(newItemData);
+    
+    if (isEditing) {
+      // Edit mode: save to backend
+      addItemMutation.mutate(newItemData);
+    } else {
+      // Create mode: add to local state
+      const newLocalItem: LocalPackItem = {
+        id: `local-${Date.now()}`,
+        serviceId: newItemData.serviceId,
+        quantity: parseInt(newItemData.quantity) || 1,
+      };
+      setLocalItems([...localItems, newLocalItem]);
+      setNewItemData({ serviceId: "", quantity: "1" });
+      toast({ title: "Service added to pack" });
+    }
+  };
+  
+  const handleRemoveLocalItem = (itemId: string) => {
+    setLocalItems(localItems.filter(item => item.id !== itemId));
+    toast({ title: "Service removed from pack" });
   };
 
-  const getItemName = (item: ServicePackItem): string => {
+  const getItemName = (item: ServicePackItem | LocalPackItem): string => {
     return services.find(s => s.id === item.serviceId)?.title || "Unknown Service";
   };
 
-  const getItemPrice = (item: ServicePackItem): number => {
+  const getItemPrice = (item: ServicePackItem | LocalPackItem): number => {
     const service = services.find(s => s.id === item.serviceId);
     return service ? parseFloat(service.basePrice) : 0;
   };
 
+  // Get items to display - either from server (edit mode) or local state (create mode)
+  const displayItems = isEditing ? packItems : localItems;
+
   const calculateTotals = () => {
     let fullPrice = 0;
-    for (const item of packItems) {
+    const items = isEditing ? packItems : localItems;
+    for (const item of items) {
       fullPrice += getItemPrice(item) * item.quantity;
     }
-    const packPrice = form.watch("price") ? parseFloat(form.watch("price") || "0") : fullPrice;
-    return { fullPrice, packPrice };
+    const packPriceStr = form.watch("price");
+    // Only treat as valid pack price if it's a non-empty string that parses to a positive number
+    const isValidPackPrice = packPriceStr && packPriceStr.trim() !== "" && !isNaN(parseFloat(packPriceStr)) && parseFloat(packPriceStr) > 0;
+    const packPrice = isValidPackPrice ? parseFloat(packPriceStr) : null;
+    
+    // Only calculate savings if we have a valid pack price
+    const savings = packPrice !== null ? Math.max(0, fullPrice - packPrice) : null;
+    const savingsPercent = (savings !== null && fullPrice > 0) ? (savings / fullPrice) * 100 : null;
+    const isOverpriced = packPrice !== null && fullPrice > 0 && packPrice > fullPrice;
+    
+    return { fullPrice, packPrice, savings, savingsPercent, isValidPackPrice, isOverpriced };
   };
 
   if (currentUser?.role !== "admin") {
@@ -308,6 +368,103 @@ export default function PackEditor() {
                           </FormItem>
                         )}
                       />
+                      
+                      {/* Pack Items Section - inline service selector */}
+                      <div className="space-y-3 pt-2">
+                        <div className="flex items-center justify-between">
+                          <FormLabel className="text-base font-medium">Pack Items</FormLabel>
+                          <span className="text-sm text-muted-foreground">Add services to this pack</span>
+                        </div>
+                        
+                        {/* Service selector row */}
+                        <div className="flex flex-wrap items-end gap-3 p-4 bg-muted/50 rounded-md">
+                          <div className="space-y-1 flex-[2] min-w-[200px]">
+                            <Select value={newItemData.serviceId} onValueChange={(v) => setNewItemData({ ...newItemData, serviceId: v })}>
+                              <SelectTrigger data-testid="select-service">
+                                <SelectValue placeholder="Select a service" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {services.filter(s => s.isActive).map((service) => (
+                                  <SelectItem key={service.id} value={service.id}>
+                                    {service.title} - ${parseFloat(service.basePrice).toFixed(2)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1 w-20">
+                            <Input
+                              type="number"
+                              min="1"
+                              value={newItemData.quantity}
+                              onChange={(e) => setNewItemData({ ...newItemData, quantity: e.target.value })}
+                              placeholder="Qty"
+                              data-testid="input-item-quantity"
+                            />
+                          </div>
+                          <Button type="button" onClick={handleAddItem} disabled={addItemMutation.isPending} data-testid="button-add-item">
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add
+                          </Button>
+                        </div>
+                        
+                        {/* Services table */}
+                        {displayItems.length === 0 ? (
+                          <p className="text-muted-foreground text-center py-4">No services added yet</p>
+                        ) : (
+                          <ScrollArea className="max-h-[250px]">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Service</TableHead>
+                                  <TableHead className="text-center w-20">Qty</TableHead>
+                                  <TableHead className="text-right w-24">Unit Price</TableHead>
+                                  <TableHead className="text-right w-28">Total</TableHead>
+                                  <TableHead className="w-10"></TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {displayItems.map((item) => {
+                                  const unitPrice = getItemPrice(item);
+                                  const totalPrice = unitPrice * item.quantity;
+                                  return (
+                                    <TableRow key={item.id}>
+                                      <TableCell className="font-medium">
+                                        {getItemName(item)}
+                                      </TableCell>
+                                      <TableCell className="text-center">{item.quantity}</TableCell>
+                                      <TableCell className="text-right">${unitPrice.toFixed(2)}</TableCell>
+                                      <TableCell className="text-right font-medium">${totalPrice.toFixed(2)}</TableCell>
+                                      <TableCell>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          type="button"
+                                          onClick={() => isEditing ? removeItemMutation.mutate(item.id) : handleRemoveLocalItem(item.id)}
+                                          data-testid={`button-remove-item-${item.id}`}
+                                        >
+                                          <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </ScrollArea>
+                        )}
+                        
+                        {/* Full Price total line */}
+                        {displayItems.length > 0 && (
+                          <div className="flex justify-end pt-2 pr-12 border-t">
+                            <div className="flex items-center gap-4">
+                              <span className="text-sm font-medium">Full Price (Total):</span>
+                              <span className="text-lg font-semibold">${pricing.fullPrice.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      
                       <FormField
                         control={form.control}
                         name="price"
@@ -344,88 +501,6 @@ export default function PackEditor() {
                 </CardContent>
               </Card>
 
-              {isEditing && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Pack Items</CardTitle>
-                    <CardDescription>Add services to this pack</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex flex-wrap items-end gap-3 p-4 bg-muted/50 rounded-md">
-                      <div className="space-y-1 flex-[2] min-w-[200px]">
-                        <Select value={newItemData.serviceId} onValueChange={(v) => setNewItemData({ ...newItemData, serviceId: v })}>
-                          <SelectTrigger data-testid="select-service">
-                            <SelectValue placeholder="Select a service" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {services.filter(s => s.isActive).map((service) => (
-                              <SelectItem key={service.id} value={service.id}>
-                                {service.title} - ${parseFloat(service.basePrice).toFixed(2)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1 w-20">
-                        <Input
-                          type="number"
-                          min="1"
-                          value={newItemData.quantity}
-                          onChange={(e) => setNewItemData({ ...newItemData, quantity: e.target.value })}
-                          placeholder="Qty"
-                          data-testid="input-item-quantity"
-                        />
-                      </div>
-                      <Button onClick={handleAddItem} disabled={addItemMutation.isPending} data-testid="button-add-item">
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add
-                      </Button>
-                    </div>
-
-                    {packItems.length === 0 ? (
-                      <p className="text-muted-foreground text-center py-4">No items added yet</p>
-                    ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Service</TableHead>
-                            <TableHead className="text-center">Qty</TableHead>
-                            <TableHead className="text-right">Unit Price</TableHead>
-                            <TableHead className="text-right">Total</TableHead>
-                            <TableHead className="w-10"></TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {packItems.map((item) => {
-                            const unitPrice = getItemPrice(item);
-                            const totalPrice = unitPrice * item.quantity;
-                            return (
-                              <TableRow key={item.id}>
-                                <TableCell className="font-medium">
-                                  {getItemName(item)}
-                                </TableCell>
-                                <TableCell className="text-center">{item.quantity}</TableCell>
-                                <TableCell className="text-right">${unitPrice.toFixed(2)}</TableCell>
-                                <TableCell className="text-right">${totalPrice.toFixed(2)}</TableCell>
-                                <TableCell>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    onClick={() => removeItemMutation.mutate(item.id)}
-                                    data-testid={`button-remove-item-${item.id}`}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
             </div>
 
             <div className="space-y-6">
@@ -443,25 +518,29 @@ export default function PackEditor() {
                   </div>
                   <div className="flex justify-between font-semibold border-t pt-3">
                     <span>Pack Price:</span>
-                    <span>${pricing.packPrice.toFixed(2)}</span>
+                    <span>{pricing.packPrice !== null ? `$${pricing.packPrice.toFixed(2)}` : "$0.00"}</span>
                   </div>
-                  {pricing.fullPrice > 0 && pricing.fullPrice !== pricing.packPrice && (
-                    <div className="text-sm text-green-600 pt-2">
-                      Customer saves: ${(pricing.fullPrice - pricing.packPrice).toFixed(2)} ({((1 - pricing.packPrice / pricing.fullPrice) * 100).toFixed(1)}%)
+                  {pricing.isValidPackPrice && pricing.fullPrice > 0 && pricing.savings !== null && pricing.savings > 0 && pricing.savingsPercent !== null && (
+                    <div className="pt-3 border-t space-y-2">
+                      <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                        <span>Savings (Amount):</span>
+                        <span className="font-medium">${pricing.savings.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                        <span>Savings (%):</span>
+                        <span className="font-medium">{pricing.savingsPercent.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  )}
+                  {pricing.isOverpriced && (
+                    <div className="pt-3 border-t">
+                      <p className="text-sm text-amber-600 dark:text-amber-400">
+                        Pack price is higher than full price
+                      </p>
                     </div>
                   )}
                 </CardContent>
               </Card>
-
-              {!isEditing && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <p className="text-sm text-muted-foreground text-center">
-                      Save the pack first to add services.
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
             </div>
           </div>
         </div>
