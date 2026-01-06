@@ -1,16 +1,22 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Header } from "@/components/Header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ServicesListSection } from "./sections/ServicesListSection";
-import type { Bundle, BundleItem, BundleLineItem, ServicePack, ServicePackItem, Service } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Loader2, Check } from "lucide-react";
+import type { Bundle, BundleItem, BundleLineItem, ServicePack, ServicePackItem, Service, ClientPackSubscription } from "@shared/schema";
 
 interface CurrentUser {
   userId: string;
   role: string;
   username: string;
+  clientProfileId?: string | null;
 }
 
 interface BundleItemWithDetails extends BundleItem {
@@ -160,6 +166,9 @@ function BundlesTab(): JSX.Element {
 }
 
 function PacksTab(): JSX.Element {
+  const { toast } = useToast();
+  const [subscribingPackId, setSubscribingPackId] = useState<string | null>(null);
+  
   const { data: packs = [], isLoading } = useQuery({
     queryKey: ["/api/public/service-packs"],
     queryFn: fetchPacks,
@@ -169,6 +178,49 @@ function PacksTab(): JSX.Element {
     queryKey: ["/api/default-user"],
     queryFn: getDefaultUser,
   });
+
+  const clientProfileId = currentUser?.clientProfileId;
+  const isClientAdmin = currentUser?.role === "client" && clientProfileId;
+  
+  const { data: existingSubscriptions = [], isError: subscriptionsError } = useQuery<ClientPackSubscription[]>({
+    queryKey: ["/api/service-pack-subscriptions", clientProfileId],
+    queryFn: async () => {
+      if (!clientProfileId) return [];
+      const res = await fetch(`/api/service-pack-subscriptions?clientProfileId=${clientProfileId}`);
+      if (!res.ok) {
+        throw new Error("Failed to load subscriptions");
+      }
+      return res.json();
+    },
+    enabled: !!clientProfileId,
+  });
+
+  const subscribeMutation = useMutation({
+    mutationFn: async (packId: string) => {
+      setSubscribingPackId(packId);
+      return apiRequest("POST", "/api/service-pack-subscriptions", {
+        clientProfileId,
+        packId,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-pack-subscriptions", clientProfileId] });
+      toast({ title: "Successfully subscribed to pack!" });
+      setSubscribingPackId(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      setSubscribingPackId(null);
+    },
+  });
+
+  const isSubscribed = (packId: string) => {
+    return existingSubscriptions.some(sub => sub.packId === packId && sub.isActive);
+  };
+  
+  const isSubscribing = (packId: string) => {
+    return subscribingPackId === packId && subscribeMutation.isPending;
+  };
 
   const showPricing = currentUser && (currentUser.role === "client" || currentUser.role === "admin");
   const activePacks = packs;
@@ -198,6 +250,7 @@ function PacksTab(): JSX.Element {
         }, 0);
         const packPrice = parseFloat(pack.price || "0");
         const savings = fullPrice - packPrice;
+        const alreadySubscribed = isSubscribed(pack.id);
 
         return (
           <Card 
@@ -251,6 +304,34 @@ function PacksTab(): JSX.Element {
                     <Badge variant="outline" className="text-green-600 border-green-600">
                       Save ${savings.toFixed(2)}/mo
                     </Badge>
+                  </div>
+                )}
+
+                {isClientAdmin && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    {alreadySubscribed ? (
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        disabled
+                        data-testid={`button-subscribed-pack-${pack.id}`}
+                      >
+                        <Check className="h-4 w-4 mr-2" />
+                        Subscribed
+                      </Button>
+                    ) : (
+                      <Button
+                        className="w-full"
+                        onClick={() => subscribeMutation.mutate(pack.id)}
+                        disabled={isSubscribing(pack.id)}
+                        data-testid={`button-subscribe-pack-${pack.id}`}
+                      >
+                        {isSubscribing(pack.id) ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : null}
+                        Subscribe
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
