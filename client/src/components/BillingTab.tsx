@@ -749,10 +749,14 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
             <div className="space-y-4">
               {subscriptions.filter(s => s.isActive).map((subscription) => {
                 const pack = subscription.pack || availablePacks.find(p => p.id === subscription.packId);
-                const packItems = subscription.packItems || (pack as PackWithItems)?.packItems || (pack as PackWithItems)?.items || [];
-                const totalQty = subscription.totalIncluded || packItems.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0) || 0;
+                const packItemsForQty = subscription.packItems || (pack as PackWithItems)?.packItems || (pack as PackWithItems)?.items || [];
+                const totalQty = subscription.totalIncluded || packItemsForQty.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0) || 0;
                 const packPrice = parseFloat(subscription.priceAtSubscription || pack?.price || "0");
-                const totalPrice = packItems.reduce((sum: number, item: any) => {
+                
+                // Use activePacks items for total price calculation (has full service.basePrice data)
+                const activePack = activePacks.find(p => p.id === subscription.packId);
+                const packItemsWithPricing = activePack?.items || (pack as PackWithItems)?.items || [];
+                const totalPrice = packItemsWithPricing.reduce((sum: number, item: any) => {
                   const servicePrice = parseFloat(item.service?.basePrice || "0");
                   return sum + (servicePrice * item.quantity);
                 }, 0);
