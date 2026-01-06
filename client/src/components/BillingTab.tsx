@@ -751,7 +751,12 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                 const pack = subscription.pack || availablePacks.find(p => p.id === subscription.packId);
                 const packItems = subscription.packItems || (pack as PackWithItems)?.packItems || (pack as PackWithItems)?.items || [];
                 const totalQty = subscription.totalIncluded || packItems.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0) || 0;
-                const perUnitRate = totalQty > 0 ? parseFloat(subscription.priceAtSubscription || pack?.price || "0") / totalQty : 0;
+                const packPrice = parseFloat(subscription.priceAtSubscription || pack?.price || "0");
+                const totalPrice = packItems.reduce((sum: number, item: any) => {
+                  const servicePrice = parseFloat(item.service?.basePrice || "0");
+                  return sum + (servicePrice * item.quantity);
+                }, 0);
+                const savings = totalPrice > 0 ? totalPrice - packPrice : 0;
                 
                 return (
                   <div
@@ -771,14 +776,18 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                         {pack?.description && (
                           <p className="text-sm text-muted-foreground mt-1">{pack.description}</p>
                         )}
-                        <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
                           <div>
-                            <p className="text-muted-foreground">Monthly Price</p>
-                            <p className="font-medium">${subscription.priceAtSubscription || pack?.price || "0"}</p>
+                            <p className="text-muted-foreground">Pack Price</p>
+                            <p className="font-medium">${packPrice.toFixed(2)}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">Per-Unit Rate</p>
-                            <p className="font-medium">${perUnitRate.toFixed(2)}</p>
+                            <p className="text-muted-foreground">Total Price</p>
+                            <p className="font-medium text-muted-foreground line-through">${totalPrice.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Save</p>
+                            <p className="font-medium text-green-600">${savings.toFixed(2)}</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">Subscribed Since</p>
