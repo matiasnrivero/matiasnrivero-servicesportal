@@ -672,9 +672,9 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                                   ${packPrice.toFixed(2)}/mo
                                 </span>
                                 {fullPrice > 0 && savings > 0 && (
-                                  <Badge variant="secondary" className="text-xs line-through">
+                                  <span className="text-xs text-muted-foreground line-through">
                                     ${fullPrice.toFixed(2)}/mo
-                                  </Badge>
+                                  </span>
                                 )}
                               </div>
                               {packItems.length > 0 && (
