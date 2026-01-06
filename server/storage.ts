@@ -80,6 +80,17 @@ import {
   type Payment,
   type InsertPayment,
   type UpdatePayment,
+  type MonthlyPack,
+  type InsertMonthlyPack,
+  type UpdateMonthlyPack,
+  type MonthlyPackService,
+  type InsertMonthlyPackService,
+  type ClientMonthlyPackSubscription,
+  type InsertClientMonthlyPackSubscription,
+  type UpdateClientMonthlyPackSubscription,
+  type MonthlyPackUsage,
+  type InsertMonthlyPackUsage,
+  type UpdateMonthlyPackUsage,
   users,
   services,
   servicePricingTiers,
@@ -112,6 +123,10 @@ import {
   clientPaymentMethods,
   stripeEvents,
   payments,
+  monthlyPacks,
+  monthlyPackServices,
+  clientMonthlyPackSubscriptions,
+  monthlyPackUsage,
 } from "@shared/schema";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -363,6 +378,33 @@ export interface IStorage {
     options?: { updateVendorAssignee?: boolean; newVendorAssigneeId?: string }
   ): Promise<{ serviceRequests: number; bundleRequests: number }>;
   getUndeliveredJobsByDesigner(designerId: string): Promise<{ serviceRequests: ServiceRequest[]; bundleRequests: BundleRequest[] }>;
+
+  // Monthly Pack methods
+  getAllMonthlyPacks(): Promise<MonthlyPack[]>;
+  getActiveMonthlyPacks(): Promise<MonthlyPack[]>;
+  getMonthlyPack(id: string): Promise<MonthlyPack | undefined>;
+  createMonthlyPack(data: InsertMonthlyPack): Promise<MonthlyPack>;
+  updateMonthlyPack(id: string, data: UpdateMonthlyPack): Promise<MonthlyPack | undefined>;
+  deleteMonthlyPack(id: string): Promise<void>;
+
+  // Monthly Pack Services methods
+  getMonthlyPackServices(packId: string): Promise<MonthlyPackService[]>;
+  createMonthlyPackService(data: InsertMonthlyPackService): Promise<MonthlyPackService>;
+  deleteMonthlyPackServicesByPack(packId: string): Promise<void>;
+
+  // Client Monthly Pack Subscription methods
+  getClientMonthlyPackSubscriptions(clientProfileId: string): Promise<ClientMonthlyPackSubscription[]>;
+  getActiveClientMonthlyPackSubscription(clientProfileId: string): Promise<ClientMonthlyPackSubscription | undefined>;
+  getClientMonthlyPackSubscription(id: string): Promise<ClientMonthlyPackSubscription | undefined>;
+  createClientMonthlyPackSubscription(data: InsertClientMonthlyPackSubscription): Promise<ClientMonthlyPackSubscription>;
+  updateClientMonthlyPackSubscription(id: string, data: UpdateClientMonthlyPackSubscription): Promise<ClientMonthlyPackSubscription | undefined>;
+
+  // Monthly Pack Usage methods
+  getMonthlyPackUsage(subscriptionId: string, serviceId: string, month: number, year: number): Promise<MonthlyPackUsage | undefined>;
+  getMonthlyPackUsageBySubscription(subscriptionId: string, month: number, year: number): Promise<MonthlyPackUsage[]>;
+  createMonthlyPackUsage(data: InsertMonthlyPackUsage): Promise<MonthlyPackUsage>;
+  updateMonthlyPackUsage(id: string, data: UpdateMonthlyPackUsage): Promise<MonthlyPackUsage | undefined>;
+  incrementMonthlyPackUsage(subscriptionId: string, serviceId: string, month: number, year: number): Promise<MonthlyPackUsage>;
 }
 
 export class DbStorage implements IStorage {
@@ -1646,6 +1688,145 @@ export class DbStorage implements IStorage {
       serviceRequests: serviceResult.length, 
       bundleRequests: bundleResultByAssignee.length + bundleResultByVendorAssignee.length 
     };
+  }
+
+  // Monthly Pack methods
+  async getAllMonthlyPacks(): Promise<MonthlyPack[]> {
+    return await db.select().from(monthlyPacks).orderBy(monthlyPacks.name);
+  }
+
+  async getActiveMonthlyPacks(): Promise<MonthlyPack[]> {
+    return await db.select().from(monthlyPacks)
+      .where(eq(monthlyPacks.isActive, true))
+      .orderBy(monthlyPacks.name);
+  }
+
+  async getMonthlyPack(id: string): Promise<MonthlyPack | undefined> {
+    const result = await db.select().from(monthlyPacks).where(eq(monthlyPacks.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createMonthlyPack(data: InsertMonthlyPack): Promise<MonthlyPack> {
+    const result = await db.insert(monthlyPacks).values(data).returning();
+    return result[0];
+  }
+
+  async updateMonthlyPack(id: string, data: UpdateMonthlyPack): Promise<MonthlyPack | undefined> {
+    const result = await db.update(monthlyPacks)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(monthlyPacks.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteMonthlyPack(id: string): Promise<void> {
+    await db.delete(monthlyPacks).where(eq(monthlyPacks.id, id));
+  }
+
+  // Monthly Pack Services methods
+  async getMonthlyPackServices(packId: string): Promise<MonthlyPackService[]> {
+    return await db.select().from(monthlyPackServices)
+      .where(eq(monthlyPackServices.packId, packId));
+  }
+
+  async createMonthlyPackService(data: InsertMonthlyPackService): Promise<MonthlyPackService> {
+    const result = await db.insert(monthlyPackServices).values(data).returning();
+    return result[0];
+  }
+
+  async deleteMonthlyPackServicesByPack(packId: string): Promise<void> {
+    await db.delete(monthlyPackServices).where(eq(monthlyPackServices.packId, packId));
+  }
+
+  // Client Monthly Pack Subscription methods
+  async getClientMonthlyPackSubscriptions(clientProfileId: string): Promise<ClientMonthlyPackSubscription[]> {
+    return await db.select().from(clientMonthlyPackSubscriptions)
+      .where(eq(clientMonthlyPackSubscriptions.clientProfileId, clientProfileId))
+      .orderBy(desc(clientMonthlyPackSubscriptions.createdAt));
+  }
+
+  async getActiveClientMonthlyPackSubscription(clientProfileId: string): Promise<ClientMonthlyPackSubscription | undefined> {
+    const result = await db.select().from(clientMonthlyPackSubscriptions)
+      .where(and(
+        eq(clientMonthlyPackSubscriptions.clientProfileId, clientProfileId),
+        eq(clientMonthlyPackSubscriptions.isActive, true)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async getClientMonthlyPackSubscription(id: string): Promise<ClientMonthlyPackSubscription | undefined> {
+    const result = await db.select().from(clientMonthlyPackSubscriptions)
+      .where(eq(clientMonthlyPackSubscriptions.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createClientMonthlyPackSubscription(data: InsertClientMonthlyPackSubscription): Promise<ClientMonthlyPackSubscription> {
+    const result = await db.insert(clientMonthlyPackSubscriptions).values(data).returning();
+    return result[0];
+  }
+
+  async updateClientMonthlyPackSubscription(id: string, data: UpdateClientMonthlyPackSubscription): Promise<ClientMonthlyPackSubscription | undefined> {
+    const result = await db.update(clientMonthlyPackSubscriptions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(clientMonthlyPackSubscriptions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Monthly Pack Usage methods
+  async getMonthlyPackUsage(subscriptionId: string, serviceId: string, month: number, year: number): Promise<MonthlyPackUsage | undefined> {
+    const result = await db.select().from(monthlyPackUsage)
+      .where(and(
+        eq(monthlyPackUsage.subscriptionId, subscriptionId),
+        eq(monthlyPackUsage.serviceId, serviceId),
+        eq(monthlyPackUsage.periodMonth, month),
+        eq(monthlyPackUsage.periodYear, year)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async getMonthlyPackUsageBySubscription(subscriptionId: string, month: number, year: number): Promise<MonthlyPackUsage[]> {
+    return await db.select().from(monthlyPackUsage)
+      .where(and(
+        eq(monthlyPackUsage.subscriptionId, subscriptionId),
+        eq(monthlyPackUsage.periodMonth, month),
+        eq(monthlyPackUsage.periodYear, year)
+      ));
+  }
+
+  async createMonthlyPackUsage(data: InsertMonthlyPackUsage): Promise<MonthlyPackUsage> {
+    const result = await db.insert(monthlyPackUsage).values(data).returning();
+    return result[0];
+  }
+
+  async updateMonthlyPackUsage(id: string, data: UpdateMonthlyPackUsage): Promise<MonthlyPackUsage | undefined> {
+    const result = await db.update(monthlyPackUsage)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(monthlyPackUsage.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async incrementMonthlyPackUsage(subscriptionId: string, serviceId: string, month: number, year: number): Promise<MonthlyPackUsage> {
+    const existing = await this.getMonthlyPackUsage(subscriptionId, serviceId, month, year);
+    
+    if (existing) {
+      const updated = await this.updateMonthlyPackUsage(existing.id, {
+        usedQuantity: existing.usedQuantity + 1
+      });
+      return updated!;
+    } else {
+      return await this.createMonthlyPackUsage({
+        subscriptionId,
+        serviceId,
+        periodMonth: month,
+        periodYear: year,
+        usedQuantity: 1
+      });
+    }
   }
 }
 
