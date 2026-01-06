@@ -9,12 +9,34 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { Service, ServicePricingTier } from "@shared/schema";
+import type { Service, ServicePricingTier, ClientPaymentMethod } from "@shared/schema";
 
 interface CurrentUser {
   userId: string;
   role: string;
   username: string;
+  clientProfileId?: string | null;
+}
+
+interface BillingInfo {
+  paymentConfiguration: string;
+  invoiceDay?: number;
+  paymentMethods: ClientPaymentMethod[];
+  tripodDiscountTier?: string;
+}
+
+// Helper to calculate discounted price (rounds up to nearest cent)
+function applyTripodDiscount(price: number, discountTier: string): number {
+  const discountPercentages: Record<string, number> = {
+    none: 0,
+    power_level: 10,
+    oms_subscription: 15,
+    enterprise: 20,
+  };
+  const discountPercent = discountPercentages[discountTier] || 0;
+  if (discountPercent === 0) return price;
+  const discountedPrice = price * (1 - discountPercent / 100);
+  return Math.ceil(discountedPrice * 100) / 100;
 }
 
 interface PricingSettings {
@@ -71,6 +93,22 @@ export const ServicesListSection = ({ showHeader = true }: ServicesListSectionPr
     queryFn: getDefaultUser,
   });
 
+  const clientProfileId = currentUser?.clientProfileId;
+
+  // Fetch billing info to get discount tier
+  const { data: billingInfo } = useQuery<BillingInfo>({
+    queryKey: ["/api/billing/client-info", clientProfileId],
+    queryFn: async () => {
+      const res = await fetch(`/api/billing/client-info?clientProfileId=${clientProfileId}`);
+      if (!res.ok) throw new Error("Failed to fetch billing info");
+      return res.json();
+    },
+    enabled: !!clientProfileId,
+  });
+
+  const discountTier = billingInfo?.tripodDiscountTier || "none";
+  const hasDiscount = discountTier !== "none";
+
   const { data: pricingSettings = {} } = useQuery({
     queryKey: ["/api/system-settings/pricing"],
     queryFn: fetchPricingSettings,
@@ -101,18 +139,27 @@ export const ServicesListSection = ({ showHeader = true }: ServicesListSectionPr
 
   const showPricing = currentUser && (currentUser.role === "client" || currentUser.role === "admin");
 
-  const getDisplayPrice = (service: Service): string => {
+  // Returns {original, discounted} price info
+  const getDisplayPriceInfo = (service: Service): { originalPrice: string; discountedPrice: string } => {
     const serviceName = service.title;
     const pricing = pricingSettings[serviceName];
     const tiers = allTiers[service.id] || [];
 
+    let originalPrice = "";
+    let discountedPrice = "";
+
     if (serviceName === "Store Creation") {
-      return "";
+      return { originalPrice: "", discountedPrice: "" };
     }
 
     if (service.pricingStructure === "single") {
       const basePrice = pricing?.basePrice || parseFloat(service.basePrice || "0");
-      return basePrice > 0 ? `$${basePrice}` : "";
+      if (basePrice > 0) {
+        originalPrice = `$${basePrice}`;
+        const discounted = applyTripodDiscount(basePrice, discountTier);
+        discountedPrice = hasDiscount ? `$${discounted.toFixed(2)}` : `$${basePrice}`;
+      }
+      return { originalPrice: hasDiscount ? originalPrice : "", discountedPrice };
     }
 
     if (service.pricingStructure === "complexity" && tiers.length > 0) {
@@ -131,12 +178,19 @@ export const ServicesListSection = ({ showHeader = true }: ServicesListSectionPr
         const minPrice = Math.min(...prices);
         const maxPrice = Math.max(...prices);
         if (minPrice === maxPrice) {
-          return `$${minPrice}`;
+          originalPrice = `$${minPrice}`;
+          const discounted = applyTripodDiscount(minPrice, discountTier);
+          discountedPrice = hasDiscount ? `$${discounted.toFixed(2)}` : `$${minPrice}`;
+        } else {
+          originalPrice = `$${minPrice} - $${maxPrice}`;
+          const discountedMin = applyTripodDiscount(minPrice, discountTier);
+          const discountedMax = applyTripodDiscount(maxPrice, discountTier);
+          discountedPrice = hasDiscount ? `$${discountedMin.toFixed(2)} - $${discountedMax.toFixed(2)}` : `$${minPrice} - $${maxPrice}`;
         }
-        return `$${minPrice} - $${maxPrice}`;
+        return { originalPrice: hasDiscount ? originalPrice : "", discountedPrice };
       }
       
-      return service.priceRange || "";
+      return { originalPrice: "", discountedPrice: service.priceRange || "" };
     }
 
     if (service.pricingStructure === "quantity" && tiers.length > 0) {
@@ -154,20 +208,30 @@ export const ServicesListSection = ({ showHeader = true }: ServicesListSectionPr
         const minPrice = Math.min(...prices);
         const maxPrice = Math.max(...prices);
         if (minPrice === maxPrice) {
-          return `$${minPrice}`;
+          originalPrice = `$${minPrice}`;
+          const discounted = applyTripodDiscount(minPrice, discountTier);
+          discountedPrice = hasDiscount ? `$${discounted.toFixed(2)}` : `$${minPrice}`;
+        } else {
+          originalPrice = `$${minPrice} - $${maxPrice}`;
+          const discountedMin = applyTripodDiscount(minPrice, discountTier);
+          const discountedMax = applyTripodDiscount(maxPrice, discountTier);
+          discountedPrice = hasDiscount ? `$${discountedMin.toFixed(2)} - $${discountedMax.toFixed(2)}` : `$${minPrice} - $${maxPrice}`;
         }
-        return `$${minPrice} - $${maxPrice}`;
+        return { originalPrice: hasDiscount ? originalPrice : "", discountedPrice };
       }
       
-      return service.priceRange || "";
+      return { originalPrice: "", discountedPrice: service.priceRange || "" };
     }
 
     const basePrice = pricing?.basePrice;
     if (basePrice) {
-      return `$${basePrice}`;
+      originalPrice = `$${basePrice}`;
+      const discounted = applyTripodDiscount(basePrice, discountTier);
+      discountedPrice = hasDiscount ? `$${discounted.toFixed(2)}` : `$${basePrice}`;
+      return { originalPrice: hasDiscount ? originalPrice : "", discountedPrice };
     }
 
-    return service.priceRange || "";
+    return { originalPrice: "", discountedPrice: service.priceRange || "" };
   };
 
   const getStorePricingTiers = () => {
@@ -247,11 +311,18 @@ export const ServicesListSection = ({ showHeader = true }: ServicesListSectionPr
                             </button>
                           );
                         }
-                        const displayPrice = getDisplayPrice(service);
+                        const { originalPrice, discountedPrice } = getDisplayPriceInfo(service);
                         return (
-                          <span className="font-semibold text-sky-blue-accent whitespace-nowrap">
-                            {displayPrice}
-                          </span>
+                          <div className="flex flex-col items-end">
+                            <span className="font-semibold text-sky-blue-accent whitespace-nowrap">
+                              {discountedPrice}
+                            </span>
+                            {originalPrice && (
+                              <span className="text-xs text-muted-foreground line-through whitespace-nowrap">
+                                {originalPrice}
+                              </span>
+                            )}
+                          </div>
                         );
                       })()}
                     </div>

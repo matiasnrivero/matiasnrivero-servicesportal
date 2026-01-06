@@ -23,6 +23,7 @@ interface BillingInfo {
   billingAddress: BillingAddress | null;
   stripeCustomerId: string | null;
   paymentMethods: ClientPaymentMethod[];
+  tripodDiscountTier: string;
 }
 
 interface AddPaymentMethodFormProps {
@@ -287,6 +288,7 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [paymentConfig, setPaymentConfig] = useState("pay_as_you_go");
   const [invoiceDay, setInvoiceDay] = useState<number>(1);
+  const [tripodDiscountTier, setTripodDiscountTier] = useState("none");
   const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
   const [selectedPackForSubscribe, setSelectedPackForSubscribe] = useState<PackWithItems | null>(null);
   const [cancelSubscriptionId, setCancelSubscriptionId] = useState<string | null>(null);
@@ -426,7 +428,7 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
   });
 
   const updateConfigMutation = useMutation({
-    mutationFn: async (data: { paymentConfiguration: string; invoiceDay?: number }) => {
+    mutationFn: async (data: { paymentConfiguration: string; invoiceDay?: number; tripodDiscountTier?: string }) => {
       if (data.paymentConfiguration === "monthly_payment") {
         const day = data.invoiceDay ?? 1;
         if (day < 1 || day > 28) {
@@ -457,13 +459,15 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
     if (billingInfo) {
       setPaymentConfig(billingInfo.paymentConfiguration || "pay_as_you_go");
       setInvoiceDay(billingInfo.invoiceDay || 1);
+      setTripodDiscountTier(billingInfo.tripodDiscountTier || "none");
     }
     setConfigDialogOpen(true);
   };
 
   const handleSaveConfig = () => {
-    const data: { paymentConfiguration: string; invoiceDay?: number } = {
+    const data: { paymentConfiguration: string; invoiceDay?: number; tripodDiscountTier?: string } = {
       paymentConfiguration: paymentConfig,
+      tripodDiscountTier: tripodDiscountTier,
     };
     if (paymentConfig === "monthly_payment") {
       data.invoiceDay = invoiceDay;
@@ -481,6 +485,21 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
         return "Deduct from Royalties";
       default:
         return config;
+    }
+  };
+
+  const getTripodDiscountTierLabel = (tier: string) => {
+    switch (tier) {
+      case "none":
+        return "Not Subscribed to any Plan (0%)";
+      case "power_level":
+        return "Tri-POD Power Level Client (10%)";
+      case "oms_subscription":
+        return "Tri-POD OMS Subscription (15%)";
+      case "enterprise":
+        return "Tri-POD Enterprise Level Client (20%)";
+      default:
+        return "Not Subscribed to any Plan (0%)";
     }
   };
 
@@ -521,7 +540,7 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
           )}
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-muted-foreground">Payment Type</p>
               <p className="font-medium" data-testid="text-payment-config">
@@ -536,6 +555,12 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                 </p>
               </div>
             )}
+            <div>
+              <p className="text-sm text-muted-foreground">Tri-POD Product Discount</p>
+              <p className="font-medium" data-testid="text-tripod-discount">
+                {getTripodDiscountTierLabel(billingInfo?.tripodDiscountTier || "none")}
+              </p>
+            </div>
             {billingInfo?.billingAddress && (
               <div>
                 <p className="text-sm text-muted-foreground">Billing Address</p>
@@ -599,6 +624,23 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                 </p>
               </div>
             )}
+            <div className="space-y-2">
+              <Label htmlFor="tripodDiscount">Tri-POD Product Discount</Label>
+              <Select value={tripodDiscountTier} onValueChange={setTripodDiscountTier}>
+                <SelectTrigger data-testid="select-tripod-discount">
+                  <SelectValue placeholder="Select discount tier" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Not Subscribed to any Plan (0%)</SelectItem>
+                  <SelectItem value="power_level">Tri-POD Power Level Client (10%)</SelectItem>
+                  <SelectItem value="oms_subscription">Tri-POD OMS Subscription (15%)</SelectItem>
+                  <SelectItem value="enterprise">Tri-POD Enterprise Level Client (20%)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                Discount applied to ad-hoc services and bundles (not monthly packs).
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfigDialogOpen(false)}>

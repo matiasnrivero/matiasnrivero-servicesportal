@@ -51,6 +51,23 @@ interface CurrentUser {
   userId: string;
   role: string;
   username: string;
+  clientProfileId?: string | null;
+}
+
+interface BillingInfo {
+  paymentConfiguration: string;
+  invoiceDay?: number;
+  tripodDiscountTier?: string;
+}
+
+function applyTripodDiscount(price: number, discountTier: string): number {
+  const discountPercent = 
+    discountTier === "power_level" ? 10 :
+    discountTier === "oms_subscription" ? 15 :
+    discountTier === "enterprise" ? 20 : 0;
+  
+  if (discountPercent === 0) return price;
+  return Math.ceil((price * (1 - discountPercent / 100)) * 100) / 100;
 }
 
 async function fetchServices(): Promise<Service[]> {
@@ -238,6 +255,22 @@ export default function ServiceRequestForm() {
     queryKey: ["/api/default-user"],
     queryFn: getDefaultUser,
   });
+
+  const clientProfileId = currentUser?.clientProfileId;
+
+  // Fetch billing info for Tri-POD discount tier
+  const { data: billingInfo } = useQuery<BillingInfo>({
+    queryKey: ["/api/client-companies", clientProfileId, "billing"],
+    queryFn: async () => {
+      const res = await fetch(`/api/billing/client-info?clientProfileId=${clientProfileId}`);
+      if (!res.ok) throw new Error("Failed to fetch billing info");
+      return res.json();
+    },
+    enabled: !!clientProfileId,
+  });
+
+  const tripodDiscountTier = billingInfo?.tripodDiscountTier || "none";
+  const hasTripodDiscount = tripodDiscountTier !== "none";
 
   // Fetch designers for assignment (Admin and Internal Designer only)
   const { data: designers = [] } = useQuery<User[]>({
@@ -528,20 +561,24 @@ export default function ServiceRequestForm() {
     setCouponError("");
   };
 
-  const calculateDiscountedPrice = (basePrice: number): { discountAmount: number; finalPrice: number } => {
+  const calculateDiscountedPrice = (basePrice: number): { discountAmount: number; finalPrice: number; priceAfterTripod: number } => {
+    // First apply Tri-POD discount
+    const priceAfterTripod = hasTripodDiscount ? applyTripodDiscount(basePrice, tripodDiscountTier) : basePrice;
+    
+    // Then apply coupon discount on top
     if (!validatedCoupon) {
-      return { discountAmount: 0, finalPrice: basePrice };
+      return { discountAmount: 0, finalPrice: priceAfterTripod, priceAfterTripod };
     }
 
     let discountAmount = 0;
     if (validatedCoupon.discountType === "percentage") {
-      discountAmount = basePrice * (parseFloat(validatedCoupon.discountValue) / 100);
+      discountAmount = priceAfterTripod * (parseFloat(validatedCoupon.discountValue) / 100);
     } else {
       discountAmount = parseFloat(validatedCoupon.discountValue);
     }
 
-    const finalPrice = Math.max(0, basePrice - discountAmount);
-    return { discountAmount, finalPrice };
+    const finalPrice = Math.max(0, priceAfterTripod - discountAmount);
+    return { discountAmount, finalPrice, priceAfterTripod };
   };
 
   const { discountAmount, finalPrice: discountedFinalPrice } = calculateDiscountedPrice(calculatedPrice);

@@ -24,6 +24,21 @@ interface BillingInfo {
   paymentConfiguration: string;
   invoiceDay?: number;
   paymentMethods: ClientPaymentMethod[];
+  tripodDiscountTier?: string;
+}
+
+// Helper to calculate discounted price (rounds up to nearest cent)
+function applyTripodDiscount(price: number, discountTier: string): number {
+  const discountPercentages: Record<string, number> = {
+    none: 0,
+    power_level: 10,
+    oms_subscription: 15,
+    enterprise: 20,
+  };
+  const discountPercent = discountPercentages[discountTier] || 0;
+  if (discountPercent === 0) return price;
+  const discountedPrice = price * (1 - discountPercent / 100);
+  return Math.ceil(discountedPrice * 100) / 100; // Round up to nearest cent
 }
 
 interface CurrentUser {
@@ -81,6 +96,21 @@ function BundlesTab(): JSX.Element {
     queryFn: getDefaultUser,
   });
 
+  const clientProfileId = currentUser?.clientProfileId;
+  
+  // Fetch billing info to get discount tier
+  const { data: billingInfo } = useQuery<BillingInfo>({
+    queryKey: ["/api/billing/client-info", clientProfileId],
+    queryFn: async () => {
+      const res = await fetch(`/api/billing/client-info?clientProfileId=${clientProfileId}`);
+      if (!res.ok) throw new Error("Failed to fetch billing info");
+      return res.json();
+    },
+    enabled: !!clientProfileId,
+  });
+
+  const discountTier = billingInfo?.tripodDiscountTier || "none";
+  const hasDiscount = discountTier !== "none";
   const showPricing = currentUser && (currentUser.role === "client" || currentUser.role === "admin");
   const activeBundles = bundles;
 
@@ -113,6 +143,8 @@ function BundlesTab(): JSX.Element {
           return sum + (price * item.quantity);
         }, 0);
         const bundlePrice = parseFloat(bundle.finalPrice || "0");
+        // Apply Tri-POD discount to the bundle price
+        const discountedBundlePrice = hasDiscount ? applyTripodDiscount(bundlePrice, discountTier) : bundlePrice;
         const savings = fullPrice - bundlePrice;
 
         return (
@@ -130,11 +162,11 @@ function BundlesTab(): JSX.Element {
                   {showPricing && bundlePrice > 0 && (
                     <div className="flex flex-col items-end">
                       <span className="font-semibold text-sky-blue-accent whitespace-nowrap">
-                        ${bundlePrice.toFixed(2)}
+                        ${discountedBundlePrice.toFixed(2)}
                       </span>
-                      {savings > 0 && (
+                      {hasDiscount && (
                         <span className="text-xs text-muted-foreground line-through">
-                          ${fullPrice.toFixed(2)}
+                          ${bundlePrice.toFixed(2)}
                         </span>
                       )}
                     </div>

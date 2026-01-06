@@ -7740,7 +7740,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { clientProfileId } = req.params;
-      const { paymentConfiguration, invoiceDay, billingAddress } = req.body;
+      const { paymentConfiguration, invoiceDay, billingAddress, tripodDiscountTier } = req.body;
 
       const updates: any = {};
       if (paymentConfiguration) {
@@ -7758,6 +7758,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (billingAddress !== undefined) {
         updates.billingAddress = billingAddress;
+      }
+      if (tripodDiscountTier !== undefined) {
+        const validTiers = ["none", "power_level", "oms_subscription", "enterprise"];
+        if (!validTiers.includes(tripodDiscountTier)) {
+          return res.status(400).json({ error: "Invalid discount tier" });
+        }
+        updates.tripodDiscountTier = tripodDiscountTier;
       }
 
       const updated = await storage.updateClientProfile(clientProfileId, updates);
@@ -7808,6 +7815,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         invoiceDay: clientProfile.invoiceDay,
         billingAddress: clientProfile.billingAddress,
         stripeCustomerId: clientProfile.stripeCustomerId,
+        tripodDiscountTier: clientProfile.tripodDiscountTier || "none",
         paymentMethods,
       });
     } catch (error) {

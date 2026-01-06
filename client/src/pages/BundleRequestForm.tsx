@@ -47,6 +47,22 @@ interface CurrentUser {
   clientProfileId?: string | null;
 }
 
+interface BillingInfo {
+  paymentConfiguration: string;
+  invoiceDay?: number;
+  tripodDiscountTier?: string;
+}
+
+function applyTripodDiscount(price: number, discountTier: string): number {
+  const discountPercent = 
+    discountTier === "power_level" ? 10 :
+    discountTier === "oms_subscription" ? 15 :
+    discountTier === "enterprise" ? 20 : 0;
+  
+  if (discountPercent === 0) return price;
+  return Math.ceil((price * (1 - discountPercent / 100)) * 100) / 100;
+}
+
 async function fetchBundleFormStructure(bundleId: string): Promise<BundleFormStructure> {
   const response = await fetch(`/api/bundles/${bundleId}/form-structure`);
   if (!response.ok) {
@@ -106,6 +122,22 @@ export default function BundleRequestForm() {
     queryKey: ["/api/default-user"],
     queryFn: getDefaultUser,
   });
+
+  const clientProfileId = currentUser?.clientProfileId;
+
+  // Fetch billing info for Tri-POD discount tier
+  const { data: billingInfo } = useQuery<BillingInfo>({
+    queryKey: ["/api/client-companies", clientProfileId, "billing"],
+    queryFn: async () => {
+      const res = await fetch(`/api/billing/client-info?clientProfileId=${clientProfileId}`);
+      if (!res.ok) throw new Error("Failed to fetch billing info");
+      return res.json();
+    },
+    enabled: !!clientProfileId,
+  });
+
+  const tripodDiscountTier = billingInfo?.tripodDiscountTier || "none";
+  const hasTripodDiscount = tripodDiscountTier !== "none";
 
   // Fetch designers that can be assigned to the bundle request
   const { data: designers } = useQuery<UserType[]>({
@@ -232,20 +264,24 @@ export default function BundleRequestForm() {
     setCouponError("");
   };
 
-  const calculateDiscountedPrice = (basePrice: number): { discountAmount: number; finalPrice: number } => {
+  const calculateDiscountedPrice = (basePrice: number): { discountAmount: number; finalPrice: number; priceAfterTripod: number } => {
+    // First apply Tri-POD discount
+    const priceAfterTripod = hasTripodDiscount ? applyTripodDiscount(basePrice, tripodDiscountTier) : basePrice;
+    
+    // Then apply coupon discount on top
     if (!validatedCoupon) {
-      return { discountAmount: 0, finalPrice: basePrice };
+      return { discountAmount: 0, finalPrice: priceAfterTripod, priceAfterTripod };
     }
 
     let discountAmount = 0;
     if (validatedCoupon.discountType === "percentage") {
-      discountAmount = basePrice * (parseFloat(validatedCoupon.discountValue) / 100);
+      discountAmount = priceAfterTripod * (parseFloat(validatedCoupon.discountValue) / 100);
     } else {
       discountAmount = parseFloat(validatedCoupon.discountValue);
     }
 
-    const finalPrice = Math.max(0, basePrice - discountAmount);
-    return { discountAmount, finalPrice };
+    const finalPrice = Math.max(0, priceAfterTripod - discountAmount);
+    return { discountAmount, finalPrice, priceAfterTripod };
   };
 
   const handleSubmit = () => {
@@ -554,27 +590,34 @@ export default function BundleRequestForm() {
           <div className="mb-6">
             <h1 className="font-title-semibold text-dark-blue-night text-2xl flex items-center gap-3" data-testid="text-bundle-name">
               {bundle.name}
-              {showPricing && bundle.finalPrice && (
-                <>
-                  {validatedCoupon ? (
+              {showPricing && bundle.finalPrice && (() => {
+                const basePrice = parseFloat(bundle.finalPrice);
+                const { finalPrice, priceAfterTripod } = calculateDiscountedPrice(basePrice);
+                const hasAnyDiscount = hasTripodDiscount || validatedCoupon;
+                
+                if (hasAnyDiscount) {
+                  return (
                     <span className="flex items-center gap-2">
                       <span className="text-muted-foreground line-through font-body-2-semibold">
-                        ${parseFloat(bundle.finalPrice).toFixed(2)}
+                        ${basePrice.toFixed(2)}
                       </span>
-                      <span className="text-green-600 font-body-2-semibold">
-                        ${calculateDiscountedPrice(parseFloat(bundle.finalPrice)).finalPrice.toFixed(2)}
+                      <span className="text-sky-blue-accent font-body-2-semibold">
+                        ${finalPrice.toFixed(2)}
                       </span>
-                      <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded">
-                        -{validatedCoupon.discountType === "percentage" ? `${validatedCoupon.discountValue}%` : `$${parseFloat(validatedCoupon.discountValue).toFixed(2)}`}
-                      </span>
+                      {validatedCoupon && (
+                        <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded">
+                          -{validatedCoupon.discountType === "percentage" ? `${validatedCoupon.discountValue}%` : `$${parseFloat(validatedCoupon.discountValue).toFixed(2)}`}
+                        </span>
+                      )}
                     </span>
-                  ) : (
-                    <span className="text-sky-blue-accent font-body-2-semibold">
-                      ${parseFloat(bundle.finalPrice).toFixed(2)}
-                    </span>
-                  )}
-                </>
-              )}
+                  );
+                }
+                return (
+                  <span className="text-sky-blue-accent font-body-2-semibold">
+                    ${basePrice.toFixed(2)}
+                  </span>
+                );
+              })()}
             </h1>
             {bundle.description && (
               <p className="font-body-reg text-dark-gray mt-1">{bundle.description}</p>
