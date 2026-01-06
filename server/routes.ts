@@ -435,10 +435,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Filter requests based on user's role hierarchy
       // admin, internal_designer can see all requests
       // vendor, vendor_designer see jobs assigned to their vendor organization
-      // client can only see their own requests
-      if (sessionUser.role === "client") {
-        // Clients can only see their own requests
-        requests = await storage.getServiceRequestsByUser(sessionUserId);
+      // client and client_member see all requests from their company (client profile)
+      if (["client", "client_member"].includes(sessionUser.role)) {
+        // Clients and client members see all requests from their company
+        if (sessionUser.clientProfileId) {
+          requests = await storage.getServiceRequestsByClientProfile(sessionUser.clientProfileId);
+        } else {
+          requests = await storage.getServiceRequestsByUser(sessionUserId);
+        }
       } else if (["admin", "internal_designer", "designer"].includes(sessionUser.role)) {
         // Admin, Internal Designers can see all requests
         if (status) {
@@ -501,9 +505,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Service request not found" });
       }
 
-      // Clients can only view their own requests
-      if (sessionUser.role === "client" && request.userId !== sessionUserId) {
-        return res.status(403).json({ error: "Access denied" });
+      // Clients and client members can only view requests from their company
+      if (["client", "client_member"].includes(sessionUser.role)) {
+        if (sessionUser.clientProfileId) {
+          const teamMembers = await storage.getClientTeamMembers(sessionUser.clientProfileId);
+          const teamMemberIds = teamMembers.map(u => u.id);
+          if (!teamMemberIds.includes(request.userId)) {
+            return res.status(403).json({ error: "Access denied" });
+          }
+        } else if (request.userId !== sessionUserId) {
+          return res.status(403).json({ error: "Access denied" });
+        }
       }
 
       // Admin, Internal Designers, Vendors, Vendor Designers can view all requests
