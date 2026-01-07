@@ -128,6 +128,14 @@ export default function PackEditor() {
         price: pack.price || "",
         isActive: pack.isActive,
       });
+      
+      // For new-style packs with direct serviceId/quantity, initialize the service selector
+      if (pack.serviceId && pack.quantity) {
+        setNewItemData({
+          serviceId: pack.serviceId,
+          quantity: String(pack.quantity),
+        });
+      }
     }
   }, [pack, form]);
 
@@ -260,15 +268,47 @@ export default function PackEditor() {
     return service ? parseFloat(service.basePrice) : 0;
   };
 
-  // Get items to display - either from server (edit mode) or local state (create mode)
-  const displayItems = isEditing ? packItems : localItems;
+  // Get items to display - for new-style packs use pack's serviceId/quantity, otherwise use packItems/localItems
+  const displayItems: (ServicePackItem | LocalPackItem)[] = (() => {
+    if (isEditing) {
+      // New-style pack: use pack's direct serviceId/quantity
+      if (pack?.serviceId && pack?.quantity) {
+        return [{
+          id: 'pack-service',
+          serviceId: pack.serviceId,
+          quantity: pack.quantity,
+        } as LocalPackItem];
+      }
+      // Legacy pack: use packItems
+      return packItems;
+    }
+    // Create mode: use local items
+    return localItems;
+  })();
 
   const calculateTotals = () => {
     let fullPrice = 0;
-    const items = isEditing ? packItems : localItems;
-    for (const item of items) {
-      fullPrice += getItemPrice(item) * item.quantity;
+    
+    if (isEditing) {
+      // For edit mode: prefer pack's direct serviceId/quantity (new style), fall back to packItems (legacy)
+      if (pack?.serviceId && pack?.quantity) {
+        const service = services.find(s => s.id === pack.serviceId);
+        if (service) {
+          fullPrice = parseFloat(service.basePrice) * pack.quantity;
+        }
+      } else {
+        // Legacy pack: calculate from packItems
+        for (const item of packItems) {
+          fullPrice += getItemPrice(item) * item.quantity;
+        }
+      }
+    } else {
+      // Create mode: calculate from local items
+      for (const item of localItems) {
+        fullPrice += getItemPrice(item) * item.quantity;
+      }
     }
+    
     const packPriceStr = form.watch("price");
     // Only treat as valid pack price if it's a non-empty string that parses to a positive number
     const isValidPackPrice = packPriceStr && packPriceStr.trim() !== "" && !isNaN(parseFloat(packPriceStr)) && parseFloat(packPriceStr) > 0;

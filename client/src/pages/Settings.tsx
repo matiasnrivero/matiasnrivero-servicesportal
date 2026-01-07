@@ -948,11 +948,22 @@ function PackTableRow({
     },
   });
 
-  const fullPrice = packItems.reduce((total, item) => {
-    const service = services.find(s => s.id === item.serviceId);
-    if (service) return total + parseFloat(service.basePrice) * item.quantity;
-    return total;
-  }, 0);
+  // Calculate full price: prefer pack's direct serviceId/quantity (new style), fall back to packItems (legacy)
+  let fullPrice = 0;
+  if (pack.serviceId && pack.quantity) {
+    // New single-service pack: calculate from pack's serviceId and quantity
+    const service = services.find(s => s.id === pack.serviceId);
+    if (service) {
+      fullPrice = parseFloat(service.basePrice) * pack.quantity;
+    }
+  } else {
+    // Legacy pack: calculate from packItems
+    fullPrice = packItems.reduce((total, item) => {
+      const service = services.find(s => s.id === item.serviceId);
+      if (service) return total + parseFloat(service.basePrice) * item.quantity;
+      return total;
+    }, 0);
+  }
 
   const packPrice = pack.price ? parseFloat(pack.price) : fullPrice;
   const savings = fullPrice - packPrice;
