@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Header } from "@/components/Header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -527,6 +527,25 @@ function PacksTab(): JSX.Element {
 }
 
 export const ServicesRequestAd = (): JSX.Element => {
+  const [location] = useLocation();
+  
+  // Parse URL search params to get the initial tab
+  const getInitialTab = () => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const tabParam = searchParams.get("tab");
+    // Map URL param values to tab component values
+    if (tabParam === "bundle" || tabParam === "bundles") return "bundles";
+    if (tabParam === "packs") return "packs";
+    return "adhoc";
+  };
+  
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+  
+  // Update tab when URL changes (e.g., browser back/forward)
+  useEffect(() => {
+    setActiveTab(getInitialTab());
+  }, [location]);
+  
   return (
     <main className="flex flex-col w-full min-h-screen bg-light-grey">
       <Header />
@@ -542,7 +561,7 @@ export const ServicesRequestAd = (): JSX.Element => {
           </div>
         </section>
 
-        <Tabs defaultValue="adhoc" className="w-full max-w-6xl">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-6xl">
           <TabsList className="mb-6 bg-transparent border-b border-border rounded-none h-auto p-0 gap-6" data-testid="tabs-services">
             <TabsTrigger 
               value="adhoc" 
