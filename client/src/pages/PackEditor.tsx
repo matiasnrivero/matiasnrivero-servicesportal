@@ -246,7 +246,9 @@ export default function PackEditor() {
     }
   };
 
-  const handleAddItem = () => {
+  const [isValidating, setIsValidating] = useState(false);
+  
+  const handleAddItem = async () => {
     if (!newItemData.serviceId) {
       toast({ title: "Please select a service", variant: "destructive" });
       return;
@@ -255,24 +257,31 @@ export default function PackEditor() {
     const serviceId = newItemData.serviceId;
     const quantity = parseInt(newItemData.quantity) || 1;
     
-    // Check for duplicate pack (same service + same quantity) in existing packs
-    // Exclude the current pack if we're editing
-    const duplicatePack = allPacks.find(p => {
-      // Skip the current pack when editing
-      if (isEditing && p.id === params.id) return false;
-      // Check if this pack has the same service and quantity
-      return p.serviceId === serviceId && p.quantity === quantity;
-    });
-    
-    if (duplicatePack) {
-      const service = services.find(s => s.id === serviceId);
-      toast({ 
-        title: "Duplicate pack exists", 
-        description: `A pack with ${service?.title || 'this service'} x ${quantity} already exists ("${duplicatePack.name}"). Please choose a different quantity.`,
-        variant: "destructive" 
+    // Call backend to validate for duplicates (checks both new-style and legacy packs)
+    setIsValidating(true);
+    try {
+      const response = await apiRequest("POST", "/api/service-packs/validate-duplicate", {
+        serviceId,
+        quantity,
+        excludePackId: isEditing ? params.id : undefined,
       });
-      return;
+      const result = await response.json();
+      
+      if (result.isDuplicate) {
+        const service = services.find(s => s.id === serviceId);
+        toast({ 
+          title: "Duplicate pack exists", 
+          description: `A pack with ${service?.title || 'this service'} x ${quantity} already exists ("${result.existingPackName}"). Please choose a different quantity.`,
+          variant: "destructive" 
+        });
+        setIsValidating(false);
+        return;
+      }
+    } catch (error) {
+      console.error("Validation error:", error);
+      // Continue anyway if validation fails
     }
+    setIsValidating(false);
     
     if (isEditing) {
       // Edit mode: for new-style single-service packs, just update the local state
@@ -515,11 +524,11 @@ export default function PackEditor() {
                             <Button 
                               type="button" 
                               onClick={handleAddItem} 
-                              disabled={addItemMutation.isPending}
+                              disabled={addItemMutation.isPending || isValidating}
                               data-testid="button-save-service"
                             >
                               <Save className="h-4 w-4 mr-1" />
-                              Save
+                              {isValidating ? "Validating..." : "Save"}
                             </Button>
                           )}
                         </div>

@@ -3561,6 +3561,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Validate if a service+quantity combination already exists
+  app.post("/api/service-packs/validate-duplicate", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      
+      const { serviceId, quantity, excludePackId } = req.body;
+      if (!serviceId || !quantity) {
+        return res.status(400).json({ error: "serviceId and quantity are required" });
+      }
+      
+      const existingPacks = await storage.getAllServicePacks();
+      
+      // Check new-style packs (serviceId directly on pack)
+      const duplicateNewStyle = existingPacks.find(
+        (p: any) => p.id !== excludePackId && p.serviceId === serviceId && p.quantity === quantity
+      );
+      if (duplicateNewStyle) {
+        return res.json({ 
+          isDuplicate: true,
+          existingPackName: duplicateNewStyle.name
+        });
+      }
+      
+      // Check legacy packs (serviceId in items table)
+      for (const existingPack of existingPacks) {
+        if (existingPack.id === excludePackId) continue;
+        if (existingPack.serviceId) continue;
+        
+        const items = await storage.getServicePackItems(existingPack.id);
+        const matchingItem = items.find(
+          (item: any) => item.serviceId === serviceId && item.quantity === quantity
+        );
+        if (matchingItem) {
+          return res.json({ 
+            isDuplicate: true,
+            existingPackName: existingPack.name
+          });
+        }
+      }
+      
+      return res.json({ isDuplicate: false });
+    } catch (error) {
+      console.error("Error validating duplicate pack:", error);
+      res.status(500).json({ error: "Failed to validate" });
+    }
+  });
+
   app.post("/api/service-packs", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -3581,15 +3635,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Valid quantity is required for packs" });
       }
       
-      // Check for duplicate service+quantity combination
+      // Check for duplicate service+quantity combination (both new-style and legacy packs)
       const existingPacks = await storage.getAllServicePacks();
-      const duplicate = existingPacks.find(
+      
+      // Check new-style packs (serviceId directly on pack)
+      const duplicateNewStyle = existingPacks.find(
         (p: any) => p.serviceId === serviceId && p.quantity === quantity
       );
-      if (duplicate) {
+      if (duplicateNewStyle) {
         return res.status(400).json({ 
-          error: `A pack with this same service and quantity (${quantity}) already exists. Please choose a different quantity or service.` 
+          error: `A pack with this same service and quantity (${quantity}) already exists ("${duplicateNewStyle.name}"). Please choose a different quantity or service.` 
         });
+      }
+      
+      // Check legacy packs (serviceId in items table)
+      for (const existingPack of existingPacks) {
+        // Skip new-style packs (already checked above)
+        if (existingPack.serviceId) continue;
+        
+        const items = await storage.getServicePackItems(existingPack.id);
+        // Check if any legacy pack has the same service+quantity
+        const matchingItem = items.find(
+          (item: any) => item.serviceId === serviceId && item.quantity === quantity
+        );
+        if (matchingItem) {
+          return res.status(400).json({ 
+            error: `A pack with this same service and quantity (${quantity}) already exists ("${existingPack.name}"). Please choose a different quantity or service.` 
+          });
+        }
       }
       
       const pack = await storage.createServicePack(req.body);
