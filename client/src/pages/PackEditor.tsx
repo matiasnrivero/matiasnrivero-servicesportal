@@ -177,12 +177,21 @@ export default function PackEditor() {
 
   const updatePackMutation = useMutation({
     mutationFn: async (data: PackFormValues) => {
-      return apiRequest("PATCH", `/api/service-packs/${params.id}`, {
+      // Include serviceId and quantity for new-style single-service packs
+      const updateData: Record<string, any> = {
         name: data.name,
         description: data.description || null,
         price: data.price,
         isActive: data.isActive,
-      });
+      };
+      
+      // If we have a service selected, include it in the update
+      if (newItemData.serviceId) {
+        updateData.serviceId = newItemData.serviceId;
+        updateData.quantity = parseInt(newItemData.quantity) || 1;
+      }
+      
+      return apiRequest("PATCH", `/api/service-packs/${params.id}`, updateData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/service-packs"] });
@@ -268,15 +277,15 @@ export default function PackEditor() {
     return service ? parseFloat(service.basePrice) : 0;
   };
 
-  // Get items to display - for new-style packs use pack's serviceId/quantity, otherwise use packItems/localItems
+  // Get items to display - for new-style packs use newItemData (editable), otherwise use packItems/localItems
   const displayItems: (ServicePackItem | LocalPackItem)[] = (() => {
     if (isEditing) {
-      // New-style pack: use pack's direct serviceId/quantity
-      if (pack?.serviceId && pack?.quantity) {
+      // New-style pack: use newItemData which is editable
+      if (newItemData.serviceId) {
         return [{
           id: 'pack-service',
-          serviceId: pack.serviceId,
-          quantity: pack.quantity,
+          serviceId: newItemData.serviceId,
+          quantity: parseInt(newItemData.quantity) || 1,
         } as LocalPackItem];
       }
       // Legacy pack: use packItems
@@ -290,11 +299,11 @@ export default function PackEditor() {
     let fullPrice = 0;
     
     if (isEditing) {
-      // For edit mode: prefer pack's direct serviceId/quantity (new style), fall back to packItems (legacy)
-      if (pack?.serviceId && pack?.quantity) {
-        const service = services.find(s => s.id === pack.serviceId);
+      // For edit mode: use newItemData (editable) for new-style packs, fall back to packItems (legacy)
+      if (newItemData.serviceId) {
+        const service = services.find(s => s.id === newItemData.serviceId);
         if (service) {
-          fullPrice = parseFloat(service.basePrice) * pack.quantity;
+          fullPrice = parseFloat(service.basePrice) * (parseInt(newItemData.quantity) || 1);
         }
       } else {
         // Legacy pack: calculate from packItems
