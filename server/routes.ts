@@ -613,6 +613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Server-authoritative pricing calculation for ad-hoc service requests (not pack-based)
       // Always calculate pricing server-side to prevent tampering
+      console.log(`[PRICING DEBUG] Ad-hoc pricing check: monthlyPackSubscriptionId=${requestData.monthlyPackSubscriptionId}, serviceId=${req.body.serviceId}`);
       if (!requestData.monthlyPackSubscriptionId && req.body.serviceId) {
         // Preserve incoming coupon ID for validation, then clear all client-provided pricing values
         const incomingCouponId = req.body.discountCouponId || null;
@@ -622,18 +623,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         try {
           const service = await storage.getService(req.body.serviceId);
+          console.log(`[PRICING DEBUG] Service: ${service?.title}, basePrice=${service?.basePrice}`);
           if (service && service.basePrice) {
             const basePrice = parseFloat(service.basePrice);
             let priceAfterTripod = basePrice;
             let tripodDiscountAmount = 0;
             
             // Step 1: Apply Tri-POD discount if client has a tier
+            // First try to get client profile by ID on user, fallback to looking up by user ID
+            let clientProfile = null;
             if (sessionUser.clientProfileId) {
-              const clientProfile = await storage.getClientProfileById(sessionUser.clientProfileId);
-              if (clientProfile && clientProfile.tripodDiscountTier && clientProfile.tripodDiscountTier !== "none") {
-                priceAfterTripod = applyTripodDiscount(basePrice, clientProfile.tripodDiscountTier);
-                tripodDiscountAmount = basePrice - priceAfterTripod;
-              }
+              clientProfile = await storage.getClientProfileById(sessionUser.clientProfileId);
+            }
+            // Fallback: look up client profile by user ID (for primary users)
+            if (!clientProfile && ["client", "client_member"].includes(sessionUser.role)) {
+              clientProfile = await storage.getClientProfile(sessionUserId);
+            }
+            console.log(`[PRICING DEBUG] clientProfileId=${sessionUser.clientProfileId}, profile=${clientProfile?.id}, tier=${clientProfile?.tripodDiscountTier}`);
+            
+            if (clientProfile && clientProfile.tripodDiscountTier && clientProfile.tripodDiscountTier !== "none") {
+              priceAfterTripod = applyTripodDiscount(basePrice, clientProfile.tripodDiscountTier);
+              tripodDiscountAmount = basePrice - priceAfterTripod;
+              console.log(`[PRICING DEBUG] Applied Tri-POD: basePrice=${basePrice}, tier=${clientProfile.tripodDiscountTier}, discounted=${priceAfterTripod}, discountAmount=${tripodDiscountAmount}`);
             }
             
             // Step 2: Validate and apply coupon discount on top of Tri-POD discounted price
@@ -703,6 +714,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Step 3: Calculate final price (server-authoritative, overwrites any client values)
             const totalDiscount = tripodDiscountAmount + couponDiscountAmount;
             const finalPrice = Math.max(0, basePrice - totalDiscount);
+            
+            console.log(`[PRICING DEBUG] FINAL: basePrice=${basePrice}, tripodDiscount=${tripodDiscountAmount}, couponDiscount=${couponDiscountAmount}, totalDiscount=${totalDiscount}, finalPrice=${finalPrice}`);
             
             requestData.finalPrice = finalPrice.toFixed(2);
             requestData.discountAmount = totalDiscount.toFixed(2);
@@ -4614,12 +4627,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let priceAfterTripod = bundleBasePrice;
       let tripodDiscountAmount = 0;
       
+      // First try to get client profile by ID on user, fallback to looking up by user ID
+      let clientProfile = null;
       if (sessionUser.clientProfileId) {
-        const clientProfile = await storage.getClientProfileById(sessionUser.clientProfileId);
-        if (clientProfile && clientProfile.tripodDiscountTier && clientProfile.tripodDiscountTier !== "none") {
-          priceAfterTripod = applyTripodDiscount(bundleBasePrice, clientProfile.tripodDiscountTier);
-          tripodDiscountAmount = bundleBasePrice - priceAfterTripod;
-        }
+        clientProfile = await storage.getClientProfileById(sessionUser.clientProfileId);
+      }
+      // Fallback: look up client profile by user ID (for primary users)
+      if (!clientProfile && ["client", "client_member"].includes(sessionUser.role)) {
+        clientProfile = await storage.getClientProfile(sessionUserId);
+      }
+      console.log(`[BUNDLE PRICING DEBUG] clientProfileId=${sessionUser.clientProfileId}, profile=${clientProfile?.id}, tier=${clientProfile?.tripodDiscountTier}`);
+      
+      if (clientProfile && clientProfile.tripodDiscountTier && clientProfile.tripodDiscountTier !== "none") {
+        priceAfterTripod = applyTripodDiscount(bundleBasePrice, clientProfile.tripodDiscountTier);
+        tripodDiscountAmount = bundleBasePrice - priceAfterTripod;
+        console.log(`[BUNDLE PRICING DEBUG] Applied Tri-POD: basePrice=${bundleBasePrice}, tier=${clientProfile.tripodDiscountTier}, discounted=${priceAfterTripod}, discountAmount=${tripodDiscountAmount}`);
       }
 
       // Step 3: Apply coupon discount (if any) on top of Tri-POD discounted price
