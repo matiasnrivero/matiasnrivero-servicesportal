@@ -614,6 +614,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Server-authoritative pricing calculation for ad-hoc service requests (not pack-based)
       // Always calculate pricing server-side to prevent tampering
       if (!requestData.monthlyPackSubscriptionId && req.body.serviceId) {
+        // Preserve incoming coupon ID for validation, then clear all client-provided pricing values
+        const incomingCouponId = req.body.discountCouponId || null;
+        delete requestData.finalPrice;
+        delete requestData.discountAmount;
+        delete requestData.discountCouponId;
+        
         try {
           const service = await storage.getService(req.body.serviceId);
           if (service && service.retailPrice) {
@@ -635,8 +641,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             let couponDiscountAmount = 0;
             let validatedCouponId: string | null = null;
             
-            if (requestData.discountCouponId) {
-              const coupon = await storage.getCoupon(requestData.discountCouponId);
+            if (incomingCouponId) {
+              const coupon = await storage.getCoupon(incomingCouponId);
               if (coupon && coupon.isActive) {
                 // Validate coupon scope
                 let couponValid = true;
