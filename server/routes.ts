@@ -554,7 +554,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "User not found" });
       }
 
-      console.log("Creating service request with data:", req.body);
+      console.log("[SERVICE REQUEST CREATE] sessionUser:", JSON.stringify({ id: sessionUser.id, username: sessionUser.username, role: sessionUser.role, clientProfileId: sessionUser.clientProfileId }));
+      console.log("[SERVICE REQUEST CREATE] req.body:", JSON.stringify(req.body));
       const requestData = {
         ...req.body,
         userId: sessionUserId, // Use session user instead of client-provided
