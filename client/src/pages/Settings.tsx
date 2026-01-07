@@ -1048,7 +1048,7 @@ function SubscriptionsTabContent() {
 
   const { data: vendors = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
-    select: (data: User[]) => data.filter(u => u.role === "vendor" || u.role === "vendor_designer"),
+    select: (data: User[]) => data.filter(u => u.role === "vendor"),
   });
 
   const updateSubscriptionMutation = useMutation({
