@@ -1216,11 +1216,11 @@ function SubscriptionsTabContent() {
               <div className="space-y-2">
                 <Label>Assign Vendor</Label>
                 <Select
-                  value={selectedSubscription.vendorAssigneeId || ""}
+                  value={selectedSubscription.vendorAssigneeId || "__unassigned__"}
                   onValueChange={(value) => {
                     updateSubscriptionMutation.mutate({
                       id: selectedSubscription.id,
-                      data: { vendorAssigneeId: value || null },
+                      data: { vendorAssigneeId: value === "__unassigned__" ? null : value },
                     });
                   }}
                 >
@@ -1228,7 +1228,7 @@ function SubscriptionsTabContent() {
                     <SelectValue placeholder="Select vendor..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
+                    <SelectItem value="__unassigned__">Unassigned</SelectItem>
                     {vendors.map((v) => (
                       <SelectItem key={v.id} value={v.id}>
                         {v.username} ({v.role})
@@ -1241,11 +1241,11 @@ function SubscriptionsTabContent() {
               <div className="space-y-2">
                 <Label>Stripe Status</Label>
                 <Select
-                  value={selectedSubscription.stripeStatus || ""}
+                  value={selectedSubscription.stripeStatus || "__none__"}
                   onValueChange={(value) => {
                     updateSubscriptionMutation.mutate({
                       id: selectedSubscription.id,
-                      data: { stripeStatus: value || null },
+                      data: { stripeStatus: value === "__none__" ? null : value },
                     });
                   }}
                 >
@@ -1253,6 +1253,7 @@ function SubscriptionsTabContent() {
                     <SelectValue placeholder="Select status..." />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__none__">Not Set</SelectItem>
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="past_due">Past Due</SelectItem>
                     <SelectItem value="canceled">Canceled</SelectItem>
