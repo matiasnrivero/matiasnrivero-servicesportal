@@ -622,8 +622,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         try {
           const service = await storage.getService(req.body.serviceId);
-          if (service && service.retailPrice) {
-            const basePrice = parseFloat(service.retailPrice);
+          if (service && service.basePrice) {
+            const basePrice = parseFloat(service.basePrice);
             let priceAfterTripod = basePrice;
             let tripodDiscountAmount = 0;
             
@@ -642,7 +642,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             let validatedCouponId: string | null = null;
             
             if (incomingCouponId) {
-              const coupon = await storage.getCoupon(incomingCouponId);
+              const coupon = await storage.getDiscountCoupon(incomingCouponId);
               if (coupon && coupon.isActive) {
                 // Validate coupon scope
                 let couponValid = true;
@@ -678,13 +678,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 }
                 
                 // Check usage limit
-                if (coupon.maxUses && coupon.usageCount >= coupon.maxUses) {
+                if (coupon.maxUses && coupon.currentUses >= coupon.maxUses) {
                   couponValid = false;
                   console.log(`Coupon ${coupon.code} rejected: usage limit reached`);
                 }
                 
                 // Check expiry
-                if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
+                if (coupon.validTo && new Date(coupon.validTo) < new Date()) {
                   couponValid = false;
                   console.log(`Coupon ${coupon.code} rejected: expired`);
                 }
