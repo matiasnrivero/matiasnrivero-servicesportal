@@ -3571,6 +3571,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!sessionUser || sessionUser.role !== "admin") {
         return res.status(403).json({ error: "Admin access required" });
       }
+      
+      // Validate required fields for new pack structure
+      const { serviceId, quantity } = req.body;
+      if (!serviceId) {
+        return res.status(400).json({ error: "Service ID is required for packs" });
+      }
+      if (!quantity || quantity < 1) {
+        return res.status(400).json({ error: "Valid quantity is required for packs" });
+      }
+      
+      // Check for duplicate service+quantity combination
+      const existingPacks = await storage.getServicePacks();
+      const duplicate = existingPacks.find(
+        p => p.serviceId === serviceId && p.quantity === quantity
+      );
+      if (duplicate) {
+        return res.status(400).json({ 
+          error: `A pack already exists for this service with quantity ${quantity}. Each service+quantity combination must be unique.` 
+        });
+      }
+      
       const pack = await storage.createServicePack(req.body);
       res.status(201).json(pack);
     } catch (error) {
@@ -3589,6 +3610,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!sessionUser || sessionUser.role !== "admin") {
         return res.status(403).json({ error: "Admin access required" });
       }
+      
+      // If updating serviceId or quantity, check for duplicate combinations
+      const { serviceId, quantity } = req.body;
+      if (serviceId !== undefined || quantity !== undefined) {
+        const currentPack = await storage.getServicePack(req.params.id);
+        if (!currentPack) {
+          return res.status(404).json({ error: "Service pack not found" });
+        }
+        
+        const finalServiceId = serviceId ?? currentPack.serviceId;
+        const finalQuantity = quantity ?? currentPack.quantity;
+        
+        // Check for duplicate service+quantity combination (excluding current pack)
+        const existingPacks = await storage.getServicePacks();
+        const duplicate = existingPacks.find(
+          p => p.id !== req.params.id && 
+               p.serviceId === finalServiceId && 
+               p.quantity === finalQuantity
+        );
+        if (duplicate) {
+          return res.status(400).json({ 
+            error: `A pack already exists for this service with quantity ${finalQuantity}. Each service+quantity combination must be unique.` 
+          });
+        }
+      }
+      
       const pack = await storage.updateServicePack(req.params.id, req.body);
       if (!pack) {
         return res.status(404).json({ error: "Service pack not found" });

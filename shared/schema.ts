@@ -181,6 +181,17 @@ export const serviceRequests = pgTable("service_requests", {
   // Monthly pack pricing tracking
   monthlyPackSubscriptionId: varchar("monthly_pack_subscription_id"),
   monthlyPackUnitPrice: decimal("monthly_pack_unit_price", { precision: 10, scale: 2 }),
+  // Pack coverage tracking - determines if this service is covered by a pack subscription
+  isPackCovered: boolean("is_pack_covered").default(false), // True if service is included in pack (shows "Included in Pack" badge)
+  packSubscriptionId: varchar("pack_subscription_id").references(() => clientPackSubscriptions.id), // Link to the pack subscription covering this request
+  // Client payment tracking (for Monthly Payment and Deduct from Royalties clients)
+  clientPaymentStatus: text("client_payment_status").default("pending"), // 'pending' | 'paid' | 'included_in_pack'
+  clientPaymentPeriod: text("client_payment_period"), // Format: YYYY-MM (billing period)
+  clientPaymentMarkedAt: timestamp("client_payment_marked_at"),
+  clientPaymentMarkedBy: varchar("client_payment_marked_by").references(() => users.id),
+  // Stripe charge tracking
+  stripePaymentIntentId: text("stripe_payment_intent_id"), // For Pay as you Go immediate charges
+  stripeInvoiceId: text("stripe_invoice_id"), // For Monthly Payment consolidated charges
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -305,12 +316,16 @@ export const monthlyPackUsage = pgTable("monthly_pack_usage", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Service Packs - legacy table (keeping for backwards compatibility)
+// Service Packs - subscription packs with single service per pack
 export const servicePacks = pgTable("service_packs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  serviceId: varchar("service_id").references(() => services.id), // Single service per pack (new single-service enforcement)
+  quantity: integer("quantity"), // Quantity of the single service included
+  stripeProductId: text("stripe_product_id"), // Stripe product ID for this pack
+  stripePriceId: text("stripe_price_id"), // Stripe price ID for monthly subscription
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -335,6 +350,29 @@ export const clientPackSubscriptions = pgTable("client_pack_subscriptions", {
   priceAtSubscription: decimal("price_at_subscription", { precision: 10, scale: 2 }),
   consumedQuantities: jsonb("consumed_quantities"), // { serviceId: consumedCount }
   isActive: boolean("is_active").notNull().default(true),
+  // Stripe subscription fields
+  stripeSubscriptionId: text("stripe_subscription_id"), // Stripe subscription ID
+  stripeStatus: text("stripe_status"), // active, past_due, canceled, trialing, etc.
+  currentPeriodStart: timestamp("current_period_start"), // Current billing period start
+  currentPeriodEnd: timestamp("current_period_end"), // Current billing period end
+  billingAnchorDay: integer("billing_anchor_day"), // Day of month for billing (1-28)
+  // Grace period for failed payments
+  gracePeriodEndsAt: timestamp("grace_period_ends_at"), // 2 weeks after payment failure
+  paymentFailedAt: timestamp("payment_failed_at"), // When payment first failed
+  // Vendor assignment
+  vendorAssigneeId: varchar("vendor_assignee_id").references(() => users.id), // Vendor managing this pack
+  vendorAssignedAt: timestamp("vendor_assigned_at"),
+  // Pending upgrade/downgrade (effective next cycle)
+  pendingPackId: varchar("pending_pack_id").references(() => servicePacks.id), // Pack to switch to next cycle
+  pendingChangeType: text("pending_change_type"), // 'upgrade' | 'downgrade' | null
+  pendingChangeEffectiveAt: timestamp("pending_change_effective_at"), // When the change takes effect
+  // Unsubscribe tracking
+  unsubscribedAt: timestamp("unsubscribed_at"), // When client requested unsubscribe
+  unsubscribeEffectiveAt: timestamp("unsubscribe_effective_at"), // End of current cycle
+  // Payment tracking for Deduct from Royalties clients
+  royaltiesPaymentStatus: text("royalties_payment_status").default("pending"), // 'pending' | 'paid'
+  royaltiesMarkedPaidAt: timestamp("royalties_marked_paid_at"),
+  royaltiesMarkedPaidBy: varchar("royalties_marked_paid_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -510,6 +548,14 @@ export const bundleRequests = pgTable("bundle_requests", {
   vendorPaymentMarkedAt: timestamp("vendor_payment_marked_at"),
   vendorPaymentMarkedBy: varchar("vendor_payment_marked_by").references(() => users.id),
   vendorCost: decimal("vendor_cost", { precision: 10, scale: 2 }),
+  // Client payment tracking (for Monthly Payment and Deduct from Royalties clients)
+  clientPaymentStatus: text("client_payment_status").default("pending"), // 'pending' | 'paid'
+  clientPaymentPeriod: text("client_payment_period"), // Format: YYYY-MM (billing period)
+  clientPaymentMarkedAt: timestamp("client_payment_marked_at"),
+  clientPaymentMarkedBy: varchar("client_payment_marked_by").references(() => users.id),
+  // Stripe charge tracking
+  stripePaymentIntentId: text("stripe_payment_intent_id"), // For Pay as you Go immediate charges
+  stripeInvoiceId: text("stripe_invoice_id"), // For Monthly Payment consolidated charges
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -12,7 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -37,7 +36,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, CalendarRange, Plus, Trash2, DollarSign, Save } from "lucide-react";
+import { ArrowLeft, CalendarRange, DollarSign, Save } from "lucide-react";
 import type { User, Service, ServicePack, ServicePackItem } from "@shared/schema";
 import { insertServicePackSchema } from "@shared/schema";
 
@@ -372,30 +371,40 @@ export default function PackEditor() {
                         )}
                       />
                       
-                      {/* Pack Items Section - inline service selector */}
+                      {/* Pack Service - Single service per pack */}
                       <div className="space-y-3 pt-2">
                         <div className="flex items-center justify-between">
-                          <FormLabel className="text-base font-medium">Pack Items</FormLabel>
-                          <span className="text-sm text-muted-foreground">Add services to this pack</span>
+                          <FormLabel className="text-base font-medium">Pack Service</FormLabel>
+                          <span className="text-sm text-muted-foreground">Select one service for this pack</span>
                         </div>
                         
-                        {/* Service selector row */}
+                        {/* Single service selector row */}
                         <div className="flex flex-wrap items-end gap-3 p-4 bg-muted/50 rounded-md">
                           <div className="space-y-1 flex-[2] min-w-[200px]">
-                            <Select value={newItemData.serviceId} onValueChange={(v) => setNewItemData({ ...newItemData, serviceId: v })}>
+                            <Select 
+                              value={displayItems.length > 0 ? displayItems[0].serviceId : newItemData.serviceId} 
+                              onValueChange={(v) => {
+                                if (isEditing && displayItems.length > 0) {
+                                  // In edit mode with existing item, update the service
+                                  removeItemMutation.mutate(displayItems[0].id, {
+                                    onSuccess: () => {
+                                      addItemMutation.mutate({ serviceId: v, quantity: newItemData.quantity });
+                                    }
+                                  });
+                                } else if (!isEditing && localItems.length > 0) {
+                                  // In create mode, replace local item
+                                  setLocalItems([{ id: `local-${Date.now()}`, serviceId: v, quantity: parseInt(newItemData.quantity) || 1 }]);
+                                } else {
+                                  setNewItemData({ ...newItemData, serviceId: v });
+                                }
+                              }}
+                            >
                               <SelectTrigger data-testid="select-service">
                                 <SelectValue placeholder="Select a service" />
                               </SelectTrigger>
                               <SelectContent>
                                 {services
                                   .filter(s => s.isActive)
-                                  .filter(s => {
-                                    // Filter out services already added to this pack
-                                    const addedServiceIds = displayItems.map(item => 
-                                      'serviceId' in item ? item.serviceId : (item as any).service_id
-                                    );
-                                    return !addedServiceIds.includes(s.id);
-                                  })
                                   .map((service) => (
                                   <SelectItem key={service.id} value={service.id}>
                                     {service.title} - ${parseFloat(service.basePrice).toFixed(2)}
@@ -404,27 +413,49 @@ export default function PackEditor() {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="space-y-1 w-20">
+                          <div className="space-y-1 w-24">
                             <Input
                               type="number"
                               min="1"
-                              value={newItemData.quantity}
-                              onChange={(e) => setNewItemData({ ...newItemData, quantity: e.target.value })}
-                              placeholder="Qty"
+                              value={displayItems.length > 0 ? displayItems[0].quantity.toString() : newItemData.quantity}
+                              onChange={(e) => {
+                                const qty = e.target.value;
+                                if (isEditing && displayItems.length > 0) {
+                                  // In edit mode, update the quantity by recreating the item
+                                  const currentServiceId = displayItems[0].serviceId;
+                                  removeItemMutation.mutate(displayItems[0].id, {
+                                    onSuccess: () => {
+                                      addItemMutation.mutate({ serviceId: currentServiceId, quantity: qty });
+                                    }
+                                  });
+                                } else if (!isEditing && localItems.length > 0) {
+                                  // In create mode, update local item quantity
+                                  setLocalItems([{ ...localItems[0], quantity: parseInt(qty) || 1 }]);
+                                } else {
+                                  setNewItemData({ ...newItemData, quantity: qty });
+                                }
+                              }}
+                              placeholder="Quantity"
                               data-testid="input-item-quantity"
                             />
                           </div>
-                          <Button type="button" onClick={handleAddItem} disabled={addItemMutation.isPending} data-testid="button-add-item">
-                            <Plus className="h-4 w-4 mr-1" />
-                            Add
-                          </Button>
+                          {/* Save button for adding/updating the service */}
+                          {displayItems.length === 0 && newItemData.serviceId && (
+                            <Button 
+                              type="button" 
+                              onClick={handleAddItem} 
+                              disabled={addItemMutation.isPending}
+                              data-testid="button-save-service"
+                            >
+                              <Save className="h-4 w-4 mr-1" />
+                              Save
+                            </Button>
+                          )}
                         </div>
                         
-                        {/* Services table */}
-                        {displayItems.length === 0 ? (
-                          <p className="text-muted-foreground text-center py-4">No services added yet</p>
-                        ) : (
-                          <ScrollArea className="max-h-[400px]">
+                        {/* Show the selected service details */}
+                        {displayItems.length > 0 && (
+                          <div className="border rounded-md">
                             <Table>
                               <TableHeader>
                                 <TableRow>
@@ -432,11 +463,10 @@ export default function PackEditor() {
                                   <TableHead className="text-center w-20">Qty</TableHead>
                                   <TableHead className="text-right w-24">Unit Price</TableHead>
                                   <TableHead className="text-right w-28">Total</TableHead>
-                                  <TableHead className="w-10"></TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {displayItems.map((item) => {
+                                {displayItems.slice(0, 1).map((item) => {
                                   const unitPrice = getItemPrice(item);
                                   const totalPrice = unitPrice * item.quantity;
                                   return (
@@ -447,28 +477,17 @@ export default function PackEditor() {
                                       <TableCell className="text-center">{item.quantity}</TableCell>
                                       <TableCell className="text-right">${unitPrice.toFixed(2)}</TableCell>
                                       <TableCell className="text-right font-medium">${totalPrice.toFixed(2)}</TableCell>
-                                      <TableCell>
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          type="button"
-                                          onClick={() => isEditing ? removeItemMutation.mutate(item.id) : handleRemoveLocalItem(item.id)}
-                                          data-testid={`button-remove-item-${item.id}`}
-                                        >
-                                          <Trash2 className="h-4 w-4 text-destructive" />
-                                        </Button>
-                                      </TableCell>
                                     </TableRow>
                                   );
                                 })}
                               </TableBody>
                             </Table>
-                          </ScrollArea>
+                          </div>
                         )}
                         
                         {/* Full Price total line */}
                         {displayItems.length > 0 && (
-                          <div className="flex justify-end pt-2 pr-12 border-t">
+                          <div className="flex justify-end pt-2 border-t">
                             <div className="flex items-center gap-4">
                               <span className="text-sm font-medium">Full Price (Total):</span>
                               <span className="text-lg font-semibold">${pricing.fullPrice.toFixed(2)}</span>
