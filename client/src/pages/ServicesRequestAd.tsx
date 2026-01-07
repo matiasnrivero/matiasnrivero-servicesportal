@@ -199,12 +199,12 @@ function BundlesTab(): JSX.Element {
                   <div className="mt-2 flex flex-wrap gap-2">
                     {bundleSavings > 0 && (
                       <Badge variant="outline" className="text-green-600 border-green-600">
-                        Bundle Save ${bundleSavings.toFixed(2)}
+                        Bundle Savings ${bundleSavings.toFixed(2)}
                       </Badge>
                     )}
                     {extraDiscount > 0 && (
                       <Badge variant="outline" className="text-green-600 border-green-600">
-                        Extra Saving ${extraDiscount.toFixed(2)}
+                        Your Savings ${extraDiscount.toFixed(2)}
                       </Badge>
                     )}
                   </div>
