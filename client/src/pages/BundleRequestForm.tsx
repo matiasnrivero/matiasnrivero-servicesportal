@@ -598,11 +598,11 @@ export default function BundleRequestForm() {
                 if (hasAnyDiscount) {
                   return (
                     <span className="flex items-center gap-2">
-                      <span className="text-muted-foreground line-through font-body-2-semibold">
-                        ${basePrice.toFixed(2)}
-                      </span>
                       <span className="text-sky-blue-accent font-body-2-semibold">
                         ${finalPrice.toFixed(2)}
+                      </span>
+                      <span className="text-muted-foreground line-through text-sm">
+                        ${basePrice.toFixed(2)}
                       </span>
                       {validatedCoupon && (
                         <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded">

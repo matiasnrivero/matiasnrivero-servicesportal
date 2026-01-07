@@ -145,7 +145,8 @@ function BundlesTab(): JSX.Element {
         const bundlePrice = parseFloat(bundle.finalPrice || "0");
         // Apply Tri-POD discount to the bundle price
         const discountedBundlePrice = hasDiscount ? applyTripodDiscount(bundlePrice, discountTier) : bundlePrice;
-        const savings = fullPrice - bundlePrice;
+        const bundleSavings = fullPrice - bundlePrice;
+        const extraDiscount = hasDiscount ? bundlePrice - discountedBundlePrice : 0;
 
         return (
           <Link key={bundle.id} href={`/bundle-request/${bundle.id}`}>
@@ -194,11 +195,18 @@ function BundlesTab(): JSX.Element {
                   </div>
                 </div>
 
-                {showPricing && savings > 0 && (
-                  <div className="mt-2">
-                    <Badge variant="outline" className="text-green-600 border-green-600">
-                      Save ${savings.toFixed(2)}
-                    </Badge>
+                {showPricing && (bundleSavings > 0 || extraDiscount > 0) && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {bundleSavings > 0 && (
+                      <Badge variant="outline" className="text-green-600 border-green-600">
+                        Bundle Save ${bundleSavings.toFixed(2)}
+                      </Badge>
+                    )}
+                    {extraDiscount > 0 && (
+                      <Badge variant="outline" className="text-green-600 border-green-600">
+                        Extra Saving ${extraDiscount.toFixed(2)}
+                      </Badge>
+                    )}
                   </div>
                 )}
               </div>

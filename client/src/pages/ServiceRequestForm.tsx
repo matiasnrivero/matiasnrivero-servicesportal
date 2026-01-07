@@ -1956,11 +1956,65 @@ export default function ServiceRequestForm() {
                   >
                     Pricing Breakdown
                   </button>
-                ) : (
-                  <span className="text-sky-blue-accent font-body-2-semibold">
-                    {selectedService?.priceRange}
-                  </span>
-                )
+                ) : (() => {
+                  // Get the base price for the service
+                  const basePrice = parseFloat(selectedService?.basePrice || "0");
+                  const priceRange = selectedService?.priceRange || "";
+                  
+                  if (hasTripodDiscount && basePrice > 0) {
+                    const discountedPrice = applyTripodDiscount(basePrice, tripodDiscountTier);
+                    return (
+                      <span className="flex items-center gap-2">
+                        <span className="text-sky-blue-accent font-body-2-semibold">
+                          ${discountedPrice.toFixed(2)}
+                        </span>
+                        <span className="text-muted-foreground line-through text-sm">
+                          ${basePrice.toFixed(2)}
+                        </span>
+                      </span>
+                    );
+                  } else if (hasTripodDiscount && priceRange) {
+                    // Handle price ranges like "$10 - $50"
+                    const rangeMatch = priceRange.match(/\$?([\d.]+)\s*-\s*\$?([\d.]+)/);
+                    if (rangeMatch) {
+                      const minPrice = parseFloat(rangeMatch[1]);
+                      const maxPrice = parseFloat(rangeMatch[2]);
+                      const discountedMin = applyTripodDiscount(minPrice, tripodDiscountTier);
+                      const discountedMax = applyTripodDiscount(maxPrice, tripodDiscountTier);
+                      return (
+                        <span className="flex items-center gap-2">
+                          <span className="text-sky-blue-accent font-body-2-semibold">
+                            ${discountedMin.toFixed(2)} - ${discountedMax.toFixed(2)}
+                          </span>
+                          <span className="text-muted-foreground line-through text-sm">
+                            ${minPrice.toFixed(2)} - ${maxPrice.toFixed(2)}
+                          </span>
+                        </span>
+                      );
+                    }
+                    // Handle single-value priceRange like "$45"
+                    const singleMatch = priceRange.match(/\$?([\d.]+)/);
+                    if (singleMatch) {
+                      const singlePrice = parseFloat(singleMatch[1]);
+                      const discountedPrice = applyTripodDiscount(singlePrice, tripodDiscountTier);
+                      return (
+                        <span className="flex items-center gap-2">
+                          <span className="text-sky-blue-accent font-body-2-semibold">
+                            ${discountedPrice.toFixed(2)}
+                          </span>
+                          <span className="text-muted-foreground line-through text-sm">
+                            ${singlePrice.toFixed(2)}
+                          </span>
+                        </span>
+                      );
+                    }
+                  }
+                  return (
+                    <span className="text-sky-blue-accent font-body-2-semibold">
+                      {priceRange}
+                    </span>
+                  );
+                })()
               )}
             </h1>
             <p className="font-body-reg text-dark-gray mt-1">
