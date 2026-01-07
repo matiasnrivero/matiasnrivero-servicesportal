@@ -133,30 +133,24 @@ export default function PackEditor() {
 
   const createPackMutation = useMutation({
     mutationFn: async (data: PackFormValues) => {
-      // Create the pack first
+      // Validate that we have a service selected (single-service pack)
+      if (localItems.length === 0) {
+        throw new Error("Please select a service for this pack");
+      }
+      
+      // Get the single service from localItems (packs are now single-service only)
+      const packItem = localItems[0];
+      
+      // Create the pack with serviceId and quantity included
       const res = await apiRequest("POST", "/api/service-packs", {
         name: data.name,
         description: data.description || null,
         price: data.price,
         isActive: data.isActive,
+        serviceId: packItem.serviceId,
+        quantity: packItem.quantity,
       });
       const newPack = await res.json();
-      
-      // If no local items, just return the pack
-      if (localItems.length === 0) {
-        return { pack: newPack, allSucceeded: true };
-      }
-      
-      // Add all local items to the pack - must all succeed
-      const itemPromises = localItems.map(item => 
-        apiRequest("POST", `/api/service-packs/${newPack.id}/items`, {
-          serviceId: item.serviceId,
-          quantity: item.quantity,
-        })
-      );
-      
-      // Use Promise.all so any failure rejects immediately
-      await Promise.all(itemPromises);
       
       return { pack: newPack, allSucceeded: true };
     },

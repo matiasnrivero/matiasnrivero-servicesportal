@@ -3582,13 +3582,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Check for duplicate service+quantity combination
-      const existingPacks = await storage.getServicePacks();
+      const existingPacks = await storage.getAllServicePacks();
       const duplicate = existingPacks.find(
-        p => p.serviceId === serviceId && p.quantity === quantity
+        (p: any) => p.serviceId === serviceId && p.quantity === quantity
       );
       if (duplicate) {
         return res.status(400).json({ 
-          error: `A pack already exists for this service with quantity ${quantity}. Each service+quantity combination must be unique.` 
+          error: `A pack with this same service and quantity (${quantity}) already exists. Please choose a different quantity or service.` 
         });
       }
       
@@ -3623,15 +3623,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const finalQuantity = quantity ?? currentPack.quantity;
         
         // Check for duplicate service+quantity combination (excluding current pack)
-        const existingPacks = await storage.getServicePacks();
+        const existingPacks = await storage.getAllServicePacks();
         const duplicate = existingPacks.find(
-          p => p.id !== req.params.id && 
+          (p: any) => p.id !== req.params.id && 
                p.serviceId === finalServiceId && 
                p.quantity === finalQuantity
         );
         if (duplicate) {
           return res.status(400).json({ 
-            error: `A pack already exists for this service with quantity ${finalQuantity}. Each service+quantity combination must be unique.` 
+            error: `A pack with this same service and quantity (${finalQuantity}) already exists. Please choose a different quantity or service.` 
           });
         }
       }
