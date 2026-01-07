@@ -613,6 +613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Server-authoritative pricing calculation for ad-hoc service requests (not pack-based)
       // Always calculate pricing server-side to prevent tampering
+      console.log(`Pricing calculation check: monthlyPackSubscriptionId=${requestData.monthlyPackSubscriptionId}, serviceId=${req.body.serviceId}`);
       if (!requestData.monthlyPackSubscriptionId && req.body.serviceId) {
         // Preserve incoming coupon ID for validation, then clear all client-provided pricing values
         const incomingCouponId = req.body.discountCouponId || null;
@@ -622,14 +623,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         try {
           const service = await storage.getService(req.body.serviceId);
+          console.log(`Service lookup: id=${req.body.serviceId}, title=${service?.title}, basePrice=${service?.basePrice}`);
           if (service && service.basePrice) {
             const basePrice = parseFloat(service.basePrice);
             let priceAfterTripod = basePrice;
             let tripodDiscountAmount = 0;
             
             // Step 1: Apply Tri-POD discount if client has a tier
+            console.log(`Tri-POD discount check: clientProfileId=${sessionUser.clientProfileId}`);
             if (sessionUser.clientProfileId) {
               const clientProfile = await storage.getClientProfile(sessionUser.clientProfileId);
+              console.log(`Client profile lookup: id=${clientProfile?.id}, tier=${clientProfile?.tripodDiscountTier}`);
               if (clientProfile && clientProfile.tripodDiscountTier && clientProfile.tripodDiscountTier !== "none") {
                 priceAfterTripod = applyTripodDiscount(basePrice, clientProfile.tripodDiscountTier);
                 tripodDiscountAmount = basePrice - priceAfterTripod;
