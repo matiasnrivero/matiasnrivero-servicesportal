@@ -290,13 +290,18 @@ export default function BundleRequestForm() {
     // Merge bundle header data with service form data
     const combinedFormData = { ...formData, ...bundleHeaderData };
 
-    // Note: discountAmount and finalPrice are calculated server-side to prevent tampering
+    // Calculate the final price with Tri-POD discount applied
+    const basePrice = parseFloat(bundle?.finalPrice || "0");
+    const { discountAmount, finalPrice } = calculateDiscountedPrice(basePrice);
+
     const requestData = {
       bundleId,
       formData: combinedFormData,
       assigneeId: selectedAssignee || null,
       discountCouponId: validatedCoupon?.id || null,
       discountCouponCode: validatedCoupon?.code || null,
+      discountAmount: discountAmount > 0 ? discountAmount.toFixed(2) : null,
+      finalPrice: finalPrice.toFixed(2),
     };
 
     createMutation.mutate(requestData as InsertBundleRequest);

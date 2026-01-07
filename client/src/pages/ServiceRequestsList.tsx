@@ -569,6 +569,10 @@ export default function ServiceRequestsList() {
   };
 
   const getBundlePrice = (request: BundleRequest) => {
+    // First check if request has its own finalPrice (includes Tri-POD discount and coupon)
+    if (request.finalPrice) {
+      return `$ ${parseFloat(request.finalPrice).toFixed(2)}`;
+    }
     const formData = request.formData as Record<string, any> | null;
     if (formData?.calculatedPrice) {
       return `$ ${formData.calculatedPrice}`;

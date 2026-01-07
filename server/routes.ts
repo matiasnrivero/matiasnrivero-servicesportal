@@ -6,6 +6,21 @@ import { automationEngine } from "./services/automationEngine";
 import type { User } from "@shared/schema";
 
 /**
+ * Apply Tri-POD product discount tier to a price
+ * Discount tiers: none (0%), power_level (10%), oms_subscription (15%), enterprise (20%)
+ * Rounds up to nearest cent
+ */
+function applyTripodDiscount(price: number, discountTier: string): number {
+  const discountPercent = 
+    discountTier === "power_level" ? 10 :
+    discountTier === "oms_subscription" ? 15 :
+    discountTier === "enterprise" ? 20 : 0;
+  
+  if (discountPercent === 0) return price;
+  return Math.ceil((price * (1 - discountPercent / 100)) * 100) / 100;
+}
+
+/**
  * Role-based assignment permissions:
  * - Admin → can assign to Vendor, Internal Designer, Vendor Designer
  * - Internal Designer → can assign to Vendor, Vendor Designer, other Internal Designers
@@ -578,14 +593,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const priceToUse = subscription.priceAtSubscription || pack.price;
                 const perUnitPrice = totalQty > 0 ? parseFloat(priceToUse) / totalQty : 0;
                 
-                // Set pack pricing on the request
+                // Set pack pricing on the request (server-authoritative, always overwrite client values)
                 requestData.monthlyPackSubscriptionId = subscription.id;
                 requestData.monthlyPackUnitPrice = perUnitPrice.toFixed(2);
-                
-                // Also set the finalPrice based on pack unit price
-                if (!requestData.finalPrice) {
-                  requestData.finalPrice = perUnitPrice.toFixed(2);
-                }
+                requestData.finalPrice = perUnitPrice.toFixed(2);
+                requestData.discountAmount = "0.00"; // Pack pricing doesn't stack with discounts
+                delete requestData.discountCouponId; // Coupons don't apply to pack pricing
                 
                 console.log(`Applied service pack pricing: subscription=${subscription.id}, unitPrice=${perUnitPrice.toFixed(2)}`);
                 break; // Use the first matching subscription
@@ -596,6 +609,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error("Error checking service pack subscription:", packError);
           // Continue without pack pricing if there's an error
         }
+      }
+
+      // Server-authoritative pricing calculation for ad-hoc service requests (not pack-based)
+      // Always calculate pricing server-side to prevent tampering
+      if (!requestData.monthlyPackSubscriptionId && req.body.serviceId) {
+        try {
+          const service = await storage.getService(req.body.serviceId);
+          if (service && service.retailPrice) {
+            const basePrice = parseFloat(service.retailPrice);
+            let priceAfterTripod = basePrice;
+            let tripodDiscountAmount = 0;
+            
+            // Step 1: Apply Tri-POD discount if client has a tier
+            if (sessionUser.clientProfileId) {
+              const clientProfile = await storage.getClientProfile(sessionUser.clientProfileId);
+              if (clientProfile && clientProfile.tripodDiscountTier && clientProfile.tripodDiscountTier !== "none") {
+                priceAfterTripod = applyTripodDiscount(basePrice, clientProfile.tripodDiscountTier);
+                tripodDiscountAmount = basePrice - priceAfterTripod;
+                console.log(`Applied Tri-POD discount: tier=${clientProfile.tripodDiscountTier}, basePrice=${basePrice}, discounted=${priceAfterTripod}`);
+              }
+            }
+            
+            // Step 2: Validate and apply coupon discount on top of Tri-POD discounted price
+            let couponDiscountAmount = 0;
+            let validatedCouponId: string | null = null;
+            
+            if (requestData.discountCouponId) {
+              const coupon = await storage.getCoupon(requestData.discountCouponId);
+              if (coupon && coupon.isActive) {
+                // Validate coupon scope
+                let couponValid = true;
+                
+                // Check service restriction
+                if (coupon.serviceId && coupon.serviceId !== req.body.serviceId) {
+                  couponValid = false;
+                  console.log(`Coupon ${coupon.code} rejected: service mismatch`);
+                }
+                
+                // Check bundle-only coupons (not valid for services)
+                if (coupon.bundleId && !coupon.serviceId) {
+                  couponValid = false;
+                  console.log(`Coupon ${coupon.code} rejected: bundle-only coupon`);
+                }
+                
+                // Check client restriction (coupon.clientId can be a user ID or client profile ID)
+                if (coupon.clientId) {
+                  // Match against: session user ID, client profile ID, or check if coupon targets any team member
+                  let clientMatch = coupon.clientId === sessionUserId;
+                  if (!clientMatch && sessionUser.clientProfileId) {
+                    clientMatch = coupon.clientId === sessionUser.clientProfileId;
+                    // Also check if coupon clientId matches the user's company
+                    if (!clientMatch) {
+                      const teamMembers = await storage.getClientTeamMembers(sessionUser.clientProfileId);
+                      clientMatch = teamMembers.some(member => member.id === coupon.clientId);
+                    }
+                  }
+                  if (!clientMatch) {
+                    couponValid = false;
+                    console.log(`Coupon ${coupon.code} rejected: client mismatch`);
+                  }
+                }
+                
+                // Check usage limit
+                if (coupon.maxUses && coupon.usageCount >= coupon.maxUses) {
+                  couponValid = false;
+                  console.log(`Coupon ${coupon.code} rejected: usage limit reached`);
+                }
+                
+                // Check expiry
+                if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
+                  couponValid = false;
+                  console.log(`Coupon ${coupon.code} rejected: expired`);
+                }
+                
+                if (couponValid) {
+                  if (coupon.discountType === "percentage") {
+                    couponDiscountAmount = priceAfterTripod * (parseFloat(coupon.discountValue) / 100);
+                  } else {
+                    couponDiscountAmount = parseFloat(coupon.discountValue);
+                  }
+                  validatedCouponId = coupon.id;
+                  console.log(`Applied coupon discount: ${coupon.discountType}=${coupon.discountValue}, amount=${couponDiscountAmount}`);
+                }
+              }
+            }
+            
+            // Step 3: Calculate final price (server-authoritative, overwrites any client values)
+            const totalDiscount = tripodDiscountAmount + couponDiscountAmount;
+            const finalPrice = Math.max(0, basePrice - totalDiscount);
+            
+            requestData.finalPrice = finalPrice.toFixed(2);
+            requestData.discountAmount = totalDiscount.toFixed(2);
+            
+            // Only store validated coupon ID
+            if (validatedCouponId) {
+              requestData.discountCouponId = validatedCouponId;
+            } else {
+              delete requestData.discountCouponId;
+            }
+          }
+        } catch (pricingError) {
+          console.error("Error calculating service request pricing:", pricingError);
+          // On error, ensure we don't store client-provided discount values
+          delete requestData.finalPrice;
+          delete requestData.discountAmount;
+          delete requestData.discountCouponId;
+        }
+      } else if (!requestData.monthlyPackSubscriptionId) {
+        // No serviceId or pricing error - clear any client-provided discount values
+        delete requestData.finalPrice;
+        delete requestData.discountAmount;
+        delete requestData.discountCouponId;
       }
 
       let request = await storage.createServiceRequest(requestData);
@@ -4470,24 +4595,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Store the coupon ID
         requestData.discountCouponId = coupon.id;
         validatedCoupon = coupon;
-        
-        // Get the bundle to calculate server-side discount
-        const bundle = await storage.getBundle(requestData.bundleId);
-        if (bundle && bundle.finalPrice) {
-          const basePrice = parseFloat(bundle.finalPrice);
-          let discountAmount = 0;
-          
-          if (coupon.discountType === "percentage") {
-            discountAmount = basePrice * (parseFloat(coupon.discountValue) / 100);
-          } else {
-            discountAmount = parseFloat(coupon.discountValue);
-          }
-          
-          const finalPrice = Math.max(0, basePrice - discountAmount);
-          requestData.discountAmount = discountAmount.toFixed(2);
-          requestData.finalPrice = finalPrice.toFixed(2);
+      }
+
+      // Server-authoritative pricing calculation
+      // Step 1: Get base price from bundle
+      const bundle = await storage.getBundle(requestData.bundleId);
+      if (!bundle || !bundle.finalPrice) {
+        return res.status(400).json({ error: "Bundle not found or has no price" });
+      }
+      const bundleBasePrice = parseFloat(bundle.finalPrice);
+
+      // Step 2: Apply Tri-POD discount (if client has a tier)
+      let priceAfterTripod = bundleBasePrice;
+      let tripodDiscountAmount = 0;
+      
+      if (sessionUser.clientProfileId) {
+        const clientProfile = await storage.getClientProfile(sessionUser.clientProfileId);
+        if (clientProfile && clientProfile.tripodDiscountTier && clientProfile.tripodDiscountTier !== "none") {
+          priceAfterTripod = applyTripodDiscount(bundleBasePrice, clientProfile.tripodDiscountTier);
+          tripodDiscountAmount = bundleBasePrice - priceAfterTripod;
         }
       }
+
+      // Step 3: Apply coupon discount (if any) on top of Tri-POD discounted price
+      let couponDiscountAmount = 0;
+      if (validatedCoupon) {
+        if (validatedCoupon.discountType === "percentage") {
+          couponDiscountAmount = priceAfterTripod * (parseFloat(validatedCoupon.discountValue) / 100);
+        } else {
+          couponDiscountAmount = parseFloat(validatedCoupon.discountValue);
+        }
+      }
+
+      // Step 4: Calculate final price
+      const totalDiscountAmount = tripodDiscountAmount + couponDiscountAmount;
+      const serverFinalPrice = Math.max(0, bundleBasePrice - totalDiscountAmount);
+      
+      requestData.discountAmount = totalDiscountAmount.toFixed(2);
+      requestData.finalPrice = serverFinalPrice.toFixed(2);
 
       const request = await storage.createBundleRequest(requestData);
       
