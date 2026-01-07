@@ -259,8 +259,8 @@ export default function ServiceRequestForm() {
   const clientProfileId = currentUser?.clientProfileId;
 
   // Fetch billing info for Tri-POD discount tier
-  const { data: billingInfo } = useQuery<BillingInfo>({
-    queryKey: ["/api/client-companies", clientProfileId, "billing"],
+  const { data: billingInfo, isLoading: billingInfoLoading } = useQuery<BillingInfo>({
+    queryKey: ["/api/billing/client-info", clientProfileId],
     queryFn: async () => {
       const res = await fetch(`/api/billing/client-info?clientProfileId=${clientProfileId}`);
       if (!res.ok) throw new Error("Failed to fetch billing info");
@@ -271,6 +271,7 @@ export default function ServiceRequestForm() {
 
   const tripodDiscountTier = billingInfo?.tripodDiscountTier || "none";
   const hasTripodDiscount = tripodDiscountTier !== "none";
+  const billingInfoReady = !billingInfoLoading && billingInfo !== undefined;
 
   // Fetch designers for assignment (Admin and Internal Designer only)
   const { data: designers = [] } = useQuery<User[]>({
@@ -1961,53 +1962,59 @@ export default function ServiceRequestForm() {
                   const basePrice = parseFloat(selectedService?.basePrice || "0");
                   const priceRange = selectedService?.priceRange || "";
                   
-                  if (hasTripodDiscount && basePrice > 0) {
-                    const discountedPrice = applyTripodDiscount(basePrice, tripodDiscountTier);
+                  // Check if priceRange is a range (contains a hyphen with numbers on both sides)
+                  const rangeMatch = priceRange.match(/\$?\s*([\d.]+)\s*-\s*\$?\s*([\d.]+)/);
+                  const isRange = !!rangeMatch;
+                  
+                  // Extract single price from priceRange only if it's NOT a range and basePrice is 0
+                  let effectiveBasePrice = basePrice;
+                  if (basePrice === 0 && priceRange && !isRange) {
+                    const singleMatch = priceRange.match(/\$?\s*([\d.]+)/);
+                    if (singleMatch) {
+                      effectiveBasePrice = parseFloat(singleMatch[1]);
+                    }
+                  }
+                  
+                  // Handle price ranges like "$10 - $50" first
+                  if (billingInfoReady && hasTripodDiscount && isRange && rangeMatch) {
+                    const minPrice = parseFloat(rangeMatch[1]);
+                    const maxPrice = parseFloat(rangeMatch[2]);
+                    const discountedMin = applyTripodDiscount(minPrice, tripodDiscountTier);
+                    const discountedMax = applyTripodDiscount(maxPrice, tripodDiscountTier);
+                    return (
+                      <span className="flex items-center gap-2">
+                        <span className="text-sky-blue-accent font-body-2-semibold">
+                          ${discountedMin.toFixed(2)} - ${discountedMax.toFixed(2)}
+                        </span>
+                        <span className="text-muted-foreground line-through text-sm">
+                          ${minPrice.toFixed(2)} - ${maxPrice.toFixed(2)}
+                        </span>
+                      </span>
+                    );
+                  }
+                  
+                  // Show discounted single price when billing info is loaded and client has a discount
+                  if (billingInfoReady && hasTripodDiscount && effectiveBasePrice > 0) {
+                    const discountedPrice = applyTripodDiscount(effectiveBasePrice, tripodDiscountTier);
                     return (
                       <span className="flex items-center gap-2">
                         <span className="text-sky-blue-accent font-body-2-semibold">
                           ${discountedPrice.toFixed(2)}
                         </span>
                         <span className="text-muted-foreground line-through text-sm">
-                          ${basePrice.toFixed(2)}
+                          ${effectiveBasePrice.toFixed(2)}
                         </span>
                       </span>
                     );
-                  } else if (hasTripodDiscount && priceRange) {
-                    // Handle price ranges like "$10 - $50"
-                    const rangeMatch = priceRange.match(/\$?([\d.]+)\s*-\s*\$?([\d.]+)/);
-                    if (rangeMatch) {
-                      const minPrice = parseFloat(rangeMatch[1]);
-                      const maxPrice = parseFloat(rangeMatch[2]);
-                      const discountedMin = applyTripodDiscount(minPrice, tripodDiscountTier);
-                      const discountedMax = applyTripodDiscount(maxPrice, tripodDiscountTier);
-                      return (
-                        <span className="flex items-center gap-2">
-                          <span className="text-sky-blue-accent font-body-2-semibold">
-                            ${discountedMin.toFixed(2)} - ${discountedMax.toFixed(2)}
-                          </span>
-                          <span className="text-muted-foreground line-through text-sm">
-                            ${minPrice.toFixed(2)} - ${maxPrice.toFixed(2)}
-                          </span>
-                        </span>
-                      );
-                    }
-                    // Handle single-value priceRange like "$45"
-                    const singleMatch = priceRange.match(/\$?([\d.]+)/);
-                    if (singleMatch) {
-                      const singlePrice = parseFloat(singleMatch[1]);
-                      const discountedPrice = applyTripodDiscount(singlePrice, tripodDiscountTier);
-                      return (
-                        <span className="flex items-center gap-2">
-                          <span className="text-sky-blue-accent font-body-2-semibold">
-                            ${discountedPrice.toFixed(2)}
-                          </span>
-                          <span className="text-muted-foreground line-through text-sm">
-                            ${singlePrice.toFixed(2)}
-                          </span>
-                        </span>
-                      );
-                    }
+                  }
+                  
+                  // Show base price while loading or when no discount
+                  if (effectiveBasePrice > 0) {
+                    return (
+                      <span className="text-sky-blue-accent font-body-2-semibold">
+                        ${effectiveBasePrice.toFixed(2)}
+                      </span>
+                    );
                   }
                   return (
                     <span className="text-sky-blue-accent font-body-2-semibold">

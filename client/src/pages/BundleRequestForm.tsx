@@ -126,8 +126,8 @@ export default function BundleRequestForm() {
   const clientProfileId = currentUser?.clientProfileId;
 
   // Fetch billing info for Tri-POD discount tier
-  const { data: billingInfo } = useQuery<BillingInfo>({
-    queryKey: ["/api/client-companies", clientProfileId, "billing"],
+  const { data: billingInfo, isLoading: billingInfoLoading } = useQuery<BillingInfo>({
+    queryKey: ["/api/billing/client-info", clientProfileId],
     queryFn: async () => {
       const res = await fetch(`/api/billing/client-info?clientProfileId=${clientProfileId}`);
       if (!res.ok) throw new Error("Failed to fetch billing info");
@@ -138,6 +138,7 @@ export default function BundleRequestForm() {
 
   const tripodDiscountTier = billingInfo?.tripodDiscountTier || "none";
   const hasTripodDiscount = tripodDiscountTier !== "none";
+  const billingInfoReady = !billingInfoLoading && billingInfo !== undefined;
 
   // Fetch designers that can be assigned to the bundle request
   const { data: designers } = useQuery<UserType[]>({
@@ -598,7 +599,7 @@ export default function BundleRequestForm() {
               {showPricing && bundle.finalPrice && (() => {
                 const basePrice = parseFloat(bundle.finalPrice);
                 const { finalPrice, priceAfterTripod } = calculateDiscountedPrice(basePrice);
-                const hasAnyDiscount = hasTripodDiscount || validatedCoupon;
+                const hasAnyDiscount = (billingInfoReady && hasTripodDiscount) || validatedCoupon;
                 
                 if (hasAnyDiscount) {
                   return (
