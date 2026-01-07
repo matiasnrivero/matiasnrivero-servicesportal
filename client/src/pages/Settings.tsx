@@ -56,7 +56,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap, Percent } from "lucide-react";
+import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap, Percent, Users } from "lucide-react";
+import { format } from "date-fns";
 import { AutomationSettingsTab } from "@/components/AutomationSettings";
 import { DiscountCouponsTab } from "@/components/DiscountCouponsTab";
 import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem, InputField, ServiceField, BundleField, ServicePricingTier, LineItemField } from "@shared/schema";
@@ -1004,6 +1005,278 @@ function PackTableRow({
         </div>
       </TableCell>
     </TableRow>
+  );
+}
+
+// ==================== SUBSCRIPTIONS TAB ====================
+
+interface EnrichedSubscription {
+  id: string;
+  packId: string;
+  clientProfileId: string | null;
+  isActive: boolean;
+  startDate: string;
+  endDate: string | null;
+  stripeSubscriptionId: string | null;
+  stripeStatus: string | null;
+  gracePeriodEndsAt: string | null;
+  paymentFailedAt: string | null;
+  vendorAssigneeId: string | null;
+  vendorAssignedAt: string | null;
+  pendingPackId: string | null;
+  pendingChangeType: string | null;
+  pendingChangeEffectiveAt: string | null;
+  unsubscribedAt: string | null;
+  unsubscribeEffectiveAt: string | null;
+  totalIncluded: number;
+  totalUsed: number;
+  clientProfile: { id: string; companyName: string } | null;
+  clientUser: { id: string; username: string; email: string } | null;
+  pack: { id: string; name: string; price: string } | null;
+  vendorAssignee: { id: string; username: string; email: string } | null;
+  pendingPack: { id: string; name: string } | null;
+}
+
+function SubscriptionsTabContent() {
+  const { toast } = useToast();
+  const [selectedSubscription, setSelectedSubscription] = useState<EnrichedSubscription | null>(null);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+
+  const { data: subscriptions = [], isLoading } = useQuery<EnrichedSubscription[]>({
+    queryKey: ["/api/admin/pack-subscriptions"],
+  });
+
+  const { data: vendors = [] } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+    select: (data: User[]) => data.filter(u => u.role === "vendor" || u.role === "vendor_designer"),
+  });
+
+  const updateSubscriptionMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Record<string, any> }) => {
+      return apiRequest("PATCH", `/api/admin/pack-subscriptions/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pack-subscriptions"] });
+      toast({ title: "Subscription updated" });
+      setAssignDialogOpen(false);
+      setSelectedSubscription(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const getStatusBadge = (sub: EnrichedSubscription) => {
+    if (!sub.isActive) {
+      return <Badge variant="secondary">Inactive</Badge>;
+    }
+    if (sub.gracePeriodEndsAt) {
+      const graceEnd = new Date(sub.gracePeriodEndsAt);
+      if (graceEnd > new Date()) {
+        return <Badge variant="destructive">Grace Period</Badge>;
+      }
+    }
+    if (sub.stripeStatus === "past_due") {
+      return <Badge variant="destructive">Past Due</Badge>;
+    }
+    if (sub.stripeStatus === "active") {
+      return <Badge variant="default">Active</Badge>;
+    }
+    if (sub.unsubscribedAt) {
+      return <Badge variant="secondary">Cancelling</Badge>;
+    }
+    return <Badge variant="default">Active</Badge>;
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Pack Subscriptions ({subscriptions.length})
+          </CardTitle>
+          <CardDescription>
+            Manage client pack subscriptions, vendor assignments, and subscription status.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {subscriptions.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">No pack subscriptions yet.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Pack</TableHead>
+                  <TableHead>Usage</TableHead>
+                  <TableHead>Stripe Status</TableHead>
+                  <TableHead>Grace Period</TableHead>
+                  <TableHead>Pending Change</TableHead>
+                  <TableHead>Vendor</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {subscriptions.map((sub) => (
+                  <TableRow key={sub.id} data-testid={`row-subscription-${sub.id}`}>
+                    <TableCell>{getStatusBadge(sub)}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{sub.clientProfile?.companyName || "N/A"}</span>
+                        <span className="text-xs text-muted-foreground">{sub.clientUser?.email || ""}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{sub.pack?.name || "Unknown Pack"}</span>
+                        <span className="text-xs text-muted-foreground">${sub.pack?.price || "0"}/mo</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className={sub.totalUsed >= sub.totalIncluded ? "text-destructive font-medium" : ""}>
+                        {sub.totalUsed} / {sub.totalIncluded}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={sub.stripeStatus === "active" ? "default" : sub.stripeStatus === "past_due" ? "destructive" : "secondary"}>
+                        {sub.stripeStatus || "N/A"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {sub.gracePeriodEndsAt ? (
+                        <span className="text-destructive text-sm">
+                          Ends {format(new Date(sub.gracePeriodEndsAt), "MMM d, yyyy")}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {sub.pendingPack ? (
+                        <div className="flex flex-col">
+                          <Badge variant="outline">{sub.pendingChangeType}</Badge>
+                          <span className="text-xs text-muted-foreground">{sub.pendingPack.name}</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {sub.vendorAssignee ? (
+                        <span className="text-sm">{sub.vendorAssignee.username}</span>
+                      ) : (
+                        <span className="text-muted-foreground">Unassigned</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedSubscription(sub);
+                          setAssignDialogOpen(true);
+                        }}
+                        data-testid={`button-edit-subscription-${sub.id}`}
+                      >
+                        <Pencil className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Edit Subscription Dialog */}
+      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Subscription</DialogTitle>
+            <DialogDescription>
+              Update vendor assignment and subscription details for {selectedSubscription?.clientProfile?.companyName || "this client"}.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedSubscription && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Assign Vendor</Label>
+                <Select
+                  value={selectedSubscription.vendorAssigneeId || ""}
+                  onValueChange={(value) => {
+                    updateSubscriptionMutation.mutate({
+                      id: selectedSubscription.id,
+                      data: { vendorAssigneeId: value || null },
+                    });
+                  }}
+                >
+                  <SelectTrigger data-testid="select-vendor-assignee">
+                    <SelectValue placeholder="Select vendor..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Unassigned</SelectItem>
+                    {vendors.map((v) => (
+                      <SelectItem key={v.id} value={v.id}>
+                        {v.username} ({v.role})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Stripe Status</Label>
+                <Select
+                  value={selectedSubscription.stripeStatus || ""}
+                  onValueChange={(value) => {
+                    updateSubscriptionMutation.mutate({
+                      id: selectedSubscription.id,
+                      data: { stripeStatus: value || null },
+                    });
+                  }}
+                >
+                  <SelectTrigger data-testid="select-stripe-status">
+                    <SelectValue placeholder="Select status..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="past_due">Past Due</SelectItem>
+                    <SelectItem value="canceled">Canceled</SelectItem>
+                    <SelectItem value="trialing">Trialing</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="pt-4 border-t">
+                <h4 className="font-medium mb-2">Subscription Details</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <span className="text-muted-foreground">Start Date:</span>
+                  <span>{selectedSubscription.startDate ? format(new Date(selectedSubscription.startDate), "MMM d, yyyy") : "N/A"}</span>
+                  <span className="text-muted-foreground">Stripe Subscription:</span>
+                  <span className="font-mono text-xs">{selectedSubscription.stripeSubscriptionId || "N/A"}</span>
+                  <span className="text-muted-foreground">Grace Period Ends:</span>
+                  <span>{selectedSubscription.gracePeriodEndsAt ? format(new Date(selectedSubscription.gracePeriodEndsAt), "MMM d, yyyy") : "N/A"}</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -4167,6 +4440,10 @@ export default function Settings() {
                     <CalendarRange className="h-4 w-4 mr-1" />
                     Packs
                   </TabsTrigger>
+                  <TabsTrigger value="subscriptions" data-testid="tab-subscriptions">
+                    <Users className="h-4 w-4 mr-1" />
+                    Subscriptions
+                  </TabsTrigger>
                   <TabsTrigger value="automation" data-testid="tab-automation">
                     <Zap className="h-4 w-4 mr-1" />
                     Automation
@@ -4208,6 +4485,10 @@ export default function Settings() {
 
                 <TabsContent value="packs">
                   <PacksTabContent />
+                </TabsContent>
+
+                <TabsContent value="subscriptions">
+                  <SubscriptionsTabContent />
                 </TabsContent>
 
                 <TabsContent value="automation">

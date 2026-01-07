@@ -3803,6 +3803,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== SERVICE PACK SUBSCRIPTION ROUTES ====================
 
+  // Admin: Get all pack subscriptions with enriched data
+  app.get("/api/admin/pack-subscriptions", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const subscriptions = await storage.getAllClientPackSubscriptions();
+      
+      // Enrich with client profile, pack, and vendor data
+      const enrichedSubscriptions = await Promise.all(subscriptions.map(async (sub) => {
+        const [clientProfile, pack, vendorAssignee, pendingPack] = await Promise.all([
+          sub.clientProfileId ? storage.getClientProfile(sub.clientProfileId) : null,
+          storage.getServicePack(sub.packId),
+          sub.vendorAssigneeId ? storage.getUser(sub.vendorAssigneeId) : null,
+          sub.pendingPackId ? storage.getServicePack(sub.pendingPackId) : null,
+        ]);
+        
+        // Get client user info if available
+        let clientUser = null;
+        if (clientProfile) {
+          const users = await storage.getUsersByClientProfile(clientProfile.id);
+          clientUser = users.find(u => u.role === 'client') || users[0];
+        }
+        
+        // Get pack items for usage calculation
+        const packItems = pack ? await storage.getServicePackItems(pack.id) : [];
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1;
+        const currentYear = now.getFullYear();
+        
+        // Calculate usage
+        let totalIncluded = 0;
+        let totalUsed = 0;
+        
+        // For new-style packs with serviceId directly on pack
+        if (pack?.serviceId && pack?.quantity) {
+          totalIncluded = pack.quantity;
+          const usage = await storage.getServicePackUsage(sub.id, pack.serviceId, currentMonth, currentYear);
+          if (usage) {
+            totalUsed = usage.usedQuantity;
+          }
+        } else {
+          // Legacy packs with items table
+          for (const item of packItems) {
+            totalIncluded += item.quantity;
+            const usage = await storage.getServicePackUsage(sub.id, item.serviceId, currentMonth, currentYear);
+            if (usage) {
+              totalUsed += usage.usedQuantity;
+            }
+          }
+        }
+        
+        return {
+          ...sub,
+          clientProfile,
+          clientUser: clientUser ? { 
+            id: clientUser.id, 
+            username: clientUser.username, 
+            email: clientUser.email 
+          } : null,
+          pack,
+          packItems,
+          vendorAssignee: vendorAssignee ? {
+            id: vendorAssignee.id,
+            username: vendorAssignee.username,
+            email: vendorAssignee.email,
+          } : null,
+          pendingPack,
+          currentMonth,
+          currentYear,
+          totalIncluded,
+          totalUsed,
+        };
+      }));
+
+      res.json(enrichedSubscriptions);
+    } catch (error) {
+      console.error("Error fetching all pack subscriptions:", error);
+      res.status(500).json({ error: "Failed to fetch pack subscriptions" });
+    }
+  });
+
+  // Admin: Update pack subscription (vendor assignment, etc.)
+  app.patch("/api/admin/pack-subscriptions/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { vendorAssigneeId, stripeStatus, gracePeriodEndsAt, pendingPackId, pendingChangeType, pendingChangeEffectiveAt } = req.body;
+      
+      const updateData: Record<string, any> = {};
+      if (vendorAssigneeId !== undefined) {
+        updateData.vendorAssigneeId = vendorAssigneeId;
+        updateData.vendorAssignedAt = vendorAssigneeId ? new Date() : null;
+      }
+      if (stripeStatus !== undefined) updateData.stripeStatus = stripeStatus;
+      if (gracePeriodEndsAt !== undefined) updateData.gracePeriodEndsAt = gracePeriodEndsAt ? new Date(gracePeriodEndsAt) : null;
+      if (pendingPackId !== undefined) updateData.pendingPackId = pendingPackId;
+      if (pendingChangeType !== undefined) updateData.pendingChangeType = pendingChangeType;
+      if (pendingChangeEffectiveAt !== undefined) updateData.pendingChangeEffectiveAt = pendingChangeEffectiveAt ? new Date(pendingChangeEffectiveAt) : null;
+
+      const updated = await storage.updateClientPackSubscription(req.params.id, updateData);
+      if (!updated) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating pack subscription:", error);
+      res.status(500).json({ error: "Failed to update subscription" });
+    }
+  });
+
   // Get client's pack subscriptions
   app.get("/api/service-pack-subscriptions", async (req, res) => {
     try {

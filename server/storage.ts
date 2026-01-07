@@ -247,6 +247,7 @@ export interface IStorage {
   removeServicePackItem(id: string): Promise<void>;
 
   // Service Pack Subscription methods
+  getAllClientPackSubscriptions(): Promise<ClientPackSubscription[]>;
   getClientPackSubscriptions(clientProfileId: string): Promise<ClientPackSubscription[]>;
   getActiveClientPackSubscriptions(clientProfileId: string): Promise<ClientPackSubscription[]>;
   getClientPackSubscription(id: string): Promise<ClientPackSubscription | undefined>;
@@ -949,6 +950,11 @@ export class DbStorage implements IStorage {
   }
 
   // Service Pack Subscription methods
+  async getAllClientPackSubscriptions(): Promise<ClientPackSubscription[]> {
+    return await db.select().from(clientPackSubscriptions)
+      .orderBy(desc(clientPackSubscriptions.createdAt));
+  }
+
   async getClientPackSubscriptions(clientProfileId: string): Promise<ClientPackSubscription[]> {
     return await db.select().from(clientPackSubscriptions)
       .where(eq(clientPackSubscriptions.clientProfileId, clientProfileId))
