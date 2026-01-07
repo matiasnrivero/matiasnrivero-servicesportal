@@ -120,6 +120,11 @@ export default function PackEditor() {
     queryKey: ["/api/services"],
   });
 
+  // Fetch all existing packs for duplicate validation
+  const { data: allPacks = [] } = useQuery<ServicePack[]>({
+    queryKey: ["/api/service-packs"],
+  });
+
   useEffect(() => {
     if (pack) {
       form.reset({
@@ -247,18 +252,41 @@ export default function PackEditor() {
       return;
     }
     
+    const serviceId = newItemData.serviceId;
+    const quantity = parseInt(newItemData.quantity) || 1;
+    
+    // Check for duplicate pack (same service + same quantity) in existing packs
+    // Exclude the current pack if we're editing
+    const duplicatePack = allPacks.find(p => {
+      // Skip the current pack when editing
+      if (isEditing && p.id === params.id) return false;
+      // Check if this pack has the same service and quantity
+      return p.serviceId === serviceId && p.quantity === quantity;
+    });
+    
+    if (duplicatePack) {
+      const service = services.find(s => s.id === serviceId);
+      toast({ 
+        title: "Duplicate pack exists", 
+        description: `A pack with ${service?.title || 'this service'} x ${quantity} already exists ("${duplicatePack.name}"). Please choose a different quantity.`,
+        variant: "destructive" 
+      });
+      return;
+    }
+    
     if (isEditing) {
-      // Edit mode: save to backend
-      addItemMutation.mutate(newItemData);
+      // Edit mode: for new-style single-service packs, just update the local state
+      // The actual save happens when "Update Pack" is clicked
+      toast({ title: "Service configuration updated", description: "Click 'Update Pack' to save changes" });
     } else {
-      // Create mode: add to local state
+      // Create mode: add to local state (single-service packs replace any existing)
       const newLocalItem: LocalPackItem = {
         id: `local-${Date.now()}`,
-        serviceId: newItemData.serviceId,
-        quantity: parseInt(newItemData.quantity) || 1,
+        serviceId: serviceId,
+        quantity: quantity,
       };
-      setLocalItems([...localItems, newLocalItem]);
-      setNewItemData({ serviceId: "", quantity: "1" });
+      // Replace any existing items (single-service pack enforcement)
+      setLocalItems([newLocalItem]);
       toast({ title: "Service added to pack" });
     }
   };
