@@ -3730,6 +3730,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!sessionUser || sessionUser.role !== "admin") {
         return res.status(403).json({ error: "Admin access required" });
       }
+      
+      // Check if any subscriptions reference this pack
+      const allSubscriptions = await storage.getAllClientPackSubscriptions();
+      const activeSubscriptions = allSubscriptions.filter(
+        (sub: any) => sub.packId === req.params.id || sub.pendingPackId === req.params.id
+      );
+      
+      if (activeSubscriptions.length > 0) {
+        return res.status(400).json({ 
+          error: `Cannot delete this pack. It has ${activeSubscriptions.length} active subscription(s). Please cancel or reassign those subscriptions first.` 
+        });
+      }
+      
       await storage.deleteServicePack(req.params.id);
       res.status(204).send();
     } catch (error) {
