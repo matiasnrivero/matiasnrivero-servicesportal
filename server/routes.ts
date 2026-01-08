@@ -3731,16 +3731,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Admin access required" });
       }
       
-      // Check if any subscriptions reference this pack
+      // Check if any subscriptions reference this pack (active or inactive)
       const allSubscriptions = await storage.getAllClientPackSubscriptions();
-      const activeSubscriptions = allSubscriptions.filter(
+      const referencingSubscriptions = allSubscriptions.filter(
         (sub: any) => sub.packId === req.params.id || sub.pendingPackId === req.params.id
       );
+      const activeCount = referencingSubscriptions.filter((sub: any) => sub.isActive).length;
+      const inactiveCount = referencingSubscriptions.length - activeCount;
       
-      if (activeSubscriptions.length > 0) {
-        return res.status(400).json({ 
-          error: `Cannot delete this pack. It has ${activeSubscriptions.length} active subscription(s). Please cancel or reassign those subscriptions first.` 
-        });
+      if (referencingSubscriptions.length > 0) {
+        let message = `Cannot delete this pack. It has `;
+        if (activeCount > 0 && inactiveCount > 0) {
+          message += `${activeCount} active and ${inactiveCount} inactive subscription(s)`;
+        } else if (activeCount > 0) {
+          message += `${activeCount} active subscription(s)`;
+        } else {
+          message += `${inactiveCount} inactive subscription(s)`;
+        }
+        message += `. Please delete those subscriptions first.`;
+        return res.status(400).json({ error: message });
       }
       
       await storage.deleteServicePack(req.params.id);
