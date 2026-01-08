@@ -7332,6 +7332,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalOrders = serviceRequests.length + bundleRequests.length;
       const aov = totalOrders > 0 ? totalSales / totalOrders : 0;
 
+      // Calculate pack job metrics (scoped to filtered requests for vendors)
+      const packJobCounts = {
+        total: 0,
+        delivered: 0,
+        inProgress: 0,
+        pending: 0,
+        changeRequest: 0,
+      };
+
+      // Use filtered service requests (already scoped by vendor for vendor roles)
+      for (const r of serviceRequests) {
+        if (r.packSubscriptionId) {
+          packJobCounts.total++;
+          if (r.status === "delivered") {
+            packJobCounts.delivered++;
+          } else if (r.status === "in-progress") {
+            packJobCounts.inProgress++;
+          } else if (r.status === "pending") {
+            packJobCounts.pending++;
+          } else if (r.status === "change-request") {
+            packJobCounts.changeRequest++;
+          }
+        }
+      }
+
       res.json({
         jobCounts,
         jobsOverSla,
@@ -7344,6 +7369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           aov,
         },
         totalOrders,
+        packJobCounts,
       });
     } catch (error) {
       console.error("Error fetching dashboard summary:", error);

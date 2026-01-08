@@ -83,6 +83,13 @@ interface DashboardSummary {
     aov: number;
   };
   totalOrders: number;
+  packJobCounts?: {
+    total: number;
+    delivered: number;
+    inProgress: number;
+    pending: number;
+    changeRequest: number;
+  };
 }
 
 interface TopClient {
@@ -698,6 +705,94 @@ export default function AdminDashboard() {
             </Card>
           </div>
         </section>
+
+        {/* Pack Jobs Section - visible to all roles */}
+        {summary?.packJobCounts && summary.packJobCounts.total > 0 && (
+          <section className="space-y-4">
+            <h2 className="text-lg font-medium">Pack Jobs</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <Card data-testid="card-pack-jobs-total">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Pack Jobs</CardTitle>
+                  <Package className="h-4 w-4 text-primary" />
+                </CardHeader>
+                <CardContent>
+                  {summaryLoading ? (
+                    <Skeleton className="h-8 w-16" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="text-pack-jobs-total">
+                      {summary?.packJobCounts?.total || 0}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-pack-jobs-pending">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
+                  <Clock className="h-4 w-4 text-yellow-500" />
+                </CardHeader>
+                <CardContent>
+                  {summaryLoading ? (
+                    <Skeleton className="h-8 w-16" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="text-pack-jobs-pending">
+                      {summary?.packJobCounts?.pending || 0}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-pack-jobs-in-progress">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">In Progress</CardTitle>
+                  <RefreshCw className="h-4 w-4 text-blue-500" />
+                </CardHeader>
+                <CardContent>
+                  {summaryLoading ? (
+                    <Skeleton className="h-8 w-16" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="text-pack-jobs-in-progress">
+                      {summary?.packJobCounts?.inProgress || 0}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-pack-jobs-delivered">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Delivered</CardTitle>
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                </CardHeader>
+                <CardContent>
+                  {summaryLoading ? (
+                    <Skeleton className="h-8 w-16" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="text-pack-jobs-delivered">
+                      {summary?.packJobCounts?.delivered || 0}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-pack-jobs-change-request">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Change Request</CardTitle>
+                  <AlertCircle className="h-4 w-4 text-orange-500" />
+                </CardHeader>
+                <CardContent>
+                  {summaryLoading ? (
+                    <Skeleton className="h-8 w-16" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="text-pack-jobs-change-request">
+                      {summary?.packJobCounts?.changeRequest || 0}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+        )}
 
         {/* Section 2: Financial Performance (Admin only) */}
         {showFinancials && (
