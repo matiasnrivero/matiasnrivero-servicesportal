@@ -61,6 +61,15 @@ interface PackWithItems extends ServicePack {
   items: (ServicePackItem & { service: Service | null })[];
 }
 
+interface EnrichedPackSubscription extends ClientPackSubscription {
+  pack?: ServicePack | null;
+  packItems?: ServicePackItem[];
+  currentMonth?: number;
+  currentYear?: number;
+  totalIncluded?: number;
+  totalUsed?: number;
+}
+
 async function getDefaultUser(): Promise<CurrentUser> {
   const response = await fetch("/api/default-user");
   if (!response.ok) {
@@ -249,7 +258,7 @@ function PacksTab(): JSX.Element {
     enabled: !!clientProfileId,
   });
   
-  const { data: existingSubscriptions = [], isError: subscriptionsError } = useQuery<ClientPackSubscription[]>({
+  const { data: existingSubscriptions = [], isError: subscriptionsError } = useQuery<EnrichedPackSubscription[]>({
     queryKey: ["/api/service-pack-subscriptions", clientProfileId],
     queryFn: async () => {
       if (!clientProfileId) return [];
@@ -261,6 +270,9 @@ function PacksTab(): JSX.Element {
     },
     enabled: !!clientProfileId,
   });
+  
+  // Get active subscriptions with usage data
+  const activeSubscriptionsWithUsage = existingSubscriptions.filter(sub => sub.isActive);
 
   const subscribeMutation = useMutation({
     mutationFn: async (packId: string) => {
@@ -336,7 +348,60 @@ function PacksTab(): JSX.Element {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="space-y-6">
+      {/* Pack Usage Section - shows for clients with active subscriptions */}
+      {activeSubscriptionsWithUsage.length > 0 && (
+        <div className="space-y-4 mb-6">
+          <h3 className="text-lg font-medium text-dark-blue-night">Your Active Packs</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {activeSubscriptionsWithUsage.map((sub) => {
+              const usagePercent = sub.totalIncluded && sub.totalIncluded > 0 
+                ? Math.min((sub.totalUsed || 0) / sub.totalIncluded * 100, 100) 
+                : 0;
+              const remaining = (sub.totalIncluded || 0) - (sub.totalUsed || 0);
+              
+              return (
+                <Card key={sub.id} className="border-primary/20 bg-primary/5" data-testid={`card-active-pack-${sub.id}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between gap-4 mb-3">
+                      <div className="flex items-center gap-2">
+                        <Package className="h-5 w-5 text-primary" />
+                        <span className="font-medium">{sub.pack?.name || "Monthly Pack"}</span>
+                      </div>
+                      <Badge variant="outline" className="text-green-600 border-green-600">Active</Badge>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">This Month's Usage</span>
+                        <span className="font-medium">{sub.totalUsed || 0} / {sub.totalIncluded || 0} jobs</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="bg-primary h-full rounded-full transition-all" 
+                          style={{ width: `${usagePercent}%` }}
+                          data-testid={`progress-pack-usage-${sub.id}`}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Remaining</span>
+                        <span className={`font-medium ${remaining <= 0 ? 'text-destructive' : 'text-green-600'}`}>
+                          {remaining} jobs left
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      
+      {/* Available Packs */}
+      {activeSubscriptionsWithUsage.length > 0 && (
+        <h3 className="text-lg font-medium text-dark-blue-night">Available Packs</h3>
+      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {activePacks.map((pack) => {
         const fullPrice = pack.items.reduce((sum, item) => {
           const price = parseFloat(item.service?.basePrice || "0");
@@ -429,6 +494,7 @@ function PacksTab(): JSX.Element {
           </Card>
         );
       })}
+      </div>
 
       <Dialog open={!!confirmingPack} onOpenChange={(open) => !open && setConfirmingPack(null)}>
         <DialogContent className="max-w-md">

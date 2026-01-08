@@ -255,6 +255,7 @@ export interface IStorage {
   createClientPackSubscription(data: InsertClientPackSubscription): Promise<ClientPackSubscription>;
   updateClientPackSubscription(id: string, data: Partial<InsertClientPackSubscription>): Promise<ClientPackSubscription | undefined>;
   getServicePackUsage(subscriptionId: string, serviceId: string, month: number, year: number): Promise<ServicePackUsage | undefined>;
+  getAllServicePackUsageBySubscription(subscriptionId: string, month: number, year: number): Promise<ServicePackUsage[]>;
   incrementServicePackUsage(subscriptionId: string, serviceId: string, month: number, year: number): Promise<ServicePackUsage>;
 
   // Input Field methods
@@ -1007,6 +1008,15 @@ export class DbStorage implements IStorage {
       ))
       .limit(1);
     return result[0];
+  }
+
+  async getAllServicePackUsageBySubscription(subscriptionId: string, month: number, year: number): Promise<ServicePackUsage[]> {
+    return await db.select().from(servicePackUsage)
+      .where(and(
+        eq(servicePackUsage.subscriptionId, subscriptionId),
+        eq(servicePackUsage.periodMonth, month),
+        eq(servicePackUsage.periodYear, year)
+      ));
   }
 
   async incrementServicePackUsage(subscriptionId: string, serviceId: string, month: number, year: number): Promise<ServicePackUsage> {
