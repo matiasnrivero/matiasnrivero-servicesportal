@@ -4097,8 +4097,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           stripeSubscription = await stripeService.createPackSubscription(clientProfileId, pack);
           stripeSubscriptionId = stripeSubscription.id;
           stripeStatus = stripeSubscription.status;
-          currentPeriodStart = new Date((stripeSubscription as any).current_period_start * 1000);
-          currentPeriodEnd = new Date((stripeSubscription as any).current_period_end * 1000);
+          
+          // Safely extract period dates from Stripe subscription
+          const periodStart = (stripeSubscription as any).current_period_start;
+          const periodEnd = (stripeSubscription as any).current_period_end;
+          
+          if (periodStart && typeof periodStart === 'number') {
+            currentPeriodStart = new Date(periodStart * 1000);
+          }
+          if (periodEnd && typeof periodEnd === 'number') {
+            currentPeriodEnd = new Date(periodEnd * 1000);
+          }
+          
+          // Log for debugging
+          console.log("Stripe subscription created:", {
+            id: stripeSubscription.id,
+            status: stripeSubscription.status,
+            periodStart,
+            periodEnd,
+            currentPeriodStart: currentPeriodStart.toISOString(),
+            currentPeriodEnd: currentPeriodEnd.toISOString()
+          });
         } catch (stripeError: any) {
           console.error("Stripe subscription creation failed:", stripeError.message);
           return res.status(400).json({ 
