@@ -415,7 +415,7 @@ export class StripeService {
     // Get current subscription
     const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId, {
       expand: ['items.data.price'],
-    });
+    }) as Stripe.Subscription;
     
     if (subscription.items.data.length === 0) {
       throw new Error("Subscription has no items");
@@ -427,8 +427,16 @@ export class StripeService {
       ? currentPriceItem 
       : currentPriceItem.id;
 
-    // Calculate timestamps
-    const periodEnd = subscription.current_period_end;
+    // Calculate timestamps - ensure we have valid values
+    // Use type assertion since Stripe types may not include these properties
+    const subData = subscription as unknown as { current_period_start: number; current_period_end: number };
+    const periodStart = subData.current_period_start;
+    const periodEnd = subData.current_period_end;
+    
+    if (!periodStart || !periodEnd) {
+      throw new Error("Subscription has no valid billing period. Cannot schedule changes.");
+    }
+    
     const effectiveTimestamp = Math.floor(effectiveAt.getTime() / 1000);
     
     // Use the later of effectiveAt or period end to ensure validity
@@ -448,13 +456,12 @@ export class StripeService {
         phases: [
           {
             items: [{ price: currentPriceId }],
-            start_date: subscription.current_period_start,
+            start_date: periodStart,
             end_date: changeStartDate,
           },
           {
             items: [{ price: newPriceId }],
             start_date: changeStartDate,
-            iterations: 1,
             proration_behavior: 'none',
           },
         ],
@@ -471,13 +478,12 @@ export class StripeService {
         phases: [
           {
             items: [{ price: currentPriceId }],
-            start_date: subscription.current_period_start,
+            start_date: periodStart,
             end_date: changeStartDate,
           },
           {
             items: [{ price: newPriceId }],
             start_date: changeStartDate,
-            iterations: 1,
             proration_behavior: 'none',
           },
         ],
