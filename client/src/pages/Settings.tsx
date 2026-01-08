@@ -1127,6 +1127,7 @@ function SubscriptionsTabContent() {
                   <TableHead>Status</TableHead>
                   <TableHead>Client</TableHead>
                   <TableHead>Pack</TableHead>
+                  <TableHead>Created</TableHead>
                   <TableHead>Usage</TableHead>
                   <TableHead>Stripe Status</TableHead>
                   <TableHead>Vendor</TableHead>
@@ -1139,7 +1140,7 @@ function SubscriptionsTabContent() {
                     <TableCell>{getStatusBadge(sub)}</TableCell>
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="font-medium">{sub.clientProfile?.companyName || "N/A"}</span>
+                        <span className="font-medium">{sub.clientProfile?.companyName || sub.clientUser?.username || "N/A"}</span>
                         <span className="text-xs text-muted-foreground">{sub.clientUser?.email || ""}</span>
                       </div>
                     </TableCell>
@@ -1148,6 +1149,11 @@ function SubscriptionsTabContent() {
                         <span className="font-medium">{sub.pack?.name || "Unknown Pack"}</span>
                         <span className="text-xs text-muted-foreground">${sub.pack?.price || "0"}/mo</span>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm whitespace-nowrap">
+                        {sub.startDate ? format(new Date(sub.startDate), "MMM d, yyyy") : "N/A"}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <span className={`whitespace-nowrap ${sub.totalUsed >= sub.totalIncluded ? "text-destructive font-medium" : ""}`}>

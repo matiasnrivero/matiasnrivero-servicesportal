@@ -3829,8 +3829,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Get client user info if available
         let clientUser = null;
         if (clientProfile) {
-          const users = await storage.getUsersByClientProfile(clientProfile.id);
-          clientUser = users.find(u => u.role === 'client') || users[0];
+          const teamMembers = await storage.getClientTeamMembers(clientProfile.id);
+          clientUser = teamMembers.find((u: any) => u.role === 'client') || teamMembers[0];
         }
         
         // Get pack items for usage calculation
@@ -4066,6 +4066,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate: new Date(),
         priceAtSubscription: pack.price,
         isActive: true,
+        stripeStatus: "active",
       });
 
       res.status(201).json(subscription);
