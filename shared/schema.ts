@@ -365,6 +365,9 @@ export const clientPackSubscriptions = pgTable("client_pack_subscriptions", {
   // Vendor assignment
   vendorAssigneeId: varchar("vendor_assignee_id").references(() => users.id), // Vendor managing this pack
   vendorAssignedAt: timestamp("vendor_assigned_at"),
+  // Pending vendor reassignment (effective next cycle)
+  pendingVendorAssigneeId: varchar("pending_vendor_assignee_id").references(() => users.id), // Vendor to switch to next cycle
+  pendingVendorEffectiveAt: timestamp("pending_vendor_effective_at"), // When the vendor change takes effect
   // Pending upgrade/downgrade (effective next cycle)
   pendingPackId: varchar("pending_pack_id").references(() => servicePacks.id), // Pack to switch to next cycle
   pendingChangeType: text("pending_change_type"), // 'upgrade' | 'downgrade' | null
