@@ -379,6 +379,28 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
     },
   });
 
+  // Resume subscription mutation (undo cancellation)
+  const resumeSubscriptionMutation = useMutation({
+    mutationFn: async (subscriptionId: string) => {
+      const res = await apiRequest("PATCH", `/api/service-pack-subscriptions/${subscriptionId}/resume`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-pack-subscriptions", clientProfileId] });
+      toast({
+        title: "Success",
+        description: "Cancellation undone - subscription will continue",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to undo cancellation",
+        variant: "destructive",
+      });
+    },
+  });
+
   const setDefaultMutation = useMutation({
     mutationFn: async (paymentMethodId: string) => {
       const res = await apiRequest("POST", "/api/billing/set-default-payment-method", {
@@ -927,14 +949,30 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                         </div>
                       </div>
                       {(isAdmin || isPrimaryClient) && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCancelSubscriptionId(subscription.id)}
-                          data-testid={`button-cancel-subscription-${subscription.id}`}
-                        >
-                          Unsubscribe
-                        </Button>
+                        subscription.cancelAt || subscription.stripeStatus === "cancel_at_period_end" ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => resumeSubscriptionMutation.mutate(subscription.id)}
+                            disabled={resumeSubscriptionMutation.isPending}
+                            data-testid={`button-resume-subscription-${subscription.id}`}
+                          >
+                            {resumeSubscriptionMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Undo Cancellation"
+                            )}
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCancelSubscriptionId(subscription.id)}
+                            data-testid={`button-cancel-subscription-${subscription.id}`}
+                          >
+                            Unsubscribe
+                          </Button>
+                        )
                       )}
                     </div>
                   </div>

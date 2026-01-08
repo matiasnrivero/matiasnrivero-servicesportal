@@ -4213,6 +4213,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Resume/undo a subscription cancellation
+  app.patch("/api/service-pack-subscriptions/:id/resume", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const subscription = await storage.getClientPackSubscription(req.params.id);
+      if (!subscription) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+
+      // Verify permissions
+      const isAdmin = sessionUser.role === "admin";
+      const isClient = (sessionUser.role === "client" || sessionUser.role === "client_member") && sessionUser.clientProfileId === subscription.clientProfileId;
+
+      if (!isAdmin && !isClient) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+
+      // Check if subscription is actually scheduled for cancellation
+      if (!subscription.cancelAt && subscription.stripeStatus !== "cancel_at_period_end") {
+        return res.status(400).json({ error: "Subscription is not scheduled for cancellation" });
+      }
+
+      // Resume Stripe subscription if exists
+      if (subscription.stripeSubscriptionId) {
+        try {
+          await stripeService.resumeSubscription(subscription.stripeSubscriptionId);
+        } catch (stripeError: any) {
+          console.error("Error resuming Stripe subscription:", stripeError.message);
+          return res.status(400).json({ error: stripeError.message || "Failed to resume subscription" });
+        }
+      }
+
+      // Update local record
+      const updated = await storage.updateClientPackSubscription(req.params.id, {
+        stripeStatus: "active",
+        cancelAt: null,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error resuming pack subscription:", error);
+      res.status(500).json({ error: "Failed to resume pack subscription" });
+    }
+  });
+
   // ==================== INPUT FIELDS ROUTES ====================
 
   // Get all input fields (admin and internal_designer)

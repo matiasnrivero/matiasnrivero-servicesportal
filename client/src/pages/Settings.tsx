@@ -1038,6 +1038,7 @@ interface EnrichedSubscription {
   stripeStatus: string | null;
   gracePeriodEndsAt: string | null;
   paymentFailedAt: string | null;
+  cancelAt: string | null;
   vendorAssigneeId: string | null;
   vendorAssignedAt: string | null;
   pendingPackId: string | null;
@@ -1178,16 +1179,29 @@ function SubscriptionsTabContent() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <Badge 
-                        variant={
-                          sub.stripeStatus === "past_due" ? "destructive" : 
-                          sub.stripeStatus === "canceled" ? "outline" :
-                          !sub.stripeStatus ? "default" : "default"
-                        }
-                        className={sub.stripeStatus === "active" ? "bg-emerald-600 text-white" : ""}
-                      >
-                        {sub.stripeStatus || (sub.isActive ? "Manual" : "Inactive")}
-                      </Badge>
+                      <div className="flex flex-col gap-1">
+                        <Badge 
+                          variant={
+                            sub.stripeStatus === "past_due" ? "destructive" : 
+                            sub.stripeStatus === "canceled" ? "outline" :
+                            sub.stripeStatus === "cancel_at_period_end" ? "outline" :
+                            !sub.stripeStatus ? "default" : "default"
+                          }
+                          className={
+                            sub.stripeStatus === "active" ? "bg-emerald-600 text-white" : 
+                            sub.stripeStatus === "cancel_at_period_end" ? "text-amber-600 border-amber-300" : ""
+                          }
+                        >
+                          {sub.stripeStatus === "cancel_at_period_end" 
+                            ? "Canceling" 
+                            : sub.stripeStatus || (sub.isActive ? "Manual" : "Inactive")}
+                        </Badge>
+                        {(sub.cancelAt || sub.stripeStatus === "cancel_at_period_end") && (
+                          <span className="text-xs text-amber-600">
+                            Ends {sub.cancelAt ? format(new Date(sub.cancelAt), "MMM d") : "at period end"}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {sub.vendorAssignee ? (
