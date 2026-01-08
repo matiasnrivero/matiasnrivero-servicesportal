@@ -9485,6 +9485,184 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Vendor Pack Payments Report - list pack subscriptions that need vendor payment
+  app.get("/api/reports/vendor-payments/packs", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || !["admin", "vendor"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { period, vendorId, status } = req.query;
+      const paymentPeriod = period as string || new Date().toISOString().slice(0, 7);
+
+      const allSubscriptions = await storage.getAllClientPackSubscriptions();
+      const allPacks = await storage.getAllPacks();
+      const allUsers = await storage.getAllUsers();
+      const vendorProfiles = await storage.getAllVendorProfiles();
+      const vendorPackCosts = await storage.getAllVendorPackCosts();
+      const clientCompanies = await storage.getAllClientCompanies();
+
+      const packMap: Record<string, typeof allPacks[0]> = {};
+      allPacks.forEach(p => { packMap[p.id] = p; });
+      const userMap: Record<string, typeof allUsers[0]> = {};
+      allUsers.forEach(u => { userMap[u.id] = u; });
+      const vendorProfileMap: Record<string, typeof vendorProfiles[0]> = {};
+      vendorProfiles.forEach(v => { vendorProfileMap[v.id] = v; });
+      const clientCompanyMap: Record<string, typeof clientCompanies[0]> = {};
+      clientCompanies.forEach(c => { clientCompanyMap[c.id] = c; });
+
+      // Build vendor pack cost lookup: packId -> vendorId -> cost
+      const vendorPackCostMap: Record<string, Record<string, number>> = {};
+      for (const vpc of vendorPackCosts) {
+        if (!vendorPackCostMap[vpc.packId]) vendorPackCostMap[vpc.packId] = {};
+        vendorPackCostMap[vpc.packId][vpc.vendorProfileId] = parseFloat(vpc.vendorCost || "0");
+      }
+
+      // Filter subscriptions by period (using currentPeriodStart)
+      let filteredSubs = allSubscriptions.filter(sub => {
+        if (sub.status !== "active" || !sub.vendorId) return false;
+        
+        // Check if subscription period matches
+        const periodStart = sub.currentPeriodStart ? new Date(sub.currentPeriodStart) : new Date(sub.startDate);
+        const subPeriod = sub.vendorPaymentPeriod || periodStart.toISOString().slice(0, 7);
+        if (subPeriod !== paymentPeriod) return false;
+
+        // Filter by status
+        if (status && sub.vendorPaymentStatus !== status) return false;
+
+        return true;
+      });
+
+      // If vendor, filter to only their assignments
+      if (sessionUser.role === "vendor") {
+        const vendorProfile = vendorProfiles.find(v => v.userId === sessionUserId);
+        if (vendorProfile) {
+          filteredSubs = filteredSubs.filter(sub => sub.vendorId === vendorProfile.id);
+        } else {
+          filteredSubs = [];
+        }
+      }
+
+      // Additional vendor filter from query
+      if (vendorId && vendorId !== "all") {
+        filteredSubs = filteredSubs.filter(sub => sub.vendorId === vendorId);
+      }
+
+      // Group by vendor
+      const vendorSummaries: Record<string, {
+        vendorId: string;
+        vendorName: string;
+        subscriptions: {
+          id: string;
+          packName: string;
+          clientName: string;
+          vendorCost: number;
+          paymentStatus: string;
+          periodStart: string | null;
+          periodEnd: string | null;
+        }[];
+        totalEarnings: number;
+        pendingCount: number;
+        paidCount: number;
+      }> = {};
+
+      for (const sub of filteredSubs) {
+        const pack = sub.packId ? packMap[sub.packId] : null;
+        const vendorProfile = sub.vendorId ? vendorProfileMap[sub.vendorId] : null;
+        const clientUser = sub.userId ? userMap[sub.userId] : null;
+        const clientCompany = sub.clientCompanyId ? clientCompanyMap[sub.clientCompanyId] : null;
+
+        const vendorIdKey = sub.vendorId || "unassigned";
+        const vendorName = vendorProfile?.companyName || "Unassigned";
+
+        // Get vendor cost from vendorPackCosts table
+        let vendorCost = parseFloat(sub.vendorCost || "0");
+        if (vendorCost === 0 && pack && vendorProfile) {
+          vendorCost = vendorPackCostMap[pack.id]?.[vendorProfile.id] || 0;
+        }
+
+        if (!vendorSummaries[vendorIdKey]) {
+          vendorSummaries[vendorIdKey] = {
+            vendorId: vendorIdKey,
+            vendorName,
+            subscriptions: [],
+            totalEarnings: 0,
+            pendingCount: 0,
+            paidCount: 0,
+          };
+        }
+
+        const clientName = clientCompany?.companyName || clientUser?.fullName || clientUser?.username || "Unknown";
+
+        vendorSummaries[vendorIdKey].subscriptions.push({
+          id: sub.id,
+          packName: pack?.name || "Unknown Pack",
+          clientName,
+          vendorCost,
+          paymentStatus: sub.vendorPaymentStatus || "pending",
+          periodStart: sub.currentPeriodStart?.toISOString() || null,
+          periodEnd: sub.currentPeriodEnd?.toISOString() || null,
+        });
+
+        vendorSummaries[vendorIdKey].totalEarnings += vendorCost;
+        if (sub.vendorPaymentStatus === "paid") {
+          vendorSummaries[vendorIdKey].paidCount++;
+        } else {
+          vendorSummaries[vendorIdKey].pendingCount++;
+        }
+      }
+
+      res.json({
+        period: paymentPeriod,
+        vendors: Object.values(vendorSummaries).sort((a, b) => b.totalEarnings - a.totalEarnings),
+      });
+    } catch (error) {
+      console.error("Error fetching vendor pack payments:", error);
+      res.status(500).json({ error: "Failed to fetch vendor pack payments" });
+    }
+  });
+
+  // Mark pack subscriptions as paid for vendors
+  app.post("/api/reports/vendor-payments/packs/mark-paid", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { subscriptionIds, period } = req.body;
+      if (!Array.isArray(subscriptionIds) || subscriptionIds.length === 0) {
+        return res.status(400).json({ error: "No subscriptions provided" });
+      }
+
+      const now = new Date();
+      const paymentPeriod = period || now.toISOString().slice(0, 7);
+
+      for (const subId of subscriptionIds) {
+        await storage.updateClientPackSubscription(subId, {
+          vendorPaymentStatus: "paid",
+          vendorPaymentPeriod: paymentPeriod,
+          vendorPaymentMarkedAt: now,
+          vendorPaymentMarkedBy: sessionUserId,
+        });
+      }
+
+      res.json({ success: true, markedCount: subscriptionIds.length });
+    } catch (error) {
+      console.error("Error marking pack subscriptions as paid:", error);
+      res.status(500).json({ error: "Failed to mark subscriptions as paid" });
+    }
+  });
+
   // ==================== END REPORTS ====================
 
   const httpServer = createServer(app);

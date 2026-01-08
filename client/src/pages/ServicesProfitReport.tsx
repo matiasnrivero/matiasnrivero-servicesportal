@@ -440,6 +440,9 @@ export default function ServicesProfitReport() {
     const rows: ReportRow[] = [];
 
     requests.forEach(request => {
+      // Skip pack-covered services (they have $0 price and should appear in Pack Profit Report instead)
+      if (request.packSubscriptionId) return;
+      
       const service = serviceMap[request.serviceId];
       const client = userMap[request.userId];
       const assignee = request.assigneeId ? userMap[request.assigneeId] : undefined;

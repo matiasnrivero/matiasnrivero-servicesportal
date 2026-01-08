@@ -32,6 +32,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import {
   Download,
   FileText,
   DollarSign,
@@ -40,6 +46,7 @@ import {
   ChevronLeft,
   Building2,
   RefreshCw,
+  Package,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -106,6 +113,30 @@ interface JobsResponse {
   jobs: JobDetail[];
 }
 
+interface PackSubscription {
+  id: string;
+  packName: string;
+  clientName: string;
+  vendorCost: number;
+  paymentStatus: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+}
+
+interface VendorPackSummary {
+  vendorId: string;
+  vendorName: string;
+  subscriptions: PackSubscription[];
+  totalEarnings: number;
+  pendingCount: number;
+  paidCount: number;
+}
+
+interface VendorPackPaymentsData {
+  period: string;
+  vendors: VendorPackSummary[];
+}
+
 function generatePaymentPeriods(): { value: string; label: string }[] {
   const periods = [];
   const now = new Date();
@@ -120,10 +151,12 @@ function generatePaymentPeriods(): { value: string; label: string }[] {
 
 export default function VendorPaymentsReport() {
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<"services" | "packs">("services");
   const [selectedPeriod, setSelectedPeriod] = useState(
     format(new Date(), "yyyy-MM")
   );
   const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set());
+  const [selectedPacks, setSelectedPacks] = useState<Set<string>>(new Set());
   const [expandedVendor, setExpandedVendor] = useState<string | null>(null);
 
   const paymentPeriods = useMemo(() => generatePaymentPeriods(), []);
@@ -169,9 +202,32 @@ export default function VendorPaymentsReport() {
     gcTime: 0,
   });
   
+  // Pack payments query
+  const { 
+    data: packPaymentsData, 
+    isLoading: isLoadingPacks,
+    refetch: refetchPackPayments,
+  } = useQuery<VendorPackPaymentsData>({
+    queryKey: ["/api/reports/vendor-payments/packs", selectedPeriod],
+    queryFn: async () => {
+      const response = await fetch(
+        `/api/reports/vendor-payments/packs?period=${selectedPeriod}`
+      );
+      if (!response.ok) throw new Error("Failed to fetch pack payments");
+      return response.json();
+    },
+    enabled: !!currentUser && activeTab === "packs",
+    staleTime: 0,
+    refetchOnMount: 'always',
+    gcTime: 0,
+  });
+
   const handleRefresh = () => {
     refetchReport();
     refetchJobs();
+    if (activeTab === "packs") {
+      refetchPackPayments();
+    }
   };
 
   const markPaidMutation = useMutation({
@@ -224,6 +280,71 @@ export default function VendorPaymentsReport() {
     pendingJobs.forEach((j) => newSelected.add(j.id));
     setSelectedJobs(newSelected);
   };
+
+  // Pack payment handlers
+  const markPacksPaidMutation = useMutation({
+    mutationFn: async (subscriptionIds: string[]) => {
+      return apiRequest("POST", "/api/reports/vendor-payments/packs/mark-paid", {
+        subscriptionIds,
+        period: selectedPeriod,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/reports/vendor-payments/packs"],
+      });
+      setSelectedPacks(new Set());
+      toast({
+        title: "Packs Marked as Paid",
+        description: `Successfully marked ${selectedPacks.size} subscription(s) as paid.`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to mark packs as paid.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleMarkPacksPaid = () => {
+    if (selectedPacks.size === 0) return;
+    markPacksPaidMutation.mutate(Array.from(selectedPacks));
+  };
+
+  const handlePackSelection = (packId: string, checked: boolean) => {
+    const newSelected = new Set(selectedPacks);
+    if (checked) {
+      newSelected.add(packId);
+    } else {
+      newSelected.delete(packId);
+    }
+    setSelectedPacks(newSelected);
+  };
+
+  const handleSelectAllPendingPacks = (subs: PackSubscription[]) => {
+    const pendingSubs = subs.filter((s) => s.paymentStatus === "pending");
+    const newSelected = new Set(selectedPacks);
+    pendingSubs.forEach((s) => newSelected.add(s.id));
+    setSelectedPacks(newSelected);
+  };
+
+  // Pack totals
+  const totalPackPendingAmount = packPaymentsData?.vendors.reduce(
+    (sum, v) => sum + v.subscriptions.filter(s => s.paymentStatus === "pending").reduce((s, sub) => s + sub.vendorCost, 0),
+    0
+  ) || 0;
+
+  const totalPackPaidAmount = packPaymentsData?.vendors.reduce(
+    (sum, v) => sum + v.subscriptions.filter(s => s.paymentStatus === "paid").reduce((s, sub) => s + sub.vendorCost, 0),
+    0
+  ) || 0;
+
+  const totalPackSubscriptions = packPaymentsData?.vendors.reduce(
+    (sum, v) => sum + v.subscriptions.length,
+    0
+  ) || 0;
 
   const exportToCSV = () => {
     if (!reportData?.vendors) return;
@@ -494,7 +615,21 @@ export default function VendorPaymentsReport() {
           </div>
         </div>
 
-        {isLoading ? (
+        {/* Tab Toggle */}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "services" | "packs")} className="mb-6">
+          <TabsList>
+            <TabsTrigger value="services" data-testid="tab-services">
+              <FileText className="h-4 w-4 mr-2" />
+              Services
+            </TabsTrigger>
+            <TabsTrigger value="packs" data-testid="tab-packs">
+              <Package className="h-4 w-4 mr-2" />
+              Packs
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {activeTab === "services" && (isLoading ? (
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {[1, 2, 3, 4].map((i) => (
@@ -1030,7 +1165,246 @@ export default function VendorPaymentsReport() {
               </Card>
             )}
           </>
-        )}
+        ))}
+
+        {/* Packs Tab Content */}
+        {activeTab === "packs" && (isLoadingPacks ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <Card key={i}>
+                  <CardContent className="pt-6">
+                    <Skeleton className="h-8 w-24 mb-2" />
+                    <Skeleton className="h-4 w-32" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <Card>
+              <CardContent className="pt-6">
+                <Skeleton className="h-64 w-full" />
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <>
+            {/* Pack Summary Cards */}
+            <div className={`grid grid-cols-1 gap-4 mb-6 ${isAdmin ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
+              {isAdmin && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-md bg-sky-blue-accent/10">
+                        <Building2 className="h-5 w-5 text-sky-blue-accent" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-dark-blue-night">
+                          {packPaymentsData?.vendors.length || 0}
+                        </p>
+                        <p className="text-sm text-dark-gray">Vendors</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-md bg-sky-blue-accent/10">
+                      <Package className="h-5 w-5 text-sky-blue-accent" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-dark-blue-night">
+                        {totalPackSubscriptions}
+                      </p>
+                      <p className="text-sm text-dark-gray">Subscriptions</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-md bg-yellow-100">
+                      <Clock className="h-5 w-5 text-yellow-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-dark-blue-night">
+                        ${totalPackPendingAmount.toFixed(2)}
+                      </p>
+                      <p className="text-sm text-dark-gray">Pending</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-md bg-green-100">
+                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-dark-blue-night">
+                        ${totalPackPaidAmount.toFixed(2)}
+                      </p>
+                      <p className="text-sm text-dark-gray">Paid</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Action Buttons for Packs */}
+            {isAdmin && selectedPacks.size > 0 && (
+              <div className="mb-4 flex items-center gap-3">
+                <Button
+                  onClick={handleMarkPacksPaid}
+                  disabled={markPacksPaidMutation.isPending}
+                  data-testid="button-mark-packs-paid"
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Mark as Paid ({selectedPacks.size})
+                </Button>
+              </div>
+            )}
+
+            {/* Pack Vendors List */}
+            {!packPaymentsData?.vendors.length ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-dark-gray">No pack subscriptions found for this period.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5" />
+                    Pack Subscriptions by Vendor
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Accordion
+                    type="single"
+                    collapsible
+                    value={expandedVendor || undefined}
+                    onValueChange={(v) => setExpandedVendor(v || null)}
+                  >
+                    {packPaymentsData.vendors.map((vendor) => (
+                      <AccordionItem key={vendor.vendorId} value={vendor.vendorId}>
+                        <AccordionTrigger className="hover:no-underline">
+                          <div className="flex items-center justify-between w-full pr-4">
+                            <div className="flex items-center gap-3">
+                              <Building2 className="h-5 w-5 text-dark-gray" />
+                              <span className="font-semibold">{vendor.vendorName}</span>
+                              <Badge variant="outline">{vendor.subscriptions.length} subscription(s)</Badge>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                <p className="font-bold">${vendor.totalEarnings.toFixed(2)}</p>
+                                <p className="text-xs text-dark-gray">Total</p>
+                              </div>
+                              <div className="flex gap-2">
+                                <Badge className="bg-yellow-100 text-yellow-700">
+                                  {vendor.pendingCount} pending
+                                </Badge>
+                                <Badge className="bg-green-100 text-green-700">
+                                  {vendor.paidCount} paid
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          {isAdmin && vendor.pendingCount > 0 && (
+                            <div className="mb-4 flex justify-end">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleSelectAllPendingPacks(vendor.subscriptions)}
+                                data-testid={`button-select-all-pending-packs-${vendor.vendorId}`}
+                              >
+                                Select All Pending
+                              </Button>
+                            </div>
+                          )}
+                          <div className="rounded-md border">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  {isAdmin && <TableHead className="w-[50px]"></TableHead>}
+                                  <TableHead>Pack</TableHead>
+                                  <TableHead>Client</TableHead>
+                                  <TableHead>Period</TableHead>
+                                  <TableHead className="text-right">
+                                    {isAdmin ? "Vendor Cost" : "Earnings"}
+                                  </TableHead>
+                                  <TableHead>Status</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {vendor.subscriptions.map((sub) => (
+                                  <TableRow key={sub.id} data-testid={`row-pack-${sub.id}`}>
+                                    {isAdmin && (
+                                      <TableCell>
+                                        <Checkbox
+                                          checked={selectedPacks.has(sub.id)}
+                                          onCheckedChange={(checked) =>
+                                            handlePackSelection(sub.id, !!checked)
+                                          }
+                                          disabled={sub.paymentStatus === "paid"}
+                                          data-testid={`checkbox-pack-${sub.id}`}
+                                        />
+                                      </TableCell>
+                                    )}
+                                    <TableCell className="font-medium">{sub.packName}</TableCell>
+                                    <TableCell>{sub.clientName}</TableCell>
+                                    <TableCell className="whitespace-nowrap">
+                                      {sub.periodStart
+                                        ? format(new Date(sub.periodStart), "MMM dd")
+                                        : "-"}
+                                      {sub.periodEnd && (
+                                        <> - {format(new Date(sub.periodEnd), "MMM dd, yyyy")}</>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="font-medium text-right">
+                                      ${sub.vendorCost.toFixed(2)}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge
+                                        className={
+                                          sub.paymentStatus === "paid"
+                                            ? "bg-green-100 text-green-700"
+                                            : "bg-yellow-100 text-yellow-700"
+                                        }
+                                      >
+                                        {sub.paymentStatus === "paid" ? (
+                                          <>
+                                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                                            Paid
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Clock className="h-3 w-3 mr-1" />
+                                            Pending
+                                          </>
+                                        )}
+                                      </Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                </CardContent>
+              </Card>
+            )}
+          </>
+        ))}
       </main>
     </div>
   );
