@@ -74,6 +74,15 @@ Role-based access to reports (Admin, Client, Vendor).
   - **Exclusions**: Jobs assigned to admin or internal_designer roles have $0 cost and are excluded from payment reports.
   - **Exports**: CSV and PDF exports with job details, vendor names, and payment status.
   - **API Endpoints**: `GET /api/reports/vendor-payments`, `POST /api/reports/vendor-payments/mark-paid`, `GET /api/reports/vendor-payments/jobs`.
+  - **Packs Tab**: Shows pack subscriptions where vendors have completed jobs, with mark-as-paid functionality.
+- **Pack Profit Report (Admin only)**: Financial analysis for monthly pack subscriptions.
+  - Revenue, vendor cost, and profit margin calculations per pack subscription
+  - Monthly period filtering
+  - Summary totals with CSV/PDF export
+- **Royalties Deduction Report (Admin and Client)**: Tracks services and packs billed via "Deduct from Royalties" payment method.
+  - Two tabs: Services and Packs
+  - Monthly period filtering
+  - Client-scoped views for client role
 
 ## Role-Specific Dashboards
 
@@ -84,10 +93,16 @@ The Admin Dashboard (`/dashboard`) provides analytics with role-based views:
 |---------|-------|-------------------|--------|-----------------|
 | Date Range Selector | Yes | Yes | Yes | Yes |
 | Job Operations KPIs | Yes (all jobs) | Yes (all jobs) | Yes (vendor jobs) | Yes (own jobs) |
+| Pack Jobs KPIs | Yes (all packs) | Yes (all packs) | Yes (vendor packs) | Yes (own packs) |
 | Financial Performance | Yes | No | No | No |
 | Top Drivers | Yes | No | No | No |
 | Daily Sales Chart | Yes | No | No | No |
 | Daily Orders Chart | Yes | Yes | Yes | Yes |
+
+### Financial Performance Sections (Admin Only)
+- **Services & Bundles**: Sales, Orders, Avg Order, Vendor Cost, Profit, Margin
+- **Monthly Packs**: Pack Revenue, Pack Profit, Pack Margin
+- **Combined Totals**: Total Revenue, Total Profit, Total Margin
 
 ### API Endpoints
 - **`GET /api/dashboard/summary`**: Returns job status counts, financial metrics (admin only), comparison percentages
