@@ -400,6 +400,120 @@ export class StripeService {
   }
 
   /**
+   * Schedule a subscription update for the next billing cycle
+   * Uses Stripe's subscription schedules to change prices at renewal
+   */
+  async scheduleSubscriptionUpdate(
+    stripeSubscriptionId: string,
+    newPriceId: string,
+    effectiveAt: Date
+  ): Promise<Stripe.SubscriptionSchedule> {
+    if (!newPriceId) {
+      throw new Error("New price ID is required for scheduling subscription update");
+    }
+
+    // Get current subscription
+    const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId, {
+      expand: ['items.data.price'],
+    });
+    
+    if (subscription.items.data.length === 0) {
+      throw new Error("Subscription has no items");
+    }
+
+    // Extract current price ID properly (price can be string or object)
+    const currentPriceItem = subscription.items.data[0].price;
+    const currentPriceId = typeof currentPriceItem === 'string' 
+      ? currentPriceItem 
+      : currentPriceItem.id;
+
+    // Calculate timestamps
+    const periodEnd = subscription.current_period_end;
+    const effectiveTimestamp = Math.floor(effectiveAt.getTime() / 1000);
+    
+    // Use the later of effectiveAt or period end to ensure validity
+    // Stripe requires phase transitions to be at or after current period end
+    const changeStartDate = Math.max(effectiveTimestamp, periodEnd);
+
+    let schedule: Stripe.SubscriptionSchedule;
+    
+    if (subscription.schedule) {
+      // Already has a schedule - update it
+      const existingScheduleId = typeof subscription.schedule === 'string' 
+        ? subscription.schedule 
+        : subscription.schedule.id;
+      
+      // Update existing schedule with new phase
+      schedule = await stripe.subscriptionSchedules.update(existingScheduleId, {
+        phases: [
+          {
+            items: [{ price: currentPriceId }],
+            start_date: subscription.current_period_start,
+            end_date: changeStartDate,
+          },
+          {
+            items: [{ price: newPriceId }],
+            start_date: changeStartDate,
+            iterations: 1,
+            proration_behavior: 'none',
+          },
+        ],
+        end_behavior: 'release',
+      });
+    } else {
+      // Create a new schedule from the subscription
+      schedule = await stripe.subscriptionSchedules.create({
+        from_subscription: stripeSubscriptionId,
+      });
+      
+      // Update the schedule with the pending change phase
+      schedule = await stripe.subscriptionSchedules.update(schedule.id, {
+        phases: [
+          {
+            items: [{ price: currentPriceId }],
+            start_date: subscription.current_period_start,
+            end_date: changeStartDate,
+          },
+          {
+            items: [{ price: newPriceId }],
+            start_date: changeStartDate,
+            iterations: 1,
+            proration_behavior: 'none',
+          },
+        ],
+        end_behavior: 'release',
+      });
+    }
+
+    return schedule;
+  }
+
+  /**
+   * Cancel a scheduled subscription update by releasing the schedule
+   */
+  async cancelScheduledUpdate(stripeSubscriptionId: string): Promise<void> {
+    const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+    
+    if (!subscription.schedule) {
+      return; // No schedule to cancel
+    }
+
+    const scheduleId = typeof subscription.schedule === 'string' 
+      ? subscription.schedule 
+      : subscription.schedule.id;
+    
+    // Retrieve the schedule to check its status
+    const existingSchedule = await stripe.subscriptionSchedules.retrieve(scheduleId);
+    
+    // Only release if the schedule is active (not already released or canceled)
+    if (existingSchedule.status === 'active' || existingSchedule.status === 'not_started') {
+      await stripe.subscriptionSchedules.release(scheduleId, {
+        preserve_cancel_date: true,
+      });
+    }
+  }
+
+  /**
    * Update subscription to a different pack (upgrade/downgrade)
    * Changes take effect immediately with prorated charges
    */

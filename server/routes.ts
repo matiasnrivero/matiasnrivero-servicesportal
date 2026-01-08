@@ -4289,6 +4289,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Schedule a pack change (upgrade/downgrade) for the next billing cycle
+  app.patch("/api/service-pack-subscriptions/:id/change-pack", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const subscription = await storage.getClientPackSubscription(req.params.id);
+      if (!subscription) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+
+      // Verify permissions
+      const isAdmin = sessionUser.role === "admin";
+      const isClient = (sessionUser.role === "client" || sessionUser.role === "client_member") && sessionUser.clientProfileId === subscription.clientProfileId;
+
+      if (!isAdmin && !isClient) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+
+      const { newPackId } = req.body;
+      if (!newPackId) {
+        return res.status(400).json({ error: "New pack ID is required" });
+      }
+
+      // Get the new pack
+      const newPack = await storage.getServicePack(newPackId);
+      if (!newPack || !newPack.isActive) {
+        return res.status(400).json({ error: "Invalid pack selected" });
+      }
+
+      // Get the current pack to compare
+      const currentPack = await storage.getServicePack(subscription.packId);
+      if (!currentPack) {
+        return res.status(400).json({ error: "Current pack not found" });
+      }
+
+      // Verify both packs are for the same service
+      if (newPack.serviceId !== currentPack.serviceId) {
+        return res.status(400).json({ error: "Can only change to packs for the same service" });
+      }
+
+      // Verify packs are different
+      if (newPack.id === currentPack.id) {
+        return res.status(400).json({ error: "Cannot change to the same pack" });
+      }
+
+      // Determine if upgrade or downgrade based on quantity and price
+      const currentQty = currentPack.quantity || 0;
+      const newQty = newPack.quantity || 0;
+      const currentPrice = parseFloat(currentPack.price) || 0;
+      const newPrice = parseFloat(newPack.price) || 0;
+      
+      // Consider it an upgrade if quantity OR price increases
+      const changeType = (newQty > currentQty || (newQty === currentQty && newPrice > currentPrice)) 
+        ? "upgrade" 
+        : "downgrade";
+
+      // Calculate effective date (next billing cycle)
+      let effectiveAt = subscription.currentPeriodEnd;
+      if (!effectiveAt) {
+        // If no current period end, use 30 days from now
+        effectiveAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      }
+
+      // Ensure new pack has a Stripe price ID (sync if needed)
+      let stripePriceId = newPack.stripePriceId;
+      if (!stripePriceId && subscription.stripeSubscriptionId) {
+        // Sync pack to Stripe to get a price ID
+        try {
+          const syncResult = await stripeService.syncPackToStripe(newPack);
+          stripePriceId = syncResult.priceId;
+          // Update the pack with the new Stripe IDs
+          await storage.updateServicePack(newPack.id, {
+            stripeProductId: syncResult.productId,
+            stripePriceId: syncResult.priceId,
+          });
+        } catch (syncError: any) {
+          console.error("Error syncing pack to Stripe:", syncError.message);
+          return res.status(400).json({ error: "Failed to sync pack to payment system" });
+        }
+      }
+
+      // Schedule the Stripe subscription update if exists
+      if (subscription.stripeSubscriptionId && stripePriceId) {
+        try {
+          await stripeService.scheduleSubscriptionUpdate(
+            subscription.stripeSubscriptionId,
+            stripePriceId,
+            effectiveAt instanceof Date ? effectiveAt : new Date(effectiveAt)
+          );
+        } catch (stripeError: any) {
+          console.error("Error scheduling Stripe subscription update:", stripeError.message);
+          return res.status(400).json({ error: stripeError.message || "Failed to schedule pack change with payment system" });
+        }
+      }
+
+      // Update local record with pending change
+      const updated = await storage.updateClientPackSubscription(req.params.id, {
+        pendingPackId: newPackId,
+        pendingChangeType: changeType,
+        pendingChangeEffectiveAt: effectiveAt,
+      });
+
+      res.json({ ...updated, changeType });
+    } catch (error) {
+      console.error("Error scheduling pack change:", error);
+      res.status(500).json({ error: "Failed to schedule pack change" });
+    }
+  });
+
+  // Cancel a pending pack change
+  app.patch("/api/service-pack-subscriptions/:id/cancel-change", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const subscription = await storage.getClientPackSubscription(req.params.id);
+      if (!subscription) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+
+      // Verify permissions
+      const isAdmin = sessionUser.role === "admin";
+      const isClient = (sessionUser.role === "client" || sessionUser.role === "client_member") && sessionUser.clientProfileId === subscription.clientProfileId;
+
+      if (!isAdmin && !isClient) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+
+      // Check if there's actually a pending change
+      if (!subscription.pendingPackId) {
+        return res.status(400).json({ error: "No pending change to cancel" });
+      }
+
+      // Cancel the Stripe scheduled update if exists
+      if (subscription.stripeSubscriptionId) {
+        try {
+          await stripeService.cancelScheduledUpdate(subscription.stripeSubscriptionId);
+        } catch (stripeError: any) {
+          console.error("Error canceling Stripe scheduled update:", stripeError.message);
+          // Continue anyway - we'll clear the pending change locally
+        }
+      }
+
+      // Clear the pending change
+      const updated = await storage.updateClientPackSubscription(req.params.id, {
+        pendingPackId: null,
+        pendingChangeType: null,
+        pendingChangeEffectiveAt: null,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error canceling pending pack change:", error);
+      res.status(500).json({ error: "Failed to cancel pending pack change" });
+    }
+  });
+
   // ==================== INPUT FIELDS ROUTES ====================
 
   // Get all input fields (admin and internal_designer)

@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, CreditCard, Plus, Trash2, Star, CheckCircle2, Pencil, Package, Calendar, TrendingUp, AlertTriangle, AlertCircle } from "lucide-react";
+import { Loader2, CreditCard, Plus, Trash2, Star, CheckCircle2, Pencil, Package, Calendar, TrendingUp, AlertTriangle, AlertCircle, ArrowUpDown, ArrowUp, ArrowDown, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -280,6 +280,7 @@ interface SubscriptionWithUsage extends ClientPackSubscription {
   packItems?: ServicePackItem[];
   totalIncluded?: number;
   totalUsed?: number;
+  pendingPack?: ServicePack;
 }
 
 export default function BillingTab({ clientProfileId, isAdmin = false, isPrimaryClient = false }: BillingTabProps) {
@@ -293,6 +294,8 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
   const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
   const [selectedPackForSubscribe, setSelectedPackForSubscribe] = useState<PackWithItems | null>(null);
   const [cancelSubscriptionId, setCancelSubscriptionId] = useState<string | null>(null);
+  const [changePackSubscription, setChangePackSubscription] = useState<SubscriptionWithUsage | null>(null);
+  const [selectedNewPack, setSelectedNewPack] = useState<PackWithItems | null>(null);
 
   const { data: billingInfo, isLoading } = useQuery<BillingInfo>({
     queryKey: ["/api/billing/client-info", clientProfileId],
@@ -401,6 +404,69 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
       });
     },
   });
+
+  // Schedule pack change (upgrade/downgrade) mutation
+  const changePackMutation = useMutation({
+    mutationFn: async ({ subscriptionId, newPackId }: { subscriptionId: string; newPackId: string }) => {
+      const res = await apiRequest("PATCH", `/api/service-pack-subscriptions/${subscriptionId}/change-pack`, {
+        newPackId,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-pack-subscriptions", clientProfileId] });
+      toast({
+        title: "Success",
+        description: data.changeType === "upgrade" 
+          ? "Pack upgrade scheduled for your next billing cycle" 
+          : "Pack downgrade scheduled for your next billing cycle",
+      });
+      setChangePackSubscription(null);
+      setSelectedNewPack(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to schedule pack change",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Cancel pending pack change mutation
+  const cancelPendingChangeMutation = useMutation({
+    mutationFn: async (subscriptionId: string) => {
+      const res = await apiRequest("PATCH", `/api/service-pack-subscriptions/${subscriptionId}/cancel-change`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-pack-subscriptions", clientProfileId] });
+      toast({
+        title: "Success",
+        description: "Pending pack change cancelled",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to cancel pending change",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Get available packs for the same service as the current subscription (for upgrade/downgrade)
+  const getAlternativePacksForSubscription = (subscription: SubscriptionWithUsage): PackWithItems[] => {
+    const currentPack = availablePacks.find(p => p.id === subscription.packId);
+    if (!currentPack) return [];
+    
+    // Find packs for the same service with different quantities
+    return availablePacks.filter(pack => 
+      pack.isActive && 
+      pack.id !== subscription.packId &&
+      pack.serviceId === currentPack.serviceId
+    ).sort((a, b) => (a.quantity || 0) - (b.quantity || 0));
+  };
 
   const setDefaultMutation = useMutation({
     mutationFn: async (paymentMethodId: string) => {
@@ -980,30 +1046,79 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                         </div>
                       </div>
                       {(isAdmin || isPrimaryClient) && (
-                        subscription.cancelAt || subscription.stripeStatus === "cancel_at_period_end" ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => resumeSubscriptionMutation.mutate(subscription.id)}
-                            disabled={resumeSubscriptionMutation.isPending}
-                            data-testid={`button-resume-subscription-${subscription.id}`}
-                          >
-                            {resumeSubscriptionMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              "Undo Cancellation"
-                            )}
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setCancelSubscriptionId(subscription.id)}
-                            data-testid={`button-cancel-subscription-${subscription.id}`}
-                          >
-                            Unsubscribe
-                          </Button>
-                        )
+                        <div className="flex flex-col gap-2 items-end">
+                          {/* Show pending change info */}
+                          {subscription.pendingPackId && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Badge variant="outline" className="text-blue-600 border-blue-300">
+                                {subscription.pendingChangeType === "upgrade" ? (
+                                  <ArrowUp className="h-3 w-3 mr-1" />
+                                ) : (
+                                  <ArrowDown className="h-3 w-3 mr-1" />
+                                )}
+                                {subscription.pendingChangeType === "upgrade" ? "Upgrading" : "Downgrading"} to{" "}
+                                {subscription.pendingPack?.name || availablePacks.find(p => p.id === subscription.pendingPackId)?.name || "new pack"}
+                              </Badge>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => cancelPendingChangeMutation.mutate(subscription.id)}
+                                disabled={cancelPendingChangeMutation.isPending}
+                                data-testid={`button-cancel-pending-change-${subscription.id}`}
+                              >
+                                {cancelPendingChangeMutation.isPending ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <X className="h-3 w-3" />
+                                )}
+                              </Button>
+                            </div>
+                          )}
+                          
+                          {/* Action buttons */}
+                          {subscription.cancelAt || subscription.stripeStatus === "cancel_at_period_end" ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => resumeSubscriptionMutation.mutate(subscription.id)}
+                              disabled={resumeSubscriptionMutation.isPending}
+                              data-testid={`button-resume-subscription-${subscription.id}`}
+                            >
+                              {resumeSubscriptionMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                "Undo Cancellation"
+                              )}
+                            </Button>
+                          ) : (
+                            <div className="flex gap-2">
+                              {/* Change Pack button - only show if there are alternative packs */}
+                              {getAlternativePacksForSubscription(subscription).length > 0 && !subscription.pendingPackId && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setChangePackSubscription(subscription);
+                                    setSelectedNewPack(null);
+                                  }}
+                                  data-testid={`button-change-pack-${subscription.id}`}
+                                >
+                                  <ArrowUpDown className="h-4 w-4 mr-1" />
+                                  Change Pack
+                                </Button>
+                              )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCancelSubscriptionId(subscription.id)}
+                                data-testid={`button-cancel-subscription-${subscription.id}`}
+                              >
+                                Unsubscribe
+                              </Button>
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1038,6 +1153,118 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
               ) : (
                 "Cancel Subscription"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Pack (Upgrade/Downgrade) Dialog */}
+      <Dialog 
+        open={!!changePackSubscription} 
+        onOpenChange={() => {
+          setChangePackSubscription(null);
+          setSelectedNewPack(null);
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Change Pack</DialogTitle>
+          </DialogHeader>
+          {changePackSubscription && (() => {
+            const currentPack = availablePacks.find(p => p.id === changePackSubscription.packId);
+            const alternativePacks = getAlternativePacksForSubscription(changePackSubscription);
+            const currentQty = currentPack?.quantity || 0;
+            
+            return (
+              <div className="space-y-4 py-2">
+                <div className="p-3 bg-muted rounded-md">
+                  <p className="text-sm text-muted-foreground">Current Pack</p>
+                  <p className="font-medium">{currentPack?.name || "Unknown Pack"}</p>
+                  <p className="text-sm">${parseFloat(currentPack?.price || "0").toFixed(2)}/mo • {currentQty} services/month</p>
+                </div>
+                
+                <p className="text-sm text-muted-foreground">
+                  Select a new pack. The change will take effect at the start of your next billing cycle 
+                  {changePackSubscription.currentPeriodEnd && (
+                    <span className="font-medium"> on {format(new Date(changePackSubscription.currentPeriodEnd), "MMM d, yyyy")}</span>
+                  )}.
+                </p>
+                
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {alternativePacks.map((pack) => {
+                    const packQty = pack.quantity || 0;
+                    const packPrice = parseFloat(pack.price) || 0;
+                    const currentPrice = parseFloat(currentPack?.price || "0") || 0;
+                    // Consider it an upgrade if quantity OR price increases
+                    const isUpgrade = packQty > currentQty || (packQty === currentQty && packPrice > currentPrice);
+                    const isSelected = selectedNewPack?.id === pack.id;
+                    
+                    return (
+                      <div
+                        key={pack.id}
+                        className={`p-3 border rounded-md cursor-pointer transition-colors ${
+                          isSelected ? "border-primary bg-primary/5" : ""
+                        }`}
+                        onClick={() => setSelectedNewPack(pack)}
+                        data-testid={`pack-change-option-${pack.id}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{pack.name}</p>
+                              <Badge variant={isUpgrade ? "default" : "secondary"} className="text-xs">
+                                {isUpgrade ? (
+                                  <>
+                                    <ArrowUp className="h-3 w-3 mr-1" />
+                                    Upgrade
+                                  </>
+                                ) : (
+                                  <>
+                                    <ArrowDown className="h-3 w-3 mr-1" />
+                                    Downgrade
+                                  </>
+                                )}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              ${packPrice.toFixed(2)}/mo • {packQty} services/month
+                            </p>
+                          </div>
+                          {isSelected && <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" />}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setChangePackSubscription(null);
+                setSelectedNewPack(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (changePackSubscription && selectedNewPack) {
+                  changePackMutation.mutate({
+                    subscriptionId: changePackSubscription.id,
+                    newPackId: selectedNewPack.id,
+                  });
+                }
+              }}
+              disabled={!selectedNewPack || changePackMutation.isPending}
+              data-testid="button-confirm-change-pack"
+            >
+              {changePackMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Schedule Change
             </Button>
           </DialogFooter>
         </DialogContent>
