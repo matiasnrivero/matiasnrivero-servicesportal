@@ -28,7 +28,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Search, Eye, Plus, Trash2 } from "lucide-react";
+import { Building2, Search, Eye, Plus, Trash2, Pencil, LogIn, Store } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -354,7 +354,7 @@ export default function VendorsList() {
                         className={`flex items-center p-4 border rounded-md ${isInternalVendor ? 'bg-muted/50 border-primary/20' : ''}`}
                         data-testid={`row-vendor-${vendor.id}`}
                       >
-                        <div className="w-12 flex-shrink-0">
+                        <div className="w-16 flex-shrink-0">
                           <Switch
                             id={`toggle-vendor-${vendor.id}`}
                             checked={vendor.isActive}
@@ -368,36 +368,66 @@ export default function VendorsList() {
                             data-testid={`switch-vendor-active-${vendor.id}`}
                           />
                         </div>
-                        <div className="w-[200px] flex-shrink-0">
-                          <p className="font-semibold text-dark-blue-night">
-                            {profile?.companyName || "No Company Name"}
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <p className="text-xs text-dark-gray">Company</p>
-                            {isInternalVendor && (
-                              <Badge variant="secondary" className="text-xs">Internal</Badge>
-                            )}
+                        <div className="w-[220px] flex-shrink-0 flex items-center gap-3">
+                          <Store className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <div>
+                            <p className="font-semibold text-dark-blue-night">
+                              {profile?.companyName || "No Company Name"}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-dark-gray">Company</p>
+                              {isInternalVendor && (
+                                <Badge variant="secondary" className="text-xs">Internal</Badge>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        <div className="w-[220px] flex-shrink-0">
+                        <div className="w-[200px] flex-shrink-0">
                           <p className="text-dark-blue-night truncate">{vendor.username}</p>
                           <p className="text-xs text-dark-gray">Primary Contact</p>
                         </div>
-                        <div className="flex-1 min-w-[250px]">
+                        <div className="flex-1 min-w-[220px]">
                           <p className="text-dark-blue-night truncate">{vendor.email || "No email"}</p>
                           <p className="text-xs text-dark-gray">Email</p>
                         </div>
-                        <div className="w-[80px] flex-shrink-0 flex justify-center">
-                          {!vendor.isActive && (
-                            <Badge
-                              variant="outline"
-                              className="bg-destructive/10 text-destructive border-destructive/20"
-                            >
-                              Inactive
-                            </Badge>
-                          )}
-                        </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={async () => {
+                                  try {
+                                    await apiRequest("POST", "/api/login-as", { userId: vendor.id });
+                                    window.location.href = "/";
+                                  } catch (error) {
+                                    toast({
+                                      title: "Error",
+                                      description: "Failed to login as vendor",
+                                      variant: "destructive",
+                                    });
+                                  }
+                                }}
+                                data-testid={`button-login-as-vendor-${vendor.id}`}
+                              >
+                                <LogIn className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Login As</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setLocation(`/vendors/${vendor.id}`)}
+                                data-testid={`button-edit-vendor-${vendor.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Edit</TooltipContent>
+                          </Tooltip>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
