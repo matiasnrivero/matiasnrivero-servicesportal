@@ -968,25 +968,25 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                     data-testid={`subscription-${subscription.id}`}
                   >
                     {/* Line 1: Pack Name / Status / Pending Change Badge */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium">{pack?.name || "Unknown Pack"}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium flex-shrink-0">{pack?.name || "Unknown Pack"}</p>
                       {subscription.stripeStatus === "past_due" ? (
-                        <Badge variant="destructive">
+                        <Badge variant="destructive" className="flex-shrink-0">
                           <AlertTriangle className="h-3 w-3 mr-1" />
                           Payment Failed
                         </Badge>
                       ) : subscription.stripeStatus === "cancel_at_period_end" ? (
-                        <Badge variant="outline" className="text-amber-600 border-amber-300">
+                        <Badge variant="outline" className="text-amber-600 border-amber-300 flex-shrink-0">
                           Canceling at Period End
                         </Badge>
                       ) : (
-                        <Badge className="bg-emerald-600 text-white">
+                        <Badge className="bg-emerald-600 text-white flex-shrink-0">
                           <CheckCircle2 className="h-3 w-3 mr-1" />
                           Active
                         </Badge>
                       )}
                       {subscription.pendingPackId && (
-                        <Badge variant="outline" className="text-blue-600 border-blue-300">
+                        <Badge variant="outline" className="text-blue-600 border-blue-300 flex-shrink-0">
                           {subscription.pendingChangeType === "upgrade" ? (
                             <ArrowUp className="h-3 w-3 mr-1" />
                           ) : (
