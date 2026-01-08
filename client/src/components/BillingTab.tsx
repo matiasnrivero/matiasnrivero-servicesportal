@@ -914,7 +914,7 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                               Canceling at Period End
                             </Badge>
                           ) : (
-                            <Badge variant="secondary">
+                            <Badge className="bg-emerald-600 text-white">
                               <CheckCircle2 className="h-3 w-3 mr-1" />
                               Active
                             </Badge>

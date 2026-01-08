@@ -1196,7 +1196,9 @@ function SubscriptionsTabContent() {
                         >
                           {sub.stripeStatus === "cancel_at_period_end" 
                             ? "Canceling" 
-                            : sub.stripeStatus || (sub.isActive ? "Manual" : "Inactive")}
+                            : sub.stripeStatus 
+                              ? sub.stripeStatus.charAt(0).toUpperCase() + sub.stripeStatus.slice(1)
+                              : (sub.isActive ? "Manual" : "Inactive")}
                         </Badge>
                         {(sub.cancelAt || sub.stripeStatus === "cancel_at_period_end") && (
                           <span className="text-xs text-amber-600">
