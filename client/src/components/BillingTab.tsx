@@ -7,7 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, CreditCard, Plus, Trash2, Star, CheckCircle2, Pencil, Package, Calendar, TrendingUp, AlertTriangle } from "lucide-react";
+import { Loader2, CreditCard, Plus, Trash2, Star, CheckCircle2, Pencil, Package, Calendar, TrendingUp, AlertTriangle, AlertCircle } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { loadStripe } from "@stripe/stripe-js";
@@ -923,7 +924,25 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                         {pack?.description && (
                           <p className="text-sm text-muted-foreground mt-1">{pack.description}</p>
                         )}
-                        <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-6 text-sm">
+                        {/* Pack Usage Warning Banner */}
+                        {(() => {
+                          const used = subscription.totalUsed || 0;
+                          const usagePercent = totalQty > 0 ? (used / totalQty) * 100 : 0;
+                          if (usagePercent >= 90) {
+                            return (
+                              <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md flex items-center gap-2">
+                                <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                                <span className="text-sm text-amber-700 dark:text-amber-400">
+                                  {usagePercent >= 100 
+                                    ? "You've used all services in your pack this month. Additional requests will be charged at regular rates."
+                                    : "You're approaching your monthly pack limit. Consider your remaining usage."}
+                                </span>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                        <div className="mt-3 grid grid-cols-2 md:grid-cols-6 gap-6 text-sm">
                           <div>
                             <p className="text-muted-foreground">Pack Price</p>
                             <p className="font-medium">${packPrice.toFixed(2)}</p>
@@ -945,6 +964,18 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                           <div>
                             <p className="text-muted-foreground whitespace-nowrap">Included Services</p>
                             <p className="font-medium">{totalQty} per month</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground whitespace-nowrap">Usage This Month</p>
+                            <div className="flex flex-col gap-1">
+                              <p className={`font-medium ${(subscription.totalUsed || 0) >= totalQty ? "text-destructive" : (subscription.totalUsed || 0) >= totalQty * 0.9 ? "text-amber-600" : ""}`}>
+                                {subscription.totalUsed || 0} / {totalQty} used
+                              </p>
+                              <Progress 
+                                value={totalQty > 0 ? Math.min(((subscription.totalUsed || 0) / totalQty) * 100, 100) : 0} 
+                                className="h-2"
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>

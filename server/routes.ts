@@ -22,6 +22,23 @@ function applyTripodDiscount(price: number, discountTier: string): number {
 }
 
 /**
+ * Get current month and year in CST/CDT (America/Chicago) timezone for pack usage tracking
+ * Uses Intl.DateTimeFormat to properly handle Daylight Saving Time
+ */
+function getCSTMonthYear(): { month: number; year: number } {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+    month: 'numeric'
+  });
+  const parts = formatter.formatToParts(now);
+  const month = parseInt(parts.find(p => p.type === 'month')?.value || '1', 10);
+  const year = parseInt(parts.find(p => p.type === 'year')?.value || String(now.getFullYear()), 10);
+  return { month, year };
+}
+
+/**
  * Role-based assignment permissions:
  * - Admin → can assign to Vendor, Internal Designer, Vendor Designer
  * - Internal Designer → can assign to Vendor, Vendor Designer, other Internal Designers
@@ -600,6 +617,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 requestData.discountAmount = "0.00"; // Pack pricing doesn't stack with discounts
                 delete requestData.discountCouponId; // Coupons don't apply to pack pricing
                 
+                // Set pack coverage fields for tracking and display
+                requestData.isPackCovered = true;
+                requestData.packSubscriptionId = subscription.id;
+                requestData.clientPaymentStatus = "included_in_pack";
+                
                 console.log(`Applied service pack pricing: subscription=${subscription.id}, unitPrice=${perUnitPrice.toFixed(2)}`);
                 break; // Use the first matching subscription
               }
@@ -751,14 +773,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const service = await storage.getService(request.serviceId);
           const fatherServiceId = service?.parentServiceId || request.serviceId;
-          const now = new Date();
+          // Use CST timezone for consistent billing period tracking
+          const { month, year } = getCSTMonthYear();
           await storage.incrementServicePackUsage(
             request.monthlyPackSubscriptionId, 
             fatherServiceId,
-            now.getMonth() + 1,
-            now.getFullYear()
+            month,
+            year
           );
-          console.log(`Incremented service pack usage for subscription ${request.monthlyPackSubscriptionId}`);
+          console.log(`Incremented service pack usage for subscription ${request.monthlyPackSubscriptionId} (CST period: ${month}/${year})`);
         } catch (usageError) {
           console.error("Failed to increment service pack usage:", usageError);
         }

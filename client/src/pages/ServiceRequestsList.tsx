@@ -46,7 +46,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, XCircle, LayoutGrid, List, Trash2, CalendarIcon, Search, ChevronDown, X, SlidersHorizontal, Users, Building2, Percent } from "lucide-react";
+import { Eye, Clock, RefreshCw, CheckCircle2, AlertCircle, XCircle, LayoutGrid, List, Trash2, CalendarIcon, Search, ChevronDown, X, SlidersHorizontal, Users, Building2, Percent, Package } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -94,6 +94,7 @@ interface CombinedRequest {
   originalRequest: ServiceRequest | BundleRequest;
   price: string;
   hasDiscount: boolean;
+  isPackCovered: boolean;
 }
 
 interface MultiSelectClientFilterProps {
@@ -255,6 +256,7 @@ export default function ServiceRequestsList() {
   
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusFromUrl);
   const [overSlaFilter, setOverSlaFilter] = useState<boolean>(initialOverSla);
+  const [hidePackRequests, setHidePackRequests] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<"list" | "board">(() => {
     const saved = localStorage.getItem("serviceRequestsViewMode");
     return (saved as "list" | "board") || "list";
@@ -754,6 +756,7 @@ export default function ServiceRequestsList() {
     setSearchJobId("");
     setStatusFilter("all");
     setOverSlaFilter(false);
+    setHidePackRequests(false);
   };
   
   // Helper function to check if a job is over SLA
@@ -780,6 +783,7 @@ export default function ServiceRequestsList() {
       originalRequest: r,
       price: getServicePrice(r),
       hasDiscount: !!r.discountCouponId,
+      isPackCovered: !!(r as ServiceRequest).isPackCovered,
     }));
 
     const bundleItems: CombinedRequest[] = filteredBundleRequests.map(r => ({
@@ -797,6 +801,7 @@ export default function ServiceRequestsList() {
       originalRequest: r,
       price: getBundlePrice(r),
       hasDiscount: !!r.discountCouponId,
+      isPackCovered: false, // Bundles don't have pack coverage
     }));
 
     let combined = [...adhocItems, ...bundleItems];
@@ -806,10 +811,15 @@ export default function ServiceRequestsList() {
       combined = combined.filter(r => isOverSla(r.dueDate, r.status));
     }
     
+    // Apply hidePackRequests filter if active (for internal designers)
+    if (hidePackRequests) {
+      combined = combined.filter(r => !r.isPackCovered);
+    }
+    
     return combined.sort((a, b) => 
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
-  }, [filteredRequests, filteredBundleRequests, overSlaFilter, isOverSla]);
+  }, [filteredRequests, filteredBundleRequests, overSlaFilter, isOverSla, hidePackRequests]);
 
   // Compute eligible count from selected requests for bulk assignment
   const eligibleSelectedRequests = useMemo(() => {
@@ -1095,6 +1105,20 @@ export default function ServiceRequestsList() {
                   />
                 </div>
               </div>
+
+              {currentUser?.role === "internal_designer" && (
+                <div className="space-y-2 flex items-center gap-2">
+                  <Checkbox
+                    id="hide-pack-requests"
+                    checked={hidePackRequests}
+                    onCheckedChange={(checked) => setHidePackRequests(checked === true)}
+                    data-testid="checkbox-hide-pack-requests"
+                  />
+                  <Label htmlFor="hide-pack-requests" className="text-sm cursor-pointer">
+                    Hide pack-based requests
+                  </Label>
+                </div>
+              )}
                     </div>
                   );
                 })()}
@@ -1234,7 +1258,21 @@ export default function ServiceRequestsList() {
                           <TableCell data-testid={`text-price-${request.id}`}>
                             <div className="flex items-center gap-1">
                               <span className="text-dark-blue-night font-medium">{request.price}</span>
-                              {request.hasDiscount && (
+                              {request.isPackCovered && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge 
+                                      variant="secondary" 
+                                      className="text-xs px-1.5 py-0 h-5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                                      data-testid={`badge-pack-${request.id}`}
+                                    >
+                                      <Package className="w-3 h-3" />
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Included in Pack</TooltipContent>
+                                </Tooltip>
+                              )}
+                              {request.hasDiscount && !request.isPackCovered && (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <Badge 
