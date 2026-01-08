@@ -3833,7 +3833,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Enrich with client profile, pack, and vendor data
       const enrichedSubscriptions = await Promise.all(subscriptions.map(async (sub) => {
         const [clientProfile, pack, vendorAssignee, pendingPack] = await Promise.all([
-          sub.clientProfileId ? storage.getClientProfile(sub.clientProfileId) : null,
+          sub.clientProfileId ? storage.getClientProfileById(sub.clientProfileId) : null,
           storage.getServicePack(sub.packId),
           sub.vendorAssigneeId ? storage.getUser(sub.vendorAssigneeId) : null,
           sub.pendingPackId ? storage.getServicePack(sub.pendingPackId) : null,

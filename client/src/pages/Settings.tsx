@@ -850,6 +850,18 @@ function PacksTabContent() {
     queryFn: fetchAllServices,
   });
 
+  // Fetch subscriptions to count active clients per pack
+  const { data: subscriptions = [] } = useQuery<{ packId: string; isActive: boolean }[]>({
+    queryKey: ["/api/admin/pack-subscriptions"],
+    select: (data: any[]) => data.map((s: any) => ({ packId: s.packId, isActive: s.isActive })),
+  });
+
+  // Count active subscriptions per pack
+  const activeClientCounts = servicePacks.reduce((acc, pack) => {
+    acc[pack.id] = subscriptions.filter(s => s.packId === pack.id && s.isActive).length;
+    return acc;
+  }, {} as Record<string, number>);
+
   if (isLoading) {
     return (
       <Card>
@@ -881,6 +893,7 @@ function PacksTabContent() {
               <TableRow>
                 <TableHead className="w-[60px]">Status</TableHead>
                 <TableHead>Pack Name</TableHead>
+                <TableHead className="text-center">Active Clients</TableHead>
                 <TableHead className="text-right">Full Price</TableHead>
                 <TableHead className="text-right">Pack Price</TableHead>
                 <TableHead className="text-right">Savings</TableHead>
@@ -893,6 +906,7 @@ function PacksTabContent() {
                   key={pack.id} 
                   pack={pack} 
                   services={services}
+                  activeClientCount={activeClientCounts[pack.id] || 0}
                   onEdit={() => navigate(`/settings/packs/${pack.id}/edit`)}
                 />
               ))}
@@ -907,10 +921,12 @@ function PacksTabContent() {
 function PackTableRow({ 
   pack, 
   services, 
+  activeClientCount,
   onEdit 
 }: { 
   pack: ServicePack; 
   services: Service[]; 
+  activeClientCount: number;
   onEdit: () => void;
 }) {
   const { toast } = useToast();
@@ -980,6 +996,7 @@ function PackTableRow({
         />
       </TableCell>
       <TableCell className="font-medium">{pack.name}</TableCell>
+      <TableCell className="text-center">{activeClientCount}</TableCell>
       <TableCell className="text-right">${fullPrice.toFixed(2)}</TableCell>
       <TableCell className="text-right">${packPrice.toFixed(2)}</TableCell>
       <TableCell className="text-right text-emerald-600 dark:text-emerald-400 font-medium">
