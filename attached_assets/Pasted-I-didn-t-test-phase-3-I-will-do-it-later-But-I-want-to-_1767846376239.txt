@@ -1,0 +1,40 @@
+I didn't test phase 3. I will do it later. But I want to make sure you are following this 7 phases plan that you gave me? Because I can imagine that each title and subtitle (feature) that is described in this plan, has tons of more specifications attach to them that we've been discussing all day! If you are possitive about this, let's move into phase 4, and then tomorrow I will test Phase 3 and 4. Here is the roadmap you planned for me?
+Build Plan: Monthly Packs Payment System
+Phase 1: Core Pack Structure & Schema
+Restrict Pack Editor to single service (remove +Add, replace with Save)
+Add validation: no duplicate service+quantity combinations
+Add stripeSubscriptionId, stripeStatus, gracePeriodEndsAt, pendingPackChange, vendorAssigneeId to pack subscriptions
+Create Tri-POD internal vendor with all internal designers
+Phase 2: Pack Subscription & Stripe Integration
+Client subscription flow (from Services > Monthly Packs and Payment tab)
+Stripe subscription creation on subscribe (immediate first charge)
+Anniversary billing for renewals
+Webhook handlers for payment success/fail/cancel
+2-week grace period with banner
+Phase 3: Pack Usage Tracking & Display
+Track pack consumption on service request submission (CST timezone)
+"Included in Pack" badge on Service Request List
+Pack usage display on Client Dashboard (with 90% warning)
+Pack consumption columns on Payment > Monthly Packs section
+Toggle for Internal Designers to show/hide pack requests
+Phase 4: Upgrade/Downgrade & Unsubscribe
+Upgrade/Downgrade flow (effective next cycle)
+Pending change display and cancellation
+Unsubscribe flow (keep benefits until cycle end)
+Phase 5: Pack Assignment to Vendors
+New Pack Assignment Screen (Admin/Internal Designer)
+Bulk and individual assignment with modal
+Pending Assignment highlighting
+Reassignment effective next period
+Phase 6: Reports & Dashboard Updates
+Pack Profit Report (separate from Services Profit)
+Deduct from Royalties Report (2 tabs: Services, Packs)
+Vendor Payments Report - Packs Tab
+Update Services Profit Report (hide $0 pack services)
+Dashboard KPIs: Packs Profit, Total Profit
+Client Dashboard with pack usage + job operations
+Vendor Dashboard - pack consumption section
+Phase 7: Billing Logic for Payment Types
+Pay as you Go: Immediate overage charges
+Monthly Payment: Consolidated overage charge on 1st
+Deduct from Royalties: Manual mark as paid functionality
