@@ -341,33 +341,35 @@ export default function VendorsList() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                {filteredVendors.length === 0 ? (
-                  <p className="text-dark-gray text-center py-8">No vendors found</p>
-                ) : (
-                  filteredVendors.map((vendor) => {
+              {filteredVendors.length === 0 ? (
+                <p className="text-dark-gray text-center py-8">No vendors found</p>
+              ) : (
+                <div className="space-y-2">
+                  {filteredVendors.map((vendor) => {
                     const profile = getVendorProfile(vendor.id);
                     const isInternalVendor = (vendor as any).isInternal;
                     return (
                       <div
                         key={vendor.id}
-                        className={`grid grid-cols-[auto_1fr_1fr_1fr_auto_auto] items-center gap-4 p-4 border rounded-md ${isInternalVendor ? 'bg-muted/50 border-primary/20' : ''}`}
+                        className={`flex items-center p-4 border rounded-md ${isInternalVendor ? 'bg-muted/50 border-primary/20' : ''}`}
                         data-testid={`row-vendor-${vendor.id}`}
                       >
-                        <Switch
-                          id={`toggle-vendor-${vendor.id}`}
-                          checked={vendor.isActive}
-                          disabled={isInternalVendor}
-                          onCheckedChange={(checked) =>
-                            toggleVendorActiveMutation.mutate({
-                              userId: vendor.id,
-                              isActive: checked,
-                            })
-                          }
-                          data-testid={`switch-vendor-active-${vendor.id}`}
-                        />
-                        <div>
-                          <div className="flex items-center gap-2">
+                        <div className="w-12 flex-shrink-0">
+                          <Switch
+                            id={`toggle-vendor-${vendor.id}`}
+                            checked={vendor.isActive}
+                            disabled={isInternalVendor}
+                            onCheckedChange={(checked) =>
+                              toggleVendorActiveMutation.mutate({
+                                userId: vendor.id,
+                                isActive: checked,
+                              })
+                            }
+                            data-testid={`switch-vendor-active-${vendor.id}`}
+                          />
+                        </div>
+                        <div className="w-[200px] flex-shrink-0">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-semibold text-dark-blue-night">
                               {profile?.companyName || "No Company Name"}
                             </p>
@@ -377,15 +379,15 @@ export default function VendorsList() {
                           </div>
                           <p className="text-xs text-dark-gray">Company</p>
                         </div>
-                        <div>
-                          <p className="text-dark-blue-night">{vendor.username}</p>
+                        <div className="w-[180px] flex-shrink-0">
+                          <p className="text-dark-blue-night truncate">{vendor.username}</p>
                           <p className="text-xs text-dark-gray">Primary Contact</p>
                         </div>
-                        <div>
-                          <p className="text-dark-blue-night">{vendor.email || "No email"}</p>
+                        <div className="flex-1 min-w-[200px]">
+                          <p className="text-dark-blue-night truncate">{vendor.email || "No email"}</p>
                           <p className="text-xs text-dark-gray">Email</p>
                         </div>
-                        <div>
+                        <div className="w-[80px] flex-shrink-0 flex justify-center">
                           {!vendor.isActive && (
                             <Badge
                               variant="outline"
@@ -395,7 +397,7 @@ export default function VendorsList() {
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 flex-shrink-0">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
@@ -409,7 +411,7 @@ export default function VendorsList() {
                             </TooltipTrigger>
                             <TooltipContent>View</TooltipContent>
                           </Tooltip>
-                          {!isInternalVendor && (
+                          {!isInternalVendor ? (
                             <Tooltip>
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
@@ -453,13 +455,15 @@ export default function VendorsList() {
                                 </AlertDialogContent>
                               </AlertDialog>
                             </Tooltip>
+                          ) : (
+                            <div className="w-9" />
                           )}
                         </div>
                       </div>
                     );
-                  })
-                )}
-              </div>
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
