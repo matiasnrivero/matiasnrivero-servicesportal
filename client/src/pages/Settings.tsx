@@ -1181,7 +1181,7 @@ function SubscriptionsTabContent() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col gap-1">
+                      <div className="flex flex-col gap-1 items-start">
                         <Badge 
                           variant={
                             sub.stripeStatus === "past_due" ? "destructive" : 
