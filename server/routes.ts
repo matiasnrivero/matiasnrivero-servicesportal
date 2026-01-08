@@ -3865,11 +3865,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Enrich with client profile, pack, and vendor data
       const enrichedSubscriptions = await Promise.all(subscriptions.map(async (sub) => {
-        const [clientProfile, pack, vendorAssignee, pendingPack] = await Promise.all([
+        const [clientProfile, pack, vendorAssignee, pendingPack, pendingVendorAssignee] = await Promise.all([
           sub.clientProfileId ? storage.getClientProfileById(sub.clientProfileId) : null,
           storage.getServicePack(sub.packId),
           sub.vendorAssigneeId ? storage.getUser(sub.vendorAssigneeId) : null,
           sub.pendingPackId ? storage.getServicePack(sub.pendingPackId) : null,
+          sub.pendingVendorAssigneeId ? storage.getUser(sub.pendingVendorAssigneeId) : null,
         ]);
         
         // Get client user info if available
@@ -3922,6 +3923,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             username: vendorAssignee.username,
             email: vendorAssignee.email,
           } : null,
+          pendingVendorAssignee: pendingVendorAssignee ? {
+            id: pendingVendorAssignee.id,
+            username: pendingVendorAssignee.username,
+            email: pendingVendorAssignee.email,
+          } : null,
           pendingPack,
           currentMonth,
           currentYear,
@@ -3949,13 +3955,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Admin access required" });
       }
 
-      const { vendorAssigneeId, stripeStatus, gracePeriodEndsAt, pendingPackId, pendingChangeType, pendingChangeEffectiveAt } = req.body;
+      const { 
+        vendorAssigneeId, 
+        stripeStatus, 
+        gracePeriodEndsAt, 
+        pendingPackId, 
+        pendingChangeType, 
+        pendingChangeEffectiveAt,
+        pendingVendorAssigneeId,
+        pendingVendorEffectiveAt,
+        immediateVendorAssignment
+      } = req.body;
       
       const updateData: Record<string, any> = {};
-      if (vendorAssigneeId !== undefined) {
+      
+      // Handle immediate vendor assignment (clears pending)
+      if (immediateVendorAssignment && vendorAssigneeId !== undefined) {
+        updateData.vendorAssigneeId = vendorAssigneeId;
+        updateData.vendorAssignedAt = vendorAssigneeId ? new Date() : null;
+        updateData.pendingVendorAssigneeId = null;
+        updateData.pendingVendorEffectiveAt = null;
+      } else if (vendorAssigneeId !== undefined) {
         updateData.vendorAssigneeId = vendorAssigneeId;
         updateData.vendorAssignedAt = vendorAssigneeId ? new Date() : null;
       }
+      
+      // Handle pending vendor reassignment
+      if (pendingVendorAssigneeId !== undefined) {
+        updateData.pendingVendorAssigneeId = pendingVendorAssigneeId;
+      }
+      if (pendingVendorEffectiveAt !== undefined) {
+        updateData.pendingVendorEffectiveAt = pendingVendorEffectiveAt ? new Date(pendingVendorEffectiveAt) : null;
+      }
+      
       if (stripeStatus !== undefined) updateData.stripeStatus = stripeStatus;
       if (gracePeriodEndsAt !== undefined) updateData.gracePeriodEndsAt = gracePeriodEndsAt ? new Date(gracePeriodEndsAt) : null;
       if (pendingPackId !== undefined) updateData.pendingPackId = pendingPackId;
@@ -3970,6 +4002,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating pack subscription:", error);
       res.status(500).json({ error: "Failed to update subscription" });
+    }
+  });
+
+  // Admin: Bulk vendor assignment for pack subscriptions
+  app.post("/api/admin/pack-subscriptions/bulk-assign", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
+      }
+
+      const { subscriptionIds, vendorAssigneeId, assignmentType } = req.body;
+      
+      if (!subscriptionIds || !Array.isArray(subscriptionIds) || subscriptionIds.length === 0) {
+        return res.status(400).json({ error: "subscriptionIds array is required" });
+      }
+      
+      if (!vendorAssigneeId) {
+        return res.status(400).json({ error: "vendorAssigneeId is required" });
+      }
+
+      // Verify vendor exists and has vendor role
+      const vendor = await storage.getUser(vendorAssigneeId);
+      if (!vendor || vendor.role !== "vendor") {
+        return res.status(400).json({ error: "Invalid vendor" });
+      }
+
+      const results: { subscriptionId: string; success: boolean; error?: string }[] = [];
+
+      for (const subscriptionId of subscriptionIds) {
+        try {
+          const subscription = await storage.getClientPackSubscription(subscriptionId);
+          if (!subscription) {
+            results.push({ subscriptionId, success: false, error: "Subscription not found" });
+            continue;
+          }
+
+          const updateData: Record<string, any> = {};
+          
+          if (assignmentType === "immediate") {
+            // Immediate assignment
+            updateData.vendorAssigneeId = vendorAssigneeId;
+            updateData.vendorAssignedAt = new Date();
+            updateData.pendingVendorAssigneeId = null;
+            updateData.pendingVendorEffectiveAt = null;
+          } else {
+            // Scheduled for next billing period
+            updateData.pendingVendorAssigneeId = vendorAssigneeId;
+            updateData.pendingVendorEffectiveAt = subscription.currentPeriodEnd || subscription.endDate;
+          }
+
+          await storage.updateClientPackSubscription(subscriptionId, updateData);
+          results.push({ subscriptionId, success: true });
+        } catch (err) {
+          results.push({ subscriptionId, success: false, error: "Failed to update" });
+        }
+      }
+
+      res.json({ results, successCount: results.filter(r => r.success).length, failCount: results.filter(r => !r.success).length });
+    } catch (error) {
+      console.error("Error bulk assigning vendors:", error);
+      res.status(500).json({ error: "Failed to bulk assign vendors" });
+    }
+  });
+
+  // Admin: Cancel pending vendor assignment
+  app.patch("/api/admin/pack-subscriptions/:id/cancel-pending-vendor", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
+      }
+
+      const updated = await storage.updateClientPackSubscription(req.params.id, {
+        pendingVendorAssigneeId: null,
+        pendingVendorEffectiveAt: null,
+      });
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error canceling pending vendor:", error);
+      res.status(500).json({ error: "Failed to cancel pending vendor assignment" });
     }
   });
 
