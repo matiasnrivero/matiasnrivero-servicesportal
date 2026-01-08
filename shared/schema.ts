@@ -379,6 +379,13 @@ export const clientPackSubscriptions = pgTable("client_pack_subscriptions", {
   royaltiesPaymentStatus: text("royalties_payment_status").default("pending"), // 'pending' | 'paid'
   royaltiesMarkedPaidAt: timestamp("royalties_marked_paid_at"),
   royaltiesMarkedPaidBy: varchar("royalties_marked_paid_by").references(() => users.id),
+  // Vendor payment tracking
+  vendorPaymentStatus: text("vendor_payment_status").default("pending"), // 'pending' | 'paid'
+  vendorPaymentPeriod: text("vendor_payment_period"), // Format: YYYY-MM
+  vendorPaymentMarkedAt: timestamp("vendor_payment_marked_at"),
+  vendorPaymentMarkedBy: varchar("vendor_payment_marked_by").references(() => users.id),
+  vendorCost: decimal("vendor_cost", { precision: 10, scale: 2 }), // Vendor cost for this subscription period
+  clientCompanyId: varchar("client_company_id"), // Reference to client company (table defined later)
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

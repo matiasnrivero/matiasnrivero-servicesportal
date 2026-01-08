@@ -6765,18 +6765,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate pack profit metrics
       const allPackSubscriptions = await storage.getAllClientPackSubscriptions();
-      const allPacks = await storage.getAllPacks();
+      const allPacks = await storage.getAllServicePacks();
       const allVendorPackCosts = await storage.getAllVendorPackCosts();
       
       const packMap: Record<string, typeof allPacks[0]> = {};
-      allPacks.forEach(p => { packMap[p.id] = p; });
+      allPacks.forEach((p: typeof allPacks[0]) => { packMap[p.id] = p; });
       
       // Calculate pack revenue and costs for subscriptions active in the date range
       let packRevenue = 0;
       let packVendorCost = 0;
       
       for (const sub of allPackSubscriptions) {
-        if (sub.status !== 'active' && sub.status !== 'past_due') continue;
+        // Check if subscription is active
+        if (!sub.isActive) continue;
         
         // Check if subscription was active during the date range
         const subStart = sub.currentPeriodStart ? new Date(sub.currentPeriodStart) : new Date(sub.createdAt);
@@ -6791,12 +6792,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (pack) {
           packRevenue += parseFloat(String(pack.price || 0));
           
-          // Find vendor cost for this pack
-          const vendorCostEntry = allVendorPackCosts.find(vpc => 
-            vpc.packId === sub.packId && vpc.vendorId === sub.vendorProfileId
-          );
-          if (vendorCostEntry) {
-            packVendorCost += parseFloat(String(vendorCostEntry.cost || 0));
+          // Find vendor cost for this pack using vendorAssigneeId
+          if (sub.vendorAssigneeId) {
+            const vendorCostEntry = allVendorPackCosts.find(vpc => 
+              vpc.packId === sub.packId && vpc.vendorId === sub.vendorAssigneeId
+            );
+            if (vendorCostEntry) {
+              packVendorCost += parseFloat(String(vendorCostEntry.cost || 0));
+            }
           }
         }
       }
@@ -9582,38 +9585,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paymentPeriod = period as string || new Date().toISOString().slice(0, 7);
 
       const allSubscriptions = await storage.getAllClientPackSubscriptions();
-      const allPacks = await storage.getAllPacks();
+      const allPacks = await storage.getAllServicePacks();
       const allUsers = await storage.getAllUsers();
       const vendorProfiles = await storage.getAllVendorProfiles();
       const vendorPackCosts = await storage.getAllVendorPackCosts();
-      const clientCompanies = await storage.getAllClientCompanies();
 
       const packMap: Record<string, typeof allPacks[0]> = {};
-      allPacks.forEach(p => { packMap[p.id] = p; });
+      allPacks.forEach((p: typeof allPacks[0]) => { packMap[p.id] = p; });
       const userMap: Record<string, typeof allUsers[0]> = {};
-      allUsers.forEach(u => { userMap[u.id] = u; });
+      allUsers.forEach((u: typeof allUsers[0]) => { userMap[u.id] = u; });
       const vendorProfileMap: Record<string, typeof vendorProfiles[0]> = {};
-      vendorProfiles.forEach(v => { vendorProfileMap[v.id] = v; });
-      const clientCompanyMap: Record<string, typeof clientCompanies[0]> = {};
-      clientCompanies.forEach(c => { clientCompanyMap[c.id] = c; });
+      vendorProfiles.forEach((v: typeof vendorProfiles[0]) => { vendorProfileMap[v.id] = v; });
 
       // Build vendor pack cost lookup: packId -> vendorId -> cost
       const vendorPackCostMap: Record<string, Record<string, number>> = {};
       for (const vpc of vendorPackCosts) {
         if (!vendorPackCostMap[vpc.packId]) vendorPackCostMap[vpc.packId] = {};
-        vendorPackCostMap[vpc.packId][vpc.vendorProfileId] = parseFloat(vpc.vendorCost || "0");
+        vendorPackCostMap[vpc.packId][vpc.vendorId] = parseFloat(vpc.cost || "0");
       }
 
       // Filter subscriptions by period (using currentPeriodStart)
       let filteredSubs = allSubscriptions.filter(sub => {
-        if (sub.status !== "active" || !sub.vendorId) return false;
+        // Must be active and have a vendor assigned
+        if (!sub.isActive || !sub.vendorAssigneeId) return false;
         
         // Check if subscription period matches
         const periodStart = sub.currentPeriodStart ? new Date(sub.currentPeriodStart) : new Date(sub.startDate);
         const subPeriod = sub.vendorPaymentPeriod || periodStart.toISOString().slice(0, 7);
         if (subPeriod !== paymentPeriod) return false;
 
-        // Filter by status
+        // Filter by payment status if specified
         if (status && sub.vendorPaymentStatus !== status) return false;
 
         return true;
@@ -9621,17 +9622,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // If vendor, filter to only their assignments
       if (sessionUser.role === "vendor") {
-        const vendorProfile = vendorProfiles.find(v => v.userId === sessionUserId);
-        if (vendorProfile) {
-          filteredSubs = filteredSubs.filter(sub => sub.vendorId === vendorProfile.id);
-        } else {
-          filteredSubs = [];
-        }
+        filteredSubs = filteredSubs.filter(sub => sub.vendorAssigneeId === sessionUserId);
       }
 
-      // Additional vendor filter from query
+      // Additional vendor filter from query (using vendorAssigneeId which is a user ID)
       if (vendorId && vendorId !== "all") {
-        filteredSubs = filteredSubs.filter(sub => sub.vendorId === vendorId);
+        filteredSubs = filteredSubs.filter(sub => sub.vendorAssigneeId === vendorId);
       }
 
       // Group by vendor
@@ -9654,12 +9650,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const sub of filteredSubs) {
         const pack = sub.packId ? packMap[sub.packId] : null;
-        const vendorProfile = sub.vendorId ? vendorProfileMap[sub.vendorId] : null;
+        const vendorUser = sub.vendorAssigneeId ? userMap[sub.vendorAssigneeId] : null;
+        // Find vendor profile by userId
+        const vendorProfile = vendorUser?.vendorId ? vendorProfileMap[vendorUser.vendorId] : 
+                              vendorProfiles.find((v: typeof vendorProfiles[0]) => v.userId === sub.vendorAssigneeId) || null;
         const clientUser = sub.userId ? userMap[sub.userId] : null;
-        const clientCompany = sub.clientCompanyId ? clientCompanyMap[sub.clientCompanyId] : null;
 
-        const vendorIdKey = sub.vendorId || "unassigned";
-        const vendorName = vendorProfile?.companyName || "Unassigned";
+        const vendorIdKey = sub.vendorAssigneeId || "unassigned";
+        const vendorName = vendorProfile?.companyName || vendorUser?.username || "Unassigned";
 
         // Get vendor cost from vendorPackCosts table
         let vendorCost = parseFloat(sub.vendorCost || "0");
@@ -9678,7 +9676,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         }
 
-        const clientName = clientCompany?.companyName || clientUser?.fullName || clientUser?.username || "Unknown";
+        // Use client user name since clientCompanies table doesn't exist yet
+        const clientName = clientUser?.username || "Unknown";
 
         vendorSummaries[vendorIdKey].subscriptions.push({
           id: sub.id,
