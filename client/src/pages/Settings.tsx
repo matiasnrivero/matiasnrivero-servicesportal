@@ -1178,12 +1178,14 @@ function SubscriptionsTabContent() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={
-                        sub.stripeStatus === "active" ? "default" : 
-                        sub.stripeStatus === "past_due" ? "destructive" : 
-                        sub.stripeStatus === "canceled" ? "outline" :
-                        sub.isActive ? "default" : "secondary"
-                      }>
+                      <Badge 
+                        variant={
+                          sub.stripeStatus === "past_due" ? "destructive" : 
+                          sub.stripeStatus === "canceled" ? "outline" :
+                          !sub.stripeStatus ? "default" : "default"
+                        }
+                        className={sub.stripeStatus === "active" ? "bg-emerald-600 text-white" : ""}
+                      >
                         {sub.stripeStatus || (sub.isActive ? "Manual" : "Inactive")}
                       </Badge>
                     </TableCell>
