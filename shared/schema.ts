@@ -35,6 +35,8 @@ export const users = pgTable("users", {
   phone: text("phone"),
   role: text("role").notNull().default("client"),
   isActive: boolean("is_active").notNull().default(true),
+  // Internal vendor flag - cannot be deactivated, always shows at top of vendor lists
+  isInternal: boolean("is_internal").notNull().default(false),
   // Vendor relationship - links vendor_designer to their parent vendor
   vendorId: varchar("vendor_id"),
   // Client company relationship - links client users to their company

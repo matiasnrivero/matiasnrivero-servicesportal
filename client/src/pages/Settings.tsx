@@ -1048,7 +1048,14 @@ function SubscriptionsTabContent() {
 
   const { data: vendors = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
-    select: (data: User[]) => data.filter(u => u.role === "vendor"),
+    select: (data: User[]) => {
+      const vendorUsers = data.filter(u => u.role === "vendor");
+      return vendorUsers.sort((a, b) => {
+        if ((a as any).isInternal && !(b as any).isInternal) return -1;
+        if (!(a as any).isInternal && (b as any).isInternal) return 1;
+        return a.username.localeCompare(b.username);
+      });
+    },
   });
 
   const updateSubscriptionMutation = useMutation({

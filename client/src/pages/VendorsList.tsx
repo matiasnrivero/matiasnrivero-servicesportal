@@ -149,15 +149,23 @@ export default function VendorsList() {
     return vendorProfiles.find((p) => p.userId === userId);
   };
 
-  const filteredVendors = vendorUsers.filter((vendor) => {
-    const profile = getVendorProfile(vendor.id);
-    const companyName = profile?.companyName || "";
-    return (
-      vendor.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (vendor.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
-    );
-  });
+  const filteredVendors = vendorUsers
+    .filter((vendor) => {
+      const profile = getVendorProfile(vendor.id);
+      const companyName = profile?.companyName || "";
+      return (
+        vendor.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (vendor.email?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
+      );
+    })
+    .sort((a, b) => {
+      if ((a as any).isInternal && !(b as any).isInternal) return -1;
+      if (!(a as any).isInternal && (b as any).isInternal) return 1;
+      const profileA = getVendorProfile(a.id);
+      const profileB = getVendorProfile(b.id);
+      return (profileA?.companyName || a.username).localeCompare(profileB?.companyName || b.username);
+    });
 
   const isAdmin = currentUser?.role === "admin";
 
@@ -339,16 +347,18 @@ export default function VendorsList() {
                 ) : (
                   filteredVendors.map((vendor) => {
                     const profile = getVendorProfile(vendor.id);
+                    const isInternalVendor = (vendor as any).isInternal;
                     return (
                       <div
                         key={vendor.id}
-                        className="flex items-center justify-between p-4 border rounded-md"
+                        className={`flex items-center justify-between p-4 border rounded-md ${isInternalVendor ? 'bg-muted/50 border-primary/20' : ''}`}
                         data-testid={`row-vendor-${vendor.id}`}
                       >
                         <div className="flex items-center gap-6 flex-1">
                           <Switch
                             id={`toggle-vendor-${vendor.id}`}
                             checked={vendor.isActive}
+                            disabled={isInternalVendor}
                             onCheckedChange={(checked) =>
                               toggleVendorActiveMutation.mutate({
                                 userId: vendor.id,
@@ -358,9 +368,14 @@ export default function VendorsList() {
                             data-testid={`switch-vendor-active-${vendor.id}`}
                           />
                           <div className="min-w-[200px]">
-                            <p className="font-semibold text-dark-blue-night">
-                              {profile?.companyName || "No Company Name"}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-dark-blue-night">
+                                {profile?.companyName || "No Company Name"}
+                              </p>
+                              {isInternalVendor && (
+                                <Badge variant="secondary" className="text-xs">Internal</Badge>
+                              )}
+                            </div>
                             <p className="text-xs text-dark-gray">Company</p>
                           </div>
                           <div className="min-w-[150px]">
@@ -394,49 +409,51 @@ export default function VendorsList() {
                             </TooltipTrigger>
                             <TooltipContent>View</TooltipContent>
                           </Tooltip>
-                          <Tooltip>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    data-testid={`button-delete-vendor-${vendor.id}`}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                </TooltipTrigger>
-                              </AlertDialogTrigger>
-                              <TooltipContent>Delete</TooltipContent>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete{" "}
-                                    <strong>{profile?.companyName || vendor.username}</strong>?
-                                    This will deactivate the vendor account and all associated
-                                    team members. This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel data-testid="button-cancel-delete">
-                                    Cancel
-                                  </AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => {
-                                      if (profile) {
-                                        deleteVendorMutation.mutate(profile.id);
-                                      }
-                                    }}
-                                    className="bg-destructive text-destructive-foreground"
-                                    data-testid="button-confirm-delete"
-                                  >
-                                    {deleteVendorMutation.isPending ? "Deleting..." : "Delete Vendor"}
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </Tooltip>
+                          {!isInternalVendor && (
+                            <Tooltip>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      data-testid={`button-delete-vendor-${vendor.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                </AlertDialogTrigger>
+                                <TooltipContent>Delete</TooltipContent>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete{" "}
+                                      <strong>{profile?.companyName || vendor.username}</strong>?
+                                      This will deactivate the vendor account and all associated
+                                      team members. This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel data-testid="button-cancel-delete">
+                                      Cancel
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => {
+                                        if (profile) {
+                                          deleteVendorMutation.mutate(profile.id);
+                                        }
+                                      }}
+                                      className="bg-destructive text-destructive-foreground"
+                                      data-testid="button-confirm-delete"
+                                    >
+                                      {deleteVendorMutation.isPending ? "Deleting..." : "Delete Vendor"}
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </Tooltip>
+                          )}
                         </div>
                       </div>
                     );
