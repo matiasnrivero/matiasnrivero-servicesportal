@@ -967,116 +967,86 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                     className="p-4 border rounded-md"
                     data-testid={`subscription-${subscription.id}`}
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium">{pack?.name || "Unknown Pack"}</p>
-                          {subscription.stripeStatus === "past_due" ? (
-                            <Badge variant="destructive">
-                              <AlertTriangle className="h-3 w-3 mr-1" />
-                              Payment Failed
-                            </Badge>
-                          ) : subscription.stripeStatus === "cancel_at_period_end" ? (
-                            <Badge variant="outline" className="text-amber-600 border-amber-300">
-                              Canceling at Period End
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-emerald-600 text-white">
-                              <CheckCircle2 className="h-3 w-3 mr-1" />
-                              Active
-                            </Badge>
-                          )}
-                        </div>
-                        {pack?.description && (
-                          <p className="text-sm text-muted-foreground mt-1">{pack.description}</p>
+                    {/* Line 1: Pack Name / Status / Pending Change Badge */}
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium">{pack?.name || "Unknown Pack"}</p>
+                        {subscription.stripeStatus === "past_due" ? (
+                          <Badge variant="destructive">
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            Payment Failed
+                          </Badge>
+                        ) : subscription.stripeStatus === "cancel_at_period_end" ? (
+                          <Badge variant="outline" className="text-amber-600 border-amber-300">
+                            Canceling at Period End
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-emerald-600 text-white">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Active
+                          </Badge>
                         )}
-                        {/* Pack Usage Warning Banner */}
-                        {(() => {
-                          const used = subscription.totalUsed || 0;
-                          const usagePercent = totalQty > 0 ? (used / totalQty) * 100 : 0;
-                          if (usagePercent >= 90) {
-                            return (
-                              <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md flex items-center gap-2">
-                                <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                                <span className="text-sm text-amber-700 dark:text-amber-400">
-                                  {usagePercent >= 100 
-                                    ? "You've used all services in your pack this month. Additional requests will be charged at regular rates."
-                                    : "You're approaching your monthly pack limit. Consider your remaining usage."}
-                                </span>
-                              </div>
-                            );
-                          }
-                          return null;
-                        })()}
-                        <div className="mt-3 flex flex-wrap gap-x-8 gap-y-3 text-sm">
-                          <div className="min-w-[80px]">
-                            <p className="text-xs text-muted-foreground">Pack Price</p>
-                            <p className="font-medium">${packPrice.toFixed(2)}</p>
+                      </div>
+                      {subscription.pendingPackId && (
+                        <Badge variant="outline" className="text-blue-600 border-blue-300">
+                          {subscription.pendingChangeType === "upgrade" ? (
+                            <ArrowUp className="h-3 w-3 mr-1" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3 mr-1" />
+                          )}
+                          {subscription.pendingChangeType === "upgrade" ? "Upgrading" : "Downgrading"} to{" "}
+                          {subscription.pendingPack?.name || availablePacks.find(p => p.id === subscription.pendingPackId)?.name || "new pack"}
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    {pack?.description && (
+                      <p className="text-sm text-muted-foreground mt-1">{pack.description}</p>
+                    )}
+                    
+                    {/* Pack Usage Warning Banner */}
+                    {(() => {
+                      const used = subscription.totalUsed || 0;
+                      const usagePercent = totalQty > 0 ? (used / totalQty) * 100 : 0;
+                      if (usagePercent >= 90) {
+                        return (
+                          <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                            <span className="text-sm text-amber-700 dark:text-amber-400">
+                              {usagePercent >= 100 
+                                ? "You've used all services in your pack this month. Additional requests will be charged at regular rates."
+                                : "You're approaching your monthly pack limit. Consider your remaining usage."}
+                            </span>
                           </div>
-                          <div className="min-w-[80px]">
-                            <p className="text-xs text-muted-foreground">Total Price</p>
-                            <p className="font-medium text-muted-foreground line-through">${totalPrice.toFixed(2)}</p>
-                          </div>
-                          <div className="min-w-[70px]">
-                            <p className="text-xs text-muted-foreground">Save</p>
-                            <p className="font-medium text-green-600">${savings.toFixed(2)}</p>
-                          </div>
-                          <div className="min-w-[90px]">
-                            <p className="text-xs text-muted-foreground">Subscribed Since</p>
-                            <p className="font-medium">
-                              {subscription.startDate ? format(new Date(subscription.startDate), "MMM d, yyyy") : "-"}
-                            </p>
-                          </div>
-                          <div className="min-w-[90px]">
-                            <p className="text-xs text-muted-foreground">Jobs/Month</p>
-                            <p className="font-medium">{totalQty} per month</p>
-                          </div>
-                          <div className="min-w-[100px]">
-                            <p className="text-xs text-muted-foreground">Usage This Month</p>
-                            <div className="flex flex-col gap-1">
-                              <p className={`font-medium ${(subscription.totalUsed || 0) >= totalQty ? "text-destructive" : (subscription.totalUsed || 0) >= totalQty * 0.9 ? "text-amber-600" : ""}`}>
-                                {subscription.totalUsed || 0} / {totalQty} used
-                              </p>
-                              <Progress 
-                                value={totalQty > 0 ? Math.min(((subscription.totalUsed || 0) / totalQty) * 100, 100) : 0} 
-                                className="h-2 w-24"
-                              />
-                            </div>
-                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                    
+                    {/* Line 2: Pack Price / Total Price / Savings / Subscribed Since / Buttons */}
+                    <div className="mt-3 flex items-center justify-between gap-4 flex-wrap">
+                      <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+                        <div className="min-w-[80px]">
+                          <p className="text-xs text-muted-foreground">Pack Price</p>
+                          <p className="font-medium">${packPrice.toFixed(2)}</p>
+                        </div>
+                        <div className="min-w-[80px]">
+                          <p className="text-xs text-muted-foreground">Total Price</p>
+                          <p className="font-medium text-muted-foreground line-through">${totalPrice.toFixed(2)}</p>
+                        </div>
+                        <div className="min-w-[70px]">
+                          <p className="text-xs text-muted-foreground">Savings</p>
+                          <p className="font-medium text-green-600">${savings.toFixed(2)}</p>
+                        </div>
+                        <div className="min-w-[90px]">
+                          <p className="text-xs text-muted-foreground">Subscribed Since</p>
+                          <p className="font-medium">
+                            {subscription.startDate ? format(new Date(subscription.startDate), "MMM d, yyyy") : "-"}
+                          </p>
                         </div>
                       </div>
                       {(isAdmin || isPrimaryClient) && (
-                        <div className="flex flex-col gap-2 items-end">
-                          {/* Show pending change info */}
-                          {subscription.pendingPackId && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <Badge variant="outline" className="text-blue-600 border-blue-300">
-                                {subscription.pendingChangeType === "upgrade" ? (
-                                  <ArrowUp className="h-3 w-3 mr-1" />
-                                ) : (
-                                  <ArrowDown className="h-3 w-3 mr-1" />
-                                )}
-                                {subscription.pendingChangeType === "upgrade" ? "Upgrading" : "Downgrading"} to{" "}
-                                {subscription.pendingPack?.name || availablePacks.find(p => p.id === subscription.pendingPackId)?.name || "new pack"}
-                              </Badge>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() => cancelPendingChangeMutation.mutate(subscription.id)}
-                                disabled={cancelPendingChangeMutation.isPending}
-                                data-testid={`button-cancel-pending-change-${subscription.id}`}
-                              >
-                                {cancelPendingChangeMutation.isPending ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : (
-                                  <X className="h-3 w-3" />
-                                )}
-                              </Button>
-                            </div>
-                          )}
-                          
-                          {/* Action buttons */}
+                        <div className="flex gap-2 items-center flex-shrink-0">
                           {subscription.cancelAt || subscription.stripeStatus === "cancel_at_period_end" ? (
                             <Button
                               variant="outline"
@@ -1091,10 +1061,23 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                                 "Undo Cancellation"
                               )}
                             </Button>
+                          ) : subscription.pendingPackId ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => cancelPendingChangeMutation.mutate(subscription.id)}
+                              disabled={cancelPendingChangeMutation.isPending}
+                              data-testid={`button-cancel-pending-change-${subscription.id}`}
+                            >
+                              {cancelPendingChangeMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                `Cancel ${subscription.pendingChangeType === "upgrade" ? "Upgrading" : "Downgrading"}`
+                              )}
+                            </Button>
                           ) : (
-                            <div className="flex gap-2">
-                              {/* Change Pack button - only show if there are alternative packs */}
-                              {getAlternativePacksForSubscription(subscription).length > 0 && !subscription.pendingPackId && (
+                            <>
+                              {getAlternativePacksForSubscription(subscription).length > 0 && (
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -1116,10 +1099,30 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                               >
                                 Unsubscribe
                               </Button>
-                            </div>
+                            </>
                           )}
                         </div>
                       )}
+                    </div>
+                    
+                    {/* Line 3: Jobs/Month / Usage This Month */}
+                    <div className="mt-3 flex flex-wrap gap-x-8 gap-y-2 text-sm">
+                      <div className="min-w-[100px]">
+                        <p className="text-xs text-muted-foreground">Jobs/Month</p>
+                        <p className="font-medium">{totalQty} per month</p>
+                      </div>
+                      <div className="min-w-[140px]">
+                        <p className="text-xs text-muted-foreground">Usage This Month</p>
+                        <div className="flex items-center gap-2">
+                          <p className={`font-medium ${(subscription.totalUsed || 0) >= totalQty ? "text-destructive" : (subscription.totalUsed || 0) >= totalQty * 0.9 ? "text-amber-600" : ""}`}>
+                            {subscription.totalUsed || 0} / {totalQty} used
+                          </p>
+                          <Progress 
+                            value={totalQty > 0 ? Math.min(((subscription.totalUsed || 0) / totalQty) * 100, 100) : 0} 
+                            className="h-2 w-20"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
