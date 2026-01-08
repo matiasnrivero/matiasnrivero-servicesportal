@@ -3857,8 +3857,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const sessionUser = await storage.getUser(sessionUserId);
-      if (!sessionUser || sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Admin access required" });
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
       }
 
       const subscriptions = await storage.getAllClientPackSubscriptions();

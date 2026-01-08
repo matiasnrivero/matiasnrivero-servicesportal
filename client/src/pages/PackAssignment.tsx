@@ -33,7 +33,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Users, Package, Clock, X, UserPlus, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
-import type { User, ServicePack } from "@shared/schema";
+import type { User, ServicePack, VendorProfile } from "@shared/schema";
 
 interface EnrichedPackSubscription {
   id: string;
@@ -92,9 +92,8 @@ export default function PackAssignment() {
     queryKey: ["/api/admin/pack-subscriptions"],
   });
 
-  const { data: vendors = [] } = useQuery<User[]>({
-    queryKey: ["/api/users"],
-    select: (data: User[]) => data.filter((u: User) => u.role === "vendor"),
+  const { data: vendorProfiles = [] } = useQuery<VendorProfile[]>({
+    queryKey: ["/api/vendor-profiles"],
   });
 
   const bulkAssignMutation = useMutation({
@@ -172,7 +171,8 @@ export default function PackAssignment() {
       const query = searchQuery.toLowerCase();
       const clientName = sub.clientProfile?.companyName?.toLowerCase() || "";
       const packName = sub.pack?.name?.toLowerCase() || "";
-      const vendorName = sub.vendorAssignee?.username?.toLowerCase() || "";
+      const vendorProfile = vendorProfiles.find(vp => vp.userId === sub.vendorAssigneeId);
+      const vendorName = vendorProfile?.companyName?.toLowerCase() || sub.vendorAssignee?.username?.toLowerCase() || "";
       if (!clientName.includes(query) && !packName.includes(query) && !vendorName.includes(query)) {
         return false;
       }
@@ -248,8 +248,8 @@ export default function PackAssignment() {
                 <SelectContent>
                   <SelectItem value="all">All Vendors</SelectItem>
                   <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {vendors.map((v) => (
-                    <SelectItem key={v.id} value={v.id}>{v.username}</SelectItem>
+                  {vendorProfiles.map((vp) => (
+                    <SelectItem key={vp.id} value={vp.userId}>{vp.companyName}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -340,7 +340,7 @@ export default function PackAssignment() {
                           {sub.vendorAssignee ? (
                             <div className="flex items-center gap-2">
                               <Users className="h-4 w-4 text-muted-foreground" />
-                              <span>{sub.vendorAssignee.username}</span>
+                              <span>{vendorProfiles.find(vp => vp.userId === sub.vendorAssigneeId)?.companyName || sub.vendorAssignee.username}</span>
                             </div>
                           ) : (
                             <Badge variant="outline">Unassigned</Badge>
@@ -353,11 +353,11 @@ export default function PackAssignment() {
                               <div>
                                 <div className="flex items-center gap-1">
                                   <span className="text-muted-foreground">
-                                    {sub.vendorAssignee?.username || "None"}
+                                    {vendorProfiles.find(vp => vp.userId === sub.vendorAssigneeId)?.companyName || sub.vendorAssignee?.username || "None"}
                                   </span>
                                   <ArrowRight className="h-3 w-3" />
                                   <span className="font-medium text-yellow-700 dark:text-yellow-400">
-                                    {sub.pendingVendorAssignee.username}
+                                    {vendorProfiles.find(vp => vp.userId === sub.pendingVendorAssigneeId)?.companyName || sub.pendingVendorAssignee.username}
                                   </span>
                                 </div>
                                 {sub.pendingVendorEffectiveAt && (
@@ -436,8 +436,8 @@ export default function PackAssignment() {
                     <SelectValue placeholder="Choose a vendor" />
                   </SelectTrigger>
                   <SelectContent>
-                    {vendors.map((v) => (
-                      <SelectItem key={v.id} value={v.id}>{v.username}</SelectItem>
+                    {vendorProfiles.map((vp) => (
+                      <SelectItem key={vp.id} value={vp.userId}>{vp.companyName}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
