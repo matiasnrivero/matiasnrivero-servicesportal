@@ -703,114 +703,243 @@ export default function AdminDashboard() {
         {showFinancials && (
         <section className="space-y-4">
           <h2 className="text-lg font-medium">Financial Performance</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <Card data-testid="card-total-sales">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Sales</CardTitle>
-                <DollarSign className="h-4 w-4 text-green-600" />
-              </CardHeader>
-              <CardContent>
-                {summaryLoading ? (
-                  <Skeleton className="h-8 w-24" />
-                ) : (
-                  <div className="space-y-1">
-                    <div className="text-2xl font-bold" data-testid="text-total-sales">
-                      {formatCurrency(summary?.financial.totalSales || 0)}
+          
+          {/* Services Revenue */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium text-muted-foreground">Services & Bundles</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <Card data-testid="card-total-sales">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Sales</CardTitle>
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                </CardHeader>
+                <CardContent>
+                  {summaryLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="text-2xl font-bold" data-testid="text-total-sales">
+                        {formatCurrency(summary?.financial.totalSales || 0)}
+                      </div>
+                      <ChangeIndicator change={salesChange} />
                     </div>
-                    <ChangeIndicator change={salesChange} />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  )}
+                </CardContent>
+              </Card>
 
-            <Card data-testid="card-total-orders">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Orders</CardTitle>
-                <Package className="h-4 w-4 text-blue-500" />
-              </CardHeader>
-              <CardContent>
-                {summaryLoading ? (
-                  <Skeleton className="h-8 w-16" />
-                ) : (
-                  <div className="space-y-1">
-                    <div className="text-2xl font-bold" data-testid="text-total-orders">
-                      {summary?.totalOrders || 0}
+              <Card data-testid="card-total-orders">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Orders</CardTitle>
+                  <Package className="h-4 w-4 text-blue-500" />
+                </CardHeader>
+                <CardContent>
+                  {summaryLoading ? (
+                    <Skeleton className="h-8 w-16" />
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="text-2xl font-bold" data-testid="text-total-orders">
+                        {summary?.totalOrders || 0}
+                      </div>
+                      <ChangeIndicator change={ordersChange} />
                     </div>
-                    <ChangeIndicator change={ordersChange} />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  )}
+                </CardContent>
+              </Card>
 
-            <Card data-testid="card-aov">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Avg Order Value</CardTitle>
-                <TrendingUp className="h-4 w-4 text-indigo-500" />
-              </CardHeader>
-              <CardContent>
-                {summaryLoading ? (
-                  <Skeleton className="h-8 w-24" />
-                ) : (
-                  <div className="space-y-1">
-                    <div className="text-2xl font-bold" data-testid="text-aov">
-                      {formatCurrency(summary?.financial.aov || 0)}
+              <Card data-testid="card-aov">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Avg Order</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-indigo-500" />
+                </CardHeader>
+                <CardContent>
+                  {summaryLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="text-2xl font-bold" data-testid="text-aov">
+                        {formatCurrency(summary?.financial.aov || 0)}
+                      </div>
+                      <ChangeIndicator change={aovChange} />
                     </div>
-                    <ChangeIndicator change={aovChange} />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  )}
+                </CardContent>
+              </Card>
 
-            <Card data-testid="card-vendor-cost">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Vendor Cost</CardTitle>
-                <DollarSign className="h-4 w-4 text-red-500" />
-              </CardHeader>
-              <CardContent>
-                {summaryLoading ? (
-                  <Skeleton className="h-8 w-24" />
-                ) : (
-                  <div className="text-2xl font-bold" data-testid="text-vendor-cost">
-                    {formatCurrency(summary?.financial.vendorCost || 0)}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-profit">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Profit</CardTitle>
-                <TrendingUp className="h-4 w-4 text-green-600" />
-              </CardHeader>
-              <CardContent>
-                {summaryLoading ? (
-                  <Skeleton className="h-8 w-24" />
-                ) : (
-                  <div className="space-y-1">
-                    <div className="text-2xl font-bold" data-testid="text-profit">
-                      {formatCurrency(summary?.financial.profit || 0)}
+              <Card data-testid="card-vendor-cost">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Vendor Cost</CardTitle>
+                  <DollarSign className="h-4 w-4 text-red-500" />
+                </CardHeader>
+                <CardContent>
+                  {summaryLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="text-vendor-cost">
+                      {formatCurrency(summary?.financial.vendorCost || 0)}
                     </div>
-                    <ChangeIndicator change={profitChange} />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  )}
+                </CardContent>
+              </Card>
 
-            <Card data-testid="card-margin">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Margin</CardTitle>
-                <TrendingUp className="h-4 w-4 text-purple-600" />
-              </CardHeader>
-              <CardContent>
-                {summaryLoading ? (
-                  <Skeleton className="h-8 w-16" />
-                ) : (
-                  <div className="text-2xl font-bold" data-testid="text-margin">
-                    {summary?.financial.totalSales ? formatPercent(summary.financial.marginPercent) : "—"}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+              <Card data-testid="card-profit">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Profit</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-green-600" />
+                </CardHeader>
+                <CardContent>
+                  {summaryLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="text-2xl font-bold" data-testid="text-profit">
+                        {formatCurrency(summary?.financial.profit || 0)}
+                      </div>
+                      <ChangeIndicator change={profitChange} />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-margin">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Margin</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-purple-600" />
+                </CardHeader>
+                <CardContent>
+                  {summaryLoading ? (
+                    <Skeleton className="h-8 w-16" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="text-margin">
+                      {summary?.financial.totalSales ? formatPercent(summary.financial.marginPercent) : "—"}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Pack Revenue */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium text-muted-foreground">Monthly Packs</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card data-testid="card-pack-revenue">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Pack Revenue</CardTitle>
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                </CardHeader>
+                <CardContent>
+                  {summaryLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="text-pack-revenue">
+                      {formatCurrency(summary?.financial.packRevenue || 0)}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-pack-vendor-cost">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Vendor Cost</CardTitle>
+                  <DollarSign className="h-4 w-4 text-red-500" />
+                </CardHeader>
+                <CardContent>
+                  {summaryLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="text-pack-vendor-cost">
+                      {formatCurrency(summary?.financial.packVendorCost || 0)}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-pack-profit">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Pack Profit</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-green-600" />
+                </CardHeader>
+                <CardContent>
+                  {summaryLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="text-pack-profit">
+                      {formatCurrency(summary?.financial.packProfit || 0)}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-pack-margin">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Pack Margin</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-purple-600" />
+                </CardHeader>
+                <CardContent>
+                  {summaryLoading ? (
+                    <Skeleton className="h-8 w-16" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="text-pack-margin">
+                      {summary?.financial.packRevenue ? formatPercent(summary.financial.packMarginPercent) : "—"}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Combined Totals */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium text-muted-foreground">Combined Totals</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <Card data-testid="card-total-revenue">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Revenue</CardTitle>
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                </CardHeader>
+                <CardContent>
+                  {summaryLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="text-total-revenue">
+                      {formatCurrency(summary?.financial.totalRevenue || 0)}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-total-profit">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Profit</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-green-600" />
+                </CardHeader>
+                <CardContent>
+                  {summaryLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="text-total-profit">
+                      {formatCurrency(summary?.financial.totalProfit || 0)}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-total-margin">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Margin</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-purple-600" />
+                </CardHeader>
+                <CardContent>
+                  {summaryLoading ? (
+                    <Skeleton className="h-8 w-16" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="text-total-margin">
+                      {summary?.financial.totalRevenue ? formatPercent(summary.financial.totalMarginPercent) : "—"}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </section>
         )}

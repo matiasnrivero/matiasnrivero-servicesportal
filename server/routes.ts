@@ -6760,8 +6760,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For now, estimate vendor cost as 60% of sales (configurable later)
       vendorCost = totalSales * 0.6;
 
-      const profit = totalSales - vendorCost;
-      const marginPercent = totalSales > 0 ? (profit / totalSales) * 100 : 0;
+      const serviceProfit = totalSales - vendorCost;
+      const marginPercent = totalSales > 0 ? (serviceProfit / totalSales) * 100 : 0;
+
+      // Calculate pack profit metrics
+      const allPackSubscriptions = await storage.getAllClientPackSubscriptions();
+      const allPacks = await storage.getAllPacks();
+      const allVendorPackCosts = await storage.getAllVendorPackCosts();
+      
+      const packMap: Record<string, typeof allPacks[0]> = {};
+      allPacks.forEach(p => { packMap[p.id] = p; });
+      
+      // Calculate pack revenue and costs for subscriptions active in the date range
+      let packRevenue = 0;
+      let packVendorCost = 0;
+      
+      for (const sub of allPackSubscriptions) {
+        if (sub.status !== 'active' && sub.status !== 'past_due') continue;
+        
+        // Check if subscription was active during the date range
+        const subStart = sub.currentPeriodStart ? new Date(sub.currentPeriodStart) : new Date(sub.createdAt);
+        const subEnd = sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null;
+        
+        // Skip if subscription started after the end date
+        if (subStart > endDate) continue;
+        // Skip if subscription ended before the start date
+        if (subEnd && subEnd < startDate) continue;
+        
+        const pack = packMap[sub.packId];
+        if (pack) {
+          packRevenue += parseFloat(String(pack.price || 0));
+          
+          // Find vendor cost for this pack
+          const vendorCostEntry = allVendorPackCosts.find(vpc => 
+            vpc.packId === sub.packId && vpc.vendorId === sub.vendorProfileId
+          );
+          if (vendorCostEntry) {
+            packVendorCost += parseFloat(String(vendorCostEntry.cost || 0));
+          }
+        }
+      }
+      
+      const packProfit = packRevenue - packVendorCost;
+      const packMarginPercent = packRevenue > 0 ? (packProfit / packRevenue) * 100 : 0;
+      
+      // Total profit combines services and packs
+      const totalProfit = serviceProfit + packProfit;
+      const totalRevenue = totalSales + packRevenue;
+      const totalMarginPercent = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
 
       // Calculate additional metrics
       const openJobs = jobCounts.pendingAssignment + jobCounts.assignedToVendor + 
@@ -6777,9 +6823,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         financial: {
           totalSales,
           vendorCost,
-          profit,
+          profit: serviceProfit,
           marginPercent,
           aov,
+          // Pack metrics
+          packRevenue,
+          packVendorCost,
+          packProfit,
+          packMarginPercent,
+          // Combined totals
+          totalRevenue,
+          totalProfit,
+          totalMarginPercent,
         },
         totalOrders,
       });
