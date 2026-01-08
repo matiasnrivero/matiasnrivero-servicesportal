@@ -290,6 +290,17 @@ export function Header() {
             </Link>
           )}
           {(isAdmin || isInternalDesigner) && (
+            <Link href="/pack-assignment">
+              <Button
+                variant={location === "/pack-assignment" ? "default" : "ghost"}
+                className={location === "/pack-assignment" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
+                data-testid="nav-pack-assignment"
+              >
+                Packs
+              </Button>
+            </Link>
+          )}
+          {(isAdmin || isInternalDesigner) && (
             <Link href="/settings">
               <Button
                 variant={location.startsWith("/settings") ? "default" : "ghost"}

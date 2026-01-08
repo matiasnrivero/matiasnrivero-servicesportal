@@ -27,6 +27,7 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import Payments from "@/pages/Payments";
 import ClientCompaniesList from "@/pages/ClientCompaniesList";
 import ClientCompanyDetail from "@/pages/ClientCompanyDetail";
+import PackAssignment from "@/pages/PackAssignment";
 
 function Router() {
   return (
@@ -60,6 +61,7 @@ function Router() {
       <Route path="/client-companies" component={ClientCompaniesList} />
       <Route path="/client-companies/:id" component={ClientCompanyDetail} />
       <Route path="/client-companies/:id/edit" component={ClientCompanyDetail} />
+      <Route path="/pack-assignment" component={PackAssignment} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>
