@@ -56,7 +56,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap, Percent, Users } from "lucide-react";
+import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap, Percent, Users, UserCheck } from "lucide-react";
 import { format } from "date-fns";
 import { AutomationSettingsTab } from "@/components/AutomationSettings";
 import { DiscountCouponsTab } from "@/components/DiscountCouponsTab";
@@ -1202,9 +1202,9 @@ function SubscriptionsTabContent() {
                           setSelectedSubscription(sub);
                           setAssignDialogOpen(true);
                         }}
-                        data-testid={`button-edit-subscription-${sub.id}`}
+                        data-testid={`button-assign-subscription-${sub.id}`}
                       >
-                        <Pencil className="h-4 w-4" />
+                        <UserCheck className="h-4 w-4" />
                       </Button>
                     </TableCell>
                   </TableRow>
