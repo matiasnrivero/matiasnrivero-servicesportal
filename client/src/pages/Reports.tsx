@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Header } from "@/components/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, DollarSign, Receipt, FileText, TrendingUp, Users } from "lucide-react";
+import { BarChart3, DollarSign, Receipt, FileText, TrendingUp, Users, Package } from "lucide-react";
 
 interface CurrentUser {
   userId: string;
@@ -26,6 +26,22 @@ const reportCards: ReportCard[] = [
     description: "View retail prices, vendor costs, and profit margins for all service requests",
     icon: DollarSign,
     path: "/reports/services-profit",
+    roles: ["admin"],
+  },
+  {
+    id: "pack-profit",
+    title: "Pack Profit",
+    description: "Analyze pack subscription revenue, vendor costs, and profit margins",
+    icon: Package,
+    path: "/reports/pack-profit",
+    roles: ["admin"],
+  },
+  {
+    id: "royalties-deduction",
+    title: "Deduct from Royalties",
+    description: "Track and manage royalty deductions for services and packs",
+    icon: TrendingUp,
+    path: "/reports/royalties-deduction",
     roles: ["admin"],
   },
   {

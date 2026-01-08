@@ -22,6 +22,8 @@ import Reports from "@/pages/Reports";
 import ServicesProfitReport from "@/pages/ServicesProfitReport";
 import VendorPaymentsReport from "@/pages/VendorPaymentsReport";
 import VendorDesignerWorkloadReport from "@/pages/VendorDesignerWorkloadReport";
+import PackProfitReport from "@/pages/PackProfitReport";
+import RoyaltiesDeductionReport from "@/pages/RoyaltiesDeductionReport";
 import ClientTeamManagement from "@/pages/ClientTeamManagement";
 import AdminDashboard from "@/pages/AdminDashboard";
 import Payments from "@/pages/Payments";
@@ -56,6 +58,8 @@ function Router() {
       <Route path="/reports/services-profit" component={ServicesProfitReport} />
       <Route path="/reports/vendor-payments" component={VendorPaymentsReport} />
       <Route path="/reports/vendor-designer-workload" component={VendorDesignerWorkloadReport} />
+      <Route path="/reports/pack-profit" component={PackProfitReport} />
+      <Route path="/reports/royalties-deduction" component={RoyaltiesDeductionReport} />
       <Route path="/client-team" component={ClientTeamManagement} />
       <Route path="/payments" component={Payments} />
       <Route path="/client-companies" component={ClientCompaniesList} />

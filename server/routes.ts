@@ -9135,6 +9135,358 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== END MONTHLY PACKS ROUTES ====================
 
+  // ==================== PACK PROFIT REPORT ====================
+
+  // Get pack profit report data - Admin only
+  app.get("/api/reports/pack-profit", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { startDate, endDate, vendorId, packId, status } = req.query;
+
+      // Get all pack subscriptions
+      const allSubscriptions = await storage.getAllClientPackSubscriptions();
+      const allPacks = await storage.getAllServicePacks();
+      const allVendorPackCosts = await storage.getAllVendorPackCosts();
+      const allVendorProfiles = await storage.getAllVendorProfiles();
+      const allClientProfiles = await storage.getAllClientProfiles();
+      const allUsers = await storage.getAllUsers();
+
+      // Build lookup maps
+      const packMap: Record<string, typeof allPacks[0]> = {};
+      allPacks.forEach(p => { packMap[p.id] = p; });
+      
+      const vendorProfileMap: Record<string, typeof allVendorProfiles[0]> = {};
+      allVendorProfiles.forEach(vp => { vendorProfileMap[vp.userId] = vp; });
+      
+      const clientProfileMap: Record<string, typeof allClientProfiles[0]> = {};
+      allClientProfiles.forEach(cp => { clientProfileMap[cp.id] = cp; });
+
+      const userMap: Record<string, typeof allUsers[0]> = {};
+      allUsers.forEach(u => { userMap[u.id] = u; });
+
+      // Build vendor pack cost lookup: vendorId-packId -> cost
+      const vendorPackCostMap: Record<string, number> = {};
+      allVendorPackCosts.forEach(vpc => {
+        vendorPackCostMap[`${vpc.vendorId}-${vpc.packId}`] = parseFloat(vpc.cost);
+      });
+
+      // Filter subscriptions
+      let filteredSubscriptions = allSubscriptions.filter(sub => {
+        // Date filtering
+        if (startDate) {
+          const start = new Date(startDate as string);
+          if (sub.startDate < start) return false;
+        }
+        if (endDate) {
+          const end = new Date(endDate as string);
+          if (sub.startDate > end) return false;
+        }
+        
+        // Vendor filter
+        if (vendorId && vendorId !== "all" && sub.vendorAssigneeId !== vendorId) return false;
+        
+        // Pack filter
+        if (packId && packId !== "all" && sub.packId !== packId) return false;
+        
+        // Status filter
+        if (status === "active" && !sub.isActive) return false;
+        if (status === "inactive" && sub.isActive) return false;
+        
+        return true;
+      });
+
+      // Calculate report rows
+      const reportRows = filteredSubscriptions.map(sub => {
+        const pack = packMap[sub.packId];
+        const vendorProfile = sub.vendorAssigneeId ? vendorProfileMap[sub.vendorAssigneeId] : null;
+        const clientProfile = sub.clientProfileId ? clientProfileMap[sub.clientProfileId] : null;
+        const clientUser = sub.userId ? userMap[sub.userId] : null;
+
+        const retailPrice = sub.priceAtSubscription ? parseFloat(sub.priceAtSubscription) : 
+                           (pack?.price ? parseFloat(pack.price) : 0);
+        
+        // Get vendor cost for this pack-vendor combination
+        const vendorCost = sub.vendorAssigneeId 
+          ? (vendorPackCostMap[`${sub.vendorAssigneeId}-${sub.packId}`] || 0)
+          : 0;
+        
+        const profit = retailPrice - vendorCost;
+        const marginPercent = retailPrice > 0 ? (profit / retailPrice) * 100 : 0;
+
+        return {
+          id: sub.id,
+          clientName: clientProfile?.companyName || clientUser?.username || "Unknown",
+          clientEmail: clientUser?.email || "",
+          packName: pack?.name || "Unknown Pack",
+          vendorName: vendorProfile?.companyName || "Unassigned",
+          vendorId: sub.vendorAssigneeId,
+          retailPrice,
+          vendorCost,
+          profit,
+          marginPercent,
+          status: sub.stripeStatus || (sub.isActive ? "active" : "inactive"),
+          startDate: sub.startDate,
+          currentPeriodStart: sub.currentPeriodStart,
+          currentPeriodEnd: sub.currentPeriodEnd,
+        };
+      });
+
+      // Calculate summary
+      const totalRetailPrice = reportRows.reduce((sum, row) => sum + row.retailPrice, 0);
+      const totalVendorCost = reportRows.reduce((sum, row) => sum + row.vendorCost, 0);
+      const totalProfit = reportRows.reduce((sum, row) => sum + row.profit, 0);
+      const averageMargin = totalRetailPrice > 0 ? (totalProfit / totalRetailPrice) * 100 : 0;
+
+      res.json({
+        rows: reportRows,
+        summary: {
+          totalSubscriptions: reportRows.length,
+          totalRetailPrice,
+          totalVendorCost,
+          totalProfit,
+          averageMargin,
+        },
+        filters: {
+          packs: allPacks.filter(p => p.isActive).map(p => ({ id: p.id, name: p.name })),
+          vendors: allVendorProfiles.map(vp => ({ id: vp.userId, name: vp.companyName })),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching pack profit report:", error);
+      res.status(500).json({ error: "Failed to fetch pack profit report" });
+    }
+  });
+
+  // ==================== DEDUCT FROM ROYALTIES REPORT ====================
+
+  // Get royalties deduction report data - Admin only
+  app.get("/api/reports/royalties-deduction", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { tab, period, clientId, status } = req.query;
+      const reportTab = (tab as string) || "services";
+      const paymentPeriod = (period as string) || new Date().toISOString().slice(0, 7);
+
+      const allUsers = await storage.getAllUsers();
+      const allClientProfiles = await storage.getAllClientProfiles();
+      const allServices = await storage.getAllServices();
+      
+      const userMap: Record<string, typeof allUsers[0]> = {};
+      allUsers.forEach(u => { userMap[u.id] = u; });
+      
+      const clientProfileMap: Record<string, typeof allClientProfiles[0]> = {};
+      allClientProfiles.forEach(cp => { clientProfileMap[cp.id] = cp; });
+
+      const serviceMap: Record<string, typeof allServices[0]> = {};
+      allServices.forEach(s => { serviceMap[s.id] = s; });
+
+      // Get users that use "deduct_from_royalties" payment method
+      const royaltiesUsers = allUsers.filter(u => u.paymentMethod === "deduct_from_royalties");
+      const royaltiesUserIds = new Set(royaltiesUsers.map(u => u.id));
+      
+      // Build royalties client profiles for filter dropdown
+      const royaltiesClientIds = new Set<string>();
+      royaltiesUsers.forEach(u => {
+        if (u.clientProfileId) royaltiesClientIds.add(u.clientProfileId);
+      });
+      const royaltiesClients = allClientProfiles.filter(cp => royaltiesClientIds.has(cp.id));
+
+      if (reportTab === "services") {
+        // Services tab - get service requests from royalties clients
+        const allServiceRequests = await storage.getAllServiceRequests();
+        
+        let filteredRequests = allServiceRequests.filter(sr => {
+          // Must be from a royalties client
+          if (!sr.userId || !royaltiesUserIds.has(sr.userId)) return false;
+          
+          // Must be delivered
+          if (sr.status !== "delivered" || !sr.deliveredAt) return false;
+          
+          // Filter by period (using deliveredAt)
+          const deliveredMonth = new Date(sr.deliveredAt).toISOString().slice(0, 7);
+          if (deliveredMonth !== paymentPeriod) return false;
+          
+          // Client filter
+          if (clientId && clientId !== "all") {
+            const user = userMap[sr.userId];
+            if (user?.clientProfileId !== clientId) return false;
+          }
+          
+          // For services, we use vendorPaymentStatus as proxy for royalties tracking
+          if (status && status !== "all" && sr.vendorPaymentStatus !== status) return false;
+          
+          return true;
+        });
+
+        const rows = filteredRequests.map(sr => {
+          const user = sr.userId ? userMap[sr.userId] : null;
+          const clientProfile = user?.clientProfileId ? clientProfileMap[user.clientProfileId] : null;
+          const service = sr.serviceId ? serviceMap[sr.serviceId] : null;
+          
+          return {
+            id: sr.id,
+            jobId: `SR-${sr.id.slice(0, 5).toUpperCase()}`,
+            clientName: clientProfile?.companyName || user?.username || "Unknown",
+            serviceName: service?.title || "Unknown Service",
+            amount: sr.finalPrice ? parseFloat(sr.finalPrice) : 0,
+            deliveredAt: sr.deliveredAt,
+            paymentStatus: sr.vendorPaymentStatus || "pending",
+          };
+        });
+
+        const totalAmount = rows.reduce((sum, row) => sum + row.amount, 0);
+        const pendingCount = rows.filter(r => r.paymentStatus === "pending").length;
+        const paidCount = rows.filter(r => r.paymentStatus === "paid").length;
+
+        res.json({
+          tab: "services",
+          period: paymentPeriod,
+          rows,
+          summary: {
+            totalItems: rows.length,
+            totalAmount,
+            pendingCount,
+            paidCount,
+          },
+          filters: {
+            clients: royaltiesClients.map(cp => ({ id: cp.id, name: cp.companyName })),
+          },
+        });
+      } else {
+        // Packs tab - get pack subscriptions from royalties clients
+        const allSubscriptions = await storage.getAllClientPackSubscriptions();
+        const allPacks = await storage.getAllServicePacks();
+        
+        const packMap: Record<string, typeof allPacks[0]> = {};
+        allPacks.forEach(p => { packMap[p.id] = p; });
+
+        let filteredSubscriptions = allSubscriptions.filter(sub => {
+          // Must be from a royalties client
+          if (!sub.clientProfileId || !royaltiesClientIds.has(sub.clientProfileId)) return false;
+          
+          // Must be active
+          if (!sub.isActive) return false;
+          
+          // Filter by period (using currentPeriodStart or startDate)
+          const subPeriod = (sub.currentPeriodStart || sub.startDate).toISOString().slice(0, 7);
+          if (subPeriod !== paymentPeriod) return false;
+          
+          // Client filter
+          if (clientId && clientId !== "all" && sub.clientProfileId !== clientId) return false;
+          
+          // Status filter
+          if (status && status !== "all" && sub.royaltiesPaymentStatus !== status) return false;
+          
+          return true;
+        });
+
+        const rows = filteredSubscriptions.map(sub => {
+          const clientProfile = sub.clientProfileId ? clientProfileMap[sub.clientProfileId] : null;
+          const clientUser = sub.userId ? userMap[sub.userId] : null;
+          const pack = packMap[sub.packId];
+          
+          return {
+            id: sub.id,
+            subscriptionId: sub.id.slice(0, 8).toUpperCase(),
+            clientName: clientProfile?.companyName || clientUser?.username || "Unknown",
+            packName: pack?.name || "Unknown Pack",
+            amount: sub.priceAtSubscription ? parseFloat(sub.priceAtSubscription) : 
+                   (pack?.price ? parseFloat(pack.price) : 0),
+            periodStart: sub.currentPeriodStart || sub.startDate,
+            periodEnd: sub.currentPeriodEnd,
+            paymentStatus: sub.royaltiesPaymentStatus || "pending",
+          };
+        });
+
+        const totalAmount = rows.reduce((sum, row) => sum + row.amount, 0);
+        const pendingCount = rows.filter(r => r.paymentStatus === "pending").length;
+        const paidCount = rows.filter(r => r.paymentStatus === "paid").length;
+
+        res.json({
+          tab: "packs",
+          period: paymentPeriod,
+          rows,
+          summary: {
+            totalItems: rows.length,
+            totalAmount,
+            pendingCount,
+            paidCount,
+          },
+          filters: {
+            clients: royaltiesClients.map(cp => ({ id: cp.id, name: cp.companyName })),
+          },
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching royalties deduction report:", error);
+      res.status(500).json({ error: "Failed to fetch royalties deduction report" });
+    }
+  });
+
+  // Mark royalties items as paid
+  app.post("/api/reports/royalties-deduction/mark-paid", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { tab, ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: "No items provided" });
+      }
+
+      const now = new Date();
+
+      if (tab === "services") {
+        // Mark service requests as paid (using vendor payment tracking)
+        for (const id of ids) {
+          await storage.updateServiceRequest(id, {
+            vendorPaymentStatus: "paid",
+            vendorPaymentMarkedAt: now,
+            vendorPaymentMarkedBy: sessionUserId,
+          });
+        }
+      } else {
+        // Mark pack subscriptions as paid
+        for (const id of ids) {
+          await storage.updateClientPackSubscription(id, {
+            royaltiesPaymentStatus: "paid",
+            royaltiesMarkedPaidAt: now,
+            royaltiesMarkedPaidBy: sessionUserId,
+          });
+        }
+      }
+
+      res.json({ success: true, markedCount: ids.length });
+    } catch (error) {
+      console.error("Error marking royalties as paid:", error);
+      res.status(500).json({ error: "Failed to mark as paid" });
+    }
+  });
+
+  // ==================== END REPORTS ====================
+
   const httpServer = createServer(app);
 
   return httpServer;
