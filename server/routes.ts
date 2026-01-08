@@ -3170,6 +3170,292 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ======= CLIENT COMPANIES (Organizational Entities) =======
+  // New Phase 7 endpoints for organizational company management
+  // These use the clientCompanies table for company-wide pack subscriptions and vendor assignments
+  
+  // List all organizational companies (admin only)
+  app.get("/api/org-companies", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const companies = await storage.getClientCompanies();
+      
+      // Enrich with member count and primary contact info
+      const enrichedCompanies = await Promise.all(
+        companies.map(async (company) => {
+          const members = await storage.getClientCompanyMembers(company.id);
+          const primaryContact = company.primaryContactId 
+            ? await storage.getUser(company.primaryContactId) 
+            : null;
+          const defaultVendor = company.defaultVendorId 
+            ? await storage.getUser(company.defaultVendorId) 
+            : null;
+          
+          return {
+            ...company,
+            memberCount: members.length,
+            primaryContact: primaryContact ? {
+              id: primaryContact.id,
+              username: primaryContact.username,
+              email: primaryContact.email,
+            } : null,
+            defaultVendor: defaultVendor ? {
+              id: defaultVendor.id,
+              username: defaultVendor.username,
+            } : null,
+          };
+        })
+      );
+
+      res.json(enrichedCompanies);
+    } catch (error) {
+      console.error("Error fetching organizational companies:", error);
+      res.status(500).json({ error: "Failed to fetch companies" });
+    }
+  });
+
+  // Get single organizational company
+  app.get("/api/org-companies/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const company = await storage.getClientCompany(req.params.id);
+      if (!company) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+
+      const members = await storage.getClientCompanyMembers(company.id);
+      const primaryContact = company.primaryContactId 
+        ? await storage.getUser(company.primaryContactId) 
+        : null;
+      const defaultVendor = company.defaultVendorId 
+        ? await storage.getUser(company.defaultVendorId) 
+        : null;
+
+      res.json({
+        ...company,
+        memberCount: members.length,
+        members,
+        primaryContact: primaryContact ? {
+          id: primaryContact.id,
+          username: primaryContact.username,
+          email: primaryContact.email,
+        } : null,
+        defaultVendor: defaultVendor ? {
+          id: defaultVendor.id,
+          username: defaultVendor.username,
+        } : null,
+      });
+    } catch (error) {
+      console.error("Error fetching organizational company:", error);
+      res.status(500).json({ error: "Failed to fetch company" });
+    }
+  });
+
+  // Create organizational company
+  app.post("/api/org-companies", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { name, industry, website, email, phone, address, primaryContactId, defaultVendorId, paymentConfiguration, notes } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ error: "Company name is required" });
+      }
+
+      const company = await storage.createClientCompany({
+        name,
+        industry,
+        website,
+        email,
+        phone,
+        address,
+        primaryContactId,
+        defaultVendorId,
+        paymentConfiguration: paymentConfiguration || "pay_as_you_go",
+        notes,
+      });
+
+      res.status(201).json(company);
+    } catch (error) {
+      console.error("Error creating organizational company:", error);
+      res.status(500).json({ error: "Failed to create company" });
+    }
+  });
+
+  // Update organizational company
+  app.patch("/api/org-companies/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const company = await storage.getClientCompany(req.params.id);
+      if (!company) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+
+      const updated = await storage.updateClientCompany(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating organizational company:", error);
+      res.status(500).json({ error: "Failed to update company" });
+    }
+  });
+
+  // Delete (soft) organizational company
+  app.delete("/api/org-companies/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const company = await storage.getClientCompany(req.params.id);
+      if (!company) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+
+      await storage.deleteClientCompany(req.params.id);
+      res.json({ success: true, message: "Company deleted" });
+    } catch (error) {
+      console.error("Error deleting organizational company:", error);
+      res.status(500).json({ error: "Failed to delete company" });
+    }
+  });
+
+  // Get members of an organizational company
+  app.get("/api/org-companies/:id/members", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const company = await storage.getClientCompany(req.params.id);
+      if (!company) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+
+      const members = await storage.getClientCompanyMembers(req.params.id);
+      res.json(members);
+    } catch (error) {
+      console.error("Error fetching company members:", error);
+      res.status(500).json({ error: "Failed to fetch members" });
+    }
+  });
+
+  // Add a user to an organizational company
+  app.post("/api/org-companies/:id/members", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const company = await storage.getClientCompany(req.params.id);
+      if (!company) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({ error: "User ID is required" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Link user to company
+      await storage.updateUser(userId, { clientCompanyId: req.params.id });
+      res.json({ success: true, message: "User added to company" });
+    } catch (error) {
+      console.error("Error adding member to company:", error);
+      res.status(500).json({ error: "Failed to add member" });
+    }
+  });
+
+  // Remove a user from an organizational company
+  app.delete("/api/org-companies/:id/members/:userId", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const company = await storage.getClientCompany(req.params.id);
+      if (!company) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+
+      const user = await storage.getUser(req.params.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (user.clientCompanyId !== req.params.id) {
+        return res.status(400).json({ error: "User is not a member of this company" });
+      }
+
+      // Cannot remove the primary contact
+      if (company.primaryContactId === req.params.userId) {
+        return res.status(400).json({ error: "Cannot remove the primary contact. Assign a new primary contact first." });
+      }
+
+      // Unlink user from company
+      await storage.updateUser(req.params.userId, { clientCompanyId: null });
+      res.json({ success: true, message: "User removed from company" });
+    } catch (error) {
+      console.error("Error removing member from company:", error);
+      res.status(500).json({ error: "Failed to remove member" });
+    }
+  });
+
   // System settings routes
   app.get("/api/system-settings/pricing", async (req, res) => {
     try {
@@ -9589,6 +9875,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allUsers = await storage.getAllUsers();
       const vendorProfiles = await storage.getAllVendorProfiles();
       const vendorPackCosts = await storage.getAllVendorPackCosts();
+      const clientProfiles = await storage.getClientProfiles();
+      const clientCompanies = await storage.getClientCompanies();
 
       const packMap: Record<string, typeof allPacks[0]> = {};
       allPacks.forEach((p: typeof allPacks[0]) => { packMap[p.id] = p; });
@@ -9596,6 +9884,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       allUsers.forEach((u: typeof allUsers[0]) => { userMap[u.id] = u; });
       const vendorProfileMap: Record<string, typeof vendorProfiles[0]> = {};
       vendorProfiles.forEach((v: typeof vendorProfiles[0]) => { vendorProfileMap[v.id] = v; });
+      const clientProfileMap: Record<string, typeof clientProfiles[0]> = {};
+      clientProfiles.forEach((p: typeof clientProfiles[0]) => { clientProfileMap[p.id] = p; });
+      const clientCompanyMap: Record<string, typeof clientCompanies[0]> = {};
+      clientCompanies.forEach((c: typeof clientCompanies[0]) => { clientCompanyMap[c.id] = c; });
 
       // Build vendor pack cost lookup: packId -> vendorId -> cost
       const vendorPackCostMap: Record<string, Record<string, number>> = {};
@@ -9676,8 +9968,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         }
 
-        // Use client user name since clientCompanies table doesn't exist yet
-        const clientName = clientUser?.username || "Unknown";
+        // Use clientCompany name if available, then clientProfile companyName, then user name
+        let clientName = "Unknown";
+        if (sub.clientCompanyId && clientCompanyMap[sub.clientCompanyId]) {
+          clientName = clientCompanyMap[sub.clientCompanyId].name;
+        } else if (sub.clientProfileId && clientProfileMap[sub.clientProfileId]) {
+          clientName = clientProfileMap[sub.clientProfileId].companyName || clientUser?.username || "Unknown";
+        } else if (clientUser) {
+          // Check if user has a clientCompanyId or clientProfileId
+          if (clientUser.clientCompanyId && clientCompanyMap[clientUser.clientCompanyId]) {
+            clientName = clientCompanyMap[clientUser.clientCompanyId].name;
+          } else if (clientUser.clientProfileId && clientProfileMap[clientUser.clientProfileId]) {
+            clientName = clientProfileMap[clientUser.clientProfileId].companyName || clientUser.username;
+          } else {
+            clientName = clientUser.username;
+          }
+        }
 
         vendorSummaries[vendorIdKey].subscriptions.push({
           id: sub.id,

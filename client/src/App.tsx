@@ -30,6 +30,7 @@ import Payments from "@/pages/Payments";
 import ClientCompaniesList from "@/pages/ClientCompaniesList";
 import ClientCompanyDetail from "@/pages/ClientCompanyDetail";
 import PackAssignment from "@/pages/PackAssignment";
+import OrgCompanies from "@/pages/OrgCompanies";
 
 function Router() {
   return (
@@ -66,6 +67,7 @@ function Router() {
       <Route path="/client-companies/:id" component={ClientCompanyDetail} />
       <Route path="/client-companies/:id/edit" component={ClientCompanyDetail} />
       <Route path="/pack-assignment" component={PackAssignment} />
+      <Route path="/org-companies" component={OrgCompanies} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>

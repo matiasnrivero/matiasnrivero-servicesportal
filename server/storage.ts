@@ -74,6 +74,9 @@ import {
   type ClientProfile,
   type InsertClientProfile,
   type UpdateClientProfile,
+  type ClientCompany,
+  type InsertClientCompany,
+  type UpdateClientCompany,
   type DiscountCoupon,
   type InsertDiscountCoupon,
   type UpdateDiscountCoupon,
@@ -125,6 +128,7 @@ import {
   automationRules,
   automationAssignmentLogs,
   clientProfiles,
+  clientCompanies,
   discountCoupons,
   clientPaymentMethods,
   stripeEvents,
@@ -165,6 +169,15 @@ export interface IStorage {
   updateClientProfile(id: string, profile: UpdateClientProfile): Promise<ClientProfile | undefined>;
   deleteClientProfile(profileId: string): Promise<void>;
   getClientTeamMembers(clientProfileId: string): Promise<User[]>;
+
+  // Client Company methods (organizational entities for shared pack subscriptions)
+  getClientCompany(id: string): Promise<ClientCompany | undefined>;
+  getClientCompanies(): Promise<ClientCompany[]>;
+  getActiveClientCompanies(): Promise<ClientCompany[]>;
+  createClientCompany(company: InsertClientCompany): Promise<ClientCompany>;
+  updateClientCompany(id: string, company: UpdateClientCompany): Promise<ClientCompany | undefined>;
+  deleteClientCompany(id: string): Promise<void>;
+  getClientCompanyMembers(companyId: string): Promise<User[]>;
 
   // Service methods
   getAllServices(): Promise<Service[]>;
@@ -558,6 +571,52 @@ export class DbStorage implements IStorage {
   async getClientTeamMembers(clientProfileId: string): Promise<User[]> {
     return await db.select().from(users)
       .where(eq(users.clientProfileId, clientProfileId))
+      .orderBy(users.username);
+  }
+
+  // Client Company methods
+  async getClientCompany(id: string): Promise<ClientCompany | undefined> {
+    const result = await db.select().from(clientCompanies).where(eq(clientCompanies.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getClientCompanies(): Promise<ClientCompany[]> {
+    return await db.select().from(clientCompanies)
+      .where(isNull(clientCompanies.deletedAt))
+      .orderBy(clientCompanies.name);
+  }
+
+  async getActiveClientCompanies(): Promise<ClientCompany[]> {
+    return await db.select().from(clientCompanies)
+      .where(and(
+        isNull(clientCompanies.deletedAt),
+        eq(clientCompanies.isActive, 1)
+      ))
+      .orderBy(clientCompanies.name);
+  }
+
+  async createClientCompany(company: InsertClientCompany): Promise<ClientCompany> {
+    const result = await db.insert(clientCompanies).values(company).returning();
+    return result[0];
+  }
+
+  async updateClientCompany(id: string, company: UpdateClientCompany): Promise<ClientCompany | undefined> {
+    const result = await db.update(clientCompanies)
+      .set({ ...company, updatedAt: new Date() })
+      .where(eq(clientCompanies.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteClientCompany(id: string): Promise<void> {
+    await db.update(clientCompanies)
+      .set({ deletedAt: new Date(), updatedAt: new Date(), isActive: 0 })
+      .where(eq(clientCompanies.id, id));
+  }
+
+  async getClientCompanyMembers(companyId: string): Promise<User[]> {
+    return await db.select().from(users)
+      .where(eq(users.clientCompanyId, companyId))
       .orderBy(users.username);
   }
 

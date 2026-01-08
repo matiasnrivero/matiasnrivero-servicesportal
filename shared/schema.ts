@@ -39,8 +39,10 @@ export const users = pgTable("users", {
   isInternal: boolean("is_internal").notNull().default(false),
   // Vendor relationship - links vendor_designer to their parent vendor
   vendorId: varchar("vendor_id"),
-  // Client company relationship - links client users to their company
+  // Client company relationship - links client users to their company profile
   clientProfileId: varchar("client_profile_id"),
+  // Client company entity - links users to their organizational company for shared pack subscriptions
+  clientCompanyId: varchar("client_company_id"),
   // Client payment configuration
   paymentMethod: text("payment_method"),
   invitedBy: varchar("invited_by"),
@@ -108,6 +110,35 @@ export const clientProfiles = pgTable("client_profiles", {
   // Tri-POD product discount tier: none (default), power_level (10%), oms_subscription (15%), enterprise (20%)
   tripodDiscountTier: text("tripod_discount_tier").notNull().default("none"),
   // Soft delete timestamp - when set, client company is considered deleted
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Client Companies - organizational entity for multi-user clients with shared pack subscriptions
+export const clientCompanies = pgTable("client_companies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  industry: text("industry"),
+  website: text("website"),
+  email: text("email"),
+  phone: text("phone"),
+  address: text("address"),
+  // Primary contact - admin user for this company
+  primaryContactId: varchar("primary_contact_id").references(() => users.id),
+  // Default vendor assignment for this company's pack subscriptions
+  defaultVendorId: varchar("default_vendor_id").references(() => users.id),
+  // Stripe integration
+  stripeCustomerId: text("stripe_customer_id"),
+  // Payment configuration inherited by company users
+  paymentConfiguration: text("payment_configuration").notNull().default("pay_as_you_go"),
+  invoiceDay: integer("invoice_day"),
+  billingAddress: jsonb("billing_address"),
+  // Tri-POD discount tier for company-wide pricing
+  tripodDiscountTier: text("tripod_discount_tier").notNull().default("none"),
+  // Notes for admin
+  notes: text("notes"),
+  isActive: integer("is_active").notNull().default(1),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -385,7 +416,7 @@ export const clientPackSubscriptions = pgTable("client_pack_subscriptions", {
   vendorPaymentMarkedAt: timestamp("vendor_payment_marked_at"),
   vendorPaymentMarkedBy: varchar("vendor_payment_marked_by").references(() => users.id),
   vendorCost: decimal("vendor_cost", { precision: 10, scale: 2 }), // Vendor cost for this subscription period
-  clientCompanyId: varchar("client_company_id"), // Reference to client company (table defined later)
+  clientCompanyId: varchar("client_company_id").references(() => clientCompanies.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -804,6 +835,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   role: true,
   vendorId: true,
   clientProfileId: true,
+  clientCompanyId: true,
   paymentMethod: true,
   invitedBy: true,
 });
@@ -829,6 +861,18 @@ export const updateClientProfileSchema = createInsertSchema(clientProfiles).part
   id: true,
   primaryUserId: true,
   createdAt: true,
+});
+
+export const insertClientCompanySchema = createInsertSchema(clientCompanies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateClientCompanySchema = createInsertSchema(clientCompanies).partial().omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export const insertServiceSchema = createInsertSchema(services).omit({
@@ -1127,6 +1171,9 @@ export type UpdateVendorProfile = z.infer<typeof updateVendorProfileSchema>;
 export type ClientProfile = typeof clientProfiles.$inferSelect;
 export type InsertClientProfile = z.infer<typeof insertClientProfileSchema>;
 export type UpdateClientProfile = z.infer<typeof updateClientProfileSchema>;
+export type ClientCompany = typeof clientCompanies.$inferSelect;
+export type InsertClientCompany = z.infer<typeof insertClientCompanySchema>;
+export type UpdateClientCompany = z.infer<typeof updateClientCompanySchema>;
 export type Service = typeof services.$inferSelect;
 export type InsertService = z.infer<typeof insertServiceSchema>;
 export type UpdateService = z.infer<typeof updateServiceSchema>;
