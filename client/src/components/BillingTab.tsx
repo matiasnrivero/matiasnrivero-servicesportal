@@ -968,25 +968,23 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                     data-testid={`subscription-${subscription.id}`}
                   >
                     {/* Line 1: Pack Name / Status / Pending Change Badge */}
-                    <div className="flex items-center justify-between gap-4 flex-wrap">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium">{pack?.name || "Unknown Pack"}</p>
-                        {subscription.stripeStatus === "past_due" ? (
-                          <Badge variant="destructive">
-                            <AlertTriangle className="h-3 w-3 mr-1" />
-                            Payment Failed
-                          </Badge>
-                        ) : subscription.stripeStatus === "cancel_at_period_end" ? (
-                          <Badge variant="outline" className="text-amber-600 border-amber-300">
-                            Canceling at Period End
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-emerald-600 text-white">
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Active
-                          </Badge>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium">{pack?.name || "Unknown Pack"}</p>
+                      {subscription.stripeStatus === "past_due" ? (
+                        <Badge variant="destructive">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Payment Failed
+                        </Badge>
+                      ) : subscription.stripeStatus === "cancel_at_period_end" ? (
+                        <Badge variant="outline" className="text-amber-600 border-amber-300">
+                          Canceling at Period End
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-emerald-600 text-white">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Active
+                        </Badge>
+                      )}
                       {subscription.pendingPackId && (
                         <Badge variant="outline" className="text-blue-600 border-blue-300">
                           {subscription.pendingChangeType === "upgrade" ? (
