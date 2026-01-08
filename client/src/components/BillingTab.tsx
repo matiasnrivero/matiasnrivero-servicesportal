@@ -1008,38 +1008,38 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                           }
                           return null;
                         })()}
-                        <div className="mt-3 grid grid-cols-2 md:grid-cols-6 gap-6 text-sm">
-                          <div>
-                            <p className="text-muted-foreground">Pack Price</p>
+                        <div className="mt-3 flex flex-wrap gap-x-8 gap-y-3 text-sm">
+                          <div className="min-w-[80px]">
+                            <p className="text-xs text-muted-foreground">Pack Price</p>
                             <p className="font-medium">${packPrice.toFixed(2)}</p>
                           </div>
-                          <div>
-                            <p className="text-muted-foreground">Total Price</p>
+                          <div className="min-w-[80px]">
+                            <p className="text-xs text-muted-foreground">Total Price</p>
                             <p className="font-medium text-muted-foreground line-through">${totalPrice.toFixed(2)}</p>
                           </div>
-                          <div>
-                            <p className="text-muted-foreground">Save</p>
+                          <div className="min-w-[70px]">
+                            <p className="text-xs text-muted-foreground">Save</p>
                             <p className="font-medium text-green-600">${savings.toFixed(2)}</p>
                           </div>
-                          <div>
-                            <p className="text-muted-foreground whitespace-nowrap">Subscribed Since</p>
+                          <div className="min-w-[90px]">
+                            <p className="text-xs text-muted-foreground">Subscribed Since</p>
                             <p className="font-medium">
                               {subscription.startDate ? format(new Date(subscription.startDate), "MMM d, yyyy") : "-"}
                             </p>
                           </div>
-                          <div>
-                            <p className="text-muted-foreground whitespace-nowrap">Included Services</p>
+                          <div className="min-w-[90px]">
+                            <p className="text-xs text-muted-foreground">Jobs/Month</p>
                             <p className="font-medium">{totalQty} per month</p>
                           </div>
-                          <div>
-                            <p className="text-muted-foreground whitespace-nowrap">Usage This Month</p>
+                          <div className="min-w-[100px]">
+                            <p className="text-xs text-muted-foreground">Usage This Month</p>
                             <div className="flex flex-col gap-1">
                               <p className={`font-medium ${(subscription.totalUsed || 0) >= totalQty ? "text-destructive" : (subscription.totalUsed || 0) >= totalQty * 0.9 ? "text-amber-600" : ""}`}>
                                 {subscription.totalUsed || 0} / {totalQty} used
                               </p>
                               <Progress 
                                 value={totalQty > 0 ? Math.min(((subscription.totalUsed || 0) / totalQty) * 100, 100) : 0} 
-                                className="h-2"
+                                className="h-2 w-24"
                               />
                             </div>
                           </div>
