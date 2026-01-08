@@ -1062,6 +1062,8 @@ function SubscriptionsTabContent() {
 
   const { data: subscriptions = [], isLoading } = useQuery<EnrichedSubscription[]>({
     queryKey: ["/api/admin/pack-subscriptions"],
+    refetchOnMount: "always",
+    staleTime: 0,
   });
 
   const { data: vendors = [] } = useQuery<User[]>({
