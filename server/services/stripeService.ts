@@ -406,7 +406,8 @@ export class StripeService {
   async scheduleSubscriptionUpdate(
     stripeSubscriptionId: string,
     newPriceId: string,
-    effectiveAt: Date
+    effectiveAt: Date,
+    localPeriodEnd?: Date
   ): Promise<Stripe.SubscriptionSchedule> {
     if (!newPriceId) {
       throw new Error("New price ID is required for scheduling subscription update");
@@ -428,13 +429,27 @@ export class StripeService {
       : currentPriceItem.id;
 
     // Calculate timestamps - ensure we have valid values
-    // Use type assertion since Stripe types may not include these properties
-    const subData = subscription as unknown as { current_period_start: number; current_period_end: number };
-    const periodStart = subData.current_period_start;
-    const periodEnd = subData.current_period_end;
+    // Access period dates from the subscription object directly
+    let periodStart = (subscription as any).current_period_start as number | undefined;
+    let periodEnd = (subscription as any).current_period_end as number | undefined;
+    
+    // Fall back to local period dates if Stripe doesn't have them
+    if (!periodEnd && localPeriodEnd) {
+      periodEnd = Math.floor(localPeriodEnd.getTime() / 1000);
+      // Set periodStart to 30 days before periodEnd if not available
+      periodStart = periodStart || (periodEnd - 30 * 24 * 60 * 60);
+    }
+    
+    console.log("Stripe subscription details:", {
+      id: subscription.id,
+      status: subscription.status,
+      periodStart,
+      periodEnd,
+      usingLocalFallback: !!(localPeriodEnd && !(subscription as any).current_period_end),
+    });
     
     if (!periodStart || !periodEnd) {
-      throw new Error("Subscription has no valid billing period. Cannot schedule changes.");
+      throw new Error(`Subscription has no valid billing period. periodStart=${periodStart}, periodEnd=${periodEnd}`);
     }
     
     const effectiveTimestamp = Math.floor(effectiveAt.getTime() / 1000);

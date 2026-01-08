@@ -4380,10 +4380,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Schedule the Stripe subscription update if exists
       if (subscription.stripeSubscriptionId && stripePriceId) {
         try {
+          const effectiveDate = effectiveAt instanceof Date ? effectiveAt : new Date(effectiveAt);
+          // Pass local period end as fallback
+          const localPeriodEnd = subscription.currentPeriodEnd 
+            ? (subscription.currentPeriodEnd instanceof Date ? subscription.currentPeriodEnd : new Date(subscription.currentPeriodEnd))
+            : undefined;
           await stripeService.scheduleSubscriptionUpdate(
             subscription.stripeSubscriptionId,
             stripePriceId,
-            effectiveAt instanceof Date ? effectiveAt : new Date(effectiveAt)
+            effectiveDate,
+            localPeriodEnd
           );
         } catch (stripeError: any) {
           console.error("Error scheduling Stripe subscription update:", stripeError.message);
