@@ -369,15 +369,15 @@ export default function VendorsList() {
                           />
                         </div>
                         <div className="w-[200px] flex-shrink-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-semibold text-dark-blue-night">
-                              {profile?.companyName || "No Company Name"}
-                            </p>
+                          <p className="font-semibold text-dark-blue-night">
+                            {profile?.companyName || "No Company Name"}
+                          </p>
+                          <div className="flex items-center gap-2">
                             {isInternalVendor && (
                               <Badge variant="secondary" className="text-xs">Internal</Badge>
                             )}
+                            <p className="text-xs text-dark-gray">Company</p>
                           </div>
-                          <p className="text-xs text-dark-gray">Company</p>
                         </div>
                         <div className="w-[180px] flex-shrink-0">
                           <p className="text-dark-blue-night truncate">{vendor.username}</p>
