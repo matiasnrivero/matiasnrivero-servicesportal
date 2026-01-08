@@ -251,6 +251,7 @@ export interface IStorage {
   getClientPackSubscriptions(clientProfileId: string): Promise<ClientPackSubscription[]>;
   getActiveClientPackSubscriptions(clientProfileId: string): Promise<ClientPackSubscription[]>;
   getClientPackSubscription(id: string): Promise<ClientPackSubscription | undefined>;
+  getClientPackSubscriptionByStripeId(stripeSubscriptionId: string): Promise<ClientPackSubscription | undefined>;
   createClientPackSubscription(data: InsertClientPackSubscription): Promise<ClientPackSubscription>;
   updateClientPackSubscription(id: string, data: Partial<InsertClientPackSubscription>): Promise<ClientPackSubscription | undefined>;
   getServicePackUsage(subscriptionId: string, serviceId: string, month: number, year: number): Promise<ServicePackUsage | undefined>;
@@ -973,6 +974,12 @@ export class DbStorage implements IStorage {
   async getClientPackSubscription(id: string): Promise<ClientPackSubscription | undefined> {
     const result = await db.select().from(clientPackSubscriptions)
       .where(eq(clientPackSubscriptions.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getClientPackSubscriptionByStripeId(stripeSubscriptionId: string): Promise<ClientPackSubscription | undefined> {
+    const result = await db.select().from(clientPackSubscriptions)
+      .where(eq(clientPackSubscriptions.stripeSubscriptionId, stripeSubscriptionId)).limit(1);
     return result[0];
   }
 

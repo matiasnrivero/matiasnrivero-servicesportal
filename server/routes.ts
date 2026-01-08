@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { automationEngine } from "./services/automationEngine";
+import { stripeService } from "./services/stripeService";
 import type { User } from "@shared/schema";
 
 /**
@@ -4044,7 +4045,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Subscribe to a pack
+  // Subscribe to a pack with Stripe integration
   app.post("/api/service-pack-subscriptions", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -4056,7 +4057,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "User not found" });
       }
 
-      const { clientProfileId, packId } = req.body;
+      const { clientProfileId, packId, skipStripe } = req.body;
 
       // Verify permissions
       const isAdmin = sessionUser.role === "admin";
@@ -4082,13 +4083,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Already subscribed to this pack" });
       }
 
+      // Create Stripe subscription with immediate charge (unless skipStripe is true - for admin manual creation)
+      let stripeSubscription = null;
+      let stripeSubscriptionId = null;
+      let stripeStatus = "active";
+      let currentPeriodStart = new Date();
+      let currentPeriodEnd = new Date();
+      currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 1);
+      let billingAnchorDay = Math.min(new Date().getDate(), 28);
+
+      if (!skipStripe) {
+        try {
+          stripeSubscription = await stripeService.createPackSubscription(clientProfileId, pack);
+          stripeSubscriptionId = stripeSubscription.id;
+          stripeStatus = stripeSubscription.status;
+          currentPeriodStart = new Date((stripeSubscription as any).current_period_start * 1000);
+          currentPeriodEnd = new Date((stripeSubscription as any).current_period_end * 1000);
+        } catch (stripeError: any) {
+          console.error("Stripe subscription creation failed:", stripeError.message);
+          return res.status(400).json({ 
+            error: stripeError.message || "Failed to process payment. Please check your payment method and try again."
+          });
+        }
+      }
+
       const subscription = await storage.createClientPackSubscription({
         clientProfileId,
         packId,
-        startDate: new Date(),
+        startDate: currentPeriodStart,
         priceAtSubscription: pack.price,
         isActive: true,
-        stripeStatus: "active",
+        stripeSubscriptionId,
+        stripeStatus,
+        currentPeriodStart,
+        currentPeriodEnd,
+        billingAnchorDay,
       });
 
       res.status(201).json(subscription);
@@ -4098,7 +4127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Cancel a subscription
+  // Cancel a subscription (at period end by default, or immediately with ?immediate=true)
   app.patch("/api/service-pack-subscriptions/:id/cancel", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -4123,10 +4152,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Not authorized" });
       }
 
-      const updated = await storage.updateClientPackSubscription(req.params.id, {
-        isActive: false,
-        endDate: new Date(),
-      });
+      const immediate = req.query.immediate === "true";
+
+      // Cancel Stripe subscription if exists
+      let stripeCancelAt: Date | null = null;
+      if (subscription.stripeSubscriptionId) {
+        try {
+          if (immediate) {
+            await stripeService.cancelSubscriptionImmediately(subscription.stripeSubscriptionId);
+          } else {
+            const stripeSub = await stripeService.cancelSubscription(subscription.stripeSubscriptionId);
+            // Capture the cancel_at timestamp from Stripe
+            if (stripeSub?.cancel_at) {
+              stripeCancelAt = new Date(stripeSub.cancel_at * 1000);
+            } else if (stripeSub?.current_period_end) {
+              // Use current_period_end if cancel_at is not set
+              stripeCancelAt = new Date(stripeSub.current_period_end * 1000);
+            }
+          }
+        } catch (stripeError: any) {
+          console.error("Error canceling Stripe subscription:", stripeError.message);
+          // Continue to update local record even if Stripe fails
+        }
+      }
+
+      // Determine cancelAt date: Stripe timestamp > local period end > one month from now
+      const cancelAtDate = stripeCancelAt || 
+        subscription.currentPeriodEnd || 
+        new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+      const updateData: any = immediate 
+        ? { isActive: false, endDate: new Date(), stripeStatus: "canceled" }
+        : { stripeStatus: "cancel_at_period_end", cancelAt: cancelAtDate };
+
+      const updated = await storage.updateClientPackSubscription(req.params.id, updateData);
 
       res.json(updated);
     } catch (error) {

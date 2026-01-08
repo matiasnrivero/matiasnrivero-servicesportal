@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, CreditCard, Plus, Trash2, Star, CheckCircle2, Pencil, Package, Calendar, TrendingUp } from "lucide-react";
+import { Loader2, CreditCard, Plus, Trash2, Star, CheckCircle2, Pencil, Package, Calendar, TrendingUp, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { loadStripe } from "@stripe/stripe-js";
@@ -519,8 +519,55 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
 
   const canManageCards = isAdmin || isPrimaryClient;
 
+  // Check for any subscriptions in grace period (past_due status) - show for all, not just isActive
+  // because past_due subscriptions may have been deactivated but user still needs to update payment
+  const subscriptionsInGracePeriod = subscriptions.filter(
+    sub => sub.stripeStatus === "past_due" || sub.gracePeriodEndsAt
+  );
+
   return (
     <div className="space-y-6">
+      {/* Grace Period Warning Banner */}
+      {subscriptionsInGracePeriod.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-md p-4 dark:bg-amber-950 dark:border-amber-800" data-testid="banner-grace-period">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="font-medium text-amber-900 dark:text-amber-100">Payment Issue - Action Required</h3>
+              <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
+                {subscriptionsInGracePeriod.length === 1 
+                  ? "Your subscription payment has failed. " 
+                  : `${subscriptionsInGracePeriod.length} subscription payments have failed. `}
+                Please update your payment method to avoid service interruption.
+                {(() => {
+                  // Find the earliest grace period end date
+                  const gracePeriodDates = subscriptionsInGracePeriod
+                    .filter(sub => sub.gracePeriodEndsAt)
+                    .map(sub => new Date(sub.gracePeriodEndsAt!));
+                  if (gracePeriodDates.length > 0) {
+                    const earliestDate = new Date(Math.min(...gracePeriodDates.map(d => d.getTime())));
+                    return (
+                      <span className="font-medium">
+                        {" "}Grace period ends: {format(earliestDate, "MMM d, yyyy")}.
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
+              </p>
+              <Button 
+                size="sm" 
+                className="mt-3"
+                onClick={() => setAddCardOpen(true)}
+                data-testid="button-update-payment-method"
+              >
+                Update Payment Method
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
           <div>
@@ -835,10 +882,21 @@ export default function BillingTab({ clientProfileId, isAdmin = false, isPrimary
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-medium">{pack?.name || "Unknown Pack"}</p>
-                          <Badge variant="secondary">
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Active
-                          </Badge>
+                          {subscription.stripeStatus === "past_due" ? (
+                            <Badge variant="destructive">
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              Payment Failed
+                            </Badge>
+                          ) : subscription.stripeStatus === "cancel_at_period_end" ? (
+                            <Badge variant="outline" className="text-amber-600 border-amber-300">
+                              Canceling at Period End
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Active
+                            </Badge>
+                          )}
                         </div>
                         {pack?.description && (
                           <p className="text-sm text-muted-foreground mt-1">{pack.description}</p>

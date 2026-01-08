@@ -99,6 +99,126 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           }
           break;
         }
+
+        // ============= Pack Subscription Webhook Events =============
+
+        case 'invoice.paid': {
+          // Successful subscription payment (initial or renewal)
+          const invoice = event.data.object as any;
+          const subscriptionId = invoice.subscription;
+          
+          if (subscriptionId) {
+            // Find our subscription by Stripe subscription ID (efficient O(1) lookup)
+            const localSub = await storage.getClientPackSubscriptionByStripeId(subscriptionId);
+            
+            if (localSub) {
+              // Retrieve the subscription to get accurate period dates
+              // (invoice.lines may have multiple lines or be empty for prorations)
+              let currentPeriodStart: Date | undefined;
+              let currentPeriodEnd: Date | undefined;
+              try {
+                const stripeSubResp = await stripe.subscriptions.retrieve(subscriptionId);
+                currentPeriodStart = new Date(stripeSubResp.current_period_start * 1000);
+                currentPeriodEnd = new Date(stripeSubResp.current_period_end * 1000);
+              } catch (err) {
+                console.error("Error retrieving subscription for period dates:", err);
+                // Fall back to invoice lines if subscription retrieval fails
+                if (invoice.lines?.data?.[0]?.period?.start) {
+                  currentPeriodStart = new Date(invoice.lines.data[0].period.start * 1000);
+                }
+                if (invoice.lines?.data?.[0]?.period?.end) {
+                  currentPeriodEnd = new Date(invoice.lines.data[0].period.end * 1000);
+                }
+              }
+              
+              // Update subscription status and clear any grace period
+              await storage.updateClientPackSubscription(localSub.id, {
+                stripeStatus: 'active',
+                isActive: true,
+                paymentFailedAt: null,
+                gracePeriodEndsAt: null,
+                currentPeriodStart,
+                currentPeriodEnd,
+              });
+              console.log(`Invoice paid for subscription ${localSub.id}`);
+            }
+          }
+          break;
+        }
+
+        case 'invoice.payment_failed': {
+          // Failed subscription payment - start grace period
+          const invoice = event.data.object as any;
+          const subscriptionId = invoice.subscription;
+          
+          if (subscriptionId) {
+            const localSub = await storage.getClientPackSubscriptionByStripeId(subscriptionId);
+            
+            if (localSub) {
+              // Set 2-week grace period from first failure
+              const now = new Date();
+              const gracePeriodEndsAt = new Date(now);
+              gracePeriodEndsAt.setDate(gracePeriodEndsAt.getDate() + 14); // 2 weeks
+              
+              await storage.updateClientPackSubscription(localSub.id, {
+                stripeStatus: 'past_due',
+                paymentFailedAt: localSub.paymentFailedAt || now, // Only set if not already set
+                gracePeriodEndsAt: localSub.gracePeriodEndsAt || gracePeriodEndsAt, // Only set if not already set
+              });
+              console.log(`Payment failed for subscription ${localSub.id}, grace period ends: ${gracePeriodEndsAt}`);
+            }
+          }
+          break;
+        }
+
+        case 'customer.subscription.updated': {
+          // Subscription status changed (e.g., from past_due to active after retry)
+          const subscription = event.data.object as any;
+          const localSub = await storage.getClientPackSubscriptionByStripeId(subscription.id);
+          
+          if (localSub) {
+            const updateData: any = {
+              stripeStatus: subscription.status,
+              currentPeriodStart: new Date(subscription.current_period_start * 1000),
+              currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+            };
+            
+            // If status is active, clear grace period
+            if (subscription.status === 'active') {
+              updateData.paymentFailedAt = null;
+              updateData.gracePeriodEndsAt = null;
+              updateData.isActive = true;
+            }
+            
+            // If cancel_at_period_end is set, capture the cancel_at timestamp
+            if (subscription.cancel_at_period_end) {
+              updateData.stripeStatus = 'cancel_at_period_end';
+              if (subscription.cancel_at) {
+                updateData.cancelAt = new Date(subscription.cancel_at * 1000);
+              }
+            }
+            
+            await storage.updateClientPackSubscription(localSub.id, updateData);
+            console.log(`Subscription ${localSub.id} updated: ${subscription.status}`);
+          }
+          break;
+        }
+
+        case 'customer.subscription.deleted': {
+          // Subscription fully canceled
+          const subscription = event.data.object as any;
+          const localSub = await storage.getClientPackSubscriptionByStripeId(subscription.id);
+          
+          if (localSub) {
+            await storage.updateClientPackSubscription(localSub.id, {
+              stripeStatus: 'canceled',
+              isActive: false,
+              endDate: new Date(),
+            });
+            console.log(`Subscription ${localSub.id} canceled`);
+          }
+          break;
+        }
       }
     } catch (processingError) {
       console.error('Error processing webhook event:', processingError);

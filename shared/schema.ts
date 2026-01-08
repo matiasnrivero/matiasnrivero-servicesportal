@@ -361,6 +361,7 @@ export const clientPackSubscriptions = pgTable("client_pack_subscriptions", {
   // Grace period for failed payments
   gracePeriodEndsAt: timestamp("grace_period_ends_at"), // 2 weeks after payment failure
   paymentFailedAt: timestamp("payment_failed_at"), // When payment first failed
+  cancelAt: timestamp("cancel_at"), // When subscription will be canceled (from Stripe cancel_at)
   // Vendor assignment
   vendorAssigneeId: varchar("vendor_assignee_id").references(() => users.id), // Vendor managing this pack
   vendorAssignedAt: timestamp("vendor_assigned_at"),

@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import { storage } from "../storage";
-import type { ClientProfile, BillingAddress } from "@shared/schema";
+import type { ClientProfile, BillingAddress, ServicePack, ClientPackSubscription } from "@shared/schema";
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY environment variable is required");
@@ -213,6 +213,250 @@ export class StripeService {
       type: "card",
     });
     return paymentMethods.data;
+  }
+
+  // ============= Subscription Methods =============
+
+  /**
+   * Create or update a Stripe Product and Price for a service pack
+   */
+  async syncPackToStripe(pack: ServicePack): Promise<{ productId: string; priceId: string }> {
+    const priceInCents = Math.round(parseFloat(pack.price || "0") * 100);
+    
+    let productId = pack.stripeProductId;
+    
+    // Create or update the product
+    if (productId) {
+      // Update existing product
+      await stripe.products.update(productId, {
+        name: pack.name,
+        description: pack.description || undefined,
+        active: pack.isActive,
+        metadata: {
+          packId: pack.id,
+        },
+      });
+    } else {
+      // Create new product
+      const product = await stripe.products.create({
+        name: pack.name,
+        description: pack.description || undefined,
+        active: pack.isActive,
+        metadata: {
+          packId: pack.id,
+        },
+      });
+      productId = product.id;
+    }
+
+    // For prices, we need to create a new one if the price changed
+    // (Stripe prices are immutable)
+    let priceId = pack.stripePriceId;
+    
+    if (priceId) {
+      // Check if the price matches
+      const existingPrice = await stripe.prices.retrieve(priceId);
+      if (existingPrice.unit_amount !== priceInCents) {
+        // Archive old price and create new one
+        await stripe.prices.update(priceId, { active: false });
+        priceId = null;
+      }
+    }
+    
+    if (!priceId) {
+      // Create new price
+      const price = await stripe.prices.create({
+        product: productId,
+        unit_amount: priceInCents,
+        currency: "usd",
+        recurring: {
+          interval: "month",
+        },
+        metadata: {
+          packId: pack.id,
+        },
+      });
+      priceId = price.id;
+    }
+
+    // Update the pack with Stripe IDs
+    await storage.updateServicePack(pack.id, {
+      stripeProductId: productId,
+      stripePriceId: priceId,
+    });
+
+    return { productId, priceId };
+  }
+
+  /**
+   * Create a Stripe subscription for a pack with immediate first charge
+   * Uses billing_cycle_anchor to set anniversary billing on the current day
+   * Returns a subscription ID that should be stored locally for webhook lookups
+   */
+  async createPackSubscription(
+    clientProfileId: string,
+    pack: ServicePack,
+    localSubscriptionId?: string
+  ): Promise<Stripe.Subscription> {
+    const clientProfile = await storage.getClientProfileById(clientProfileId);
+    if (!clientProfile) {
+      throw new Error("Client profile not found");
+    }
+
+    // Ensure pack has Stripe price
+    let priceId = pack.stripePriceId;
+    if (!priceId) {
+      const synced = await this.syncPackToStripe(pack);
+      priceId = synced.priceId;
+    }
+
+    // Get or create customer
+    const customerId = await this.getOrCreateCustomer(clientProfile);
+
+    // Get default payment method
+    const defaultPaymentMethod = await storage.getDefaultPaymentMethod(clientProfileId);
+    if (!defaultPaymentMethod) {
+      throw new Error("No payment method on file. Please add a payment method first.");
+    }
+
+    // Attach payment method to customer if not already attached
+    try {
+      await stripe.paymentMethods.attach(defaultPaymentMethod.stripePaymentMethodId, {
+        customer: customerId,
+      });
+    } catch (err: any) {
+      // Ignore if already attached - this is expected for returning customers
+      if (err.code !== 'resource_already_exists' && !err.message?.includes('already been attached')) {
+        throw err;
+      }
+    }
+
+    // Set as default invoice payment method
+    await stripe.customers.update(customerId, {
+      invoice_settings: {
+        default_payment_method: defaultPaymentMethod.stripePaymentMethodId,
+      },
+    });
+
+    // Get current day for billing anchor (1-28 for safety)
+    const today = new Date();
+    const billingAnchorDay = Math.min(today.getDate(), 28);
+
+    // Create subscription with immediate payment
+    // payment_behavior: "error_if_incomplete" ensures immediate charge and fails if payment fails
+    // collection_method: "charge_automatically" is default but explicit for clarity
+    const subscription = await stripe.subscriptions.create({
+      customer: customerId,
+      items: [{ price: priceId }],
+      default_payment_method: defaultPaymentMethod.stripePaymentMethodId,
+      payment_behavior: "error_if_incomplete",
+      collection_method: "charge_automatically",
+      billing_cycle_anchor: Math.floor(Date.now() / 1000),
+      proration_behavior: "none",
+      metadata: {
+        clientProfileId,
+        packId: pack.id,
+        billingAnchorDay: billingAnchorDay.toString(),
+        localSubscriptionId: localSubscriptionId || "",
+      },
+    });
+
+    return subscription;
+  }
+
+  /**
+   * Cancel a Stripe subscription at period end
+   */
+  async cancelSubscription(stripeSubscriptionId: string): Promise<Stripe.Subscription> {
+    const subscription = await stripe.subscriptions.update(stripeSubscriptionId, {
+      cancel_at_period_end: true,
+    });
+    return subscription;
+  }
+
+  /**
+   * Immediately cancel a Stripe subscription
+   */
+  async cancelSubscriptionImmediately(stripeSubscriptionId: string): Promise<Stripe.Subscription> {
+    const subscription = await stripe.subscriptions.cancel(stripeSubscriptionId);
+    return subscription;
+  }
+
+  /**
+   * Resume a subscription that was set to cancel at period end
+   */
+  async resumeSubscription(stripeSubscriptionId: string): Promise<Stripe.Subscription> {
+    const subscription = await stripe.subscriptions.update(stripeSubscriptionId, {
+      cancel_at_period_end: false,
+    });
+    return subscription;
+  }
+
+  /**
+   * Get a Stripe subscription by ID
+   */
+  async getSubscription(stripeSubscriptionId: string): Promise<Stripe.Subscription> {
+    return await stripe.subscriptions.retrieve(stripeSubscriptionId);
+  }
+
+  /**
+   * Update subscription to a different pack (upgrade/downgrade)
+   * Changes take effect immediately with prorated charges
+   */
+  async updateSubscriptionPack(
+    stripeSubscriptionId: string,
+    newPack: ServicePack
+  ): Promise<Stripe.Subscription> {
+    // Ensure pack has Stripe price
+    let priceId = newPack.stripePriceId;
+    if (!priceId) {
+      const synced = await this.syncPackToStripe(newPack);
+      priceId = synced.priceId;
+    }
+
+    // Get current subscription
+    const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+    
+    if (subscription.items.data.length === 0) {
+      throw new Error("Subscription has no items");
+    }
+
+    // Update subscription item to new price
+    const updatedSubscription = await stripe.subscriptions.update(stripeSubscriptionId, {
+      items: [{
+        id: subscription.items.data[0].id,
+        price: priceId,
+      }],
+      proration_behavior: "create_prorations",
+      metadata: {
+        ...subscription.metadata,
+        packId: newPack.id,
+      },
+    });
+
+    return updatedSubscription;
+  }
+
+  /**
+   * Retry payment for a past_due subscription
+   */
+  async retrySubscriptionPayment(stripeSubscriptionId: string): Promise<Stripe.Invoice | null> {
+    const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+    
+    if (subscription.latest_invoice) {
+      const invoiceId = typeof subscription.latest_invoice === 'string' 
+        ? subscription.latest_invoice 
+        : subscription.latest_invoice.id;
+        
+      const invoice = await stripe.invoices.retrieve(invoiceId);
+      
+      if (invoice.status === 'open') {
+        const paidInvoice = await stripe.invoices.pay(invoiceId);
+        return paidInvoice;
+      }
+    }
+    
+    return null;
   }
 }
 
