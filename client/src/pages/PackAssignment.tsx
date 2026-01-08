@@ -294,7 +294,7 @@ export default function PackAssignment() {
                       <TableHead>Client</TableHead>
                       <TableHead>Pack</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Current Vendor</TableHead>
+                      <TableHead>Vendor</TableHead>
                       <TableHead>Pending Changes</TableHead>
                       <TableHead>Usage</TableHead>
                       <TableHead>Actions</TableHead>
@@ -320,9 +320,11 @@ export default function PackAssignment() {
                         </TableCell>
                         <TableCell>
                           <div className="font-medium">{sub.pack?.name || "Unknown Pack"}</div>
-                          <div className="text-sm text-muted-foreground">
-                            ${sub.priceAtSubscription || sub.pack?.price || "0"}/mo
-                          </div>
+                          {currentUser?.role === "admin" && (
+                            <div className="text-sm text-muted-foreground">
+                              ${sub.priceAtSubscription || sub.pack?.price || "0"}/mo
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Badge variant={sub.stripeStatus === "active" ? "default" : "secondary"}>
@@ -385,7 +387,7 @@ export default function PackAssignment() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <div className="text-sm">
+                          <div className="text-sm whitespace-nowrap">
                             {sub.totalUsed} / {sub.totalIncluded}
                           </div>
                         </TableCell>
@@ -396,6 +398,7 @@ export default function PackAssignment() {
                             onClick={() => openAssignModal(sub.id)}
                             data-testid={`button-assign-${sub.id}`}
                           >
+                            <UserPlus className="h-4 w-4 mr-1" />
                             {sub.vendorAssigneeId ? "Reassign" : "Assign"}
                           </Button>
                         </TableCell>
