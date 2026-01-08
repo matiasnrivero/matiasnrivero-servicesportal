@@ -461,17 +461,29 @@ export class StripeService {
     let schedule: Stripe.SubscriptionSchedule;
     
     if (subscription.schedule) {
-      // Already has a schedule - update it
+      // Already has a schedule - retrieve it first
       const existingScheduleId = typeof subscription.schedule === 'string' 
         ? subscription.schedule 
         : subscription.schedule.id;
       
-      // Update existing schedule with new phase
+      const existingSchedule = await stripe.subscriptionSchedules.retrieve(existingScheduleId);
+      
+      // Get the current phase and add a new phase after it
+      const currentPhases = existingSchedule.phases || [];
+      if (currentPhases.length === 0) {
+        throw new Error("Existing schedule has no phases");
+      }
+      
+      // Keep the current phase as-is, just add/update the future phase
+      const firstPhase = currentPhases[0];
       schedule = await stripe.subscriptionSchedules.update(existingScheduleId, {
         phases: [
           {
-            items: [{ price: currentPriceId }],
-            start_date: periodStart,
+            items: firstPhase.items.map(item => ({ 
+              price: typeof item.price === 'string' ? item.price : item.price?.id || currentPriceId,
+              quantity: item.quantity,
+            })),
+            start_date: firstPhase.start_date,
             end_date: changeStartDate,
           },
           {
@@ -484,16 +496,29 @@ export class StripeService {
       });
     } else {
       // Create a new schedule from the subscription
+      // This automatically creates the first phase from current subscription state
       schedule = await stripe.subscriptionSchedules.create({
         from_subscription: stripeSubscriptionId,
       });
       
-      // Update the schedule with the pending change phase
+      // Retrieve to get the auto-created phase
+      const createdSchedule = await stripe.subscriptionSchedules.retrieve(schedule.id);
+      const currentPhases = createdSchedule.phases || [];
+      
+      if (currentPhases.length === 0) {
+        throw new Error("Created schedule has no phases");
+      }
+      
+      // Update to add the future phase while preserving the current one
+      const firstPhase = currentPhases[0];
       schedule = await stripe.subscriptionSchedules.update(schedule.id, {
         phases: [
           {
-            items: [{ price: currentPriceId }],
-            start_date: periodStart,
+            items: firstPhase.items.map(item => ({ 
+              price: typeof item.price === 'string' ? item.price : item.price?.id || currentPriceId,
+              quantity: item.quantity,
+            })),
+            start_date: firstPhase.start_date,
             end_date: changeStartDate,
           },
           {
