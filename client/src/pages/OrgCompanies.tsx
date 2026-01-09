@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Header } from "@/components/Header";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,6 +18,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -24,21 +35,39 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Plus, Search, Users, Edit, Trash2 } from "lucide-react";
-import type { User, ClientCompany, VendorProfile } from "@shared/schema";
+import { Building2, Plus, Search, Users, Pencil, Trash2, Eye, LogIn, Store, Filter, CalendarIcon, X } from "lucide-react";
+import type { User, VendorProfile } from "@shared/schema";
+import { format } from "date-fns";
 
-interface EnrichedCompany extends ClientCompany {
+interface EnrichedCompany {
+  id: string;
+  name: string;
+  industry: string | null;
+  website: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  paymentConfiguration: string;
+  tripodDiscountTier?: string;
+  stripeCustomerId?: string | null;
+  isActive: number;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   memberCount: number;
   primaryContact: { id: string; username: string; email: string | null } | null;
   defaultVendor: { id: string; username: string } | null;
+  members?: User[];
 }
 
 async function getDefaultUser(): Promise<User | null> {
@@ -52,9 +81,15 @@ export default function OrgCompanies() {
   const [searchQuery, setSearchQuery] = useState("");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<EnrichedCompany | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [companyToDelete, setCompanyToDelete] = useState<EnrichedCompany | null>(null);
+  
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [paymentFilter, setPaymentFilter] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -64,8 +99,6 @@ export default function OrgCompanies() {
     phone: "",
     address: "",
     paymentConfiguration: "pay_as_you_go",
-    defaultVendorId: "",
-    notes: "",
   });
 
   const { data: currentUser } = useQuery<User | null>({
@@ -78,11 +111,6 @@ export default function OrgCompanies() {
     enabled: currentUser?.role === "admin",
   });
 
-  const { data: vendors = [] } = useQuery<VendorProfile[]>({
-    queryKey: ["/api/vendor-profiles"],
-    enabled: currentUser?.role === "admin",
-  });
-
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const res = await apiRequest("POST", "/api/org-companies", data);
@@ -90,7 +118,7 @@ export default function OrgCompanies() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/org-companies"] });
-      toast({ title: "Company created", description: "The client company has been created successfully." });
+      toast({ title: "Client created", description: "The client has been created successfully." });
       setCreateModalOpen(false);
       resetForm();
     },
@@ -106,7 +134,7 @@ export default function OrgCompanies() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/org-companies"] });
-      toast({ title: "Company updated", description: "The client company has been updated successfully." });
+      toast({ title: "Client updated", description: "The client has been updated successfully." });
       setEditModalOpen(false);
       setSelectedCompany(null);
       resetForm();
@@ -123,9 +151,22 @@ export default function OrgCompanies() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/org-companies"] });
-      toast({ title: "Company deleted", description: "The client company has been deleted." });
+      toast({ title: "Client deleted", description: "The client has been deleted." });
       setDeleteConfirmOpen(false);
       setCompanyToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      return apiRequest("PATCH", `/api/org-companies/${id}`, { isActive: isActive ? 1 : 0 });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/org-companies"] });
+      toast({ title: "Status updated" });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -141,8 +182,6 @@ export default function OrgCompanies() {
       phone: "",
       address: "",
       paymentConfiguration: "pay_as_you_go",
-      defaultVendorId: "",
-      notes: "",
     });
   };
 
@@ -156,20 +195,58 @@ export default function OrgCompanies() {
       phone: company.phone || "",
       address: company.address || "",
       paymentConfiguration: company.paymentConfiguration || "pay_as_you_go",
-      defaultVendorId: company.defaultVendorId || "",
-      notes: company.notes || "",
     });
     setEditModalOpen(true);
   };
 
+  const openViewModal = (company: EnrichedCompany) => {
+    setSelectedCompany(company);
+    setViewModalOpen(true);
+  };
+
+  const handleLoginAs = async (company: EnrichedCompany) => {
+    if (!company.primaryContact?.id) {
+      toast({ title: "Error", description: "No primary contact found for this client", variant: "destructive" });
+      return;
+    }
+    try {
+      await apiRequest("POST", "/api/login-as", { userId: company.primaryContact.id });
+      window.location.href = "/";
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to login as client", variant: "destructive" });
+    }
+  };
+
   const filteredCompanies = companies.filter((company) => {
     const query = searchQuery.toLowerCase();
-    return (
+    const matchesSearch = 
       company.name.toLowerCase().includes(query) ||
       company.email?.toLowerCase().includes(query) ||
       company.primaryContact?.username.toLowerCase().includes(query) ||
-      company.industry?.toLowerCase().includes(query)
-    );
+      company.industry?.toLowerCase().includes(query);
+    
+    const matchesStatus = statusFilter === "all" || 
+      (statusFilter === "active" && company.isActive === 1) || 
+      (statusFilter === "inactive" && company.isActive === 0);
+    
+    const matchesPayment = paymentFilter === "all" || company.paymentConfiguration === paymentFilter;
+    
+    let matchesDateRange = true;
+    if (company.createdAt) {
+      const companyDate = new Date(company.createdAt);
+      if (dateFrom) {
+        const fromStart = new Date(dateFrom);
+        fromStart.setHours(0, 0, 0, 0);
+        matchesDateRange = matchesDateRange && companyDate >= fromStart;
+      }
+      if (dateTo) {
+        const toEnd = new Date(dateTo);
+        toEnd.setHours(23, 59, 59, 999);
+        matchesDateRange = matchesDateRange && companyDate <= toEnd;
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesPayment && matchesDateRange;
   });
 
   const getPaymentBadgeVariant = (config: string) => {
@@ -190,6 +267,21 @@ export default function OrgCompanies() {
     }
   };
 
+  const formatDate = (date: Date | string) => {
+    if (!date) return "-";
+    return format(new Date(date), "MMM d, yyyy");
+  };
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("all");
+    setPaymentFilter("all");
+    setDateFrom(undefined);
+    setDateTo(undefined);
+  };
+
+  const hasActiveFilters = searchQuery || statusFilter !== "all" || paymentFilter !== "all" || dateFrom || dateTo;
+
   if (!currentUser || currentUser.role !== "admin") {
     return (
       <div className="min-h-screen bg-background">
@@ -208,138 +300,233 @@ export default function OrgCompanies() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="container mx-auto p-6">
-        <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Building2 className="h-6 w-6" />
-              Clients
-            </h1>
-            <p className="text-muted-foreground text-sm mt-1">
-              Manage clients for pack subscriptions and vendor assignments
-            </p>
-          </div>
-          <Button onClick={() => setCreateModalOpen(true)} data-testid="button-create-company">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Company
-          </Button>
-        </div>
-
-        <Card>
-          <CardHeader className="pb-4">
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name, email, contact, or industry..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                  data-testid="input-search-companies"
-                />
-              </div>
-              <Badge variant="outline" className="no-default-active-elevate">
-                {filteredCompanies.length} compan{filteredCompanies.length !== 1 ? "ies" : "y"}
-              </Badge>
+      <div className="p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between gap-3 mb-6">
+            <div className="flex items-center gap-3">
+              <Building2 className="h-8 w-8 text-sky-blue-accent" />
+              <h1 className="font-title-semibold text-dark-blue-night text-2xl">
+                Clients
+              </h1>
             </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="py-12 text-center text-muted-foreground">Loading clients...</div>
-            ) : filteredCompanies.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground">
-                {searchQuery ? "No clients match your search." : "No clients yet. Create one to get started."}
+            <Button onClick={() => setCreateModalOpen(true)} data-testid="button-create-company">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Company
+            </Button>
+          </div>
+
+          <Card className="mb-6">
+            <CardContent className="pt-6">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name, email, contact, or industry..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                    data-testid="input-search-companies"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[130px]" data-testid="filter-status">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+                  <SelectTrigger className="w-[180px]" data-testid="filter-payment">
+                    <SelectValue placeholder="All Payment Types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Payment Types</SelectItem>
+                    <SelectItem value="pay_as_you_go">Pay as you go</SelectItem>
+                    <SelectItem value="monthly_payment">Monthly Payment</SelectItem>
+                    <SelectItem value="deduct_from_royalties">Deduct from Royalties</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-[130px] justify-start text-left font-normal">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateFrom ? format(dateFrom, "MMM d") : "From"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateFrom}
+                      onSelect={setDateFrom}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-[130px] justify-start text-left font-normal">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateTo ? format(dateTo, "MMM d") : "To"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateTo}
+                      onSelect={setDateTo}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters}>
+                    <X className="h-4 w-4 mr-1" />
+                    Clear
+                  </Button>
+                )}
               </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Primary Contact</TableHead>
-                    <TableHead>Members</TableHead>
-                    <TableHead>Payment</TableHead>
-                    <TableHead>Default Vendor</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">
+                Clients ({filteredCompanies.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="py-12 text-center text-muted-foreground">Loading clients...</div>
+              ) : filteredCompanies.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  {hasActiveFilters ? "No clients match your filters." : "No clients yet. Create one to get started."}
+                </div>
+              ) : (
+                <div className="space-y-2">
                   {filteredCompanies.map((company) => (
-                    <TableRow key={company.id} data-testid={`row-company-${company.id}`}>
-                      <TableCell>
+                    <div
+                      key={company.id}
+                      className="flex items-center p-4 border rounded-md"
+                      data-testid={`row-client-${company.id}`}
+                    >
+                      <div className="w-16 flex-shrink-0">
+                        <Switch
+                          id={`toggle-client-${company.id}`}
+                          checked={company.isActive === 1}
+                          onCheckedChange={(checked) =>
+                            toggleActiveMutation.mutate({
+                              id: company.id,
+                              isActive: checked,
+                            })
+                          }
+                          data-testid={`switch-client-active-${company.id}`}
+                        />
+                      </div>
+                      <div className="w-[220px] flex-shrink-0 flex items-center gap-3">
+                        <Store className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                         <div>
-                          <div className="font-medium">{company.name}</div>
-                          {company.industry && (
-                            <div className="text-sm text-muted-foreground">{company.industry}</div>
-                          )}
+                          <p className="font-semibold text-dark-blue-night">
+                            {company.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{company.industry || "No industry"}</p>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        {company.primaryContact ? (
-                          <div>
-                            <div className="text-sm">{company.primaryContact.username}</div>
-                            {company.primaryContact.email && (
-                              <div className="text-xs text-muted-foreground">{company.primaryContact.email}</div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">Not assigned</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
+                      </div>
+                      <div className="w-[200px] flex-shrink-0">
+                        <p className="text-dark-blue-night truncate">
+                          {company.primaryContact?.username || "No contact"}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {company.primaryContact?.email || "-"}
+                        </p>
+                      </div>
+                      <div className="w-[80px] flex-shrink-0">
                         <div className="flex items-center gap-1">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          <span>{company.memberCount ?? 0}</span>
+                          <Users className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-sm">{company.memberCount}</span>
                         </div>
-                      </TableCell>
-                      <TableCell>
+                      </div>
+                      <div className="w-[150px] flex-shrink-0">
                         <Badge variant={getPaymentBadgeVariant(company.paymentConfiguration)}>
                           {formatPaymentConfig(company.paymentConfiguration)}
                         </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {company.defaultVendor ? (
-                          <span className="text-sm">{company.defaultVendor.username}</span>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">None</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={company.isActive ? "default" : "secondary"}>
-                          {company.isActive ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => openEditModal(company)}
-                            data-testid={`button-edit-${company.id}`}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => {
-                              setCompanyToDelete(company);
-                              setDeleteConfirmOpen(true);
-                            }}
-                            data-testid={`button-delete-${company.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                      </div>
+                      <div className="w-[100px] flex-shrink-0">
+                        <p className="text-sm text-muted-foreground">
+                          {formatDate(company.createdAt)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleLoginAs(company)}
+                              disabled={!company.primaryContact?.id}
+                              data-testid={`button-login-as-client-${company.id}`}
+                            >
+                              <LogIn className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Login As</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditModal(company)}
+                              data-testid={`button-edit-client-${company.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Edit</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openViewModal(company)}
+                              data-testid={`button-view-client-${company.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>View</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setCompanyToDelete(company);
+                                setDeleteConfirmOpen(true);
+                              }}
+                              data-testid={`button-delete-client-${company.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Delete</TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </main>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
         <DialogContent className="max-w-lg">
@@ -356,8 +543,8 @@ export default function OrgCompanies() {
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Acme Corporation"
-                data-testid="input-company-name"
+                placeholder="Enter company name"
+                data-testid="input-create-name"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -367,7 +554,7 @@ export default function OrgCompanies() {
                   id="industry"
                   value={formData.industry}
                   onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
-                  placeholder="Technology"
+                  placeholder="e.g., Technology"
                 />
               </div>
               <div className="grid gap-2">
@@ -388,7 +575,7 @@ export default function OrgCompanies() {
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="contact@example.com"
+                  placeholder="contact@company.com"
                 />
               </div>
               <div className="grid gap-2">
@@ -410,52 +597,21 @@ export default function OrgCompanies() {
                 placeholder="123 Main St, City, State"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="payment">Payment Configuration</Label>
-                <Select
-                  value={formData.paymentConfiguration}
-                  onValueChange={(value) => setFormData({ ...formData, paymentConfiguration: value })}
-                >
-                  <SelectTrigger data-testid="select-payment-config">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pay_as_you_go">Pay as you go</SelectItem>
-                    <SelectItem value="monthly_payment">Monthly Payment</SelectItem>
-                    <SelectItem value="deduct_from_royalties">Deduct from Royalties</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="vendor">Default Vendor</Label>
-                <Select
-                  value={formData.defaultVendorId}
-                  onValueChange={(value) => setFormData({ ...formData, defaultVendorId: value })}
-                >
-                  <SelectTrigger data-testid="select-default-vendor">
-                    <SelectValue placeholder="Select vendor..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">None</SelectItem>
-                    {vendors.map((vendor) => (
-                      <SelectItem key={vendor.id} value={vendor.userId}>
-                        {vendor.companyName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
             <div className="grid gap-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Internal notes about this company..."
-                rows={3}
-              />
+              <Label htmlFor="payment">Payment Configuration</Label>
+              <Select
+                value={formData.paymentConfiguration}
+                onValueChange={(value) => setFormData({ ...formData, paymentConfiguration: value })}
+              >
+                <SelectTrigger data-testid="select-payment-config">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pay_as_you_go">Pay as you go</SelectItem>
+                  <SelectItem value="monthly_payment">Monthly Payment</SelectItem>
+                  <SelectItem value="deduct_from_royalties">Deduct from Royalties</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
@@ -476,9 +632,9 @@ export default function OrgCompanies() {
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Edit Client Company</DialogTitle>
+            <DialogTitle>Edit Client</DialogTitle>
             <DialogDescription>
-              Update company details.
+              Update client details.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -536,51 +692,21 @@ export default function OrgCompanies() {
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-payment">Payment Configuration</Label>
-                <Select
-                  value={formData.paymentConfiguration}
-                  onValueChange={(value) => setFormData({ ...formData, paymentConfiguration: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pay_as_you_go">Pay as you go</SelectItem>
-                    <SelectItem value="monthly_payment">Monthly Payment</SelectItem>
-                    <SelectItem value="deduct_from_royalties">Deduct from Royalties</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-vendor">Default Vendor</Label>
-                <Select
-                  value={formData.defaultVendorId}
-                  onValueChange={(value) => setFormData({ ...formData, defaultVendorId: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select vendor..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">None</SelectItem>
-                    {vendors.map((vendor) => (
-                      <SelectItem key={vendor.id} value={vendor.userId}>
-                        {vendor.companyName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-notes">Notes</Label>
-              <Textarea
-                id="edit-notes"
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                rows={3}
-              />
+              <Label htmlFor="edit-payment">Payment Configuration</Label>
+              <Select
+                value={formData.paymentConfiguration}
+                onValueChange={(value) => setFormData({ ...formData, paymentConfiguration: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pay_as_you_go">Pay as you go</SelectItem>
+                  <SelectItem value="monthly_payment">Monthly Payment</SelectItem>
+                  <SelectItem value="deduct_from_royalties">Deduct from Royalties</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
@@ -598,29 +724,121 @@ export default function OrgCompanies() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent>
+      <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Delete Company</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Store className="h-5 w-5" />
+              {selectedCompany?.name}
+            </DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{companyToDelete?.name}"? This action cannot be undone.
+              Client details and team members
             </DialogDescription>
           </DialogHeader>
+          {selectedCompany && (
+            <div className="grid gap-6 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground text-xs">Industry</Label>
+                  <p className="font-medium">{selectedCompany.industry || "-"}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Website</Label>
+                  <p className="font-medium">{selectedCompany.website || "-"}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Email</Label>
+                  <p className="font-medium">{selectedCompany.email || "-"}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Phone</Label>
+                  <p className="font-medium">{selectedCompany.phone || "-"}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Address</Label>
+                  <p className="font-medium">{selectedCompany.address || "-"}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Payment</Label>
+                  <Badge variant={getPaymentBadgeVariant(selectedCompany.paymentConfiguration)}>
+                    {formatPaymentConfig(selectedCompany.paymentConfiguration)}
+                  </Badge>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Status</Label>
+                  <Badge variant={selectedCompany.isActive === 1 ? "default" : "secondary"}>
+                    {selectedCompany.isActive === 1 ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Created</Label>
+                  <p className="font-medium">{formatDate(selectedCompany.createdAt)}</p>
+                </div>
+              </div>
+              
+              <div className="border-t pt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Users className="h-4 w-4" />
+                  <Label className="font-semibold">Team Members ({selectedCompany.memberCount})</Label>
+                </div>
+                {selectedCompany.primaryContact ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-md">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
+                        {selectedCompany.primaryContact.username.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium">{selectedCompany.primaryContact.username}</p>
+                        <p className="text-xs text-muted-foreground">{selectedCompany.primaryContact.email}</p>
+                      </div>
+                      <Badge variant="default" className="bg-emerald-600">Primary Admin</Badge>
+                    </div>
+                    {selectedCompany.members && selectedCompany.members.length > 1 && (
+                      <div className="text-sm text-muted-foreground">
+                        + {selectedCompany.memberCount - 1} other member(s)
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-sm">No team members assigned</p>
+                )}
+              </div>
+            </div>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
-              Cancel
+            <Button variant="outline" onClick={() => setViewModalOpen(false)}>
+              Close
             </Button>
-            <Button
-              variant="destructive"
-              onClick={() => companyToDelete && deleteMutation.mutate(companyToDelete.id)}
-              disabled={deleteMutation.isPending}
-              data-testid="button-confirm-delete"
-            >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            <Button onClick={() => {
+              setViewModalOpen(false);
+              if (selectedCompany) openEditModal(selectedCompany);
+            }}>
+              Edit Client
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Client</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{companyToDelete?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => companyToDelete && deleteMutation.mutate(companyToDelete.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
