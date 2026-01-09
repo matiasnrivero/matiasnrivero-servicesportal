@@ -296,7 +296,7 @@ export function Header() {
                 className={location.startsWith("/org-companies") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-companies"
               >
-                Client Companies
+                Clients
               </Button>
             </Link>
           )}
