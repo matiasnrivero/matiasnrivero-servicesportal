@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Header } from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -47,7 +47,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Building2, Plus, Search, Users, Pencil, Trash2, Eye, LogIn, Store, Filter, CalendarIcon, X } from "lucide-react";
-import type { User, VendorProfile } from "@shared/schema";
+import type { User } from "@shared/schema";
 import { format } from "date-fns";
 
 interface EnrichedCompany {
@@ -78,11 +78,9 @@ async function getDefaultUser(): Promise<User | null> {
 
 export default function OrgCompanies() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState<EnrichedCompany | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [companyToDelete, setCompanyToDelete] = useState<EnrichedCompany | null>(null);
   
@@ -120,23 +118,6 @@ export default function OrgCompanies() {
       queryClient.invalidateQueries({ queryKey: ["/api/org-companies"] });
       toast({ title: "Client created", description: "The client has been created successfully." });
       setCreateModalOpen(false);
-      resetForm();
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
-      const res = await apiRequest("PATCH", `/api/org-companies/${id}`, data);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/org-companies"] });
-      toast({ title: "Client updated", description: "The client has been updated successfully." });
-      setEditModalOpen(false);
-      setSelectedCompany(null);
       resetForm();
     },
     onError: (error: Error) => {
@@ -183,25 +164,6 @@ export default function OrgCompanies() {
       address: "",
       paymentConfiguration: "pay_as_you_go",
     });
-  };
-
-  const openEditModal = (company: EnrichedCompany) => {
-    setSelectedCompany(company);
-    setFormData({
-      name: company.name,
-      industry: company.industry || "",
-      website: company.website || "",
-      email: company.email || "",
-      phone: company.phone || "",
-      address: company.address || "",
-      paymentConfiguration: company.paymentConfiguration || "pay_as_you_go",
-    });
-    setEditModalOpen(true);
-  };
-
-  const openViewModal = (company: EnrichedCompany) => {
-    setSelectedCompany(company);
-    setViewModalOpen(true);
   };
 
   const handleLoginAs = async (company: EnrichedCompany) => {
@@ -481,7 +443,7 @@ export default function OrgCompanies() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => openEditModal(company)}
+                              onClick={() => setLocation(`/org-companies/${company.id}`)}
                               data-testid={`button-edit-client-${company.id}`}
                             >
                               <Pencil className="h-4 w-4" />
@@ -494,7 +456,7 @@ export default function OrgCompanies() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => openViewModal(company)}
+                              onClick={() => setLocation(`/org-companies/${company.id}`)}
                               data-testid={`button-view-client-${company.id}`}
                             >
                               <Eye className="h-4 w-4" />
@@ -624,196 +586,6 @@ export default function OrgCompanies() {
               data-testid="button-submit-create"
             >
               {createMutation.isPending ? "Creating..." : "Create Company"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Edit Client</DialogTitle>
-            <DialogDescription>
-              Update client details.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="edit-name">Company Name *</Label>
-              <Input
-                id="edit-name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                data-testid="input-edit-name"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-industry">Industry</Label>
-                <Input
-                  id="edit-industry"
-                  value={formData.industry}
-                  onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-website">Website</Label>
-                <Input
-                  id="edit-website"
-                  value={formData.website}
-                  onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-email">Email</Label>
-                <Input
-                  id="edit-email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-phone">Phone</Label>
-                <Input
-                  id="edit-phone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-address">Address</Label>
-              <Input
-                id="edit-address"
-                value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-payment">Payment Configuration</Label>
-              <Select
-                value={formData.paymentConfiguration}
-                onValueChange={(value) => setFormData({ ...formData, paymentConfiguration: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pay_as_you_go">Pay as you go</SelectItem>
-                  <SelectItem value="monthly_payment">Monthly Payment</SelectItem>
-                  <SelectItem value="deduct_from_royalties">Deduct from Royalties</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => selectedCompany && updateMutation.mutate({ id: selectedCompany.id, data: formData })}
-              disabled={!formData.name || updateMutation.isPending}
-              data-testid="button-submit-edit"
-            >
-              {updateMutation.isPending ? "Saving..." : "Save Changes"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Store className="h-5 w-5" />
-              {selectedCompany?.name}
-            </DialogTitle>
-            <DialogDescription>
-              Client details and team members
-            </DialogDescription>
-          </DialogHeader>
-          {selectedCompany && (
-            <div className="grid gap-6 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground text-xs">Industry</Label>
-                  <p className="font-medium">{selectedCompany.industry || "-"}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Website</Label>
-                  <p className="font-medium">{selectedCompany.website || "-"}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Email</Label>
-                  <p className="font-medium">{selectedCompany.email || "-"}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Phone</Label>
-                  <p className="font-medium">{selectedCompany.phone || "-"}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Address</Label>
-                  <p className="font-medium">{selectedCompany.address || "-"}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Payment</Label>
-                  <Badge variant={getPaymentBadgeVariant(selectedCompany.paymentConfiguration)}>
-                    {formatPaymentConfig(selectedCompany.paymentConfiguration)}
-                  </Badge>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Status</Label>
-                  <Badge variant={selectedCompany.isActive === 1 ? "default" : "secondary"}>
-                    {selectedCompany.isActive === 1 ? "Active" : "Inactive"}
-                  </Badge>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-xs">Created</Label>
-                  <p className="font-medium">{formatDate(selectedCompany.createdAt)}</p>
-                </div>
-              </div>
-              
-              <div className="border-t pt-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Users className="h-4 w-4" />
-                  <Label className="font-semibold">Team Members ({selectedCompany.memberCount})</Label>
-                </div>
-                {selectedCompany.primaryContact ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-md">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
-                        {selectedCompany.primaryContact.username.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium">{selectedCompany.primaryContact.username}</p>
-                        <p className="text-xs text-muted-foreground">{selectedCompany.primaryContact.email}</p>
-                      </div>
-                      <Badge variant="default" className="bg-emerald-600">Primary Admin</Badge>
-                    </div>
-                    {selectedCompany.members && selectedCompany.members.length > 1 && (
-                      <div className="text-sm text-muted-foreground">
-                        + {selectedCompany.memberCount - 1} other member(s)
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-sm">No team members assigned</p>
-                )}
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewModalOpen(false)}>
-              Close
-            </Button>
-            <Button onClick={() => {
-              setViewModalOpen(false);
-              if (selectedCompany) openEditModal(selectedCompany);
-            }}>
-              Edit Client
             </Button>
           </DialogFooter>
         </DialogContent>
