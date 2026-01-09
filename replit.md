@@ -135,38 +135,31 @@ Fully functional automation engine for automatic job routing based on vendor/des
 - **Settings.tsx Automation Tab**: Admin-only access to global automation rules management.
 - **VendorProfile.tsx Automation Tab**: Vendors manage their service capacities (daily capacity, priority, routing strategy) and designer capacities (per-designer service assignments with primary flag).
 
-## Client Company Entity Management (Phase 7)
+## Client Company Management (Phase 7)
 
-Two-tier client model for organizational pack subscriptions and vendor assignments.
+Simplified client company entity for pack subscriptions and vendor assignments.
 
 ### Database Schema
-- **clientCompanies**: Canonical organizational entity for company-wide pack subscriptions.
+- **clientCompanies**: Entity for company-wide pack subscriptions and vendor assignments.
   - Fields: `name`, `industry`, `website`, `email`, `phone`, `address`, `primaryContactId`, `defaultVendorId`, `paymentConfiguration`, `notes`, `isActive`.
   - Links users via `users.clientCompanyId` foreign key.
-- **clientProfiles**: Legacy client profiles retained for backward compatibility.
-- **clientPackSubscriptions**: Supports both `clientProfileId` (legacy) and `clientCompanyId` (new).
+- **clientPackSubscriptions**: Supports `clientCompanyId` for company-level subscriptions.
 
 ### API Endpoints
-- **`GET /api/org-companies`**: List all organizational companies (Admin only).
+- **`GET /api/org-companies`**: List all client companies (Admin only).
 - **`GET /api/org-companies/:id`**: Get single company with members and contact info.
-- **`POST /api/org-companies`**: Create new organizational company.
+- **`POST /api/org-companies`**: Create new client company.
 - **`PATCH /api/org-companies/:id`**: Update company details.
 - **`DELETE /api/org-companies/:id`**: Soft delete company.
-- **`GET /api/org-companies/:id/members`**: Get company members.
-- **`POST /api/org-companies/:id/members`**: Add user to company.
-- **`DELETE /api/org-companies/:id/members/:userId`**: Remove user from company.
 
 ### Frontend
-- **OrgCompanies.tsx** (`/org-companies`): Consolidated company management page with tabs:
-  - **Organizations Tab**: New organizational entities for pack subscriptions and vendor assignments.
-  - **Legacy Clients Tab**: Read-only access to legacy clientProfiles for migration reference.
-- **Navigation**: Single "Companies" link in header points to consolidated experience.
+- **OrgCompanies.tsx** (`/org-companies`): Admin page for managing client companies.
+- **Navigation**: "Client Companies" link in header (Admin only).
 
 ### Company-Level Features
 - **Pack Subscriptions**: Support `clientCompanyId` for company-wide subscriptions.
 - **Vendor Assignment**: `defaultVendorId` on companies for automatic vendor routing.
 - **Payment Configuration**: Company-level payment method (pay_as_you_go, monthly_payment, deduct_from_royalties).
-- **Reports**: Vendor Payments Packs report shows company names from both clientCompanies and clientProfiles.
 
 # External Dependencies
 

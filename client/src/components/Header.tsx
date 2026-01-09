@@ -292,11 +292,11 @@ export function Header() {
           {canViewClientCompanies && (
             <Link href="/org-companies">
               <Button
-                variant={location.startsWith("/org-companies") || location.startsWith("/client-companies") ? "default" : "ghost"}
-                className={location.startsWith("/org-companies") || location.startsWith("/client-companies") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
+                variant={location.startsWith("/org-companies") ? "default" : "ghost"}
+                className={location.startsWith("/org-companies") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-companies"
               >
-                Companies
+                Client Companies
               </Button>
             </Link>
           )}
