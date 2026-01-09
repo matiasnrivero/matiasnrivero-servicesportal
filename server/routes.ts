@@ -3170,11 +3170,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ======= CLIENT COMPANIES (Organizational Entities) =======
-  // New Phase 7 endpoints for organizational company management
-  // These use the clientCompanies table for company-wide pack subscriptions and vendor assignments
+  // ======= CLIENTS (Client Profiles) =======
+  // Endpoints for client company management using existing clientProfiles table
   
-  // List all organizational companies (admin only)
+  // List all client profiles (admin only)
   app.get("/api/org-companies", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -3186,43 +3185,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Admin access required" });
       }
 
-      const companies = await storage.getClientCompanies();
+      const profiles = await storage.getAllClientProfiles();
       
       // Enrich with member count and primary contact info
-      const enrichedCompanies = await Promise.all(
-        companies.map(async (company) => {
-          const members = await storage.getClientCompanyMembers(company.id);
-          const primaryContact = company.primaryContactId 
-            ? await storage.getUser(company.primaryContactId) 
-            : null;
-          const defaultVendor = company.defaultVendorId 
-            ? await storage.getUser(company.defaultVendorId) 
+      const enrichedProfiles = await Promise.all(
+        profiles.map(async (profile) => {
+          const members = await storage.getClientTeamMembers(profile.id);
+          const primaryContact = profile.primaryUserId 
+            ? await storage.getUser(profile.primaryUserId) 
             : null;
           
           return {
-            ...company,
+            id: profile.id,
+            name: profile.companyName,
+            industry: profile.industry,
+            website: profile.website,
+            email: profile.email,
+            phone: profile.phone,
+            address: profile.address,
+            paymentConfiguration: profile.paymentConfiguration,
+            tripodDiscountTier: profile.tripodDiscountTier,
+            stripeCustomerId: profile.stripeCustomerId,
+            isActive: profile.deletedAt ? 0 : 1,
+            createdAt: profile.createdAt,
+            updatedAt: profile.updatedAt,
             memberCount: members.length,
             primaryContact: primaryContact ? {
               id: primaryContact.id,
               username: primaryContact.username,
               email: primaryContact.email,
             } : null,
-            defaultVendor: defaultVendor ? {
-              id: defaultVendor.id,
-              username: defaultVendor.username,
-            } : null,
+            defaultVendor: null,
           };
         })
       );
 
-      res.json(enrichedCompanies);
+      res.json(enrichedProfiles);
     } catch (error) {
-      console.error("Error fetching organizational companies:", error);
-      res.status(500).json({ error: "Failed to fetch companies" });
+      console.error("Error fetching client profiles:", error);
+      res.status(500).json({ error: "Failed to fetch clients" });
     }
   });
 
-  // Get single organizational company
+  // Get single client profile
   app.get("/api/org-companies/:id", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -3234,21 +3239,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Admin access required" });
       }
 
-      const company = await storage.getClientCompany(req.params.id);
-      if (!company) {
-        return res.status(404).json({ error: "Company not found" });
+      const profile = await storage.getClientProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Client not found" });
       }
 
-      const members = await storage.getClientCompanyMembers(company.id);
-      const primaryContact = company.primaryContactId 
-        ? await storage.getUser(company.primaryContactId) 
-        : null;
-      const defaultVendor = company.defaultVendorId 
-        ? await storage.getUser(company.defaultVendorId) 
+      const members = await storage.getClientTeamMembers(profile.id);
+      const primaryContact = profile.primaryUserId 
+        ? await storage.getUser(profile.primaryUserId) 
         : null;
 
       res.json({
-        ...company,
+        id: profile.id,
+        name: profile.companyName,
+        industry: profile.industry,
+        website: profile.website,
+        email: profile.email,
+        phone: profile.phone,
+        address: profile.address,
+        paymentConfiguration: profile.paymentConfiguration,
+        tripodDiscountTier: profile.tripodDiscountTier,
+        stripeCustomerId: profile.stripeCustomerId,
+        isActive: profile.deletedAt ? 0 : 1,
+        createdAt: profile.createdAt,
+        updatedAt: profile.updatedAt,
         memberCount: members.length,
         members,
         primaryContact: primaryContact ? {
@@ -3256,18 +3270,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           username: primaryContact.username,
           email: primaryContact.email,
         } : null,
-        defaultVendor: defaultVendor ? {
-          id: defaultVendor.id,
-          username: defaultVendor.username,
-        } : null,
+        defaultVendor: null,
       });
     } catch (error) {
-      console.error("Error fetching organizational company:", error);
-      res.status(500).json({ error: "Failed to fetch company" });
+      console.error("Error fetching client profile:", error);
+      res.status(500).json({ error: "Failed to fetch client" });
     }
   });
 
-  // Create organizational company
+  // Create client profile
   app.post("/api/org-companies", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -3279,33 +3290,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Admin access required" });
       }
 
-      const { name, industry, website, email, phone, address, primaryContactId, defaultVendorId, paymentConfiguration, notes } = req.body;
+      const { name, industry, website, email, phone, address, primaryContactId, paymentConfiguration } = req.body;
       
       if (!name) {
         return res.status(400).json({ error: "Company name is required" });
       }
 
-      const company = await storage.createClientCompany({
-        name,
+      // Create a placeholder user as primary user if no primaryContactId is provided
+      const primaryUserId = primaryContactId || sessionUserId;
+
+      const profile = await storage.createClientProfile({
+        companyName: name,
+        primaryUserId,
         industry,
         website,
         email,
         phone,
         address,
-        primaryContactId,
-        defaultVendorId,
         paymentConfiguration: paymentConfiguration || "pay_as_you_go",
-        notes,
       });
 
-      res.status(201).json(company);
+      res.status(201).json({
+        id: profile.id,
+        name: profile.companyName,
+        industry: profile.industry,
+        website: profile.website,
+        email: profile.email,
+        phone: profile.phone,
+        address: profile.address,
+        paymentConfiguration: profile.paymentConfiguration,
+        isActive: profile.deletedAt ? 0 : 1,
+        createdAt: profile.createdAt,
+        updatedAt: profile.updatedAt,
+      });
     } catch (error) {
-      console.error("Error creating organizational company:", error);
-      res.status(500).json({ error: "Failed to create company" });
+      console.error("Error creating client profile:", error);
+      res.status(500).json({ error: "Failed to create client" });
     }
   });
 
-  // Update organizational company
+  // Update client profile
   app.patch("/api/org-companies/:id", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -3317,20 +3341,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Admin access required" });
       }
 
-      const company = await storage.getClientCompany(req.params.id);
-      if (!company) {
-        return res.status(404).json({ error: "Company not found" });
+      const profile = await storage.getClientProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Client not found" });
       }
 
-      const updated = await storage.updateClientCompany(req.params.id, req.body);
-      res.json(updated);
+      // Map incoming fields to clientProfile fields
+      const updateData: any = {};
+      if (req.body.name !== undefined) updateData.companyName = req.body.name;
+      if (req.body.industry !== undefined) updateData.industry = req.body.industry;
+      if (req.body.website !== undefined) updateData.website = req.body.website;
+      if (req.body.email !== undefined) updateData.email = req.body.email;
+      if (req.body.phone !== undefined) updateData.phone = req.body.phone;
+      if (req.body.address !== undefined) updateData.address = req.body.address;
+      if (req.body.paymentConfiguration !== undefined) updateData.paymentConfiguration = req.body.paymentConfiguration;
+      if (req.body.primaryContactId !== undefined) updateData.primaryUserId = req.body.primaryContactId;
+      if (req.body.tripodDiscountTier !== undefined) updateData.tripodDiscountTier = req.body.tripodDiscountTier;
+
+      const updated = await storage.updateClientProfile(req.params.id, updateData);
+      if (!updated) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      res.json({
+        id: updated.id,
+        name: updated.companyName,
+        industry: updated.industry,
+        website: updated.website,
+        email: updated.email,
+        phone: updated.phone,
+        address: updated.address,
+        paymentConfiguration: updated.paymentConfiguration,
+        tripodDiscountTier: updated.tripodDiscountTier,
+        isActive: updated.deletedAt ? 0 : 1,
+        createdAt: updated.createdAt,
+        updatedAt: updated.updatedAt,
+      });
     } catch (error) {
-      console.error("Error updating organizational company:", error);
-      res.status(500).json({ error: "Failed to update company" });
+      console.error("Error updating client profile:", error);
+      res.status(500).json({ error: "Failed to update client" });
     }
   });
 
-  // Delete (soft) organizational company
+  // Delete (soft) client profile
   app.delete("/api/org-companies/:id", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -3342,20 +3395,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Admin access required" });
       }
 
-      const company = await storage.getClientCompany(req.params.id);
-      if (!company) {
-        return res.status(404).json({ error: "Company not found" });
+      const profile = await storage.getClientProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Client not found" });
       }
 
-      await storage.deleteClientCompany(req.params.id);
-      res.json({ success: true, message: "Company deleted" });
+      await storage.deleteClientProfile(req.params.id);
+      res.json({ success: true, message: "Client deleted" });
     } catch (error) {
-      console.error("Error deleting organizational company:", error);
-      res.status(500).json({ error: "Failed to delete company" });
+      console.error("Error deleting client profile:", error);
+      res.status(500).json({ error: "Failed to delete client" });
     }
   });
 
-  // Get members of an organizational company
+  // Get members of a client profile
   app.get("/api/org-companies/:id/members", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -3367,20 +3420,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Admin access required" });
       }
 
-      const company = await storage.getClientCompany(req.params.id);
-      if (!company) {
-        return res.status(404).json({ error: "Company not found" });
+      const profile = await storage.getClientProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Client not found" });
       }
 
-      const members = await storage.getClientCompanyMembers(req.params.id);
+      const members = await storage.getClientTeamMembers(req.params.id);
       res.json(members);
     } catch (error) {
-      console.error("Error fetching company members:", error);
+      console.error("Error fetching client members:", error);
       res.status(500).json({ error: "Failed to fetch members" });
     }
   });
 
-  // Add a user to an organizational company
+  // Add a user to a client profile
   app.post("/api/org-companies/:id/members", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -3392,9 +3445,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Admin access required" });
       }
 
-      const company = await storage.getClientCompany(req.params.id);
-      if (!company) {
-        return res.status(404).json({ error: "Company not found" });
+      const profile = await storage.getClientProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Client not found" });
       }
 
       const { userId } = req.body;
@@ -3407,16 +3460,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
 
-      // Link user to company
-      await storage.updateUser(userId, { clientCompanyId: req.params.id });
-      res.json({ success: true, message: "User added to company" });
+      // Link user to client profile
+      await storage.updateUser(userId, { clientProfileId: req.params.id });
+      res.json({ success: true, message: "User added to client" });
     } catch (error) {
-      console.error("Error adding member to company:", error);
+      console.error("Error adding member to client:", error);
       res.status(500).json({ error: "Failed to add member" });
     }
   });
 
-  // Remove a user from an organizational company
+  // Remove a user from a client profile
   app.delete("/api/org-companies/:id/members/:userId", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
@@ -3428,9 +3481,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Admin access required" });
       }
 
-      const company = await storage.getClientCompany(req.params.id);
-      if (!company) {
-        return res.status(404).json({ error: "Company not found" });
+      const profile = await storage.getClientProfileById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ error: "Client not found" });
       }
 
       const user = await storage.getUser(req.params.userId);
@@ -3438,17 +3491,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
 
-      if (user.clientCompanyId !== req.params.id) {
-        return res.status(400).json({ error: "User is not a member of this company" });
+      if (user.clientProfileId !== req.params.id) {
+        return res.status(400).json({ error: "User is not a member of this client" });
       }
 
       // Cannot remove the primary contact
-      if (company.primaryContactId === req.params.userId) {
+      if (profile.primaryUserId === req.params.userId) {
         return res.status(400).json({ error: "Cannot remove the primary contact. Assign a new primary contact first." });
       }
 
-      // Unlink user from company
-      await storage.updateUser(req.params.userId, { clientCompanyId: null });
+      // Unlink user from client profile
+      await storage.updateUser(req.params.userId, { clientProfileId: null });
       res.json({ success: true, message: "User removed from company" });
     } catch (error) {
       console.error("Error removing member from company:", error);

@@ -213,10 +213,10 @@ export default function OrgCompanies() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <Building2 className="h-6 w-6" />
-              Client Companies
+              Clients
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Manage client companies for pack subscriptions and vendor assignments
+              Manage clients for pack subscriptions and vendor assignments
             </p>
           </div>
           <Button onClick={() => setCreateModalOpen(true)} data-testid="button-create-company">
@@ -245,10 +245,10 @@ export default function OrgCompanies() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="py-12 text-center text-muted-foreground">Loading companies...</div>
+              <div className="py-12 text-center text-muted-foreground">Loading clients...</div>
             ) : filteredCompanies.length === 0 ? (
               <div className="py-12 text-center text-muted-foreground">
-                {searchQuery ? "No companies match your search." : "No client companies yet. Create one to get started."}
+                {searchQuery ? "No clients match your search." : "No clients yet. Create one to get started."}
               </div>
             ) : (
               <Table>
