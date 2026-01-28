@@ -438,18 +438,18 @@ export default function OrgCompanies() {
                           <span className="text-sm">{company.memberCount}</span>
                         </div>
                       </div>
-                      <div className="w-[140px] flex-shrink-0">
+                      <div className="w-[160px] flex-shrink-0">
                         <Badge variant={getPaymentBadgeVariant(company.paymentConfiguration)} className="whitespace-nowrap">
                           {formatPaymentConfig(company.paymentConfiguration)}
                         </Badge>
                       </div>
-                      <div className="w-[100px] flex-shrink-0">
-                        <p className="text-sm text-muted-foreground">
+                      <div className="w-[110px] flex-shrink-0">
+                        <p className="text-sm text-muted-foreground whitespace-nowrap">
                           {formatDate(company.createdAt)}
                         </p>
                       </div>
-                      <div className="w-[90px] flex-shrink-0">
-                        <span className="text-sm font-medium text-primary">
+                      <div className="flex-1 min-w-[100px]">
+                        <span className="text-sm font-medium text-primary whitespace-nowrap">
                           Discount {getDiscountPercentage(company.tripodDiscountTier)}
                         </span>
                       </div>
