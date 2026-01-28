@@ -443,15 +443,15 @@ export default function OrgCompanies() {
                           {formatPaymentConfig(company.paymentConfiguration)}
                         </Badge>
                       </div>
-                      <div className="w-[110px] flex-shrink-0">
-                        <p className="text-sm text-muted-foreground whitespace-nowrap">
-                          {formatDate(company.createdAt)}
-                        </p>
-                      </div>
-                      <div className="flex-1 min-w-[100px]">
+                      <div className="w-[100px] flex-shrink-0">
                         <span className="text-sm font-medium text-primary whitespace-nowrap">
                           Discount {getDiscountPercentage(company.tripodDiscountTier)}
                         </span>
+                      </div>
+                      <div className="flex-1 min-w-[100px]">
+                        <p className="text-sm text-muted-foreground whitespace-nowrap">
+                          {formatDate(company.createdAt)}
+                        </p>
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
                         <Tooltip>
