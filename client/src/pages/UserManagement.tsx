@@ -761,11 +761,6 @@ export default function UserManagement() {
                       {user.id === currentUser?.id && (
                         <Badge variant="outline">You</Badge>
                       )}
-                      {!user.isActive && (
-                        <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
-                          Inactive
-                        </Badge>
-                      )}
                       <div className="text-sm text-dark-gray min-w-[90px]">
                         {user.createdAt ? format(new Date(user.createdAt), "MMM d, yyyy") : "-"}
                       </div>
