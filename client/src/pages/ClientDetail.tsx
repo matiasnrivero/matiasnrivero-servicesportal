@@ -93,6 +93,7 @@ export default function ClientDetail() {
     phone: "",
     address: "",
     paymentConfiguration: "pay_as_you_go",
+    tripodDiscountTier: "none",
   });
   
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -146,6 +147,7 @@ export default function ClientDetail() {
         phone: clientData.phone || "",
         address: clientData.address || "",
         paymentConfiguration: clientData.paymentConfiguration || "pay_as_you_go",
+        tripodDiscountTier: clientData.tripodDiscountTier || "none",
       });
     }
   }, [clientData]);
@@ -160,6 +162,7 @@ export default function ClientDetail() {
         phone: data.phone,
         address: data.address,
         paymentConfiguration: data.paymentConfiguration,
+        tripodDiscountTier: data.tripodDiscountTier,
       });
     },
     onSuccess: () => {
@@ -448,6 +451,23 @@ export default function ClientDetail() {
                             <SelectItem value="pay_as_you_go">Pay as you go</SelectItem>
                             <SelectItem value="monthly_payment">Monthly Payment</SelectItem>
                             <SelectItem value="deduct_from_royalties">Deduct from Royalties</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="tripod-discount">Tri-POD Product Discount</Label>
+                        <Select
+                          value={profileForm.tripodDiscountTier}
+                          onValueChange={(value) => setProfileForm({ ...profileForm, tripodDiscountTier: value })}
+                        >
+                          <SelectTrigger data-testid="select-tripod-discount">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            <SelectItem value="power_level">Tri-POD Power Level Client (10%)</SelectItem>
+                            <SelectItem value="oms_subscription">OMS Subscription (15%)</SelectItem>
+                            <SelectItem value="enterprise">Enterprise (20%)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
