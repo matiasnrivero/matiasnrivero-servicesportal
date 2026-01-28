@@ -86,6 +86,7 @@ export default function OrgCompanies() {
   
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
+  const [discountFilter, setDiscountFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 
@@ -193,6 +194,8 @@ export default function OrgCompanies() {
     
     const matchesPayment = paymentFilter === "all" || company.paymentConfiguration === paymentFilter;
     
+    const matchesDiscount = discountFilter === "all" || company.tripodDiscountTier === discountFilter;
+    
     let matchesDateRange = true;
     if (company.createdAt) {
       const companyDate = new Date(company.createdAt);
@@ -208,7 +211,7 @@ export default function OrgCompanies() {
       }
     }
     
-    return matchesSearch && matchesStatus && matchesPayment && matchesDateRange;
+    return matchesSearch && matchesStatus && matchesPayment && matchesDiscount && matchesDateRange;
   });
 
   const getPaymentBadgeVariant = (config: string) => {
@@ -234,15 +237,25 @@ export default function OrgCompanies() {
     return format(new Date(date), "MMM d, yyyy");
   };
 
+  const getDiscountPercentage = (tier?: string) => {
+    switch (tier) {
+      case "power_level": return "10%";
+      case "oms_subscription": return "15%";
+      case "enterprise": return "20%";
+      default: return "0%";
+    }
+  };
+
   const clearFilters = () => {
     setSearchQuery("");
     setStatusFilter("all");
     setPaymentFilter("all");
+    setDiscountFilter("all");
     setDateFrom(undefined);
     setDateTo(undefined);
   };
 
-  const hasActiveFilters = searchQuery || statusFilter !== "all" || paymentFilter !== "all" || dateFrom || dateTo;
+  const hasActiveFilters = searchQuery || statusFilter !== "all" || paymentFilter !== "all" || discountFilter !== "all" || dateFrom || dateTo;
 
   if (!currentUser || currentUser.role !== "admin") {
     return (
@@ -312,6 +325,18 @@ export default function OrgCompanies() {
                     <SelectItem value="pay_as_you_go">Pay as you go</SelectItem>
                     <SelectItem value="monthly_payment">Monthly Payment</SelectItem>
                     <SelectItem value="deduct_from_royalties">Deduct from Royalties</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={discountFilter} onValueChange={setDiscountFilter}>
+                  <SelectTrigger className="w-[160px]" data-testid="filter-discount">
+                    <SelectValue placeholder="All Discounts" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Discounts</SelectItem>
+                    <SelectItem value="none">No Discount (0%)</SelectItem>
+                    <SelectItem value="power_level">Power Level (10%)</SelectItem>
+                    <SelectItem value="oms_subscription">OMS (15%)</SelectItem>
+                    <SelectItem value="enterprise">Enterprise (20%)</SelectItem>
                   </SelectContent>
                 </Select>
                 <Popover>
@@ -413,8 +438,8 @@ export default function OrgCompanies() {
                           <span className="text-sm">{company.memberCount}</span>
                         </div>
                       </div>
-                      <div className="w-[150px] flex-shrink-0">
-                        <Badge variant={getPaymentBadgeVariant(company.paymentConfiguration)}>
+                      <div className="w-[140px] flex-shrink-0">
+                        <Badge variant={getPaymentBadgeVariant(company.paymentConfiguration)} className="whitespace-nowrap">
                           {formatPaymentConfig(company.paymentConfiguration)}
                         </Badge>
                       </div>
@@ -422,6 +447,11 @@ export default function OrgCompanies() {
                         <p className="text-sm text-muted-foreground">
                           {formatDate(company.createdAt)}
                         </p>
+                      </div>
+                      <div className="w-[90px] flex-shrink-0">
+                        <span className="text-sm font-medium text-primary">
+                          Discount {getDiscountPercentage(company.tripodDiscountTier)}
+                        </span>
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
                         <Tooltip>
