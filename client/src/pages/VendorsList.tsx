@@ -387,15 +387,14 @@ export default function VendorsList() {
                           <p className="text-dark-blue-night truncate">{vendor.username}</p>
                           <p className="text-xs text-dark-gray">Primary Contact</p>
                         </div>
-                        <div className="w-[220px] flex-shrink-0">
+                        <div className="flex-1 min-w-[200px]">
                           <p className="text-dark-blue-night truncate">{vendor.email || "No email"}</p>
                           <p className="text-xs text-dark-gray">Email</p>
                         </div>
-                        <div className="flex-1 min-w-[100px]">
+                        <div className="w-[110px] flex-shrink-0">
                           <p className="text-sm text-muted-foreground whitespace-nowrap">
                             {vendor.createdAt ? format(new Date(vendor.createdAt), "MMM d, yyyy") : "-"}
                           </p>
-                          <p className="text-xs text-dark-gray">Created</p>
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
                           <Tooltip>
