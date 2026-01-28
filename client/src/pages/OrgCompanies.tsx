@@ -172,7 +172,7 @@ export default function OrgCompanies() {
       return;
     }
     try {
-      await apiRequest("POST", "/api/login-as", { userId: company.primaryContact.id });
+      await apiRequest("POST", `/api/users/${company.primaryContact.id}/impersonate`);
       window.location.href = "/";
     } catch (error) {
       toast({ title: "Error", description: "Failed to login as client", variant: "destructive" });
