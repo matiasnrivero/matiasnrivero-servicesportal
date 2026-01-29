@@ -217,6 +217,10 @@ export const serviceRequests = pgTable("service_requests", {
   // Pack coverage tracking - determines if this service is covered by a pack subscription
   isPackCovered: boolean("is_pack_covered").default(false), // True if service is included in pack (shows "Included in Pack" badge)
   packSubscriptionId: varchar("pack_subscription_id").references(() => clientPackSubscriptions.id), // Link to the pack subscription covering this request
+  // Pack overage tracking - when client exceeds pack quota, charged at retail price with client discount
+  isPackOverage: boolean("is_pack_overage").default(false), // True if this is an overage beyond pack quota
+  overageRetailPrice: decimal("overage_retail_price", { precision: 10, scale: 2 }), // Retail price before client discount
+  overageClientDiscount: decimal("overage_client_discount", { precision: 5, scale: 2 }), // Client discount percentage applied (from tripodDiscountTier)
   // Client payment tracking (for Monthly Payment and Deduct from Royalties clients)
   clientPaymentStatus: text("client_payment_status").default("pending"), // 'pending' | 'paid' | 'included_in_pack'
   clientPaymentPeriod: text("client_payment_period"), // Format: YYYY-MM (billing period)

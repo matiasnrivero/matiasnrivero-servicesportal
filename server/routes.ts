@@ -12,13 +12,20 @@ import type { User } from "@shared/schema";
  * Rounds up to nearest cent
  */
 function applyTripodDiscount(price: number, discountTier: string): number {
-  const discountPercent = 
-    discountTier === "power_level" ? 10 :
-    discountTier === "oms_subscription" ? 15 :
-    discountTier === "enterprise" ? 20 : 0;
+  const discountPercent = getTripodDiscountPercent(discountTier);
   
   if (discountPercent === 0) return price;
   return Math.ceil((price * (1 - discountPercent / 100)) * 100) / 100;
+}
+
+/**
+ * Get the discount percentage for a Tri-POD tier
+ * Used for overage billing where client discount applies to retail price
+ */
+function getTripodDiscountPercent(discountTier: string): number {
+  return discountTier === "power_level" ? 10 :
+         discountTier === "oms_subscription" ? 15 :
+         discountTier === "enterprise" ? 20 : 0;
 }
 
 /**
@@ -589,6 +596,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check for active service pack subscription for pack-based pricing
+      // IMPORTANT: Monthly packs don't accumulate - unused services reset each month (like cellphone plans)
       if (sessionUser.clientProfileId && req.body.serviceId) {
         try {
           // Get service to find the parent service (father service)
@@ -603,26 +611,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const pack = await storage.getServicePack(subscription.packId);
             if (pack) {
               const packItems = await storage.getServicePackItems(pack.id);
-              const packService = packItems.find((item: { serviceId: string }) => item.serviceId === fatherServiceId);
+              const packService = packItems.find((item: { serviceId: string; quantity: number }) => item.serviceId === fatherServiceId);
               if (packService) {
-                // Calculate per-unit price from pack
+                // Get current billing period usage - monthly packs DON'T accumulate
+                const { month, year } = getCSTMonthYear();
+                const currentMonthUsage = await storage.getMonthlyPackUsageBySubscription(subscription.id, month, year);
+                const serviceUsage = currentMonthUsage.find(u => u.serviceId === fatherServiceId);
+                const usedQuantity = serviceUsage?.usedQuantity ?? 0;
+                const includedQuantity = packService.quantity;
+                const remainingQuota = Math.max(0, includedQuantity - usedQuantity);
+                
+                // Calculate per-unit price from pack (for reference/display)
                 const totalQty = packItems.reduce((sum: number, item: { quantity: number }) => sum + item.quantity, 0);
                 const priceToUse = subscription.priceAtSubscription || pack.price;
                 const perUnitPrice = totalQty > 0 ? parseFloat(priceToUse) / totalQty : 0;
                 
-                // Set pack pricing on the request (server-authoritative, always overwrite client values)
-                requestData.monthlyPackSubscriptionId = subscription.id;
-                requestData.monthlyPackUnitPrice = perUnitPrice.toFixed(2);
-                requestData.finalPrice = perUnitPrice.toFixed(2);
-                requestData.discountAmount = "0.00"; // Pack pricing doesn't stack with discounts
-                delete requestData.discountCouponId; // Coupons don't apply to pack pricing
-                
-                // Set pack coverage fields for tracking and display
-                requestData.isPackCovered = true;
-                requestData.packSubscriptionId = subscription.id;
-                requestData.clientPaymentStatus = "included_in_pack";
-                
-                console.log(`Applied service pack pricing: subscription=${subscription.id}, unitPrice=${perUnitPrice.toFixed(2)}`);
+                if (remainingQuota > 0) {
+                  // WITHIN QUOTA: Service is covered by pack
+                  requestData.monthlyPackSubscriptionId = subscription.id;
+                  requestData.monthlyPackUnitPrice = perUnitPrice.toFixed(2);
+                  requestData.finalPrice = perUnitPrice.toFixed(2);
+                  requestData.discountAmount = "0.00"; // Pack pricing doesn't stack with discounts
+                  delete requestData.discountCouponId; // Coupons don't apply to pack pricing
+                  
+                  // Set pack coverage fields for tracking and display
+                  requestData.isPackCovered = true;
+                  requestData.isPackOverage = false;
+                  requestData.packSubscriptionId = subscription.id;
+                  requestData.clientPaymentStatus = "included_in_pack";
+                  
+                  console.log(`Applied service pack pricing: subscription=${subscription.id}, unitPrice=${perUnitPrice.toFixed(2)}, remaining=${remainingQuota}/${includedQuantity}`);
+                } else {
+                  // OVERAGE: Beyond pack quota - charge at retail price with client discount
+                  // Note: Client discounts (tripodDiscountTier) apply, but NOT coupon discounts
+                  const retailPrice = service?.basePrice ? parseFloat(service.basePrice) : 0;
+                  let clientDiscountPercent = 0;
+                  let priceAfterClientDiscount = retailPrice;
+                  
+                  // Get client profile to check for tripodDiscountTier
+                  let clientProfile = null;
+                  if (sessionUser.clientProfileId) {
+                    clientProfile = await storage.getClientProfileById(sessionUser.clientProfileId);
+                  }
+                  if (!clientProfile && ["client", "client_member"].includes(sessionUser.role)) {
+                    clientProfile = await storage.getClientProfile(sessionUserId);
+                  }
+                  
+                  // Apply client discount (tripodDiscountTier) - NOT coupon discounts
+                  if (clientProfile && clientProfile.tripodDiscountTier && clientProfile.tripodDiscountTier !== "none") {
+                    clientDiscountPercent = getTripodDiscountPercent(clientProfile.tripodDiscountTier);
+                    priceAfterClientDiscount = retailPrice * (1 - clientDiscountPercent / 100);
+                  }
+                  
+                  // Set overage pricing on the request
+                  requestData.monthlyPackSubscriptionId = subscription.id;
+                  requestData.monthlyPackUnitPrice = perUnitPrice.toFixed(2);
+                  requestData.finalPrice = priceAfterClientDiscount.toFixed(2);
+                  requestData.discountAmount = (retailPrice - priceAfterClientDiscount).toFixed(2);
+                  delete requestData.discountCouponId; // NO coupon discounts on overages
+                  
+                  // Mark as overage
+                  requestData.isPackCovered = false;
+                  requestData.isPackOverage = true;
+                  requestData.packSubscriptionId = subscription.id;
+                  requestData.overageRetailPrice = retailPrice.toFixed(2);
+                  requestData.overageClientDiscount = clientDiscountPercent.toFixed(2);
+                  requestData.clientPaymentStatus = "pending"; // Overage needs to be billed
+                  
+                  console.log(`Pack OVERAGE: subscription=${subscription.id}, retail=$${retailPrice}, clientDiscount=${clientDiscountPercent}%, final=$${priceAfterClientDiscount.toFixed(2)}, used=${usedQuantity}/${includedQuantity}`);
+                }
                 break; // Use the first matching subscription
               }
             }

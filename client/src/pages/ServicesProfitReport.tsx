@@ -69,6 +69,8 @@ interface ReportRow {
   discount: number;
   profit: number;
   createdAt: Date;
+  isPackCovered?: boolean;
+  isPackOverage?: boolean;
 }
 
 interface MultiSelectClientFilterProps {
@@ -508,6 +510,8 @@ export default function ServicesProfitReport() {
         discount,
         profit,
         createdAt: new Date(request.createdAt),
+        isPackCovered: request.isPackCovered ?? false,
+        isPackOverage: request.isPackOverage ?? false,
       });
     });
 
@@ -978,9 +982,21 @@ export default function ServicesProfitReport() {
                       <TableCell>{row.clientName}</TableCell>
                       <TableCell>{row.serviceName}</TableCell>
                       <TableCell className="whitespace-nowrap">
-                        <Badge variant="outline" className="text-xs">
-                          {row.serviceMethod === "ad_hoc" ? "Ad-hoc" : "Bundle"}
-                        </Badge>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <Badge variant="outline" className="text-xs">
+                            {row.serviceMethod === "ad_hoc" ? "Ad-hoc" : "Bundle"}
+                          </Badge>
+                          {row.isPackCovered && (
+                            <Badge className="text-xs bg-blue-100 text-blue-700 border-blue-200">
+                              Pack
+                            </Badge>
+                          )}
+                          {row.isPackOverage && (
+                            <Badge className="text-xs bg-amber-100 text-amber-700 border-amber-200">
+                              Overage
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         {(() => {
