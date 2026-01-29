@@ -4339,6 +4339,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: Get all subscriptions for a specific pack
+  app.get("/api/admin/pack-subscriptions/by-pack/:packId", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || !["admin", "internal_designer"].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Admin or Internal Designer access required" });
+      }
+
+      const { packId } = req.params;
+      const allSubscriptions = await storage.getAllClientPackSubscriptions();
+      
+      // Filter by packId
+      const subscriptions = allSubscriptions.filter(sub => sub.packId === packId);
+      
+      // Enrich with client profile data
+      const enrichedSubscriptions = await Promise.all(subscriptions.map(async (sub) => {
+        const [clientProfile, pack, vendorAssignee] = await Promise.all([
+          sub.clientProfileId ? storage.getClientProfileById(sub.clientProfileId) : null,
+          storage.getServicePack(sub.packId),
+          sub.vendorAssigneeId ? storage.getUser(sub.vendorAssigneeId) : null,
+        ]);
+        
+        // Get client user info if available
+        let clientUser = null;
+        if (clientProfile) {
+          const teamMembers = await storage.getClientTeamMembers(clientProfile.id);
+          clientUser = teamMembers.find((u: any) => u.role === 'client') || teamMembers[0];
+        }
+        
+        return {
+          id: sub.id,
+          packId: sub.packId,
+          isActive: sub.isActive,
+          stripeStatus: sub.stripeStatus,
+          startDate: sub.startDate,
+          clientProfile: clientProfile ? {
+            id: clientProfile.id,
+            companyName: clientProfile.companyName,
+          } : null,
+          clientUser: clientUser ? { 
+            id: clientUser.id, 
+            username: clientUser.username, 
+            email: clientUser.email 
+          } : null,
+          vendorAssignee: vendorAssignee ? {
+            id: vendorAssignee.id,
+            username: vendorAssignee.username,
+          } : null,
+        };
+      }));
+
+      res.json(enrichedSubscriptions);
+    } catch (error) {
+      console.error("Error fetching subscriptions by pack:", error);
+      res.status(500).json({ error: "Failed to fetch subscriptions by pack" });
+    }
+  });
+
   // Admin: Update pack subscription (vendor assignment, etc.)
   app.patch("/api/admin/pack-subscriptions/:id", async (req, res) => {
     try {

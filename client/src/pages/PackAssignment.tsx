@@ -31,7 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Package, Clock, X, UserPlus, ArrowRight } from "lucide-react";
+import { Users, Package, Clock, X, UserPlus, ArrowRight, Eye } from "lucide-react";
 import { format } from "date-fns";
 import type { User, ServicePack, VendorProfile } from "@shared/schema";
 
@@ -82,6 +82,8 @@ export default function PackAssignment() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [singleAssignId, setSingleAssignId] = useState<string | null>(null);
+  const [clientsModalOpen, setClientsModalOpen] = useState(false);
+  const [selectedPackForClients, setSelectedPackForClients] = useState<{ id: string; name: string } | null>(null);
 
   const { data: currentUser } = useQuery<User | null>({
     queryKey: ["/api/default-user"],
@@ -95,6 +97,27 @@ export default function PackAssignment() {
   const { data: vendorProfiles = [] } = useQuery<VendorProfile[]>({
     queryKey: ["/api/vendor-profiles"],
   });
+
+  interface PackClientSubscription {
+    id: string;
+    packId: string;
+    isActive: boolean;
+    stripeStatus: string | null;
+    startDate: string;
+    clientProfile: { id: string; companyName: string } | null;
+    clientUser: { id: string; username: string; email: string } | null;
+    vendorAssignee: { id: string; username: string } | null;
+  }
+
+  const { data: packClients = [], isLoading: isLoadingPackClients } = useQuery<PackClientSubscription[]>({
+    queryKey: [`/api/admin/pack-subscriptions/by-pack/${selectedPackForClients?.id}`],
+    enabled: !!selectedPackForClients?.id && clientsModalOpen,
+  });
+
+  const openClientsModal = (packId: string, packName: string) => {
+    setSelectedPackForClients({ id: packId, name: packName });
+    setClientsModalOpen(true);
+  };
 
   const bulkAssignMutation = useMutation({
     mutationFn: async (data: { subscriptionIds: string[]; vendorAssigneeId: string; assignmentType: string }) => {
@@ -319,7 +342,23 @@ export default function PackAssignment() {
                           <div className="text-sm text-muted-foreground">{sub.clientUser?.email || ""}</div>
                         </TableCell>
                         <TableCell>
-                          <div className="font-medium">{sub.pack?.name || "Unknown Pack"}</div>
+                          <div className="flex items-center gap-2">
+                            <div className="font-medium">{sub.pack?.name || "Unknown Pack"}</div>
+                            {sub.pack && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openClientsModal(sub.pack!.id, sub.pack!.name);
+                                }}
+                                title="View all clients using this pack"
+                                data-testid={`button-view-pack-clients-${sub.pack.id}`}
+                              >
+                                <Eye className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            )}
+                          </div>
                           {currentUser?.role === "admin" && (
                             <div className="text-sm text-muted-foreground">
                               ${sub.priceAtSubscription || sub.pack?.price || "0"}/mo
@@ -476,6 +515,69 @@ export default function PackAssignment() {
                 data-testid="button-confirm-assign"
               >
                 {bulkAssignMutation.isPending ? "Assigning..." : "Assign Vendor"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={clientsModalOpen} onOpenChange={setClientsModalOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Clients Using {selectedPackForClients?.name || "Pack"}
+              </DialogTitle>
+              <DialogDescription>
+                All clients with an active or inactive subscription to this pack
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex-1 overflow-auto">
+              {isLoadingPackClients ? (
+                <div className="text-center py-8 text-muted-foreground">Loading clients...</div>
+              ) : packClients.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No clients are using this pack.</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Client</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Vendor</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {packClients.map((client) => (
+                      <TableRow key={client.id} data-testid={`row-pack-client-${client.id}`}>
+                        <TableCell className="font-medium">
+                          {client.clientProfile?.companyName || client.clientUser?.username || "Unknown"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {client.clientUser?.email || "-"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={client.stripeStatus === "active" || (!client.stripeStatus && client.isActive) ? "default" : "secondary"}>
+                            {client.stripeStatus || (client.isActive ? "active" : "inactive")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {client.vendorAssignee ? (
+                            <span>{vendorProfiles.find(vp => vp.userId === client.vendorAssignee?.id)?.companyName || client.vendorAssignee.username}</span>
+                          ) : (
+                            <span className="text-muted-foreground">Unassigned</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setClientsModalOpen(false)} data-testid="button-close-clients-modal">
+                Close
               </Button>
             </DialogFooter>
           </DialogContent>
