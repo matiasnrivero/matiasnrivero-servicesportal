@@ -722,10 +722,11 @@ export default function UserManagement() {
                 filteredUsers.map((user) => (
                   <div
                     key={user.id}
-                    className="flex items-center justify-between p-4 border rounded-md"
+                    className="flex items-center gap-4 p-4 border rounded-md"
                     data-testid={`row-user-${user.id}`}
                   >
-                    <div className="flex items-center gap-4">
+                    {/* Toggle */}
+                    <div className="flex-shrink-0">
                       {canToggleUserActive(user) && user.id !== currentUser?.id ? (
                         <Switch
                           id={`toggle-${user.id}`}
@@ -741,33 +742,49 @@ export default function UserManagement() {
                       ) : (
                         <div className="w-9" />
                       )}
+                    </div>
+                    {/* Avatar + Name */}
+                    <div className="flex items-center gap-3 w-[200px] flex-shrink-0">
                       <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                         <span className="text-blue-700 font-medium text-sm">
                           {user.username?.charAt(0).toUpperCase() || "?"}
                         </span>
                       </div>
-                      <div className="min-w-[180px]">
-                        <p className="font-semibold text-dark-blue-night">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-dark-blue-night truncate">
                           {user.username}
                         </p>
-                        <p className="text-sm text-dark-gray">{user.email || "No email"}</p>
+                        {user.id === currentUser?.id && (
+                          <Badge variant="outline" className="text-xs">You</Badge>
+                        )}
                       </div>
+                    </div>
+                    {/* Email */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-dark-gray truncate">{user.email || "No email"}</p>
+                    </div>
+                    {/* Role */}
+                    <div className="w-[140px] flex-shrink-0">
                       <Badge 
                         variant={roleBadgeVariants[user.role] || "outline"}
-                        className={roleBadgeColors[user.role] || ""}
+                        className={`${roleBadgeColors[user.role] || ""} whitespace-nowrap`}
                       >
                         {roleLabels[user.role] || user.role}
                       </Badge>
-                      {user.id === currentUser?.id && (
-                        <Badge variant="outline">You</Badge>
-                      )}
-                      <div className="text-sm text-dark-gray min-w-[90px]">
-                        {user.createdAt ? format(new Date(user.createdAt), "MMM d, yyyy") : "-"}
-                      </div>
-                      <div className="text-sm text-dark-gray min-w-[90px]">
-                        {user.lastLoginAt ? format(new Date(user.lastLoginAt), "MMM d, yyyy") : "Never"}
-                      </div>
                     </div>
+                    {/* Created Date */}
+                    <div className="w-[100px] flex-shrink-0">
+                      <p className="text-sm text-muted-foreground whitespace-nowrap">
+                        {user.createdAt ? format(new Date(user.createdAt), "MMM d, yyyy") : "-"}
+                      </p>
+                    </div>
+                    {/* Last Login */}
+                    <div className="w-[100px] flex-shrink-0">
+                      <p className="text-sm text-muted-foreground whitespace-nowrap">
+                        {user.lastLoginAt ? format(new Date(user.lastLoginAt), "MMM d, yyyy") : "Never"}
+                      </p>
+                    </div>
+                    {/* Actions */}
                     <div className="flex items-center gap-2">
                       {canImpersonateUser(user) && (
                         <Tooltip>
