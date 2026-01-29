@@ -327,8 +327,8 @@ export default function PackAssignment() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={sub.stripeStatus === "active" ? "default" : "secondary"}>
-                            {sub.stripeStatus || "unknown"}
+                          <Badge variant={sub.stripeStatus === "active" || (!sub.stripeStatus && sub.isActive) ? "default" : "secondary"}>
+                            {sub.stripeStatus || (sub.isActive ? "active" : "inactive")}
                           </Badge>
                           {sub.cancelAt && (
                             <Badge variant="destructive" className="ml-1">
