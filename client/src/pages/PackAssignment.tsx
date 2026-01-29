@@ -315,7 +315,8 @@ export default function PackAssignment() {
                         />
                       </TableHead>
                       <TableHead>Client</TableHead>
-                      <TableHead className="w-[220px]">Pack</TableHead>
+                      <TableHead>Pack</TableHead>
+                      <TableHead className="w-[40px]"></TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Vendor</TableHead>
                       <TableHead>Pending Changes</TableHead>
@@ -342,30 +343,28 @@ export default function PackAssignment() {
                           <div className="text-sm text-muted-foreground">{sub.clientUser?.email || ""}</div>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <div className="font-medium">{sub.pack?.name || "Unknown Pack"}</div>
-                              {currentUser?.role === "admin" && (
-                                <div className="text-sm text-muted-foreground">
-                                  ${sub.priceAtSubscription || sub.pack?.price || "0"}/mo
-                                </div>
-                              )}
+                          <div className="font-medium">{sub.pack?.name || "Unknown Pack"}</div>
+                          {currentUser?.role === "admin" && (
+                            <div className="text-sm text-muted-foreground">
+                              ${sub.priceAtSubscription || sub.pack?.price || "0"}/mo
                             </div>
-                            {sub.pack && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openClientsModal(sub.pack!.id, sub.pack!.name);
-                                }}
-                                title="View all clients using this pack"
-                                data-testid={`button-view-pack-clients-${sub.pack.id}`}
-                              >
-                                <Eye className="h-4 w-4 text-muted-foreground" />
-                              </Button>
-                            )}
-                          </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="p-0">
+                          {sub.pack && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openClientsModal(sub.pack!.id, sub.pack!.name);
+                              }}
+                              title="View all clients using this pack"
+                              data-testid={`button-view-pack-clients-${sub.pack.id}`}
+                            >
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Badge variant={sub.stripeStatus === "active" || (!sub.stripeStatus && sub.isActive) ? "default" : "secondary"}>
