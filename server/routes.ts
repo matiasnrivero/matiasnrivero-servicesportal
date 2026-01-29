@@ -675,16 +675,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 // Validate coupon scope
                 let couponValid = true;
                 
-                // Check service restriction
+                // Check if coupon applies to services at all (using new appliesToServices field)
+                if (coupon.appliesToServices === false) {
+                  couponValid = false;
+                  console.log(`Coupon ${coupon.code} rejected: does not apply to services`);
+                }
+                
+                // Check service restriction (specific service must match)
                 if (coupon.serviceId && coupon.serviceId !== req.body.serviceId) {
                   couponValid = false;
                   console.log(`Coupon ${coupon.code} rejected: service mismatch`);
-                }
-                
-                // Check bundle-only coupons (not valid for services)
-                if (coupon.bundleId && !coupon.serviceId) {
-                  couponValid = false;
-                  console.log(`Coupon ${coupon.code} rejected: bundle-only coupon`);
                 }
                 
                 // Check client restriction (coupon.clientId can be a user ID or client profile ID)
@@ -5633,25 +5633,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: "This coupon has reached its usage limit" });
         }
         
-        // Validate coupon applies to this bundle
-        // Coupon applicability rules:
-        // - If coupon has BOTH serviceId AND bundleId: dual-scope coupon, valid for either
-        // - If coupon.serviceId only is set: service-only coupon
-        // - If coupon.bundleId only is set: must match this bundle
-        // - If both are null: global coupon
-        const couponHasServiceRestriction = !!coupon.serviceId;
-        const couponHasBundleRestriction = !!coupon.bundleId;
-        const isDualScopeCoupon = couponHasServiceRestriction && couponHasBundleRestriction;
-        
-        if (isDualScopeCoupon) {
-          // Dual-scope coupon: for bundle requests, check if bundleId matches
-          if (coupon.bundleId !== requestData.bundleId) {
-            return res.status(400).json({ error: "This coupon is not valid for the selected bundle" });
-          }
-        } else if (couponHasServiceRestriction) {
-          // Service-only coupon, not valid for bundles
+        // Validate coupon applies to bundles using new appliesToBundles field
+        if (coupon.appliesToBundles === false) {
           return res.status(400).json({ error: "This coupon is only valid for services" });
-        } else if (couponHasBundleRestriction && coupon.bundleId !== requestData.bundleId) {
+        }
+        
+        // Check specific bundle restriction if set
+        if (coupon.bundleId && coupon.bundleId !== requestData.bundleId) {
           return res.status(400).json({ error: "This coupon is not valid for the selected bundle" });
         }
         
@@ -8756,47 +8744,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check service/bundle restriction based on what's being purchased
-      // Coupon applicability rules:
-      // - If coupon has BOTH serviceId AND bundleId: dual-scope coupon, valid for either that service OR that bundle
-      // - If coupon.serviceId only is set: coupon is restricted to that specific service
-      // - If coupon.bundleId only is set: coupon is restricted to that specific bundle
-      // - If both are null: global coupon, applies to anything
-      
-      const couponHasServiceRestriction = !!coupon.serviceId;
-      const couponHasBundleRestriction = !!coupon.bundleId;
-      const isDualScopeCoupon = couponHasServiceRestriction && couponHasBundleRestriction;
+      // Using new appliesToServices and appliesToBundles flags for explicit scope control
       const isServiceRequest = !!serviceId && !bundleId;
       const isBundleRequest = !!bundleId && !serviceId;
       
-      if (isDualScopeCoupon) {
-        // Dual-scope coupon: valid for the specific service OR the specific bundle
-        if (isServiceRequest) {
-          if (coupon.serviceId !== serviceId) {
-            return res.status(400).json({ error: "This coupon is not valid for the selected service" });
-          }
-        } else if (isBundleRequest) {
-          if (coupon.bundleId !== bundleId) {
-            return res.status(400).json({ error: "This coupon is not valid for the selected bundle" });
-          }
-        }
-      } else if (isServiceRequest) {
+      if (isServiceRequest) {
         // Purchasing a service
-        if (couponHasBundleRestriction) {
-          // Coupon is bundle-only, not valid for services
+        if (coupon.appliesToServices === false) {
           return res.status(400).json({ error: "This coupon is only valid for bundles" });
         }
-        if (couponHasServiceRestriction && coupon.serviceId !== serviceId) {
-          // Coupon is for a different service
+        // Check specific service restriction
+        if (coupon.serviceId && coupon.serviceId !== serviceId) {
           return res.status(400).json({ error: "This coupon is not valid for the selected service" });
         }
       } else if (isBundleRequest) {
         // Purchasing a bundle
-        if (couponHasServiceRestriction) {
-          // Coupon is service-only, not valid for bundles
+        if (coupon.appliesToBundles === false) {
           return res.status(400).json({ error: "This coupon is only valid for services" });
         }
-        if (couponHasBundleRestriction && coupon.bundleId !== bundleId) {
-          // Coupon is for a different bundle
+        // Check specific bundle restriction
+        if (coupon.bundleId && coupon.bundleId !== bundleId) {
           return res.status(400).json({ error: "This coupon is not valid for the selected bundle" });
         }
       }

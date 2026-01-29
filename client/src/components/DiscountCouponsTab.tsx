@@ -61,10 +61,33 @@ const couponFormSchema = z.object({
   discountValue: z.string().min(1, "Discount value is required"),
   serviceId: z.string().nullable().optional(),
   bundleId: z.string().nullable().optional(),
+  serviceSelection: z.enum(["none", "all", "specific"]).default("all"),
+  bundleSelection: z.enum(["none", "all", "specific"]).default("all"),
   maxUses: z.number().min(1, "Max uses must be at least 1").default(1),
   clientId: z.string().nullable().optional(),
   validFrom: z.string().nullable().optional(),
   validTo: z.string().nullable().optional(),
+}).refine((data) => {
+  return data.serviceSelection !== "none" || data.bundleSelection !== "none";
+}, {
+  message: "At least one of Ad-hoc Services or Bundles must be selected",
+  path: ["serviceSelection"],
+}).refine((data) => {
+  if (data.serviceSelection === "specific" && !data.serviceId) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Please select a specific service",
+  path: ["serviceId"],
+}).refine((data) => {
+  if (data.bundleSelection === "specific" && !data.bundleId) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Please select a specific bundle",
+  path: ["bundleId"],
 });
 
 type CouponFormData = z.infer<typeof couponFormSchema>;
@@ -112,6 +135,8 @@ export function DiscountCouponsTab() {
       discountValue: "",
       serviceId: null,
       bundleId: null,
+      serviceSelection: "all",
+      bundleSelection: "all",
       maxUses: 1,
       clientId: null,
       validFrom: null,
@@ -120,13 +145,21 @@ export function DiscountCouponsTab() {
   });
 
   const discountType = form.watch("discountType");
+  const serviceSelection = form.watch("serviceSelection");
+  const bundleSelection = form.watch("bundleSelection");
 
   const createMutation = useMutation({
     mutationFn: async (data: CouponFormData) => {
       const payload = {
-        ...data,
-        serviceId: data.serviceId || null,
-        bundleId: data.bundleId || null,
+        code: data.code,
+        isActive: data.isActive,
+        discountType: data.discountType,
+        discountValue: data.discountValue,
+        appliesToServices: data.serviceSelection !== "none",
+        appliesToBundles: data.bundleSelection !== "none",
+        serviceId: data.serviceSelection === "specific" ? data.serviceId : null,
+        bundleId: data.bundleSelection === "specific" ? data.bundleId : null,
+        maxUses: data.maxUses,
         clientId: data.clientId || null,
         validFrom: data.validFrom ? new Date(data.validFrom).toISOString() : null,
         validTo: data.validTo ? new Date(data.validTo).toISOString() : null,
@@ -146,14 +179,20 @@ export function DiscountCouponsTab() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: CouponFormData & { id: string }) => {
-      const { id, ...payload } = data;
+      const { id, ...formData } = data;
       return apiRequest("PATCH", `/api/discount-coupons/${id}`, {
-        ...payload,
-        serviceId: payload.serviceId || null,
-        bundleId: payload.bundleId || null,
-        clientId: payload.clientId || null,
-        validFrom: payload.validFrom ? new Date(payload.validFrom).toISOString() : null,
-        validTo: payload.validTo ? new Date(payload.validTo).toISOString() : null,
+        code: formData.code,
+        isActive: formData.isActive,
+        discountType: formData.discountType,
+        discountValue: formData.discountValue,
+        appliesToServices: formData.serviceSelection !== "none",
+        appliesToBundles: formData.bundleSelection !== "none",
+        serviceId: formData.serviceSelection === "specific" ? formData.serviceId : null,
+        bundleId: formData.bundleSelection === "specific" ? formData.bundleId : null,
+        maxUses: formData.maxUses,
+        clientId: formData.clientId || null,
+        validFrom: formData.validFrom ? new Date(formData.validFrom).toISOString() : null,
+        validTo: formData.validTo ? new Date(formData.validTo).toISOString() : null,
       });
     },
     onSuccess: () => {
@@ -196,6 +235,23 @@ export function DiscountCouponsTab() {
 
   const handleEdit = (coupon: DiscountCoupon) => {
     setEditingCoupon(coupon);
+    
+    // Determine service selection type based on appliesToServices and serviceId
+    let serviceSelection: "none" | "all" | "specific" = "all";
+    if (coupon.appliesToServices === false) {
+      serviceSelection = "none";
+    } else if (coupon.serviceId) {
+      serviceSelection = "specific";
+    }
+    
+    // Determine bundle selection type based on appliesToBundles and bundleId
+    let bundleSelection: "none" | "all" | "specific" = "all";
+    if (coupon.appliesToBundles === false) {
+      bundleSelection = "none";
+    } else if (coupon.bundleId) {
+      bundleSelection = "specific";
+    }
+    
     form.reset({
       code: coupon.code,
       isActive: coupon.isActive,
@@ -203,6 +259,8 @@ export function DiscountCouponsTab() {
       discountValue: coupon.discountValue,
       serviceId: coupon.serviceId,
       bundleId: coupon.bundleId,
+      serviceSelection,
+      bundleSelection,
       maxUses: coupon.maxUses,
       clientId: coupon.clientId,
       validFrom: coupon.validFrom ? new Date(coupon.validFrom).toISOString().split("T")[0] : null,
@@ -220,6 +278,8 @@ export function DiscountCouponsTab() {
       discountValue: "",
       serviceId: null,
       bundleId: null,
+      serviceSelection: "all",
+      bundleSelection: "all",
       maxUses: 1,
       clientId: null,
       validFrom: null,
@@ -334,12 +394,16 @@ export function DiscountCouponsTab() {
                       <TableCell>{formatDiscountValue(coupon)}</TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
-                          <Badge variant="outline">
-                            {coupon.serviceId ? getServiceName(coupon.serviceId) : "All Services"}
-                          </Badge>
-                          <Badge variant="outline">
-                            {coupon.bundleId ? getBundleName(coupon.bundleId) : "All Bundles"}
-                          </Badge>
+                          {coupon.appliesToServices !== false && (
+                            <Badge variant="outline">
+                              {coupon.serviceId ? getServiceName(coupon.serviceId) : "All Services"}
+                            </Badge>
+                          )}
+                          {coupon.appliesToBundles !== false && (
+                            <Badge variant="outline">
+                              {coupon.bundleId ? getBundleName(coupon.bundleId) : "All Bundles"}
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -515,23 +579,84 @@ export function DiscountCouponsTab() {
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="serviceId"
+                  name="serviceSelection"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Service (Optional)</FormLabel>
+                      <FormLabel>Ad-hoc Services</FormLabel>
                       <Select
                         onValueChange={(value) => {
-                          field.onChange(value === "all" ? null : value);
+                          field.onChange(value);
+                          if (value !== "specific") {
+                            form.setValue("serviceId", null);
+                          }
                         }}
-                        value={field.value || "all"}
+                        value={field.value}
                       >
                         <FormControl>
-                          <SelectTrigger data-testid="select-service">
-                            <SelectValue placeholder="All Services" />
+                          <SelectTrigger data-testid="select-service-type">
+                            <SelectValue placeholder="Select option" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
                           <SelectItem value="all">All Services</SelectItem>
+                          <SelectItem value="specific">Specific Service</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="bundleSelection"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Bundles</FormLabel>
+                      <Select
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          if (value !== "specific") {
+                            form.setValue("bundleId", null);
+                          }
+                        }}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-bundle-type">
+                            <SelectValue placeholder="Select option" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="all">All Bundles</SelectItem>
+                          <SelectItem value="specific">Specific Bundle</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {serviceSelection === "specific" && (
+                <FormField
+                  control={form.control}
+                  name="serviceId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Select Service</FormLabel>
+                      <Select
+                        onValueChange={(value) => field.onChange(value)}
+                        value={field.value || ""}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-service">
+                            <SelectValue placeholder="Choose a service" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
                           {services.map((service) => (
                             <SelectItem key={service.id} value={service.id}>
                               {service.title}
@@ -543,26 +668,25 @@ export function DiscountCouponsTab() {
                     </FormItem>
                   )}
                 />
+              )}
 
+              {bundleSelection === "specific" && (
                 <FormField
                   control={form.control}
                   name="bundleId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Bundle (Optional)</FormLabel>
+                      <FormLabel>Select Bundle</FormLabel>
                       <Select
-                        onValueChange={(value) => {
-                          field.onChange(value === "all" ? null : value);
-                        }}
-                        value={field.value || "all"}
+                        onValueChange={(value) => field.onChange(value)}
+                        value={field.value || ""}
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-bundle">
-                            <SelectValue placeholder="All Bundles" />
+                            <SelectValue placeholder="Choose a bundle" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="all">All Bundles</SelectItem>
                           {bundles.map((bundle) => (
                             <SelectItem key={bundle.id} value={bundle.id}>
                               {bundle.name}
@@ -574,7 +698,7 @@ export function DiscountCouponsTab() {
                     </FormItem>
                   )}
                 />
-              </div>
+              )}
 
               <FormField
                 control={form.control}
@@ -722,12 +846,16 @@ export function DiscountCouponsTab() {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-dark-gray">Applies To</span>
                 <div className="flex flex-col gap-1 items-end">
-                  <Badge variant="outline">
-                    {viewingCoupon.serviceId ? getServiceName(viewingCoupon.serviceId) : "All Services"}
-                  </Badge>
-                  <Badge variant="outline">
-                    {viewingCoupon.bundleId ? getBundleName(viewingCoupon.bundleId) : "All Bundles"}
-                  </Badge>
+                  {viewingCoupon.appliesToServices !== false && (
+                    <Badge variant="outline">
+                      {viewingCoupon.serviceId ? getServiceName(viewingCoupon.serviceId) : "All Services"}
+                    </Badge>
+                  )}
+                  {viewingCoupon.appliesToBundles !== false && (
+                    <Badge variant="outline">
+                      {viewingCoupon.bundleId ? getBundleName(viewingCoupon.bundleId) : "All Bundles"}
+                    </Badge>
+                  )}
                 </div>
               </div>
               <div className="flex items-center justify-between">

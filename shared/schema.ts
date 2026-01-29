@@ -743,7 +743,10 @@ export const discountCoupons = pgTable("discount_coupons", {
   isActive: boolean("is_active").notNull().default(true),
   discountType: text("discount_type").notNull(), // "amount" or "percentage"
   discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull(),
-  // Service/Bundle restrictions (null = all services/bundles)
+  // Service/Bundle scope flags (true = applies to services/bundles, false = does not apply)
+  appliesToServices: boolean("applies_to_services").notNull().default(true),
+  appliesToBundles: boolean("applies_to_bundles").notNull().default(true),
+  // Service/Bundle restrictions (null = all services/bundles when appliesToX is true)
   serviceId: varchar("service_id").references(() => services.id, { onDelete: "set null" }),
   bundleId: varchar("bundle_id").references(() => bundles.id, { onDelete: "set null" }),
   // Usage limits
