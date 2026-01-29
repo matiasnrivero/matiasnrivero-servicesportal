@@ -46,7 +46,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Plus, Search, Users, Pencil, Trash2, Eye, LogIn, Store, Filter, CalendarIcon, X } from "lucide-react";
+import { Building2, Plus, Search, Users, Pencil, Trash2, LogIn, Store, Filter, CalendarIcon, X } from "lucide-react";
 import type { User } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -480,19 +480,6 @@ export default function OrgCompanies() {
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>Edit</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setLocation(`/org-companies/${company.id}`)}
-                              data-testid={`button-view-client-${company.id}`}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>View</TooltipContent>
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
