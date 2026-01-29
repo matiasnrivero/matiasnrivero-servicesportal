@@ -28,7 +28,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Search, Eye, Plus, Trash2, Pencil, LogIn, Store } from "lucide-react";
+import { Building2, Search, Plus, Trash2, Pencil, LogIn, Store } from "lucide-react";
 import { format } from "date-fns";
 import {
   Tooltip,
@@ -404,7 +404,7 @@ export default function VendorsList() {
                                 size="icon"
                                 onClick={async () => {
                                   try {
-                                    await apiRequest("POST", "/api/login-as", { userId: vendor.id });
+                                    await apiRequest("POST", `/api/users/${vendor.id}/impersonate`, {});
                                     window.location.href = "/";
                                   } catch (error) {
                                     toast({
@@ -433,19 +433,6 @@ export default function VendorsList() {
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>Edit</TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setLocation(`/vendors/${vendor.id}`)}
-                                data-testid={`button-view-vendor-${vendor.id}`}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>View</TooltipContent>
                           </Tooltip>
                           {!isInternalVendor ? (
                             <Tooltip>
