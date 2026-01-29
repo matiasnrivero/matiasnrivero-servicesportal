@@ -46,10 +46,14 @@ const PIXELS_HIVE_VENDOR_ID = "9903d7f7-2754-41a0-872f-62863489b22c";
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   "pending": { label: "Pending", color: "bg-yellow-100 text-yellow-800 border-yellow-200", icon: Clock },
+  "pending_assignment": { label: "Pending Assignment", color: "bg-yellow-100 text-yellow-800 border-yellow-200", icon: Clock },
+  "in_progress": { label: "In Progress", color: "bg-blue-100 text-blue-800 border-blue-200", icon: RefreshCw },
   "in-progress": { label: "In Progress", color: "bg-blue-100 text-blue-800 border-blue-200", icon: RefreshCw },
   "delivered": { label: "Delivered", color: "bg-green-100 text-green-800 border-green-200", icon: CheckCircle2 },
+  "change_request": { label: "Change Request", color: "bg-orange-100 text-orange-800 border-orange-200", icon: AlertCircle },
   "change-request": { label: "Change Request", color: "bg-orange-100 text-orange-800 border-orange-200", icon: AlertCircle },
   "canceled": { label: "Canceled", color: "bg-gray-100 text-gray-800 border-gray-200", icon: XCircle },
+  "cancelled": { label: "Cancelled", color: "bg-gray-100 text-gray-800 border-gray-200", icon: XCircle },
 };
 
 interface ReportRow {
