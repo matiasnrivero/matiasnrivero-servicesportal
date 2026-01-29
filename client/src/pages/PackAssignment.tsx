@@ -342,8 +342,15 @@ export default function PackAssignment() {
                           <div className="text-sm text-muted-foreground">{sub.clientUser?.email || ""}</div>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="font-medium">{sub.pack?.name || "Unknown Pack"}</div>
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="font-medium">{sub.pack?.name || "Unknown Pack"}</div>
+                              {currentUser?.role === "admin" && (
+                                <div className="text-sm text-muted-foreground">
+                                  ${sub.priceAtSubscription || sub.pack?.price || "0"}/mo
+                                </div>
+                              )}
+                            </div>
                             {sub.pack && (
                               <Button
                                 size="icon"
@@ -359,11 +366,6 @@ export default function PackAssignment() {
                               </Button>
                             )}
                           </div>
-                          {currentUser?.role === "admin" && (
-                            <div className="text-sm text-muted-foreground">
-                              ${sub.priceAtSubscription || sub.pack?.price || "0"}/mo
-                            </div>
-                          )}
                         </TableCell>
                         <TableCell>
                           <Badge variant={sub.stripeStatus === "active" || (!sub.stripeStatus && sub.isActive) ? "default" : "secondary"}>
