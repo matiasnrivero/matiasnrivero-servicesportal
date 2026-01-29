@@ -315,7 +315,7 @@ export default function PackAssignment() {
                         />
                       </TableHead>
                       <TableHead>Client</TableHead>
-                      <TableHead>Pack</TableHead>
+                      <TableHead className="w-[220px]">Pack</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Vendor</TableHead>
                       <TableHead>Pending Changes</TableHead>
