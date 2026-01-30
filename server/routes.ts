@@ -55,7 +55,7 @@ function getCSTMonthYear(): { month: number; year: number } {
 function getAssignableRoles(assignerRole: string): string[] {
   switch (assignerRole) {
     case "admin":
-      return ["vendor", "internal_designer", "vendor_designer"];
+      return ["admin", "vendor", "internal_designer", "vendor_designer"];
     case "internal_designer":
       return ["vendor", "vendor_designer", "internal_designer"];
     case "vendor":
