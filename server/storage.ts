@@ -98,6 +98,9 @@ import {
   type MonthlyPackUsage,
   type InsertMonthlyPackUsage,
   type UpdateMonthlyPackUsage,
+  type Refund,
+  type InsertRefund,
+  type UpdateRefund,
   users,
   services,
   servicePricingTiers,
@@ -137,6 +140,7 @@ import {
   monthlyPackServices,
   clientMonthlyPackSubscriptions,
   monthlyPackUsage,
+  refunds,
 } from "@shared/schema";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -438,6 +442,15 @@ export interface IStorage {
   createMonthlyPackUsage(data: InsertMonthlyPackUsage): Promise<MonthlyPackUsage>;
   updateMonthlyPackUsage(id: string, data: UpdateMonthlyPackUsage): Promise<MonthlyPackUsage | undefined>;
   incrementMonthlyPackUsage(subscriptionId: string, serviceId: string, month: number, year: number): Promise<MonthlyPackUsage>;
+
+  // Refund methods
+  getRefund(id: string): Promise<Refund | undefined>;
+  getAllRefunds(): Promise<Refund[]>;
+  getRefundsByClient(clientId: string): Promise<Refund[]>;
+  getRefundsByServiceRequest(serviceRequestId: string): Promise<Refund[]>;
+  getRefundsByBundleRequest(bundleRequestId: string): Promise<Refund[]>;
+  createRefund(data: InsertRefund): Promise<Refund>;
+  updateRefund(id: string, data: UpdateRefund): Promise<Refund | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -2006,6 +2019,47 @@ export class DbStorage implements IStorage {
         usedQuantity: 1
       });
     }
+  }
+
+  // Refund methods
+  async getRefund(id: string): Promise<Refund | undefined> {
+    const result = await db.select().from(refunds).where(eq(refunds.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAllRefunds(): Promise<Refund[]> {
+    return await db.select().from(refunds).orderBy(desc(refunds.createdAt));
+  }
+
+  async getRefundsByClient(clientId: string): Promise<Refund[]> {
+    return await db.select().from(refunds)
+      .where(eq(refunds.clientId, clientId))
+      .orderBy(desc(refunds.createdAt));
+  }
+
+  async getRefundsByServiceRequest(serviceRequestId: string): Promise<Refund[]> {
+    return await db.select().from(refunds)
+      .where(eq(refunds.serviceRequestId, serviceRequestId))
+      .orderBy(desc(refunds.createdAt));
+  }
+
+  async getRefundsByBundleRequest(bundleRequestId: string): Promise<Refund[]> {
+    return await db.select().from(refunds)
+      .where(eq(refunds.bundleRequestId, bundleRequestId))
+      .orderBy(desc(refunds.createdAt));
+  }
+
+  async createRefund(data: InsertRefund): Promise<Refund> {
+    const result = await db.insert(refunds).values(data).returning();
+    return result[0];
+  }
+
+  async updateRefund(id: string, data: UpdateRefund): Promise<Refund | undefined> {
+    const result = await db.update(refunds)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(refunds.id, id))
+      .returning();
+    return result[0];
   }
 }
 

@@ -1279,6 +1279,67 @@ export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type UpdatePayment = z.infer<typeof updatePaymentSchema>;
 
+// ==================== REFUND MANAGEMENT ====================
+
+// Refund types
+export const refundTypes = ["full", "partial", "manual"] as const;
+export type RefundType = typeof refundTypes[number];
+
+// Refund statuses
+export const refundStatuses = ["pending", "processing", "completed", "failed"] as const;
+export type RefundStatus = typeof refundStatuses[number];
+
+// Refund request types - what is being refunded
+export const refundRequestTypes = ["service_request", "bundle_request"] as const;
+export type RefundRequestType = typeof refundRequestTypes[number];
+
+// Refunds table - tracks all refund records
+export const refunds = pgTable("refunds", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  // What type of request is being refunded
+  requestType: text("request_type").notNull(), // 'service_request' | 'bundle_request'
+  // Reference to either service request or bundle request (only one should be set)
+  serviceRequestId: varchar("service_request_id").references(() => serviceRequests.id, { onDelete: "set null" }),
+  bundleRequestId: varchar("bundle_request_id").references(() => bundleRequests.id, { onDelete: "set null" }),
+  // Client information
+  clientId: varchar("client_id").notNull().references(() => users.id),
+  // Refund details
+  refundType: text("refund_type").notNull(), // 'full' | 'partial' | 'manual'
+  originalAmount: decimal("original_amount", { precision: 10, scale: 2 }).notNull(), // Original charge amount
+  refundAmount: decimal("refund_amount", { precision: 10, scale: 2 }).notNull(), // Amount to refund
+  reason: text("reason").notNull(), // Reason for refund
+  notes: text("notes"), // Internal notes
+  // Status tracking
+  status: text("status").notNull().default("pending"), // 'pending' | 'processing' | 'completed' | 'failed'
+  errorMessage: text("error_message"), // For failed refunds
+  // Stripe integration
+  stripeRefundId: text("stripe_refund_id"), // Stripe refund ID (null for manual refunds)
+  stripePaymentIntentId: text("stripe_payment_intent_id"), // Original payment intent ID
+  // Audit fields
+  requestedBy: varchar("requested_by").notNull().references(() => users.id),
+  processedBy: varchar("processed_by").references(() => users.id),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertRefundSchema = createInsertSchema(refunds).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateRefundSchema = createInsertSchema(refunds).partial().omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertRefund = z.infer<typeof insertRefundSchema>;
+export type UpdateRefund = z.infer<typeof updateRefundSchema>;
+export type Refund = typeof refunds.$inferSelect;
+
+// ==================== END REFUND MANAGEMENT ====================
+
 // Billing address structure for Stripe integration
 export type BillingAddress = {
   line1: string;

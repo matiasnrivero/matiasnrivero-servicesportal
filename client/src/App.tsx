@@ -32,6 +32,7 @@ import ClientCompanyDetail from "@/pages/ClientCompanyDetail";
 import PackAssignment from "@/pages/PackAssignment";
 import OrgCompanies from "@/pages/OrgCompanies";
 import ClientDetail from "@/pages/ClientDetail";
+import RefundManagement from "@/pages/RefundManagement";
 
 function Router() {
   return (
@@ -62,6 +63,7 @@ function Router() {
       <Route path="/reports/vendor-designer-workload" component={VendorDesignerWorkloadReport} />
       <Route path="/reports/pack-profit" component={PackProfitReport} />
       <Route path="/reports/royalties-deduction" component={RoyaltiesDeductionReport} />
+      <Route path="/reports/refunds" component={RefundManagement} />
       <Route path="/client-team" component={ClientTeamManagement} />
       <Route path="/payments" component={Payments} />
       <Route path="/client-companies" component={ClientCompaniesList} />

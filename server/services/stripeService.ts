@@ -618,6 +618,50 @@ export class StripeService {
     
     return null;
   }
+
+  /**
+   * Create a refund for a payment intent
+   * @param paymentIntentId - The Stripe payment intent ID
+   * @param amountCents - Amount to refund in cents (optional, full refund if not provided)
+   * @param reason - Reason for the refund
+   */
+  async createRefund(
+    paymentIntentId: string,
+    amountCents?: number,
+    reason?: 'duplicate' | 'fraudulent' | 'requested_by_customer'
+  ): Promise<Stripe.Refund> {
+    const refundParams: Stripe.RefundCreateParams = {
+      payment_intent: paymentIntentId,
+    };
+    
+    if (amountCents) {
+      refundParams.amount = amountCents;
+    }
+    
+    if (reason) {
+      refundParams.reason = reason;
+    }
+    
+    const refund = await stripe.refunds.create(refundParams);
+    return refund;
+  }
+
+  /**
+   * Retrieve a refund by ID
+   */
+  async getRefund(refundId: string): Promise<Stripe.Refund> {
+    return await stripe.refunds.retrieve(refundId);
+  }
+
+  /**
+   * List refunds for a payment intent
+   */
+  async listRefundsForPaymentIntent(paymentIntentId: string): Promise<Stripe.Refund[]> {
+    const refunds = await stripe.refunds.list({
+      payment_intent: paymentIntentId,
+    });
+    return refunds.data;
+  }
 }
 
 export const stripeService = new StripeService();

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Header } from "@/components/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, DollarSign, Receipt, FileText, TrendingUp, Users, Package } from "lucide-react";
+import { BarChart3, DollarSign, Receipt, FileText, TrendingUp, Users, Package, RefreshCw } from "lucide-react";
 
 interface CurrentUser {
   userId: string;
@@ -42,6 +42,14 @@ const reportCards: ReportCard[] = [
     description: "Track and manage royalty deductions for services and packs",
     icon: TrendingUp,
     path: "/reports/royalties-deduction",
+    roles: ["admin"],
+  },
+  {
+    id: "refunds",
+    title: "Refund Management",
+    description: "Issue and manage refunds for ad-hoc jobs and bundles",
+    icon: RefreshCw,
+    path: "/reports/refunds",
     roles: ["admin"],
   },
   {

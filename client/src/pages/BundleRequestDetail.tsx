@@ -626,6 +626,18 @@ export default function BundleRequestDetail() {
           </div>
 
           <div className="flex items-center gap-3">
+            {currentUser?.role === "admin" && request.finalPrice && parseFloat(request.finalPrice) > 0 && (
+              <Link href="/reports/refunds">
+                <Button 
+                  variant="outline" 
+                  data-testid="button-refund-bundle"
+                >
+                  <DollarSign className="h-4 w-4 mr-1" />
+                  Refund
+                </Button>
+              </Link>
+            )}
+            
             {request.status === "in-progress" && (
               currentUser?.role === "admin" || 
               currentUser?.role === "internal_designer" || 

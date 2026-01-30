@@ -10190,6 +10190,401 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== END REPORTS ====================
 
+  // ==================== REFUND MANAGEMENT ====================
+
+  // Get all refunds (admin only)
+  app.get("/api/refunds", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const refunds = await storage.getAllRefunds();
+      
+      // Enrich with client and request details
+      const enrichedRefunds = await Promise.all(refunds.map(async (refund) => {
+        const client = await storage.getUser(refund.clientId);
+        const requestedBy = await storage.getUser(refund.requestedBy);
+        const processedBy = refund.processedBy ? await storage.getUser(refund.processedBy) : null;
+        
+        let serviceRequest = null;
+        let bundleRequest = null;
+        let service = null;
+        let bundle = null;
+        
+        if (refund.serviceRequestId) {
+          serviceRequest = await storage.getServiceRequest(refund.serviceRequestId);
+          if (serviceRequest) {
+            service = await storage.getService(serviceRequest.serviceId);
+          }
+        }
+        if (refund.bundleRequestId) {
+          bundleRequest = await storage.getBundleRequest(refund.bundleRequestId);
+          if (bundleRequest) {
+            bundle = await storage.getBundle(bundleRequest.bundleId);
+          }
+        }
+        
+        return {
+          ...refund,
+          client,
+          requestedByUser: requestedBy,
+          processedByUser: processedBy,
+          serviceRequest,
+          bundleRequest,
+          service,
+          bundle
+        };
+      }));
+      
+      res.json(enrichedRefunds);
+    } catch (error) {
+      console.error("Error fetching refunds:", error);
+      res.status(500).json({ error: "Failed to fetch refunds" });
+    }
+  });
+
+  // Get refunds by client
+  app.get("/api/refunds/client/:clientId", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { clientId } = req.params;
+      const refunds = await storage.getRefundsByClient(clientId);
+      
+      // Enrich with request details
+      const enrichedRefunds = await Promise.all(refunds.map(async (refund) => {
+        let serviceRequest = null;
+        let bundleRequest = null;
+        let service = null;
+        let bundle = null;
+        
+        if (refund.serviceRequestId) {
+          serviceRequest = await storage.getServiceRequest(refund.serviceRequestId);
+          if (serviceRequest) {
+            service = await storage.getService(serviceRequest.serviceId);
+          }
+        }
+        if (refund.bundleRequestId) {
+          bundleRequest = await storage.getBundleRequest(refund.bundleRequestId);
+          if (bundleRequest) {
+            bundle = await storage.getBundle(bundleRequest.bundleId);
+          }
+        }
+        
+        return {
+          ...refund,
+          serviceRequest,
+          bundleRequest,
+          service,
+          bundle
+        };
+      }));
+      
+      res.json(enrichedRefunds);
+    } catch (error) {
+      console.error("Error fetching client refunds:", error);
+      res.status(500).json({ error: "Failed to fetch client refunds" });
+    }
+  });
+
+  // Get single refund
+  app.get("/api/refunds/:id", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const refund = await storage.getRefund(req.params.id);
+      if (!refund) {
+        return res.status(404).json({ error: "Refund not found" });
+      }
+      res.json(refund);
+    } catch (error) {
+      console.error("Error fetching refund:", error);
+      res.status(500).json({ error: "Failed to fetch refund" });
+    }
+  });
+
+  // Create a refund (admin only)
+  app.post("/api/refunds", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const {
+        requestType,
+        serviceRequestId,
+        bundleRequestId,
+        clientId,
+        refundType,
+        refundAmount,
+        reason,
+        notes,
+      } = req.body;
+
+      // Validate required fields
+      if (!requestType || !clientId || !refundType || !refundAmount || !reason) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      
+      if (!["service_request", "bundle_request"].includes(requestType)) {
+        return res.status(400).json({ error: "Invalid request type" });
+      }
+      
+      if (!["full", "partial", "manual"].includes(refundType)) {
+        return res.status(400).json({ error: "Invalid refund type" });
+      }
+
+      // Fetch the job to get the original amount and Stripe payment intent
+      let originalAmount: number = 0;
+      let stripePaymentIntentId: string | null = null;
+      let jobUserId: string | null = null;
+      
+      if (requestType === "service_request" && serviceRequestId) {
+        const serviceRequest = await storage.getServiceRequest(serviceRequestId);
+        if (!serviceRequest) {
+          return res.status(404).json({ error: "Service request not found" });
+        }
+        if (!serviceRequest.finalPrice) {
+          return res.status(400).json({ error: "Service request has no final price" });
+        }
+        originalAmount = parseFloat(serviceRequest.finalPrice);
+        stripePaymentIntentId = serviceRequest.stripePaymentIntentId || null;
+        jobUserId = serviceRequest.userId;
+      } else if (requestType === "bundle_request" && bundleRequestId) {
+        const bundleRequest = await storage.getBundleRequest(bundleRequestId);
+        if (!bundleRequest) {
+          return res.status(404).json({ error: "Bundle request not found" });
+        }
+        if (!bundleRequest.finalPrice) {
+          return res.status(400).json({ error: "Bundle request has no final price" });
+        }
+        originalAmount = parseFloat(bundleRequest.finalPrice);
+        stripePaymentIntentId = bundleRequest.stripePaymentIntentId || null;
+        jobUserId = bundleRequest.userId;
+      } else {
+        return res.status(400).json({ error: "Must provide either serviceRequestId or bundleRequestId" });
+      }
+
+      // Verify client ownership
+      if (jobUserId !== clientId) {
+        return res.status(400).json({ error: "Client does not own this job" });
+      }
+
+      // Calculate remaining refundable amount (prevent over-refunds)
+      let existingRefunds: any[] = [];
+      if (requestType === "service_request" && serviceRequestId) {
+        existingRefunds = await storage.getRefundsByServiceRequest(serviceRequestId);
+      } else if (bundleRequestId) {
+        existingRefunds = await storage.getRefundsByBundleRequest(bundleRequestId);
+      }
+      
+      const totalRefunded = existingRefunds
+        .filter((r: any) => r.status === "completed")
+        .reduce((sum: number, r: any) => sum + parseFloat(r.refundAmount), 0);
+      
+      const remainingRefundable = originalAmount - totalRefunded;
+      
+      const refundAmountNum = parseFloat(refundAmount);
+      if (refundAmountNum <= 0) {
+        return res.status(400).json({ error: "Refund amount must be greater than zero" });
+      }
+      
+      if (refundAmountNum > remainingRefundable) {
+        return res.status(400).json({ 
+          error: `Refund amount exceeds remaining refundable amount ($${remainingRefundable.toFixed(2)})` 
+        });
+      }
+
+      // For manual refunds, mark as completed immediately
+      // For Stripe refunds, start as pending and process via Stripe
+      const isManual = refundType === "manual";
+      
+      const refund = await storage.createRefund({
+        requestType,
+        serviceRequestId: serviceRequestId || null,
+        bundleRequestId: bundleRequestId || null,
+        clientId,
+        refundType,
+        originalAmount: originalAmount.toString(),
+        refundAmount: refundAmountNum.toString(),
+        reason,
+        notes: notes || null,
+        status: isManual ? "completed" : "pending",
+        stripePaymentIntentId,
+        requestedBy: sessionUserId,
+        processedBy: isManual ? sessionUserId : null,
+        processedAt: isManual ? new Date() : null,
+      });
+
+      res.status(201).json(refund);
+    } catch (error) {
+      console.error("Error creating refund:", error);
+      res.status(500).json({ error: "Failed to create refund" });
+    }
+  });
+
+  // Process a refund via Stripe (admin only)
+  app.post("/api/refunds/:id/process", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const refund = await storage.getRefund(req.params.id);
+      if (!refund) {
+        return res.status(404).json({ error: "Refund not found" });
+      }
+
+      if (refund.status !== "pending") {
+        return res.status(400).json({ error: "Refund is not in pending status" });
+      }
+
+      if (refund.refundType === "manual") {
+        return res.status(400).json({ error: "Manual refunds cannot be processed via Stripe" });
+      }
+
+      // Update status to processing
+      await storage.updateRefund(refund.id, { status: "processing" });
+
+      try {
+        // Process via Stripe
+        if (!refund.stripePaymentIntentId) {
+          throw new Error("No Stripe payment intent ID found for this refund");
+        }
+
+        const stripeRefund = await stripeService.createRefund(
+          refund.stripePaymentIntentId,
+          Math.round(parseFloat(refund.refundAmount) * 100) // Convert to cents
+        );
+
+        // Update refund as completed
+        const updatedRefund = await storage.updateRefund(refund.id, {
+          status: "completed",
+          stripeRefundId: stripeRefund.id,
+          processedBy: sessionUserId,
+          processedAt: new Date()
+        });
+
+        res.json(updatedRefund);
+      } catch (stripeError: any) {
+        // Update refund as failed
+        await storage.updateRefund(refund.id, {
+          status: "failed",
+          errorMessage: stripeError.message || "Stripe refund failed"
+        });
+        
+        res.status(500).json({ 
+          error: "Stripe refund failed", 
+          details: stripeError.message 
+        });
+      }
+    } catch (error) {
+      console.error("Error processing refund:", error);
+      res.status(500).json({ error: "Failed to process refund" });
+    }
+  });
+
+  // Get refundable jobs for a client (service requests and bundle requests with Stripe payments)
+  app.get("/api/refunds/refundable/:clientId", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { clientId } = req.params;
+      
+      // Get service requests for this client
+      const allServiceRequests = await storage.getServiceRequestsByUser(clientId);
+      const serviceRequests = allServiceRequests.filter((sr: any) => 
+        sr.finalPrice && parseFloat(sr.finalPrice) > 0
+      );
+      
+      // Get bundle requests for this client
+      const allBundleRequests = await storage.getBundleRequestsByUser(clientId);
+      const bundleRequests = allBundleRequests.filter((br: any) => 
+        br.finalPrice && parseFloat(br.finalPrice) > 0
+      );
+      
+      // Enrich with service/bundle info
+      const enrichedServiceRequests = await Promise.all(serviceRequests.map(async (sr: any) => {
+        const service = await storage.getService(sr.serviceId);
+        const existingRefunds = await storage.getRefundsByServiceRequest(sr.id);
+        const totalRefunded = existingRefunds
+          .filter((r: any) => r.status === "completed")
+          .reduce((sum: number, r: any) => sum + parseFloat(r.refundAmount), 0);
+        
+        return {
+          ...sr,
+          service,
+          existingRefunds,
+          totalRefunded,
+          remainingRefundable: Math.max(0, parseFloat(sr.finalPrice!) - totalRefunded)
+        };
+      }));
+      
+      const enrichedBundleRequests = await Promise.all(bundleRequests.map(async (br: any) => {
+        const bundle = await storage.getBundle(br.bundleId);
+        const existingRefunds = await storage.getRefundsByBundleRequest(br.id);
+        const totalRefunded = existingRefunds
+          .filter((r: any) => r.status === "completed")
+          .reduce((sum: number, r: any) => sum + parseFloat(r.refundAmount), 0);
+        
+        return {
+          ...br,
+          bundle,
+          existingRefunds,
+          totalRefunded,
+          remainingRefundable: Math.max(0, parseFloat(br.finalPrice!) - totalRefunded)
+        };
+      }));
+      
+      res.json({
+        serviceRequests: enrichedServiceRequests,
+        bundleRequests: enrichedBundleRequests
+      });
+    } catch (error) {
+      console.error("Error fetching refundable jobs:", error);
+      res.status(500).json({ error: "Failed to fetch refundable jobs" });
+    }
+  });
+
+  // ==================== END REFUND MANAGEMENT ====================
+
   const httpServer = createServer(app);
 
   return httpServer;

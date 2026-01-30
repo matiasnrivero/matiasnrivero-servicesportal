@@ -83,6 +83,14 @@ Role-based access to reports (Admin, Client, Vendor).
   - Two tabs: Services and Packs
   - Monthly period filtering
   - Client-scoped views for client role
+- **Refund Management (Admin only)**: Issue and manage refunds for ad-hoc service requests and bundles.
+  - **Refund Types**: Full (complete refund), Partial (custom amount), Manual (non-Stripe)
+  - **Database Table**: `refunds` with fields for requestType, amounts, reason, status, Stripe integration
+  - **Stripe Integration**: Direct refund processing via Stripe Refunds API using existing payment intent IDs
+  - **Refund Workflow**: Select client → Choose job → Set refund type/amount → Submit → Process via Stripe (or record manual)
+  - **Status Tracking**: pending → processing → completed/failed with error messages
+  - **Job-Level Integration**: "Refund" button on service request and bundle detail pages (admin only, when finalPrice exists)
+  - **API Endpoints**: `GET /api/refunds`, `POST /api/refunds`, `POST /api/refunds/:id/process`, `GET /api/refunds/refundable/:clientId`
 
 ## Role-Specific Dashboards
 

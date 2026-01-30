@@ -901,6 +901,18 @@ export default function JobDetailView() {
                 Delete Job
               </Button>
             )}
+            
+            {currentUser?.role === "admin" && request.finalPrice && parseFloat(request.finalPrice) > 0 && (
+              <Link href="/reports/refunds">
+                <Button 
+                  variant="outline" 
+                  data-testid="button-refund-job"
+                >
+                  <DollarSign className="h-4 w-4 mr-1" />
+                  Refund
+                </Button>
+              </Link>
+            )}
 
             {request.status === "pending" && (
               <>
