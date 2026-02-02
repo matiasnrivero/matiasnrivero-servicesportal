@@ -102,10 +102,19 @@ export default function RefundManagement() {
   const [isDirectRefundMode, setIsDirectRefundMode] = useState(false);
   const [directRefundClientInfo, setDirectRefundClientInfo] = useState<{name: string; email: string | null} | null>(null);
 
-  const urlParams = new URLSearchParams(window.location.search);
-  const preselectedClientId = urlParams.get("clientId");
-  const preselectedJobId = urlParams.get("jobId");
-  const preselectedJobType = urlParams.get("jobType") as "service_request" | "bundle_request" | null;
+  // Capture URL params on initial mount only (to avoid losing them when navigate clears URL)
+  const [initialUrlParams] = useState(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return {
+      clientId: urlParams.get("clientId"),
+      jobId: urlParams.get("jobId"),
+      jobType: urlParams.get("jobType") as "service_request" | "bundle_request" | null
+    };
+  });
+  
+  const preselectedClientId = initialUrlParams.clientId;
+  const preselectedJobId = initialUrlParams.jobId;
+  const preselectedJobType = initialUrlParams.jobType;
 
   const { data: refunds = [], isLoading: loadingRefunds } = useQuery<Refund[]>({
     queryKey: ["/api/refunds"],
