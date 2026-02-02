@@ -27,7 +27,7 @@ import { ArrowLeft, Package, Loader2, User, Calendar, CheckCircle, Clock, AlertC
 import { getDisplayStatus, getStatusInfo } from "@/lib/statusUtils";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import type { Bundle, BundleRequest, User as UserType, Service, InputField, VendorProfile, ClientProfile, BundleRequestComment } from "@shared/schema";
+import type { Bundle, BundleRequest, User as UserType, Service, InputField, VendorProfile, ClientProfile, BundleRequestComment, Refund } from "@shared/schema";
 
 interface EnrichedField {
   id: string;
@@ -163,6 +163,16 @@ export default function BundleRequestDetail() {
     queryKey: ["/api/bundle-requests", requestId, "comments"],
     enabled: !!requestId && !!currentUser,
   });
+
+  // Query to check if bundle has been refunded (for hiding refund button)
+  const { data: allRefunds = [] } = useQuery<Refund[]>({
+    queryKey: ["/api/refunds"],
+    enabled: !!currentUser && currentUser.role === "admin" && !!requestDetail?.request?.id,
+  });
+  
+  const isBundleRefunded = requestDetail?.request?.id ? allRefunds.some(
+    (refund) => String(refund.bundleRequestId) === String(requestDetail.request.id) && (refund.status === "completed" || refund.status === "processing")
+  ) : false;
 
   const canAssignToVendor = ["admin", "internal_designer"].includes(currentUser?.role || "");
   const isDesigner = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(currentUser?.role || "");
@@ -626,7 +636,7 @@ export default function BundleRequestDetail() {
           </div>
 
           <div className="flex items-center gap-3">
-            {currentUser?.role === "admin" && request.finalPrice && parseFloat(request.finalPrice) > 0 && (
+            {currentUser?.role === "admin" && request.finalPrice && parseFloat(request.finalPrice) > 0 && !isBundleRefunded && (
               <Link href={`/reports/refunds?clientId=${request.userId}&jobId=${request.id}&jobType=bundle_request`}>
                 <Button 
                   variant="outline" 
@@ -636,6 +646,17 @@ export default function BundleRequestDetail() {
                   Refund
                 </Button>
               </Link>
+            )}
+            
+            {currentUser?.role === "admin" && isBundleRefunded && (
+              <Badge 
+                variant="outline" 
+                className="border-green-500 text-green-700"
+                data-testid={`status-refunded-${request.id}`}
+              >
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Refunded
+              </Badge>
             )}
             
             {request.status === "in-progress" && (

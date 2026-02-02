@@ -844,8 +844,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Trigger auto-assignment if no manual assignment was provided
-      if (!hasManualAssignment && !request.assigneeId && !request.vendorAssigneeId) {
+      // Process upfront payment for pay-as-you-go clients (NOT pack-covered jobs)
+      // Pack-covered jobs don't need upfront payment
+      // Use request.userId to get the actual client's payment config (not session user)
+      if (!request.isPackCovered && request.finalPrice && parseFloat(request.finalPrice) > 0) {
+        try {
+          const { paymentProcessor } = await import("./services/paymentProcessor");
+          
+          // Get the actual job owner's profile (not the session user who might be admin)
+          const jobOwner = await storage.getUser(request.userId);
+          const jobOwnerClientProfile = jobOwner?.clientProfileId 
+            ? await storage.getClientProfileById(jobOwner.clientProfileId)
+            : (jobOwner && ["client", "client_member"].includes(jobOwner.role))
+              ? await storage.getClientProfile(request.userId)
+              : null;
+          
+          if (jobOwnerClientProfile && jobOwnerClientProfile.paymentConfiguration === "pay_as_you_go") {
+            const paymentResult = await paymentProcessor.processUpfrontPayment(request, "service_request");
+            
+            if (!paymentResult.success) {
+              // Payment failed - update job status to payment_failed
+              request = await storage.updateServiceRequest(request.id, { 
+                status: "payment_failed" 
+              }) || request;
+              console.log(`Upfront payment failed for service request ${request.id}: ${paymentResult.error}`);
+            } else {
+              console.log(`Upfront payment processed for service request ${request.id}`);
+            }
+          }
+        } catch (paymentError) {
+          console.error("Upfront payment processing error:", paymentError);
+          // Mark as payment_failed if we couldn't process payment
+          request = await storage.updateServiceRequest(request.id, { 
+            status: "payment_failed" 
+          }) || request;
+        }
+      }
+
+      // Trigger auto-assignment if no manual assignment was provided (and job is not payment_failed)
+      if (request.status !== "payment_failed" && !hasManualAssignment && !request.assigneeId && !request.vendorAssigneeId) {
         try {
           const automationResult = await automationEngine.processNewServiceRequest(request);
           if (automationResult.success || automationResult.logs.length > 0) {
@@ -939,6 +976,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Service request not found" });
       }
 
+      // Block assignment for payment_failed jobs - must resolve payment first
+      if (existingRequest.status === "payment_failed") {
+        return res.status(400).json({ error: "Cannot assign designers to jobs with failed payment. Client must add a valid payment method." });
+      }
+
       // Only allow assignment if status is pending or in-progress (reassignment)
       if (existingRequest.status !== "pending" && existingRequest.status !== "in-progress") {
         return res.status(400).json({ error: "Can only assign designers to pending or in-progress requests" });
@@ -995,6 +1037,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existingRequest = await storage.getServiceRequest(req.params.id);
       if (!existingRequest) {
         return res.status(404).json({ error: "Service request not found" });
+      }
+
+      // Block assignment for payment_failed jobs
+      if (existingRequest.status === "payment_failed") {
+        return res.status(400).json({ error: "Cannot assign vendors to jobs with failed payment. Client must add a valid payment method." });
       }
 
       // Only allow vendor assignment when status is pending
@@ -1429,24 +1476,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
 
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
       const existingRequest = await storage.getServiceRequest(req.params.id);
       if (!existingRequest) {
         return res.status(404).json({ error: "Service request not found" });
       }
 
-      if (existingRequest.status !== "pending") {
-        return res.status(400).json({ error: "Only pending requests can be canceled" });
+      // Block cancellation for in-progress and change-request jobs
+      if (existingRequest.status === "in-progress" || existingRequest.status === "change-request") {
+        return res.status(400).json({ error: "Jobs in progress or with change requests cannot be canceled" });
       }
 
-      // Verify the session user is the original requester
-      if (existingRequest.userId !== sessionUserId) {
-        return res.status(403).json({ error: "Only the requester can cancel this request" });
+      // Only allow cancellation for pending or payment_failed statuses
+      if (existingRequest.status !== "pending" && existingRequest.status !== "payment_failed") {
+        return res.status(400).json({ error: "Only pending or payment failed requests can be canceled" });
+      }
+
+      // Verify permissions: original requester OR admin
+      if (existingRequest.userId !== sessionUserId && sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Only the requester or admin can cancel this request" });
+      }
+
+      // Process automatic refund for pay-as-you-go clients with successful payment
+      let automaticRefundCreated = false;
+      if (existingRequest.status === "pending" && existingRequest.stripePaymentIntentId) {
+        try {
+          const user = await storage.getUser(existingRequest.userId);
+          if (user?.clientProfileId) {
+            const clientProfile = await storage.getClientProfileById(user.clientProfileId);
+            
+            if (clientProfile && clientProfile.paymentConfiguration === "pay_as_you_go") {
+              // Process automatic Stripe refund
+              const { stripeService } = await import("./services/stripeService");
+              const finalPrice = existingRequest.finalPrice ? parseFloat(existingRequest.finalPrice) : 0;
+              const amountCents = Math.round(finalPrice * 100);
+              
+              if (amountCents > 0) {
+                const stripeRefund = await stripeService.refundPayment(
+                  existingRequest.stripePaymentIntentId,
+                  amountCents,
+                  "Job canceled by client - automatic refund"
+                );
+                
+                // Create refund record with "Automatic Refund" indication
+                await storage.createRefund({
+                  requestType: "service_request",
+                  serviceRequestId: existingRequest.id,
+                  bundleRequestId: null,
+                  clientId: existingRequest.userId,
+                  refundType: "full",
+                  originalAmount: finalPrice.toFixed(2),
+                  refundAmount: finalPrice.toFixed(2),
+                  reason: "Automatic refund - job canceled by client",
+                  notes: "Automatic refund triggered on cancellation",
+                  status: "completed",
+                  stripeRefundId: stripeRefund.id,
+                  stripePaymentIntentId: existingRequest.stripePaymentIntentId,
+                  requestedBy: sessionUserId,
+                  processedAt: new Date(),
+                  processedBy: sessionUserId,
+                  isAutomatic: true,
+                });
+                
+                automaticRefundCreated = true;
+                console.log(`Automatic refund processed for service request ${existingRequest.id}`);
+              }
+            }
+          }
+        } catch (refundError) {
+          console.error("Error processing automatic refund:", refundError);
+          // Continue with cancellation even if refund fails - admin can handle manually
+        }
       }
 
       const request = await storage.updateServiceRequest(req.params.id, { 
         status: "canceled"
       });
-      res.json(request);
+      
+      res.json({ 
+        ...request, 
+        automaticRefundCreated 
+      });
     } catch (error) {
       console.error("Error canceling request:", error);
       res.status(500).json({ error: "Failed to cancel request" });
@@ -5820,11 +5934,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       requestData.discountAmount = totalDiscountAmount.toFixed(2);
       requestData.finalPrice = serverFinalPrice.toFixed(2);
 
-      const request = await storage.createBundleRequest(requestData);
+      let request = await storage.createBundleRequest(requestData);
       
       // Increment coupon usage counter AFTER successful creation
       if (validatedCoupon) {
         await storage.incrementCouponUsage(validatedCoupon.id);
+      }
+      
+      // Process upfront payment for pay-as-you-go clients
+      // Use request.userId to get the actual client's payment config (not session user)
+      if (request.finalPrice && parseFloat(request.finalPrice) > 0) {
+        try {
+          const { paymentProcessor } = await import("./services/paymentProcessor");
+          
+          // Get the actual job owner's profile (not the session user who might be admin)
+          const jobOwner = await storage.getUser(request.userId);
+          const jobOwnerClientProfile = jobOwner?.clientProfileId 
+            ? await storage.getClientProfileById(jobOwner.clientProfileId)
+            : (jobOwner && ["client", "client_member"].includes(jobOwner.role))
+              ? await storage.getClientProfile(request.userId)
+              : null;
+          
+          if (jobOwnerClientProfile && jobOwnerClientProfile.paymentConfiguration === "pay_as_you_go") {
+            const paymentResult = await paymentProcessor.processUpfrontPayment(request, "bundle_request");
+            
+            if (!paymentResult.success) {
+              // Payment failed - update job status to payment_failed
+              request = await storage.updateBundleRequest(request.id, { 
+                status: "payment_failed" 
+              }) || request;
+              console.log(`Upfront payment failed for bundle request ${request.id}: ${paymentResult.error}`);
+            } else {
+              console.log(`Upfront payment processed for bundle request ${request.id}`);
+            }
+          }
+        } catch (paymentError) {
+          console.error("Upfront payment processing error for bundle:", paymentError);
+          // Mark as payment_failed if we couldn't process payment
+          request = await storage.updateBundleRequest(request.id, { 
+            status: "payment_failed" 
+          }) || request;
+        }
       }
       
       res.status(201).json(request);
@@ -5908,6 +6058,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Target user not found" });
       }
 
+      // Check if bundle request exists and is not payment_failed
+      const existingRequest = await storage.getBundleRequest(req.params.id);
+      if (!existingRequest) {
+        return res.status(404).json({ error: "Bundle request not found" });
+      }
+      if (existingRequest.status === "payment_failed") {
+        return res.status(400).json({ error: "Cannot assign designers to jobs with failed payment. Client must add a valid payment method." });
+      }
+
       // Check role-based assignment permissions
       const assignmentCheck = await canAssignTo(sessionUser, targetUser);
       if (!assignmentCheck.allowed) {
@@ -5947,6 +6106,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existingRequest = await storage.getBundleRequest(req.params.id);
       if (!existingRequest) {
         return res.status(404).json({ error: "Bundle request not found" });
+      }
+
+      // Block assignment for payment_failed jobs
+      if (existingRequest.status === "payment_failed") {
+        return res.status(400).json({ error: "Cannot assign vendors to jobs with failed payment. Client must add a valid payment method." });
       }
 
       // Only allow vendor assignment when status is pending
@@ -6107,6 +6271,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error requesting change on bundle request:", error);
       res.status(500).json({ error: "Failed to request change" });
+    }
+  });
+
+  // Cancel bundle request (only when pending or payment_failed)
+  app.post("/api/bundle-requests/:id/cancel", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const existingRequest = await storage.getBundleRequest(req.params.id);
+      if (!existingRequest) {
+        return res.status(404).json({ error: "Bundle request not found" });
+      }
+
+      // Block cancellation for in-progress and change-request jobs
+      if (existingRequest.status === "in-progress" || existingRequest.status === "change-request") {
+        return res.status(400).json({ error: "Jobs in progress or with change requests cannot be canceled" });
+      }
+
+      // Only allow cancellation for pending or payment_failed statuses
+      if (existingRequest.status !== "pending" && existingRequest.status !== "payment_failed") {
+        return res.status(400).json({ error: "Only pending or payment failed requests can be canceled" });
+      }
+
+      // Verify permissions: original requester OR admin
+      if (existingRequest.userId !== sessionUserId && sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Only the requester or admin can cancel this request" });
+      }
+
+      // Process automatic refund for pay-as-you-go clients with successful payment
+      let automaticRefundCreated = false;
+      if (existingRequest.status === "pending" && existingRequest.stripePaymentIntentId) {
+        try {
+          const user = await storage.getUser(existingRequest.userId);
+          if (user?.clientProfileId) {
+            const clientProfile = await storage.getClientProfileById(user.clientProfileId);
+            
+            if (clientProfile && clientProfile.paymentConfiguration === "pay_as_you_go") {
+              // Process automatic Stripe refund
+              const { stripeService } = await import("./services/stripeService");
+              const finalPrice = existingRequest.finalPrice ? parseFloat(existingRequest.finalPrice) : 0;
+              const amountCents = Math.round(finalPrice * 100);
+              
+              if (amountCents > 0) {
+                const stripeRefund = await stripeService.refundPayment(
+                  existingRequest.stripePaymentIntentId,
+                  amountCents,
+                  "Job canceled by client - automatic refund"
+                );
+                
+                // Create refund record with "Automatic Refund" indication
+                await storage.createRefund({
+                  requestType: "bundle_request",
+                  serviceRequestId: null,
+                  bundleRequestId: existingRequest.id,
+                  clientId: existingRequest.userId,
+                  refundType: "full",
+                  originalAmount: finalPrice.toFixed(2),
+                  refundAmount: finalPrice.toFixed(2),
+                  reason: "Automatic refund - job canceled by client",
+                  notes: "Automatic refund triggered on cancellation",
+                  status: "completed",
+                  stripeRefundId: stripeRefund.id,
+                  stripePaymentIntentId: existingRequest.stripePaymentIntentId,
+                  requestedBy: sessionUserId,
+                  processedAt: new Date(),
+                  processedBy: sessionUserId,
+                  isAutomatic: true,
+                });
+                
+                automaticRefundCreated = true;
+                console.log(`Automatic refund processed for bundle request ${existingRequest.id}`);
+              }
+            }
+          }
+        } catch (refundError) {
+          console.error("Error processing automatic refund for bundle:", refundError);
+          // Continue with cancellation even if refund fails - admin can handle manually
+        }
+      }
+
+      const request = await storage.updateBundleRequest(req.params.id, { 
+        status: "canceled"
+      });
+      
+      res.json({ 
+        ...request, 
+        automaticRefundCreated 
+      });
+    } catch (error) {
+      console.error("Error canceling bundle request:", error);
+      res.status(500).json({ error: "Failed to cancel bundle request" });
     }
   });
 
@@ -9038,6 +9301,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         billingAddress,
         setAsDefault !== false
       );
+
+      // After saving payment method, automatically retry payment for any payment_failed jobs
+      // Get the client profile to find the user ID
+      const clientProfile = await storage.getClientProfileById(clientProfileId);
+      if (clientProfile && clientProfile.paymentConfiguration === "pay_as_you_go") {
+        try {
+          const { paymentProcessor } = await import("./services/paymentProcessor");
+          
+          // Find all payment_failed service requests for users linked to this client profile
+          const clientUsers = await storage.getClientTeamMembers(clientProfileId);
+          let retryResults: { requestId: string; type: string; success: boolean }[] = [];
+          
+          for (const user of clientUsers) {
+            // Get service requests with payment_failed status
+            const userRequests = await storage.getServiceRequestsByUser(user.id);
+            const failedRequests = userRequests.filter(r => r.status === "payment_failed");
+            for (const request of failedRequests) {
+              const result = await paymentProcessor.retryPaymentForJob(request.id, "service_request");
+              retryResults.push({ requestId: request.id, type: "service_request", success: result.success });
+            }
+            
+            // Get bundle requests with payment_failed status
+            const userBundles = await storage.getBundleRequestsByUser(user.id);
+            const failedBundles = userBundles.filter(b => b.status === "payment_failed");
+            for (const bundle of failedBundles) {
+              const result = await paymentProcessor.retryPaymentForJob(bundle.id, "bundle_request");
+              retryResults.push({ requestId: bundle.id, type: "bundle_request", success: result.success });
+            }
+          }
+          
+          if (retryResults.length > 0) {
+            console.log(`Payment retry results after adding payment method:`, retryResults);
+          }
+        } catch (retryError) {
+          console.error("Error retrying payments after saving payment method:", retryError);
+          // Don't fail the save - just log the error
+        }
+      }
 
       res.json({ success: true });
     } catch (error) {

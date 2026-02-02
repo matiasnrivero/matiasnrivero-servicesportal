@@ -39,7 +39,7 @@ import {
   Building2,
   Percent
 } from "lucide-react";
-import type { ServiceRequest, Service, User as UserType, ServiceAttachment, Comment, VendorProfile, ClientProfile } from "@shared/schema";
+import type { ServiceRequest, Service, User as UserType, ServiceAttachment, Comment, VendorProfile, ClientProfile, Refund } from "@shared/schema";
 
 interface CurrentUser {
   userId: string;
@@ -147,6 +147,16 @@ export default function JobDetailView() {
   const { data: vendorProfiles = [] } = useQuery<VendorProfile[]>({
     queryKey: ["/api/vendor-profiles"],
   });
+
+  // Query to check if job has been refunded (for hiding refund button)
+  const { data: allRefunds = [] } = useQuery<Refund[]>({
+    queryKey: ["/api/refunds"],
+    enabled: !!currentUser && currentUser.role === "admin" && !!request?.id,
+  });
+  
+  const isJobRefunded = request?.id ? allRefunds.some(
+    (refund) => String(refund.serviceRequestId) === String(request.id) && (refund.status === "completed" || refund.status === "processing")
+  ) : false;
 
   const { data: clientProfiles = [] } = useQuery<ClientProfile[]>({
     queryKey: ["/api/client-profiles"],
@@ -902,7 +912,7 @@ export default function JobDetailView() {
               </Button>
             )}
             
-            {currentUser?.role === "admin" && request.finalPrice && parseFloat(request.finalPrice) > 0 && (
+            {currentUser?.role === "admin" && request.finalPrice && parseFloat(request.finalPrice) > 0 && !isJobRefunded && (
               <Link href={`/reports/refunds?clientId=${request.userId}&jobId=${request.id}&jobType=service_request`}>
                 <Button 
                   variant="outline" 
@@ -912,6 +922,17 @@ export default function JobDetailView() {
                   Refund
                 </Button>
               </Link>
+            )}
+            
+            {currentUser?.role === "admin" && isJobRefunded && (
+              <Badge 
+                variant="outline" 
+                className="border-green-500 text-green-700"
+                data-testid={`status-refunded-${request.id}`}
+              >
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Refunded
+              </Badge>
             )}
 
             {request.status === "pending" && (

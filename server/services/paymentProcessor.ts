@@ -10,6 +10,196 @@ interface PaymentResult {
 }
 
 export class PaymentProcessor {
+  /**
+   * Process upfront payment for pay-as-you-go clients at job creation time.
+   * Returns payment success/failure so we can set appropriate job status.
+   */
+  async processUpfrontPayment(
+    request: ServiceRequest | BundleRequest,
+    requestType: "service_request" | "bundle_request"
+  ): Promise<PaymentResult> {
+    try {
+      const user = await storage.getUser(request.userId);
+      if (!user?.clientProfileId) {
+        return { success: false, error: "User has no client profile" };
+      }
+
+      const clientProfile = await storage.getClientProfileById(user.clientProfileId);
+      if (!clientProfile) {
+        return { success: false, error: "Client profile not found" };
+      }
+
+      // Only pay-as-you-go clients need upfront payment
+      const paymentType = clientProfile.paymentConfiguration || "pay_as_you_go";
+      if (paymentType !== "pay_as_you_go") {
+        return { success: true, message: "No upfront payment required for this payment type" };
+      }
+
+      // Check if the job is pack-covered (no payment needed)
+      if ("isPackCovered" in request && request.isPackCovered) {
+        return { success: true, message: "Service covered by pack subscription" };
+      }
+
+      const finalPrice = request.finalPrice;
+      if (!finalPrice || parseFloat(finalPrice) <= 0) {
+        return { success: true, message: "No payment required (zero or no price)" };
+      }
+
+      const amountCents = Math.round(parseFloat(finalPrice) * 100);
+      const description = requestType === "service_request" 
+        ? `Payment for service request ${request.id}`
+        : `Payment for bundle request ${request.id}`;
+
+      // Process pay-as-you-go payment upfront
+      return await this.processPayAsYouGoUpfront({
+        clientProfile,
+        amountCents,
+        serviceRequestId: requestType === "service_request" ? request.id : undefined,
+        bundleRequestId: requestType === "bundle_request" ? request.id : undefined,
+        description,
+      });
+    } catch (error: any) {
+      console.error(`Error processing upfront payment for ${requestType}:`, error);
+      return { success: false, error: error.message || "Payment processing failed" };
+    }
+  }
+
+  /**
+   * Process pay-as-you-go payment at job creation (upfront).
+   * Returns detailed result so we can update job status accordingly.
+   */
+  private async processPayAsYouGoUpfront({
+    clientProfile,
+    amountCents,
+    serviceRequestId,
+    bundleRequestId,
+    description,
+  }: {
+    clientProfile: ClientProfile;
+    amountCents: number;
+    serviceRequestId?: string;
+    bundleRequestId?: string;
+    description: string;
+  }): Promise<PaymentResult> {
+    try {
+      const defaultPaymentMethod = await storage.getDefaultPaymentMethod(clientProfile.id);
+      if (!defaultPaymentMethod) {
+        // No payment method - record as pending, job goes to payment_failed status
+        const payment = await storage.createPayment({
+          clientProfileId: clientProfile.id,
+          serviceRequestId: serviceRequestId || null,
+          bundleRequestId: bundleRequestId || null,
+          amountCents,
+          status: "pending",
+          paymentType: "pay_as_you_go",
+        });
+        return {
+          success: false,
+          paymentId: payment.id,
+          error: "No payment method on file",
+        };
+      }
+
+      const paymentIntent = await stripeService.chargePaymentMethod(
+        clientProfile.id,
+        amountCents,
+        description,
+        {
+          serviceRequestId: serviceRequestId || "",
+          bundleRequestId: bundleRequestId || "",
+        }
+      );
+
+      const payment = await storage.createPayment({
+        clientProfileId: clientProfile.id,
+        serviceRequestId: serviceRequestId || null,
+        bundleRequestId: bundleRequestId || null,
+        amountCents,
+        status: paymentIntent.status === "succeeded" ? "succeeded" : "pending",
+        paymentType: "pay_as_you_go",
+        stripePaymentIntentId: paymentIntent.id,
+        paidAt: paymentIntent.status === "succeeded" ? new Date() : null,
+      });
+
+      // Update the job with payment intent ID
+      if (serviceRequestId && paymentIntent.status === "succeeded") {
+        await storage.updateServiceRequest(serviceRequestId, {
+          stripePaymentIntentId: paymentIntent.id,
+          clientPaymentStatus: "paid",
+        });
+      } else if (bundleRequestId && paymentIntent.status === "succeeded") {
+        await storage.updateBundleRequest(bundleRequestId, {
+          stripePaymentIntentId: paymentIntent.id,
+          clientPaymentStatus: "paid",
+        });
+      }
+
+      return {
+        success: paymentIntent.status === "succeeded",
+        paymentId: payment.id,
+        message: paymentIntent.status === "succeeded"
+          ? "Payment processed successfully"
+          : "Payment is being processed",
+      };
+    } catch (error: any) {
+      // Payment failed - record it but job should be marked as payment_failed
+      const payment = await storage.createPayment({
+        clientProfileId: clientProfile.id,
+        serviceRequestId: serviceRequestId || null,
+        bundleRequestId: bundleRequestId || null,
+        amountCents,
+        status: "failed",
+        paymentType: "pay_as_you_go",
+        failureReason: error.message,
+      });
+
+      return {
+        success: false,
+        paymentId: payment.id,
+        error: error.message || "Payment failed",
+      };
+    }
+  }
+
+  /**
+   * Retry payment for a job that previously failed payment.
+   * Used when client adds a new payment method.
+   */
+  async retryPaymentForJob(
+    requestId: string,
+    requestType: "service_request" | "bundle_request"
+  ): Promise<PaymentResult> {
+    try {
+      const request = requestType === "service_request"
+        ? await storage.getServiceRequest(requestId)
+        : await storage.getBundleRequest(requestId);
+      
+      if (!request) {
+        return { success: false, error: `${requestType} not found` };
+      }
+
+      if (request.status !== "payment_failed") {
+        return { success: false, error: "Job is not in payment_failed status" };
+      }
+
+      const result = await this.processUpfrontPayment(request, requestType);
+      
+      if (result.success) {
+        // Update job status to pending if payment succeeded
+        if (requestType === "service_request") {
+          await storage.updateServiceRequest(requestId, { status: "pending" });
+        } else {
+          await storage.updateBundleRequest(requestId, { status: "pending" });
+        }
+      }
+
+      return result;
+    } catch (error: any) {
+      console.error(`Error retrying payment for ${requestType}:`, error);
+      return { success: false, error: error.message || "Payment retry failed" };
+    }
+  }
+
   async processServiceRequestPayment(
     serviceRequest: ServiceRequest,
     deliveredBy: string

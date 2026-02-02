@@ -561,8 +561,12 @@ export const bundleFields = pgTable("bundle_fields", {
 
 // ==================== PHASE 4: BUNDLE REQUESTS ====================
 
+// Service request status workflow
+export const serviceRequestStatuses = ["pending", "payment_failed", "in-progress", "delivered", "change-request", "canceled"] as const;
+export type ServiceRequestStatus = typeof serviceRequestStatuses[number];
+
 // Bundle request status workflow
-export const bundleRequestStatuses = ["pending", "in-progress", "delivered", "change-request"] as const;
+export const bundleRequestStatuses = ["pending", "payment_failed", "in-progress", "delivered", "change-request", "canceled"] as const;
 export type BundleRequestStatus = typeof bundleRequestStatuses[number];
 
 // Bundle requests - tracks client submissions for bundles
@@ -1315,6 +1319,8 @@ export const refunds = pgTable("refunds", {
   // Stripe integration
   stripeRefundId: text("stripe_refund_id"), // Stripe refund ID (null for manual refunds)
   stripePaymentIntentId: text("stripe_payment_intent_id"), // Original payment intent ID
+  // Automatic refund flag - true when triggered by job cancellation
+  isAutomatic: boolean("is_automatic").notNull().default(false),
   // Audit fields
   requestedBy: varchar("requested_by").notNull().references(() => users.id),
   processedBy: varchar("processed_by").references(() => users.id),
