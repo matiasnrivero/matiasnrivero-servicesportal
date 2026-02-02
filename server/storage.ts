@@ -101,6 +101,9 @@ import {
   type Refund,
   type InsertRefund,
   type UpdateRefund,
+  type MonthlyBillingRecord,
+  type InsertMonthlyBillingRecord,
+  type UpdateMonthlyBillingRecord,
   users,
   services,
   servicePricingTiers,
@@ -141,6 +144,7 @@ import {
   clientMonthlyPackSubscriptions,
   monthlyPackUsage,
   refunds,
+  monthlyBillingRecords,
 } from "@shared/schema";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -404,6 +408,16 @@ export interface IStorage {
   getPaymentsByBundleRequest(bundleRequestId: string): Promise<Payment[]>;
   createPayment(data: InsertPayment): Promise<Payment>;
   updatePayment(id: string, data: UpdatePayment): Promise<Payment | undefined>;
+
+  // Monthly Billing Record methods
+  getMonthlyBillingRecord(id: string): Promise<MonthlyBillingRecord | undefined>;
+  getMonthlyBillingRecordsByClientProfile(clientProfileId: string): Promise<MonthlyBillingRecord[]>;
+  getMonthlyBillingRecordsByPeriod(billingPeriod: string): Promise<MonthlyBillingRecord[]>;
+  getMonthlyBillingRecordByClientAndPeriod(clientProfileId: string, billingPeriod: string, recordType?: string): Promise<MonthlyBillingRecord | undefined>;
+  getPendingMonthlyBillingRecords(): Promise<MonthlyBillingRecord[]>;
+  getFailedMonthlyBillingRecords(): Promise<MonthlyBillingRecord[]>;
+  createMonthlyBillingRecord(data: InsertMonthlyBillingRecord): Promise<MonthlyBillingRecord>;
+  updateMonthlyBillingRecord(id: string, data: UpdateMonthlyBillingRecord): Promise<MonthlyBillingRecord | undefined>;
 
   // Designer reassignment helper methods
   getPrimaryVendorAdmin(vendorId: string): Promise<User | undefined>;
@@ -1757,6 +1771,65 @@ export class DbStorage implements IStorage {
     const result = await db.update(payments)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(payments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Monthly Billing Record methods
+  async getMonthlyBillingRecord(id: string): Promise<MonthlyBillingRecord | undefined> {
+    const result = await db.select().from(monthlyBillingRecords)
+      .where(eq(monthlyBillingRecords.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getMonthlyBillingRecordsByClientProfile(clientProfileId: string): Promise<MonthlyBillingRecord[]> {
+    return await db.select().from(monthlyBillingRecords)
+      .where(eq(monthlyBillingRecords.clientProfileId, clientProfileId))
+      .orderBy(desc(monthlyBillingRecords.createdAt));
+  }
+
+  async getMonthlyBillingRecordsByPeriod(billingPeriod: string): Promise<MonthlyBillingRecord[]> {
+    return await db.select().from(monthlyBillingRecords)
+      .where(eq(monthlyBillingRecords.billingPeriod, billingPeriod))
+      .orderBy(desc(monthlyBillingRecords.createdAt));
+  }
+
+  async getMonthlyBillingRecordByClientAndPeriod(clientProfileId: string, billingPeriod: string, recordType?: string): Promise<MonthlyBillingRecord | undefined> {
+    const conditions = [
+      eq(monthlyBillingRecords.clientProfileId, clientProfileId),
+      eq(monthlyBillingRecords.billingPeriod, billingPeriod),
+    ];
+    if (recordType) {
+      conditions.push(eq(monthlyBillingRecords.recordType, recordType));
+    }
+    const result = await db.select().from(monthlyBillingRecords)
+      .where(and(...conditions))
+      .limit(1);
+    return result[0];
+  }
+
+  async getPendingMonthlyBillingRecords(): Promise<MonthlyBillingRecord[]> {
+    return await db.select().from(monthlyBillingRecords)
+      .where(eq(monthlyBillingRecords.status, "pending"))
+      .orderBy(monthlyBillingRecords.createdAt);
+  }
+
+  async getFailedMonthlyBillingRecords(): Promise<MonthlyBillingRecord[]> {
+    return await db.select().from(monthlyBillingRecords)
+      .where(eq(monthlyBillingRecords.status, "failed"))
+      .orderBy(desc(monthlyBillingRecords.createdAt));
+  }
+
+  async createMonthlyBillingRecord(data: InsertMonthlyBillingRecord): Promise<MonthlyBillingRecord> {
+    const result = await db.insert(monthlyBillingRecords).values(data).returning();
+    return result[0];
+  }
+
+  async updateMonthlyBillingRecord(id: string, data: UpdateMonthlyBillingRecord): Promise<MonthlyBillingRecord | undefined> {
+    const result = await db.update(monthlyBillingRecords)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(monthlyBillingRecords.id, id))
       .returning();
     return result[0];
   }

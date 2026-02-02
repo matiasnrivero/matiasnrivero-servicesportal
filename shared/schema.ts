@@ -109,6 +109,11 @@ export const clientProfiles = pgTable("client_profiles", {
   billingAddress: jsonb("billing_address"),
   // Tri-POD product discount tier: none (default), power_level (10%), oms_subscription (15%), enterprise (20%)
   tripodDiscountTier: text("tripod_discount_tier").notNull().default("none"),
+  // Payment overdue tracking for Monthly Payment clients
+  paymentOverdue: boolean("payment_overdue").notNull().default(false),
+  paymentRetryCount: integer("payment_retry_count").notNull().default(0),
+  lastPaymentRetryAt: timestamp("last_payment_retry_at"),
+  paymentOverdueAt: timestamp("payment_overdue_at"),
   // Soft delete timestamp - when set, client company is considered deleted
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -836,6 +841,38 @@ export const payments = pgTable("payments", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Monthly Billing Records - tracks consolidated monthly charges for Monthly Payment clients
+export const monthlyBillingRecords = pgTable("monthly_billing_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientProfileId: varchar("client_profile_id").notNull().references(() => clientProfiles.id, { onDelete: "cascade" }),
+  // Billing period (YYYY-MM format, e.g., "2026-01" for January 2026)
+  billingPeriod: text("billing_period").notNull(),
+  // Record type: monthly_services (regular monthly billing), pack_exceeded (exceeded pack services)
+  recordType: text("record_type").notNull().default("monthly_services"),
+  // Payment amounts in cents
+  subtotalCents: integer("subtotal_cents").notNull(),
+  processingFeeCents: integer("processing_fee_cents").notNull().default(0),
+  totalCents: integer("total_cents").notNull(),
+  // Number of services/items included
+  servicesCount: integer("services_count").notNull().default(0),
+  // Job IDs included in this billing record (for audit trail)
+  includedJobIds: jsonb("included_job_ids"), // Array of { type: 'service'|'bundle', id: string }
+  // Status: pending, processing, completed, failed
+  status: text("status").notNull().default("pending"),
+  // Stripe transaction details
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  stripeChargeId: text("stripe_charge_id"),
+  // Retry tracking
+  retryCount: integer("retry_count").notNull().default(0),
+  lastRetryAt: timestamp("last_retry_at"),
+  failureReason: text("failure_reason"),
+  // Timestamps
+  processedAt: timestamp("processed_at"),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // ==================== END PHASE 7 TABLES ====================
 
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -1168,6 +1205,20 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({
   updatedAt: true,
 });
 
+export const insertMonthlyBillingRecordSchema = createInsertSchema(monthlyBillingRecords).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateMonthlyBillingRecordSchema = createInsertSchema(monthlyBillingRecords).partial().omit({
+  id: true,
+  clientProfileId: true,
+  billingPeriod: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const updatePaymentSchema = createInsertSchema(payments).partial().omit({
   id: true,
   clientProfileId: true,
@@ -1282,6 +1333,9 @@ export type InsertStripeEvent = z.infer<typeof insertStripeEventSchema>;
 export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type UpdatePayment = z.infer<typeof updatePaymentSchema>;
+export type MonthlyBillingRecord = typeof monthlyBillingRecords.$inferSelect;
+export type InsertMonthlyBillingRecord = z.infer<typeof insertMonthlyBillingRecordSchema>;
+export type UpdateMonthlyBillingRecord = z.infer<typeof updateMonthlyBillingRecordSchema>;
 
 // ==================== REFUND MANAGEMENT ====================
 
