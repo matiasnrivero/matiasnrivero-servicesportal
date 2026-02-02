@@ -9519,6 +9519,168 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== MONTHLY BILLING CRON ROUTES ====================
+
+  // Run monthly billing (admin only) - trigger manual run or cron job
+  app.post("/api/billing/run-monthly", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+
+      const { monthlyBillingService } = await import("./services/monthlyBillingService");
+      const result = await monthlyBillingService.runMonthlyBilling();
+
+      res.json({
+        message: "Monthly billing completed",
+        ...result
+      });
+    } catch (error) {
+      console.error("Error running monthly billing:", error);
+      res.status(500).json({ error: "Failed to run monthly billing" });
+    }
+  });
+
+  // Run all monthly billing including pack exceeded services (admin only) - for 1st of month cron
+  app.post("/api/billing/run-all-monthly", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+
+      const { monthlyBillingService } = await import("./services/monthlyBillingService");
+      const result = await monthlyBillingService.runAllMonthlyBilling();
+
+      res.json({
+        message: "All monthly billing completed",
+        ...result
+      });
+    } catch (error) {
+      console.error("Error running all monthly billing:", error);
+      res.status(500).json({ error: "Failed to run all monthly billing" });
+    }
+  });
+
+  // Run pack exceeded billing only (admin only)
+  app.post("/api/billing/run-pack-exceeded", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+
+      const { monthlyBillingService } = await import("./services/monthlyBillingService");
+      const result = await monthlyBillingService.runPackExceededBilling();
+
+      res.json({
+        message: "Pack exceeded billing completed",
+        ...result
+      });
+    } catch (error) {
+      console.error("Error running pack exceeded billing:", error);
+      res.status(500).json({ error: "Failed to run pack exceeded billing" });
+    }
+  });
+
+  // Retry failed monthly billings (admin only)
+  app.post("/api/billing/retry-failed", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+
+      const { monthlyBillingService } = await import("./services/monthlyBillingService");
+      const result = await monthlyBillingService.retryFailedBillings();
+
+      res.json({
+        message: "Retry processing completed",
+        ...result
+      });
+    } catch (error) {
+      console.error("Error retrying failed billings:", error);
+      res.status(500).json({ error: "Failed to retry billings" });
+    }
+  });
+
+  // Clear payment overdue status (admin only)
+  app.post("/api/billing/clear-overdue/:clientProfileId", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+
+      const { clientProfileId } = req.params;
+      const { monthlyBillingService } = await import("./services/monthlyBillingService");
+      const success = await monthlyBillingService.clearPaymentOverdue(clientProfileId);
+
+      if (success) {
+        res.json({ message: "Payment overdue status cleared" });
+      } else {
+        res.status(500).json({ error: "Failed to clear payment overdue status" });
+      }
+    } catch (error) {
+      console.error("Error clearing payment overdue:", error);
+      res.status(500).json({ error: "Failed to clear payment overdue status" });
+    }
+  });
+
+  // Get monthly billing records (admin only)
+  app.get("/api/billing/monthly-records", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied. Admin only." });
+      }
+
+      const { period, clientProfileId } = req.query;
+
+      let records;
+      if (period && typeof period === "string") {
+        records = await storage.getMonthlyBillingRecordsByPeriod(period);
+      } else if (clientProfileId && typeof clientProfileId === "string") {
+        records = await storage.getMonthlyBillingRecordsByClientProfile(clientProfileId);
+      } else {
+        // Get all pending and recent records
+        const pending = await storage.getPendingMonthlyBillingRecords();
+        const failed = await storage.getFailedMonthlyBillingRecords();
+        records = [...pending, ...failed];
+      }
+
+      res.json(records);
+    } catch (error) {
+      console.error("Error fetching monthly billing records:", error);
+      res.status(500).json({ error: "Failed to fetch billing records" });
+    }
+  });
+
   // ==================== END PHASE 7 ROUTES ====================
 
   // ==================== MONTHLY PACKS ROUTES ====================
