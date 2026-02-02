@@ -10375,6 +10375,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         originalAmount = parseFloat(serviceRequest.finalPrice);
         stripePaymentIntentId = serviceRequest.stripePaymentIntentId || null;
         jobUserId = serviceRequest.userId;
+        
+        // If no payment intent on the service request, check the payments table
+        if (!stripePaymentIntentId) {
+          const payments = await storage.getPaymentsByServiceRequest(serviceRequestId);
+          const successfulPayment = payments.find(p => p.status === "succeeded" && p.stripePaymentIntentId);
+          if (successfulPayment) {
+            stripePaymentIntentId = successfulPayment.stripePaymentIntentId;
+          }
+        }
       } else if (requestType === "bundle_request" && bundleRequestId) {
         const bundleRequest = await storage.getBundleRequest(bundleRequestId);
         if (!bundleRequest) {
@@ -10386,8 +10395,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         originalAmount = parseFloat(bundleRequest.finalPrice);
         stripePaymentIntentId = bundleRequest.stripePaymentIntentId || null;
         jobUserId = bundleRequest.userId;
+        
+        // If no payment intent on the bundle request, check the payments table
+        if (!stripePaymentIntentId) {
+          const payments = await storage.getPaymentsByBundleRequest(bundleRequestId);
+          const successfulPayment = payments.find(p => p.status === "succeeded" && p.stripePaymentIntentId);
+          if (successfulPayment) {
+            stripePaymentIntentId = successfulPayment.stripePaymentIntentId;
+          }
+        }
       } else {
         return res.status(400).json({ error: "Must provide either serviceRequestId or bundleRequestId" });
+      }
+      
+      // For non-manual refunds, require a Stripe payment intent
+      if (refundType !== "manual" && !stripePaymentIntentId) {
+        return res.status(400).json({ 
+          error: "No Stripe payment found for this job. Use 'Manual' refund type if this was paid outside of Stripe." 
+        });
       }
 
       // Verify client ownership
