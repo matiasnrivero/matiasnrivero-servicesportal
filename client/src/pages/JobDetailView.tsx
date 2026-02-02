@@ -903,7 +903,7 @@ export default function JobDetailView() {
             )}
             
             {currentUser?.role === "admin" && request.finalPrice && parseFloat(request.finalPrice) > 0 && (
-              <Link href="/reports/refunds">
+              <Link href={`/reports/refunds?clientId=${request.userId}&jobId=${request.id}&jobType=service_request`}>
                 <Button 
                   variant="outline" 
                   data-testid="button-refund-job"

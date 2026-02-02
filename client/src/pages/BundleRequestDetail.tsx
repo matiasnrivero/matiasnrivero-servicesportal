@@ -627,7 +627,7 @@ export default function BundleRequestDetail() {
 
           <div className="flex items-center gap-3">
             {currentUser?.role === "admin" && request.finalPrice && parseFloat(request.finalPrice) > 0 && (
-              <Link href="/reports/refunds">
+              <Link href={`/reports/refunds?clientId=${request.userId}&jobId=${request.id}&jobType=bundle_request`}>
                 <Button 
                   variant="outline" 
                   data-testid="button-refund-bundle"

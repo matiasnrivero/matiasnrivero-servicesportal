@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { useLocation } from "wouter";
 import { ArrowLeft, DollarSign, RefreshCw, Plus, Search, X, CheckCircle, Clock, AlertCircle, XCircle } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -87,6 +88,7 @@ interface Client {
 
 export default function RefundManagement() {
   const { toast } = useToast();
+  const [location, navigate] = useLocation();
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -96,6 +98,12 @@ export default function RefundManagement() {
   const [refundAmount, setRefundAmount] = useState("");
   const [refundReason, setRefundReason] = useState("");
   const [refundNotes, setRefundNotes] = useState("");
+  const [urlParamsProcessed, setUrlParamsProcessed] = useState(false);
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const preselectedClientId = urlParams.get("clientId");
+  const preselectedJobId = urlParams.get("jobId");
+  const preselectedJobType = urlParams.get("jobType") as "service_request" | "bundle_request" | null;
 
   const { data: refunds = [], isLoading: loadingRefunds } = useQuery<Refund[]>({
     queryKey: ["/api/refunds"],
@@ -114,6 +122,33 @@ export default function RefundManagement() {
     queryKey: ["/api/refunds/refundable", selectedClient],
     enabled: !!selectedClient,
   });
+
+  useEffect(() => {
+    if (preselectedClientId && !urlParamsProcessed) {
+      setSelectedClient(preselectedClientId);
+      if (preselectedJobType) {
+        setSelectedJobType(preselectedJobType);
+      }
+    }
+  }, [preselectedClientId, preselectedJobType, urlParamsProcessed]);
+
+  useEffect(() => {
+    if (preselectedJobId && refundableJobs && !urlParamsProcessed) {
+      const jobList = preselectedJobType === "bundle_request" 
+        ? refundableJobs.bundleRequests 
+        : refundableJobs.serviceRequests;
+      
+      const job = jobList?.find(j => j.id === preselectedJobId);
+      if (job) {
+        setSelectedJob(job);
+        setSelectedJobType(preselectedJobType || "service_request");
+        setRefundAmount(job.remainingRefundable.toFixed(2));
+        setShowCreateModal(true);
+        setUrlParamsProcessed(true);
+        navigate("/reports/refunds", { replace: true });
+      }
+    }
+  }, [preselectedJobId, preselectedJobType, refundableJobs, urlParamsProcessed, navigate]);
 
   const createRefundMutation = useMutation({
     mutationFn: async (data: any) => {
