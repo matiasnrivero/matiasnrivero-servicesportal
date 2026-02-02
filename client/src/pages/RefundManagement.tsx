@@ -99,6 +99,8 @@ export default function RefundManagement() {
   const [refundReason, setRefundReason] = useState("");
   const [refundNotes, setRefundNotes] = useState("");
   const [urlParamsProcessed, setUrlParamsProcessed] = useState(false);
+  const [isDirectRefundMode, setIsDirectRefundMode] = useState(false);
+  const [directRefundClientInfo, setDirectRefundClientInfo] = useState<{name: string; email: string | null} | null>(null);
 
   const urlParams = new URLSearchParams(window.location.search);
   const preselectedClientId = urlParams.get("clientId");
@@ -140,15 +142,20 @@ export default function RefundManagement() {
       
       const job = jobList?.find(j => j.id === preselectedJobId);
       if (job) {
+        const client = clients.find(c => c.id === preselectedClientId);
+        if (client) {
+          setDirectRefundClientInfo({ name: client.username, email: client.email });
+        }
         setSelectedJob(job);
         setSelectedJobType(preselectedJobType || "service_request");
         setRefundAmount(job.remainingRefundable.toFixed(2));
         setShowCreateModal(true);
+        setIsDirectRefundMode(true);
         setUrlParamsProcessed(true);
         navigate("/reports/refunds", { replace: true });
       }
     }
-  }, [preselectedJobId, preselectedJobType, refundableJobs, urlParamsProcessed, navigate]);
+  }, [preselectedJobId, preselectedJobType, preselectedClientId, refundableJobs, clients, urlParamsProcessed, navigate]);
 
   const createRefundMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -159,7 +166,7 @@ export default function RefundManagement() {
       toast({ title: "Refund created successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/refunds"] });
       queryClient.invalidateQueries({ queryKey: ["/api/refunds/refundable", selectedClient] });
-      closeCreateModal();
+      closeCreateModal(true);
     },
     onError: (error: any) => {
       toast({ title: "Failed to create refund", description: error.message, variant: "destructive" });
@@ -192,14 +199,28 @@ export default function RefundManagement() {
     );
   });
 
-  const closeCreateModal = () => {
+  const closeCreateModal = (resetDirectMode: boolean = false) => {
     setShowCreateModal(false);
-    setSelectedJob(null);
+    if (!isDirectRefundMode || resetDirectMode) {
+      setSelectedJob(null);
+      setSelectedClient("");
+      setIsDirectRefundMode(false);
+      setDirectRefundClientInfo(null);
+    }
     setRefundType("full");
-    setRefundAmount("");
+    setRefundAmount(selectedJob?.remainingRefundable.toFixed(2) || "");
     setRefundReason("");
     setRefundNotes("");
   };
+
+  useEffect(() => {
+    if (isDirectRefundMode && selectedClient && !directRefundClientInfo && clients.length > 0) {
+      const client = clients.find(c => c.id === selectedClient);
+      if (client) {
+        setDirectRefundClientInfo({ name: client.username, email: client.email });
+      }
+    }
+  }, [isDirectRefundMode, selectedClient, directRefundClientInfo, clients]);
 
   const handleJobSelect = (job: RefundableJob, type: "service_request" | "bundle_request") => {
     setSelectedJob(job);
@@ -287,7 +308,13 @@ export default function RefundManagement() {
             />
           </div>
         </div>
-        <Button onClick={() => setShowCreateModal(true)} data-testid="button-create-refund">
+        <Button onClick={() => {
+          setIsDirectRefundMode(false);
+          setDirectRefundClientInfo(null);
+          setSelectedClient("");
+          setSelectedJob(null);
+          setShowCreateModal(true);
+        }} data-testid="button-create-refund">
           <Plus className="h-4 w-4 mr-2" />
           Create Refund
         </Button>
@@ -379,7 +406,7 @@ export default function RefundManagement() {
         </CardContent>
       </Card>
 
-      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+      <Dialog open={showCreateModal} onOpenChange={(open) => !open && closeCreateModal()}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create Refund</DialogTitle>
@@ -389,114 +416,164 @@ export default function RefundManagement() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div>
-              <Label>Select Client</Label>
-              <Select value={selectedClient} onValueChange={setSelectedClient}>
-                <SelectTrigger data-testid="select-client">
-                  <SelectValue placeholder="Choose a client..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.username} {client.email ? `(${client.email})` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {selectedClient && (
+            {isDirectRefundMode && selectedJob ? (
               <>
-                {loadingJobs ? (
-                  <div className="text-center py-4 text-muted-foreground">Loading jobs...</div>
-                ) : (
-                  <div className="space-y-4">
-                    {refundableJobs?.serviceRequests && refundableJobs.serviceRequests.length > 0 && (
-                      <div>
-                        <Label className="mb-2 block">Service Requests</Label>
-                        <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded-md p-2">
-                          {refundableJobs.serviceRequests.map((sr) => (
-                            <div
-                              key={sr.id}
-                              className={`p-3 border rounded-md cursor-pointer hover-elevate ${
-                                selectedJob?.id === sr.id && selectedJobType === "service_request"
-                                  ? "border-primary bg-primary/5"
-                                  : ""
-                              }`}
-                              onClick={() => handleJobSelect(sr, "service_request")}
-                              data-testid={`job-service-${sr.id}`}
-                            >
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <div className="font-medium">{sr.service?.title || "Unknown Service"}</div>
-                                  <div className="text-sm text-muted-foreground">
-                                    {format(new Date(sr.createdAt), "MMM d, yyyy")} • {sr.status}
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <div className="font-medium">${parseFloat(sr.finalPrice).toFixed(2)}</div>
-                                  {sr.totalRefunded > 0 && (
-                                    <div className="text-sm text-muted-foreground">
-                                      Refunded: ${sr.totalRefunded.toFixed(2)}
-                                    </div>
-                                  )}
-                                  <div className="text-sm text-green-600">
-                                    Available: ${sr.remainingRefundable.toFixed(2)}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {refundableJobs?.bundleRequests && refundableJobs.bundleRequests.length > 0 && (
-                      <div>
-                        <Label className="mb-2 block">Bundle Requests</Label>
-                        <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded-md p-2">
-                          {refundableJobs.bundleRequests.map((br) => (
-                            <div
-                              key={br.id}
-                              className={`p-3 border rounded-md cursor-pointer hover-elevate ${
-                                selectedJob?.id === br.id && selectedJobType === "bundle_request"
-                                  ? "border-primary bg-primary/5"
-                                  : ""
-                              }`}
-                              onClick={() => handleJobSelect(br, "bundle_request")}
-                              data-testid={`job-bundle-${br.id}`}
-                            >
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <div className="font-medium">{br.bundle?.name || "Unknown Bundle"}</div>
-                                  <div className="text-sm text-muted-foreground">
-                                    {format(new Date(br.createdAt), "MMM d, yyyy")} • {br.status}
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <div className="font-medium">${parseFloat(br.finalPrice).toFixed(2)}</div>
-                                  {br.totalRefunded > 0 && (
-                                    <div className="text-sm text-muted-foreground">
-                                      Refunded: ${br.totalRefunded.toFixed(2)}
-                                    </div>
-                                  )}
-                                  <div className="text-sm text-green-600">
-                                    Available: ${br.remainingRefundable.toFixed(2)}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {(!refundableJobs?.serviceRequests?.length && !refundableJobs?.bundleRequests?.length) && (
-                      <div className="text-center py-4 text-muted-foreground">
-                        No refundable jobs found for this client.
-                      </div>
+                <div>
+                  <Label className="text-muted-foreground">Client</Label>
+                  <div className="font-medium mt-1">
+                    {directRefundClientInfo?.name || "Unknown Client"}
+                    {directRefundClientInfo?.email && (
+                      <span className="text-muted-foreground font-normal ml-1">
+                        ({directRefundClientInfo.email})
+                      </span>
                     )}
                   </div>
+                </div>
+
+                <div>
+                  <Label className="text-muted-foreground">
+                    {selectedJobType === "service_request" ? "Service Request" : "Bundle Request"}
+                  </Label>
+                  <div className="p-3 border rounded-md mt-1 bg-muted/30">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="font-medium">
+                          {selectedJobType === "service_request" 
+                            ? (selectedJob.service?.title || "Unknown Service")
+                            : (selectedJob.bundle?.name || "Unknown Bundle")
+                          }
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {format(new Date(selectedJob.createdAt), "MMM d, yyyy")} • {selectedJob.status}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-medium">${parseFloat(selectedJob.finalPrice).toFixed(2)}</div>
+                        {selectedJob.totalRefunded > 0 && (
+                          <div className="text-sm text-muted-foreground">
+                            Refunded: ${selectedJob.totalRefunded.toFixed(2)}
+                          </div>
+                        )}
+                        <div className="text-sm text-green-600">
+                          Available: ${selectedJob.remainingRefundable.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <Label>Select Client</Label>
+                  <Select value={selectedClient} onValueChange={setSelectedClient}>
+                    <SelectTrigger data-testid="select-client">
+                      <SelectValue placeholder="Choose a client..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.username} {client.email ? `(${client.email})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {selectedClient && (
+                  <>
+                    {loadingJobs ? (
+                      <div className="text-center py-4 text-muted-foreground">Loading jobs...</div>
+                    ) : (
+                      <div className="space-y-4">
+                        {refundableJobs?.serviceRequests && refundableJobs.serviceRequests.length > 0 && (
+                          <div>
+                            <Label className="mb-2 block">Service Requests</Label>
+                            <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded-md p-2">
+                              {refundableJobs.serviceRequests.map((sr) => (
+                                <div
+                                  key={sr.id}
+                                  className={`p-3 border rounded-md cursor-pointer hover-elevate ${
+                                    selectedJob?.id === sr.id && selectedJobType === "service_request"
+                                      ? "border-primary bg-primary/5"
+                                      : ""
+                                  }`}
+                                  onClick={() => handleJobSelect(sr, "service_request")}
+                                  data-testid={`job-service-${sr.id}`}
+                                >
+                                  <div className="flex justify-between items-start">
+                                    <div>
+                                      <div className="font-medium">{sr.service?.title || "Unknown Service"}</div>
+                                      <div className="text-sm text-muted-foreground">
+                                        {format(new Date(sr.createdAt), "MMM d, yyyy")} • {sr.status}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="font-medium">${parseFloat(sr.finalPrice).toFixed(2)}</div>
+                                      {sr.totalRefunded > 0 && (
+                                        <div className="text-sm text-muted-foreground">
+                                          Refunded: ${sr.totalRefunded.toFixed(2)}
+                                        </div>
+                                      )}
+                                      <div className="text-sm text-green-600">
+                                        Available: ${sr.remainingRefundable.toFixed(2)}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {refundableJobs?.bundleRequests && refundableJobs.bundleRequests.length > 0 && (
+                          <div>
+                            <Label className="mb-2 block">Bundle Requests</Label>
+                            <div className="space-y-2 max-h-[200px] overflow-y-auto border rounded-md p-2">
+                              {refundableJobs.bundleRequests.map((br) => (
+                                <div
+                                  key={br.id}
+                                  className={`p-3 border rounded-md cursor-pointer hover-elevate ${
+                                    selectedJob?.id === br.id && selectedJobType === "bundle_request"
+                                      ? "border-primary bg-primary/5"
+                                      : ""
+                                  }`}
+                                  onClick={() => handleJobSelect(br, "bundle_request")}
+                                  data-testid={`job-bundle-${br.id}`}
+                                >
+                                  <div className="flex justify-between items-start">
+                                    <div>
+                                      <div className="font-medium">{br.bundle?.name || "Unknown Bundle"}</div>
+                                      <div className="text-sm text-muted-foreground">
+                                        {format(new Date(br.createdAt), "MMM d, yyyy")} • {br.status}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="font-medium">${parseFloat(br.finalPrice).toFixed(2)}</div>
+                                      {br.totalRefunded > 0 && (
+                                        <div className="text-sm text-muted-foreground">
+                                          Refunded: ${br.totalRefunded.toFixed(2)}
+                                        </div>
+                                      )}
+                                      <div className="text-sm text-green-600">
+                                        Available: ${br.remainingRefundable.toFixed(2)}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {(!refundableJobs?.serviceRequests?.length && !refundableJobs?.bundleRequests?.length) && (
+                          <div className="text-center py-4 text-muted-foreground">
+                            No refundable jobs found for this client.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}
@@ -568,7 +645,7 @@ export default function RefundManagement() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={closeCreateModal} data-testid="button-cancel-refund">
+            <Button variant="outline" onClick={() => closeCreateModal()} data-testid="button-cancel-refund">
               Cancel
             </Button>
             <Button
