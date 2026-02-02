@@ -85,6 +85,14 @@ export default function BillingHistoryReport() {
 
   const { data: billingSummary } = useQuery<BillingSummary>({
     queryKey: ["/api/reports/billing-summary", selectedClientId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedClientId) params.set("clientProfileId", selectedClientId);
+      const url = `/api/reports/billing-summary${params.toString() ? `?${params}` : ""}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch billing summary");
+      return res.json();
+    },
     enabled: !!currentUser,
   });
 
@@ -99,10 +107,16 @@ export default function BillingHistoryReport() {
 
   const { data: billingRecords, isLoading } = useQuery<BillingRecord[]>({
     queryKey: ["/api/reports/billing-history", queryParams],
+    queryFn: async () => {
+      const url = `/api/reports/billing-history${queryParams ? `?${queryParams}` : ""}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch billing history");
+      return res.json();
+    },
   });
 
   const isAdmin = currentUser?.role === "admin";
-  const isClient = currentUser?.role === "client";
+  const isClient = currentUser?.role && ["client", "client_member"].includes(currentUser.role);
 
   const availableTabs = useMemo(() => {
     if (isAdmin) {

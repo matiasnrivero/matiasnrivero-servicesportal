@@ -579,6 +579,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "User not found" });
       }
 
+      // Check if client has payment overdue - block new service requests for clients with overdue payments
+      if (["client", "client_member"].includes(sessionUser.role) && sessionUser.clientProfileId) {
+        const clientProfile = await storage.getClientProfileById(sessionUser.clientProfileId);
+        if (clientProfile?.paymentOverdue) {
+          return res.status(403).json({ 
+            error: "Payment overdue. Please resolve outstanding payments before submitting new requests.",
+            code: "PAYMENT_OVERDUE"
+          });
+        }
+      }
+
       const requestData = {
         ...req.body,
         userId: sessionUserId, // Use session user instead of client-provided
@@ -2905,6 +2916,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching client profile:", error);
       res.status(500).json({ error: "Failed to fetch client profile" });
+    }
+  });
+
+  // Get client payment status (for payment overdue banner)
+  app.get("/api/client-profiles/:profileId/payment-status", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const profile = await storage.getClientProfileById(req.params.profileId);
+      if (!profile) {
+        return res.status(404).json({ error: "Client profile not found" });
+      }
+
+      // Admin can view any profile, clients can only view their own company profile
+      const canView = sessionUser.role === "admin" || 
+                      sessionUser.clientProfileId === req.params.profileId;
+      
+      if (!canView) {
+        return res.status(403).json({ error: "You don't have permission to view this profile" });
+      }
+
+      res.json({
+        paymentOverdue: profile.paymentOverdue || false,
+        paymentRetryCount: profile.paymentRetryCount || 0,
+        paymentOverdueAt: profile.paymentOverdueAt,
+      });
+    } catch (error) {
+      console.error("Error fetching client payment status:", error);
+      res.status(500).json({ error: "Failed to fetch payment status" });
+    }
+  });
+
+  // Clear payment overdue status (admin only)
+  app.post("/api/client-profiles/:profileId/clear-payment-overdue", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Only admin can clear payment overdue status" });
+      }
+
+      const profile = await storage.getClientProfileById(req.params.profileId);
+      if (!profile) {
+        return res.status(404).json({ error: "Client profile not found" });
+      }
+
+      // Clear payment overdue status
+      const updatedProfile = await storage.updateClientProfile(profile.id, {
+        paymentOverdue: false,
+        paymentRetryCount: 0,
+        paymentOverdueAt: null,
+      });
+
+      res.json({
+        success: true,
+        message: "Payment overdue status cleared",
+        profile: updatedProfile,
+      });
+    } catch (error) {
+      console.error("Error clearing payment overdue status:", error);
+      res.status(500).json({ error: "Failed to clear payment overdue status" });
     }
   });
 
@@ -5830,6 +5914,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sessionUser = await storage.getUser(sessionUserId);
       if (!sessionUser) {
         return res.status(401).json({ error: "User not found" });
+      }
+
+      // Check if client has payment overdue - block new bundle requests for clients with overdue payments
+      if (["client", "client_member"].includes(sessionUser.role) && sessionUser.clientProfileId) {
+        const clientProfile = await storage.getClientProfileById(sessionUser.clientProfileId);
+        if (clientProfile?.paymentOverdue) {
+          return res.status(403).json({ 
+            error: "Payment overdue. Please resolve outstanding payments before submitting new requests.",
+            code: "PAYMENT_OVERDUE"
+          });
+        }
       }
 
       const requestData = {

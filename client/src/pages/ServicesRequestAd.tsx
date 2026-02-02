@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Header } from "@/components/Header";
+import { PaymentOverdueAlert } from "@/components/PaymentOverdueAlert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -616,6 +617,9 @@ export const ServicesRequestAd = (): JSX.Element => {
     <main className="flex flex-col w-full min-h-screen bg-light-grey">
       <Header />
       <div className="flex flex-col items-center w-full flex-1 px-8 py-6">
+        <div className="w-full max-w-6xl">
+          <PaymentOverdueAlert />
+        </div>
         <section className="flex items-center justify-between w-full max-w-6xl mb-8">
           <div className="flex flex-col gap-1">
             <h1 className="text-2xl font-semibold text-dark-blue-night">

@@ -59,6 +59,9 @@ interface ClientProfile {
   createdAt: Date | string;
   updatedAt: Date | string;
   primaryUserId?: string | null;
+  paymentOverdue?: boolean;
+  paymentRetryCount?: number;
+  paymentOverdueAt?: string | Date | null;
 }
 
 interface EnrichedClient extends ClientProfile {
@@ -171,6 +174,19 @@ export default function ClientDetail() {
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const clearPaymentOverdueMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", `/api/client-profiles/${clientId}/clear-payment-overdue`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/org-companies"] });
+      toast({ title: "Payment status cleared", description: "The payment overdue status has been cleared." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error clearing payment status", description: error.message, variant: "destructive" });
     },
   });
 
@@ -354,6 +370,11 @@ export default function ClientDetail() {
             <Badge variant={getPaymentBadgeVariant(clientData.paymentConfiguration)}>
               {formatPaymentConfig(clientData.paymentConfiguration)}
             </Badge>
+            {clientData.paymentOverdue && (
+              <Badge variant="destructive" data-testid="badge-payment-overdue">
+                Payment Overdue
+              </Badge>
+            )}
           </div>
 
           <Tabs defaultValue="profile" className="w-full">
@@ -485,6 +506,43 @@ export default function ClientDetail() {
                   </div>
                 </CardContent>
               </Card>
+
+              {clientData.paymentOverdue && (
+                <Card className="mt-4 border-destructive">
+                  <CardHeader>
+                    <CardTitle className="text-destructive flex items-center gap-2">
+                      Payment Overdue
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <div>
+                        <p className="text-muted-foreground">
+                          This client has outstanding payments that have failed multiple retry attempts.
+                        </p>
+                        {clientData.paymentOverdueAt && (
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Marked overdue: {formatDate(clientData.paymentOverdueAt)}
+                          </p>
+                        )}
+                        {clientData.paymentRetryCount !== undefined && clientData.paymentRetryCount > 0 && (
+                          <p className="text-sm text-muted-foreground">
+                            Retry attempts: {clientData.paymentRetryCount}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => clearPaymentOverdueMutation.mutate()}
+                        disabled={clearPaymentOverdueMutation.isPending}
+                        data-testid="button-clear-payment-overdue"
+                      >
+                        {clearPaymentOverdueMutation.isPending ? "Clearing..." : "Clear Overdue Status"}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
 
             <TabsContent value="team">

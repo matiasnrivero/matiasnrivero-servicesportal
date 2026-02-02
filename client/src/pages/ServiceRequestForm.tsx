@@ -37,6 +37,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import type { Service, InsertServiceRequest, Bundle, BundleItem, ServicePack, ServicePackItem, InputField, ServiceField, User } from "@shared/schema";
 import { Header } from "@/components/Header";
+import { PaymentOverdueAlert } from "@/components/PaymentOverdueAlert";
 import { FileUploader } from "@/components/FileUploader";
 import { DynamicFormField, type ServiceFieldWithInput } from "@/components/DynamicFormField";
 import { ChevronRight, HelpCircle, X, Boxes, CalendarRange, Package, ArrowLeft, Percent, CheckCircle, Loader2 } from "lucide-react";
@@ -2266,6 +2267,9 @@ export default function ServiceRequestForm() {
   return (
     <main className="flex flex-col w-full min-h-screen bg-light-grey">
       <Header />
+      <div className="w-full max-w-6xl mx-auto px-8 pt-4">
+        <PaymentOverdueAlert />
+      </div>
       {renderContent()}
     </main>
   );
