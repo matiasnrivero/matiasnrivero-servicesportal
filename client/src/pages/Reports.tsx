@@ -62,11 +62,11 @@ const reportCards: ReportCard[] = [
   },
   {
     id: "stripe-billing",
-    title: "Stripe Billing",
-    description: "View your billing history and payment details from Stripe",
+    title: "Stripe Billing History",
+    description: "View billing history and payment details from Stripe",
     icon: Receipt,
     path: "/reports/stripe-billing",
-    roles: ["client"],
+    roles: ["admin", "client"],
   },
   {
     id: "services-consumption",

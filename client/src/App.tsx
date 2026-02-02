@@ -33,6 +33,7 @@ import PackAssignment from "@/pages/PackAssignment";
 import OrgCompanies from "@/pages/OrgCompanies";
 import ClientDetail from "@/pages/ClientDetail";
 import RefundManagement from "@/pages/RefundManagement";
+import BillingHistoryReport from "@/pages/BillingHistoryReport";
 
 function Router() {
   return (
@@ -64,6 +65,7 @@ function Router() {
       <Route path="/reports/pack-profit" component={PackProfitReport} />
       <Route path="/reports/royalties-deduction" component={RoyaltiesDeductionReport} />
       <Route path="/reports/refunds" component={RefundManagement} />
+      <Route path="/reports/stripe-billing" component={BillingHistoryReport} />
       <Route path="/client-team" component={ClientTeamManagement} />
       <Route path="/payments" component={Payments} />
       <Route path="/client-companies" component={ClientCompaniesList} />

@@ -411,6 +411,7 @@ export interface IStorage {
 
   // Monthly Billing Record methods
   getMonthlyBillingRecord(id: string): Promise<MonthlyBillingRecord | undefined>;
+  getAllMonthlyBillingRecords(): Promise<MonthlyBillingRecord[]>;
   getMonthlyBillingRecordsByClientProfile(clientProfileId: string): Promise<MonthlyBillingRecord[]>;
   getMonthlyBillingRecordsByPeriod(billingPeriod: string): Promise<MonthlyBillingRecord[]>;
   getMonthlyBillingRecordByClientAndPeriod(clientProfileId: string, billingPeriod: string, recordType?: string): Promise<MonthlyBillingRecord | undefined>;
@@ -1781,6 +1782,11 @@ export class DbStorage implements IStorage {
       .where(eq(monthlyBillingRecords.id, id))
       .limit(1);
     return result[0];
+  }
+
+  async getAllMonthlyBillingRecords(): Promise<MonthlyBillingRecord[]> {
+    return await db.select().from(monthlyBillingRecords)
+      .orderBy(desc(monthlyBillingRecords.createdAt));
   }
 
   async getMonthlyBillingRecordsByClientProfile(clientProfileId: string): Promise<MonthlyBillingRecord[]> {

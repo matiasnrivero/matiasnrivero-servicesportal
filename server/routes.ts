@@ -9681,6 +9681,360 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== BILLING HISTORY REPORT ROUTES ====================
+
+  // Get billing history for report (admin sees all, client sees own)
+  app.get("/api/reports/billing-history", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const { clientProfileId, startDate, endDate, paymentType, tab } = req.query;
+      const isAdmin = sessionUser.role === "admin";
+      const isClient = sessionUser.role === "client";
+
+      if (!isAdmin && !isClient) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      let targetClientProfileId: string | undefined;
+      if (isClient) {
+        targetClientProfileId = sessionUser.clientProfileId || undefined;
+        if (!targetClientProfileId) {
+          return res.json([]);
+        }
+      } else if (clientProfileId && typeof clientProfileId === "string") {
+        targetClientProfileId = clientProfileId;
+      }
+
+      const billingRecords: any[] = [];
+      const stripe = new (await import("stripe")).default(process.env.STRIPE_SECRET_KEY!);
+
+      // Helper to get processing fee from Stripe
+      async function getProcessingFee(chargeId: string): Promise<number> {
+        try {
+          const charge = await stripe.charges.retrieve(chargeId, { expand: ["balance_transaction"] });
+          if (charge.balance_transaction && typeof charge.balance_transaction !== "string") {
+            return charge.balance_transaction.fee / 100;
+          }
+        } catch (e) {
+          console.error("Error fetching charge processing fee:", e);
+        }
+        return 0;
+      }
+
+      // Get date filters
+      const filterStartDate = startDate ? new Date(startDate as string) : undefined;
+      const filterEndDate = endDate ? new Date(endDate as string) : undefined;
+
+      // 1. Get upfront payments (pay-as-you-go) from service requests
+      if (!tab || tab === "pay_as_you_go") {
+        const allServiceRequests = await storage.getAllServiceRequests();
+        const paidServices = allServiceRequests.filter((sr) => {
+          if (sr.clientPaymentStatus !== "paid") return false;
+          if (!sr.stripePaymentIntentId) return false;
+          if (!sr.clientPaymentAt) return false;
+          
+          if (targetClientProfileId) {
+            return false; // Will filter by user's profile below
+          }
+          
+          if (filterStartDate && new Date(sr.clientPaymentAt) < filterStartDate) return false;
+          if (filterEndDate && new Date(sr.clientPaymentAt) > filterEndDate) return false;
+          
+          return true;
+        });
+
+        // Filter by client profile if needed
+        let filteredServices = paidServices;
+        if (targetClientProfileId) {
+          const usersWithProfile = await storage.getAllUsers();
+          const profileUserIds = usersWithProfile
+            .filter((u) => u.clientProfileId === targetClientProfileId)
+            .map((u) => u.id);
+          
+          filteredServices = allServiceRequests.filter((sr) => {
+            if (sr.clientPaymentStatus !== "paid") return false;
+            if (!sr.stripePaymentIntentId) return false;
+            if (!sr.clientPaymentAt) return false;
+            if (!profileUserIds.includes(sr.userId)) return false;
+            if (filterStartDate && new Date(sr.clientPaymentAt) < filterStartDate) return false;
+            if (filterEndDate && new Date(sr.clientPaymentAt) > filterEndDate) return false;
+            return true;
+          });
+        }
+
+        for (const sr of filteredServices) {
+          const amount = sr.finalPrice ? parseFloat(sr.finalPrice) : 0;
+          let processingFee = 0;
+          
+          if (sr.stripePaymentIntentId) {
+            try {
+              const pi = await stripe.paymentIntents.retrieve(sr.stripePaymentIntentId);
+              if (pi.latest_charge) {
+                const chargeId = typeof pi.latest_charge === "string" ? pi.latest_charge : pi.latest_charge.id;
+                processingFee = await getProcessingFee(chargeId);
+              }
+            } catch (e) {
+              console.error("Error fetching payment intent:", e);
+            }
+          }
+
+          const user = await storage.getUser(sr.userId);
+          const clientProfile = user?.clientProfileId ? await storage.getClientProfileById(user.clientProfileId) : null;
+
+          billingRecords.push({
+            id: sr.id,
+            type: "upfront_payment",
+            recordType: "service",
+            jobId: sr.id,
+            jobType: "service",
+            jobTitle: sr.projectName,
+            clientName: clientProfile?.companyName || user?.fullName || "Unknown",
+            clientProfileId: clientProfile?.id,
+            date: sr.clientPaymentAt,
+            amount,
+            processingFee,
+            netAmount: amount - processingFee,
+            status: "Paid",
+            stripePaymentIntentId: sr.stripePaymentIntentId,
+            paymentType: "pay_as_you_go",
+          });
+        }
+
+        // Same for bundle requests
+        const allBundleRequests = await storage.getAllBundleRequests();
+        let filteredBundles = allBundleRequests.filter((br) => {
+          if (br.clientPaymentStatus !== "paid") return false;
+          if (!br.stripePaymentIntentId) return false;
+          if (!br.clientPaymentAt) return false;
+          if (filterStartDate && new Date(br.clientPaymentAt) < filterStartDate) return false;
+          if (filterEndDate && new Date(br.clientPaymentAt) > filterEndDate) return false;
+          return true;
+        });
+
+        if (targetClientProfileId) {
+          const usersWithProfile = await storage.getAllUsers();
+          const profileUserIds = usersWithProfile
+            .filter((u) => u.clientProfileId === targetClientProfileId)
+            .map((u) => u.id);
+          
+          filteredBundles = filteredBundles.filter((br) => profileUserIds.includes(br.userId));
+        }
+
+        for (const br of filteredBundles) {
+          const amount = br.finalPrice ? parseFloat(br.finalPrice) : 0;
+          let processingFee = 0;
+
+          if (br.stripePaymentIntentId) {
+            try {
+              const pi = await stripe.paymentIntents.retrieve(br.stripePaymentIntentId);
+              if (pi.latest_charge) {
+                const chargeId = typeof pi.latest_charge === "string" ? pi.latest_charge : pi.latest_charge.id;
+                processingFee = await getProcessingFee(chargeId);
+              }
+            } catch (e) {
+              console.error("Error fetching bundle payment intent:", e);
+            }
+          }
+
+          const user = await storage.getUser(br.userId);
+          const clientProfile = user?.clientProfileId ? await storage.getClientProfileById(user.clientProfileId) : null;
+
+          billingRecords.push({
+            id: br.id,
+            type: "upfront_payment",
+            recordType: "bundle",
+            jobId: br.id,
+            jobType: "bundle",
+            jobTitle: br.projectName,
+            clientName: clientProfile?.companyName || user?.fullName || "Unknown",
+            clientProfileId: clientProfile?.id,
+            date: br.clientPaymentAt,
+            amount,
+            processingFee,
+            netAmount: amount - processingFee,
+            status: "Paid",
+            stripePaymentIntentId: br.stripePaymentIntentId,
+            paymentType: "pay_as_you_go",
+          });
+        }
+      }
+
+      // 2. Get monthly billing records
+      if (!tab || tab === "monthly_payment") {
+        const monthlyRecords = await storage.getAllMonthlyBillingRecords();
+        let filteredMonthlyRecords = monthlyRecords.filter((rec) => {
+          if (rec.status !== "completed") return false;
+          if (!rec.paidAt) return false;
+          if (filterStartDate && new Date(rec.paidAt) < filterStartDate) return false;
+          if (filterEndDate && new Date(rec.paidAt) > filterEndDate) return false;
+          if (targetClientProfileId && rec.clientProfileId !== targetClientProfileId) return false;
+          return true;
+        });
+
+        for (const rec of filteredMonthlyRecords) {
+          const clientProfile = await storage.getClientProfileById(rec.clientProfileId);
+          const amount = rec.subtotalCents / 100;
+          const processingFee = rec.processingFeeCents / 100;
+
+          billingRecords.push({
+            id: rec.id,
+            type: "monthly_billing",
+            recordType: rec.recordType,
+            jobId: null,
+            jobType: null,
+            jobTitle: rec.recordType === "pack_exceeded" 
+              ? `Pack Exceeded Services (${rec.servicesCount} jobs)` 
+              : `Monthly Services (${rec.servicesCount} jobs)`,
+            clientName: clientProfile?.companyName || "Unknown",
+            clientProfileId: rec.clientProfileId,
+            date: rec.paidAt,
+            billingPeriod: rec.billingPeriod,
+            amount,
+            processingFee,
+            netAmount: amount - processingFee,
+            status: "Paid",
+            stripePaymentIntentId: rec.stripePaymentIntentId,
+            paymentType: rec.recordType === "pack_exceeded" ? "pack_exceeded" : "monthly_payment",
+          });
+        }
+      }
+
+      // 3. Get refunds as separate rows (negative amounts)
+      const allRefunds = await storage.getAllRefunds();
+      let filteredRefunds = allRefunds.filter((ref) => {
+        if (ref.status !== "completed") return false;
+        if (!ref.processedAt) return false;
+        if (filterStartDate && new Date(ref.processedAt) < filterStartDate) return false;
+        if (filterEndDate && new Date(ref.processedAt) > filterEndDate) return false;
+        return true;
+      });
+
+      if (targetClientProfileId) {
+        const usersWithProfile = await storage.getAllUsers();
+        const profileUserIds = usersWithProfile
+          .filter((u) => u.clientProfileId === targetClientProfileId)
+          .map((u) => u.id);
+        filteredRefunds = filteredRefunds.filter((ref) => profileUserIds.includes(ref.clientId));
+      }
+
+      for (const ref of filteredRefunds) {
+        const refundAmount = parseFloat(ref.refundAmount);
+        const user = await storage.getUser(ref.clientId);
+        const clientProfile = user?.clientProfileId ? await storage.getClientProfileById(user.clientProfileId) : null;
+
+        let jobTitle = "Refund";
+        if (ref.serviceRequestId) {
+          const sr = await storage.getServiceRequest(ref.serviceRequestId);
+          jobTitle = sr ? `Refund: ${sr.projectName}` : "Refund: Service Request";
+        } else if (ref.bundleRequestId) {
+          const br = await storage.getBundleRequest(ref.bundleRequestId);
+          jobTitle = br ? `Refund: ${br.projectName}` : "Refund: Bundle Request";
+        }
+
+        billingRecords.push({
+          id: ref.id,
+          type: "refund",
+          recordType: ref.refundType,
+          jobId: ref.serviceRequestId || ref.bundleRequestId,
+          jobType: ref.requestType,
+          jobTitle,
+          clientName: clientProfile?.companyName || user?.fullName || "Unknown",
+          clientProfileId: clientProfile?.id,
+          date: ref.processedAt,
+          amount: -refundAmount,
+          processingFee: 0,
+          netAmount: -refundAmount,
+          status: "Refunded",
+          stripeRefundId: ref.stripeRefundId,
+          paymentType: "refund",
+          reason: ref.reason,
+        });
+      }
+
+      // Sort by date descending
+      billingRecords.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      res.json(billingRecords);
+    } catch (error) {
+      console.error("Error fetching billing history:", error);
+      res.status(500).json({ error: "Failed to fetch billing history" });
+    }
+  });
+
+  // Get billing summary for a client (for client dashboard)
+  app.get("/api/reports/billing-summary", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const isAdmin = sessionUser.role === "admin";
+      const isClient = sessionUser.role === "client";
+
+      if (!isAdmin && !isClient) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const targetClientProfileId = isClient ? sessionUser.clientProfileId : (req.query.clientProfileId as string);
+      
+      if (!targetClientProfileId) {
+        return res.json({ hasPayAsYouGo: false, hasMonthlyPayment: false, hasPackExceeded: false });
+      }
+
+      const clientProfile = await storage.getClientProfileById(targetClientProfileId);
+      const currentPaymentConfig = clientProfile?.paymentConfiguration || "pay_as_you_go";
+
+      // Check what payment types exist in history
+      const monthlyRecords = await storage.getAllMonthlyBillingRecords();
+      const hasMonthlyPayment = monthlyRecords.some(
+        (rec) => rec.clientProfileId === targetClientProfileId && 
+                 rec.recordType === "monthly_services" && 
+                 rec.status === "completed"
+      );
+      const hasPackExceeded = monthlyRecords.some(
+        (rec) => rec.clientProfileId === targetClientProfileId && 
+                 rec.recordType === "pack_exceeded" && 
+                 rec.status === "completed"
+      );
+
+      // Check for pay-as-you-go transactions
+      const usersWithProfile = await storage.getAllUsers();
+      const profileUserIds = usersWithProfile
+        .filter((u) => u.clientProfileId === targetClientProfileId)
+        .map((u) => u.id);
+
+      const allServiceRequests = await storage.getAllServiceRequests();
+      const hasPayAsYouGo = allServiceRequests.some(
+        (sr) => profileUserIds.includes(sr.userId) && 
+                sr.clientPaymentStatus === "paid" && 
+                sr.stripePaymentIntentId
+      );
+
+      res.json({
+        currentPaymentConfig,
+        hasPayAsYouGo,
+        hasMonthlyPayment,
+        hasPackExceeded,
+      });
+    } catch (error) {
+      console.error("Error fetching billing summary:", error);
+      res.status(500).json({ error: "Failed to fetch billing summary" });
+    }
+  });
+
   // ==================== END PHASE 7 ROUTES ====================
 
   // ==================== MONTHLY PACKS ROUTES ====================
