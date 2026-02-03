@@ -438,8 +438,13 @@ export default function ServicesProfitReport() {
   };
 
   const calculateBundleVendorCost = (
-    bundleRequest: BundleRequest
+    bundleRequest: BundleRequest,
+    assignee?: User
   ): number => {
+    if (assignee?.role === "admin" || assignee?.role === "internal_designer") {
+      return 0;
+    }
+    
     const vendorCosts = vendorBundleCostMap[PIXELS_HIVE_VENDOR_ID];
     if (!vendorCosts) return 0;
     
@@ -534,9 +539,10 @@ export default function ServicesProfitReport() {
       const bundle = bundleMap[bundleRequest.bundleId];
       const client = userMap[bundleRequest.userId];
       const createdBy = userMap[bundleRequest.userId];
+      const assignee = bundleRequest.assigneeId ? userMap[bundleRequest.assigneeId] : undefined;
       
       const isInternalJob = createdBy?.role === "admin" || createdBy?.role === "internal_designer";
-      const isInHouse = false;
+      const isInHouse = assignee?.role === "admin" || assignee?.role === "internal_designer";
       const clientPaymentMethod = client?.paymentMethod || "pay_as_you_go";
       
       let retailPrice = 0;
@@ -558,12 +564,16 @@ export default function ServicesProfitReport() {
         discount = parseFloat(String(bundleRequest.discountAmount));
       }
       
-      const vendorCost = calculateBundleVendorCost(bundleRequest);
+      const vendorCost = calculateBundleVendorCost(bundleRequest, assignee);
       const profit = retailPrice - vendorCost;
       
-      const vendorId = PIXELS_HIVE_VENDOR_ID;
-      const vp = vendorProfileMap[PIXELS_HIVE_VENDOR_ID];
-      const vendorName = vp?.companyName || "Pixel's Hive";
+      let vendorId = PIXELS_HIVE_VENDOR_ID;
+      let vendorName = vendorProfileMap[PIXELS_HIVE_VENDOR_ID]?.companyName || "Pixel's Hive";
+      
+      if (isInHouse) {
+        vendorId = "";
+        vendorName = assignee?.username || "Internal";
+      }
       
       const idPart = bundleRequest.id.slice(0, 5).toUpperCase();
       const jobNumber = `B-${idPart}`;
@@ -576,8 +586,8 @@ export default function ServicesProfitReport() {
         serviceName: bundle?.name || "Unknown Bundle",
         serviceMethod: "bundle",
         status: bundleRequest.status,
-        assigneeName: "Unassigned",
-        assigneeRole: "",
+        assigneeName: assignee?.username || "Unassigned",
+        assigneeRole: assignee?.role || "",
         vendorId,
         vendorName,
         retailPrice,
