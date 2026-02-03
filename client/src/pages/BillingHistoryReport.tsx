@@ -63,6 +63,12 @@ interface CurrentUser {
   clientProfileId?: string;
 }
 
+async function fetchCurrentUser(): Promise<CurrentUser> {
+  const res = await fetch("/api/default-user");
+  if (!res.ok) throw new Error("Failed to fetch current user");
+  return res.json();
+}
+
 interface ClientProfile {
   id: string;
   companyName: string;
@@ -75,7 +81,8 @@ export default function BillingHistoryReport() {
   const [activeTab, setActiveTab] = useState<string>("");
 
   const { data: currentUser } = useQuery<CurrentUser>({
-    queryKey: ["/api/auth/me"],
+    queryKey: ["/api/default-user"],
+    queryFn: fetchCurrentUser,
   });
 
   const { data: clientProfiles } = useQuery<ClientProfile[]>({
