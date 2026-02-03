@@ -75,6 +75,9 @@ interface ReportRow {
   createdAt: Date;
   isPackCovered?: boolean;
   isPackOverage?: boolean;
+  isInternalJob: boolean;
+  isInHouse: boolean;
+  clientPaymentMethod: string;
 }
 
 interface MultiSelectClientFilterProps {
@@ -224,6 +227,7 @@ export default function ServicesProfitReport() {
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [searchJobId, setSearchJobId] = useState("");
+  const [internalJobsOnly, setInternalJobsOnly] = useState<boolean>(false);
 
   const { data: currentUser } = useQuery<CurrentUser>({
     queryKey: ["/api/default-user"],
@@ -353,7 +357,7 @@ export default function ServicesProfitReport() {
   ): number => {
     if (!service || !assignee) return 0;
     
-    if (assignee.role === "internal_designer") {
+    if (assignee.role === "internal_designer" || assignee.role === "admin") {
       return 0;
     }
     
@@ -454,9 +458,13 @@ export default function ServicesProfitReport() {
       const assignee = request.assigneeId ? userMap[request.assigneeId] : undefined;
       const createdBy = userMap[request.userId];
       
+      const isInternalJob = createdBy?.role === "admin" || createdBy?.role === "internal_designer";
+      const isInHouse = assignee?.role === "admin" || assignee?.role === "internal_designer";
+      const clientPaymentMethod = client?.paymentMethod || "pay_as_you_go";
+      
       let retailPrice = 0;
       let discount = 0;
-      if (createdBy?.role === "admin") {
+      if (isInternalJob) {
         retailPrice = 0;
       } else if (request.finalPrice) {
         retailPrice = parseFloat(String(request.finalPrice));
@@ -516,6 +524,9 @@ export default function ServicesProfitReport() {
         createdAt: new Date(request.createdAt),
         isPackCovered: request.isPackCovered ?? false,
         isPackOverage: request.isPackOverage ?? false,
+        isInternalJob,
+        isInHouse,
+        clientPaymentMethod,
       });
     });
 
@@ -524,9 +535,13 @@ export default function ServicesProfitReport() {
       const client = userMap[bundleRequest.userId];
       const createdBy = userMap[bundleRequest.userId];
       
+      const isInternalJob = createdBy?.role === "admin" || createdBy?.role === "internal_designer";
+      const isInHouse = false;
+      const clientPaymentMethod = client?.paymentMethod || "pay_as_you_go";
+      
       let retailPrice = 0;
       let discount = 0;
-      if (createdBy?.role === "admin") {
+      if (isInternalJob) {
         retailPrice = 0;
       } else if (bundleRequest.finalPrice) {
         retailPrice = parseFloat(String(bundleRequest.finalPrice));
@@ -570,6 +585,9 @@ export default function ServicesProfitReport() {
         discount,
         profit,
         createdAt: new Date(bundleRequest.createdAt),
+        isInternalJob,
+        isInHouse,
+        clientPaymentMethod,
       });
     });
 
@@ -578,6 +596,14 @@ export default function ServicesProfitReport() {
 
   const filteredData = useMemo(() => {
     return reportData.filter(row => {
+      if (row.clientPaymentMethod === "monthly_payment" && row.status !== "delivered") {
+        return false;
+      }
+      
+      if (internalJobsOnly && !row.isInternalJob) {
+        return false;
+      }
+      
       if (vendorFilter !== "all") {
         if (row.vendorId !== vendorFilter) return false;
       }
@@ -616,7 +642,7 @@ export default function ServicesProfitReport() {
       
       return true;
     });
-  }, [reportData, vendorFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId, services, bundles]);
+  }, [reportData, vendorFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId, services, bundles, internalJobsOnly]);
 
   const totals = useMemo(() => {
     return filteredData.reduce(
@@ -641,6 +667,8 @@ export default function ServicesProfitReport() {
       "Service",
       "Method",
       "Status",
+      "Internal Job",
+      "In-House",
       "Vendor",
       "Retail Price",
       "Vendor Cost",
@@ -655,6 +683,8 @@ export default function ServicesProfitReport() {
       row.serviceName,
       row.serviceMethod === "ad_hoc" ? "Ad-hoc" : "Bundle",
       statusConfig[row.status]?.label || row.status,
+      row.isInternalJob ? "Yes" : "No",
+      row.isInHouse ? "Yes" : "No",
       row.vendorName || "-",
       row.retailPrice.toFixed(2),
       row.vendorCost.toFixed(2),
@@ -858,6 +888,21 @@ export default function ServicesProfitReport() {
               </div>
 
               <div className="space-y-2">
+                <Label className="text-sm">Internal Jobs</Label>
+                <div className="flex items-center h-9 px-3 border rounded-md bg-background">
+                  <Checkbox
+                    id="internal-jobs-filter"
+                    checked={internalJobsOnly}
+                    onCheckedChange={(checked) => setInternalJobsOnly(checked === true)}
+                    data-testid="checkbox-internal-jobs"
+                  />
+                  <label htmlFor="internal-jobs-filter" className="ml-2 text-sm cursor-pointer">
+                    Internal Jobs Only
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
                 <Label className="text-sm">Date From</Label>
                 <Popover>
                   <PopoverTrigger asChild>
@@ -926,7 +971,7 @@ export default function ServicesProfitReport() {
               </div>
             </div>
 
-            {(vendorFilter !== "all" || serviceFilter !== "all" || serviceMethodFilter !== "all" || dateFrom || dateTo || selectedClients.length > 0 || searchJobId) && (
+            {(vendorFilter !== "all" || serviceFilter !== "all" || serviceMethodFilter !== "all" || dateFrom || dateTo || selectedClients.length > 0 || searchJobId || internalJobsOnly) && (
               <div className="mt-4 flex items-center gap-2">
                 <span className="text-sm text-dark-gray">Active filters:</span>
                 <Button
@@ -940,6 +985,7 @@ export default function ServicesProfitReport() {
                     setDateTo(undefined);
                     setSelectedClients([]);
                     setSearchJobId("");
+                    setInternalJobsOnly(false);
                   }}
                   data-testid="button-clear-filters"
                 >
@@ -1000,6 +1046,16 @@ export default function ServicesProfitReport() {
                               Overage
                             </Badge>
                           )}
+                          {row.isInternalJob && (
+                            <Badge variant="outline" className="text-xs border-blue-300 text-blue-700 dark:text-blue-400">
+                              Internal Job
+                            </Badge>
+                          )}
+                          {row.isInHouse && (
+                            <Badge variant="outline" className="text-xs border-purple-300 text-purple-700 dark:text-purple-400">
+                              In-House
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
@@ -1016,7 +1072,7 @@ export default function ServicesProfitReport() {
                       </TableCell>
                       <TableCell>{row.vendorName || "-"}</TableCell>
                       <TableCell className="text-right">
-                        {row.retailPrice === 0 && row.assigneeRole !== "internal_designer" ? (
+                        {row.retailPrice === 0 ? (
                           <span className="text-dark-gray">$0.00</span>
                         ) : (
                           <span className="text-green-600">${row.retailPrice.toFixed(2)}</span>
