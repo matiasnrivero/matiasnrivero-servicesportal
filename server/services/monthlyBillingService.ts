@@ -200,7 +200,7 @@ class MonthlyBillingService {
         result.error = chargeResult.error;
 
         if (newRetryCount >= this.MAX_RETRY_COUNT) {
-          await this.notifyAdminPaymentFailed(clientProfile, billingPeriod, chargeResult.error || "Unknown error");
+          await this.notifyAdminPaymentFailed(clientProfile, billingPeriod, chargeResult.error || "Unknown error", billingRecord.id);
         }
       }
     } catch (error) {
@@ -372,13 +372,32 @@ class MonthlyBillingService {
   async notifyAdminPaymentFailed(
     clientProfile: ClientProfile,
     billingPeriod: string,
-    error: string
+    error: string,
+    billingRecordId?: string
   ): Promise<void> {
-    console.error(
-      `PAYMENT FAILED ALERT: Client "${clientProfile.companyName}" (${clientProfile.id}) ` +
-      `billing for ${billingPeriod} failed after ${this.MAX_RETRY_COUNT} attempts. ` +
-      `Error: ${error}. Client marked as payment_overdue.`
-    );
+    const title = `Payment Failed: ${clientProfile.companyName}`;
+    const message = `Billing for ${billingPeriod} failed after ${this.MAX_RETRY_COUNT} attempts. ` +
+      `Error: ${error}. Client has been marked as payment overdue and blocked from new service requests.`;
+    
+    console.error(`PAYMENT FAILED ALERT: ${message}`);
+
+    try {
+      await storage.createAdminNotification({
+        type: "payment_failed",
+        title,
+        message,
+        clientProfileId: clientProfile.id,
+        billingRecordId: billingRecordId || null,
+        metadata: {
+          companyName: clientProfile.companyName,
+          billingPeriod,
+          error,
+          retryCount: this.MAX_RETRY_COUNT,
+        },
+      });
+    } catch (notificationError) {
+      console.error("Failed to create admin notification:", notificationError);
+    }
   }
 
   async retryFailedBillings(): Promise<{ processed: number; succeeded: number; failed: number }> {
@@ -471,7 +490,8 @@ class MonthlyBillingService {
       await this.notifyAdminPaymentFailed(
         clientProfile,
         record.billingPeriod,
-        chargeResult.error || "Unknown error"
+        chargeResult.error || "Unknown error",
+        record.id
       );
     }
 
@@ -630,7 +650,8 @@ class MonthlyBillingService {
           await this.notifyAdminPaymentFailed(
             clientProfile,
             `${billingPeriod} Pack Exceeded`,
-            chargeResult.error || "Unknown error"
+            chargeResult.error || "Unknown error",
+            billingRecord.id
           );
         }
       }

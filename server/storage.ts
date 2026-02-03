@@ -104,6 +104,8 @@ import {
   type MonthlyBillingRecord,
   type InsertMonthlyBillingRecord,
   type UpdateMonthlyBillingRecord,
+  type AdminNotification,
+  type InsertAdminNotification,
   users,
   services,
   servicePricingTiers,
@@ -145,6 +147,7 @@ import {
   monthlyPackUsage,
   refunds,
   monthlyBillingRecords,
+  adminNotifications,
 } from "@shared/schema";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -419,6 +422,14 @@ export interface IStorage {
   getFailedMonthlyBillingRecords(): Promise<MonthlyBillingRecord[]>;
   createMonthlyBillingRecord(data: InsertMonthlyBillingRecord): Promise<MonthlyBillingRecord>;
   updateMonthlyBillingRecord(id: string, data: UpdateMonthlyBillingRecord): Promise<MonthlyBillingRecord | undefined>;
+
+  // Admin Notification methods
+  getAdminNotifications(options?: { unreadOnly?: boolean; limit?: number }): Promise<AdminNotification[]>;
+  getAdminNotification(id: string): Promise<AdminNotification | undefined>;
+  createAdminNotification(data: InsertAdminNotification): Promise<AdminNotification>;
+  markAdminNotificationRead(id: string, userId: string): Promise<AdminNotification | undefined>;
+  dismissAdminNotification(id: string, userId: string): Promise<AdminNotification | undefined>;
+  getUnreadAdminNotificationCount(): Promise<number>;
 
   // Designer reassignment helper methods
   getPrimaryVendorAdmin(vendorId: string): Promise<User | undefined>;
@@ -1838,6 +1849,56 @@ export class DbStorage implements IStorage {
       .where(eq(monthlyBillingRecords.id, id))
       .returning();
     return result[0];
+  }
+
+  // Admin Notification methods
+  async getAdminNotifications(options?: { unreadOnly?: boolean; limit?: number }): Promise<AdminNotification[]> {
+    let query = db.select().from(adminNotifications);
+    
+    const conditions: any[] = [eq(adminNotifications.isDismissed, false)];
+    if (options?.unreadOnly) {
+      conditions.push(eq(adminNotifications.isRead, false));
+    }
+    
+    const result = await db.select().from(adminNotifications)
+      .where(and(...conditions))
+      .orderBy(desc(adminNotifications.createdAt))
+      .limit(options?.limit || 100);
+    return result;
+  }
+
+  async getAdminNotification(id: string): Promise<AdminNotification | undefined> {
+    const result = await db.select().from(adminNotifications)
+      .where(eq(adminNotifications.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createAdminNotification(data: InsertAdminNotification): Promise<AdminNotification> {
+    const result = await db.insert(adminNotifications).values(data).returning();
+    return result[0];
+  }
+
+  async markAdminNotificationRead(id: string, userId: string): Promise<AdminNotification | undefined> {
+    const result = await db.update(adminNotifications)
+      .set({ isRead: true, readAt: new Date(), readByUserId: userId })
+      .where(eq(adminNotifications.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async dismissAdminNotification(id: string, userId: string): Promise<AdminNotification | undefined> {
+    const result = await db.update(adminNotifications)
+      .set({ isDismissed: true, dismissedAt: new Date(), dismissedByUserId: userId })
+      .where(eq(adminNotifications.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getUnreadAdminNotificationCount(): Promise<number> {
+    const result = await db.select().from(adminNotifications)
+      .where(and(eq(adminNotifications.isRead, false), eq(adminNotifications.isDismissed, false)));
+    return result.length;
   }
 
   // Designer reassignment helper methods

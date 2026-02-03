@@ -873,7 +873,39 @@ export const monthlyBillingRecords = pgTable("monthly_billing_records", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Admin notifications for system alerts (payment failures, etc.)
+export const adminNotificationTypes = ["payment_failed", "subscription_failed", "system_alert"] as const;
+export type AdminNotificationType = typeof adminNotificationTypes[number];
+
+export const adminNotifications = pgTable("admin_notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(), // payment_failed, subscription_failed, system_alert
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  // Related entities
+  clientProfileId: varchar("client_profile_id"),
+  billingRecordId: varchar("billing_record_id"),
+  // Metadata for additional context
+  metadata: jsonb("metadata"),
+  // Read/dismissed status
+  isRead: boolean("is_read").notNull().default(false),
+  readAt: timestamp("read_at"),
+  readByUserId: varchar("read_by_user_id"),
+  isDismissed: boolean("is_dismissed").notNull().default(false),
+  dismissedAt: timestamp("dismissed_at"),
+  dismissedByUserId: varchar("dismissed_by_user_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // ==================== END PHASE 7 TABLES ====================
+
+export const insertAdminNotificationSchema = createInsertSchema(adminNotifications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAdminNotification = z.infer<typeof insertAdminNotificationSchema>;
+export type AdminNotification = typeof adminNotifications.$inferSelect;
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,

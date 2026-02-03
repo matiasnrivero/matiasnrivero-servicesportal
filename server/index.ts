@@ -18,6 +18,8 @@ const app = express();
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const { stripeService } = await import("./services/stripeService");
   const { storage } = await import("./storage");
+  const Stripe = (await import("stripe")).default;
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
   
   const sig = req.headers['stripe-signature'];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -117,7 +119,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
               let currentPeriodStart: Date | undefined;
               let currentPeriodEnd: Date | undefined;
               try {
-                const stripeSubResp = await stripe.subscriptions.retrieve(subscriptionId);
+                const stripeSubResp = await stripe.subscriptions.retrieve(subscriptionId) as any;
                 currentPeriodStart = new Date(stripeSubResp.current_period_start * 1000);
                 currentPeriodEnd = new Date(stripeSubResp.current_period_end * 1000);
               } catch (err) {
@@ -285,6 +287,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  const { cronScheduler } = await import("./services/cronScheduler");
+  cronScheduler.initialize();
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
