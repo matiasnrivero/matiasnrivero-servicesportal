@@ -758,15 +758,28 @@ export default function ServicesProfitReport() {
               </p>
             </div>
           </div>
-          <Button
-            variant="outline"
-            onClick={exportToCSV}
-            disabled={filteredData.length === 0}
-            data-testid="button-download-csv"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Download CSV
-          </Button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="internal-jobs-header"
+                checked={internalJobsOnly}
+                onCheckedChange={(checked) => setInternalJobsOnly(checked === true)}
+                data-testid="checkbox-internal-jobs"
+              />
+              <label htmlFor="internal-jobs-header" className="text-sm cursor-pointer whitespace-nowrap">
+                Internal Jobs
+              </label>
+            </div>
+            <Button
+              variant="outline"
+              onClick={exportToCSV}
+              disabled={filteredData.length === 0}
+              data-testid="button-download-csv"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download CSV
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -895,21 +908,6 @@ export default function ServicesProfitReport() {
                     <SelectItem value="bundle">Bundle Service</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm">Internal Jobs</Label>
-                <div className="flex items-center h-9 px-3 border rounded-md bg-background">
-                  <Checkbox
-                    id="internal-jobs-filter"
-                    checked={internalJobsOnly}
-                    onCheckedChange={(checked) => setInternalJobsOnly(checked === true)}
-                    data-testid="checkbox-internal-jobs"
-                  />
-                  <label htmlFor="internal-jobs-filter" className="ml-2 text-sm cursor-pointer">
-                    Internal Jobs Only
-                  </label>
-                </div>
               </div>
 
               <div className="space-y-2">
