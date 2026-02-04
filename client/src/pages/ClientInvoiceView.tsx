@@ -81,9 +81,9 @@ const typeLabels: Record<string, string> = {
 };
 
 const typeBadgeColors: Record<string, string> = {
-  ad_hoc: "bg-amber-100 text-amber-800 border-amber-200",
-  bundle: "bg-rose-100 text-rose-800 border-rose-200",
-  pack: "bg-green-100 text-green-800 border-green-200",
+  ad_hoc: "bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-700",
+  bundle: "bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-200 border-rose-200 dark:border-rose-700",
+  pack: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-200 dark:border-green-700",
 };
 
 export default function ClientInvoiceView() {
@@ -98,12 +98,7 @@ export default function ClientInvoiceView() {
   const isClient = currentUser?.role === "client";
 
   const { data: invoiceData, isLoading: invoiceLoading } = useQuery<InvoiceData>({
-    queryKey: ["/api/reports/my-invoice", selectedMonth, selectedYear],
-    queryFn: async () => {
-      const res = await fetch(`/api/reports/my-invoice?month=${selectedMonth}&year=${selectedYear}`);
-      if (!res.ok) throw new Error("Failed to fetch invoice");
-      return res.json();
-    },
+    queryKey: [`/api/reports/my-invoice?month=${selectedMonth}&year=${selectedYear}`],
     enabled: isClient,
   });
 
@@ -335,8 +330,8 @@ export default function ClientInvoiceView() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">My Invoices</h1>
-            <p className="text-muted-foreground">View your monthly billing statements and download invoices</p>
+            <h1 className="text-2xl font-bold text-foreground" data-testid="text-page-title">My Invoices</h1>
+            <p className="text-muted-foreground" data-testid="text-page-description">View your monthly billing statements and download invoices</p>
           </div>
         </div>
 
@@ -357,7 +352,7 @@ export default function ClientInvoiceView() {
                   </SelectTrigger>
                   <SelectContent>
                     {monthOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
+                      <SelectItem key={option.value} value={option.value} data-testid={`select-month-${option.value}`}>
                         {option.label}
                       </SelectItem>
                     ))}
@@ -387,16 +382,16 @@ export default function ClientInvoiceView() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Client</p>
-                    <p className="font-semibold">{invoiceData.client.companyName || invoiceData.client.name}</p>
-                    <p className="text-sm text-muted-foreground">{invoiceData.client.email}</p>
+                    <p className="font-semibold" data-testid="text-client-name">{invoiceData.client.companyName || invoiceData.client.name}</p>
+                    <p className="text-sm text-muted-foreground" data-testid="text-client-email">{invoiceData.client.email}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Billing Period</p>
-                    <p className="font-semibold">{periodLabel}</p>
+                    <p className="font-semibold" data-testid="text-billing-period">{periodLabel}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Payment Method</p>
-                    <Badge variant="secondary" className="mt-1">
+                    <Badge variant="secondary" className="mt-1" data-testid="badge-payment-method">
                       {paymentMethodLabels[invoiceData.client.paymentMethod] || invoiceData.client.paymentMethod}
                     </Badge>
                   </div>
@@ -406,9 +401,9 @@ export default function ClientInvoiceView() {
               <h3 className="text-lg font-semibold mb-4">Itemized Charges</h3>
 
               {invoiceData.items.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
+                <div className="text-center py-12 text-muted-foreground" data-testid="status-empty">
                   <Receipt className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No charges for this billing period</p>
+                  <p data-testid="text-empty-message">No charges for this billing period</p>
                 </div>
               ) : (
                 <div className="border rounded-lg overflow-hidden mb-6">
@@ -423,18 +418,19 @@ export default function ClientInvoiceView() {
                     </TableHeader>
                     <TableBody>
                       {invoiceData.items.map((item) => (
-                        <TableRow key={`${item.type}-${item.id}`}>
+                        <TableRow key={`${item.type}-${item.id}`} data-testid={`row-item-${item.id}`}>
                           <TableCell>
                             <Badge 
                               variant="outline" 
                               className={typeBadgeColors[item.type]}
+                              data-testid={`badge-type-${item.id}`}
                             >
                               {typeLabels[item.type]}
                             </Badge>
                           </TableCell>
-                          <TableCell className="font-medium">{item.serviceName}</TableCell>
-                          <TableCell>{format(new Date(item.date), "MMM d, yyyy")}</TableCell>
-                          <TableCell className="text-right font-medium">${item.amount.toFixed(2)}</TableCell>
+                          <TableCell className="font-medium" data-testid={`text-service-${item.id}`}>{item.serviceName}</TableCell>
+                          <TableCell data-testid={`text-date-${item.id}`}>{format(new Date(item.date), "MMM d, yyyy")}</TableCell>
+                          <TableCell className="text-right font-medium" data-testid={`text-amount-${item.id}`}>${item.amount.toFixed(2)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -443,40 +439,40 @@ export default function ClientInvoiceView() {
               )}
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-amber-100 rounded-lg">
-                    <FileText className="w-5 h-5 text-amber-700" />
+                <div className="flex items-center gap-3" data-testid="summary-adhoc">
+                  <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                    <FileText className="w-5 h-5 text-amber-700 dark:text-amber-300" />
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Ad-hoc Services</p>
-                    <p className="font-semibold">{invoiceData.totals.adHocCount} - ${invoiceData.totals.adHocTotal.toFixed(2)}</p>
+                    <p className="font-semibold" data-testid="text-adhoc-total">{invoiceData.totals.adHocCount} - ${invoiceData.totals.adHocTotal.toFixed(2)}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-rose-100 rounded-lg">
-                    <Package className="w-5 h-5 text-rose-700" />
+                <div className="flex items-center gap-3" data-testid="summary-bundle">
+                  <div className="p-2 bg-rose-100 dark:bg-rose-900/30 rounded-lg">
+                    <Package className="w-5 h-5 text-rose-700 dark:text-rose-300" />
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Bundle Services</p>
-                    <p className="font-semibold">{invoiceData.totals.bundleCount} - ${invoiceData.totals.bundleTotal.toFixed(2)}</p>
+                    <p className="font-semibold" data-testid="text-bundle-total">{invoiceData.totals.bundleCount} - ${invoiceData.totals.bundleTotal.toFixed(2)}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <Receipt className="w-5 h-5 text-green-700" />
+                <div className="flex items-center gap-3" data-testid="summary-pack">
+                  <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                    <Receipt className="w-5 h-5 text-green-700 dark:text-green-300" />
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Monthly Packs</p>
-                    <p className="font-semibold">{invoiceData.totals.packCount} - ${invoiceData.totals.packTotal.toFixed(2)}</p>
+                    <p className="font-semibold" data-testid="text-pack-total">{invoiceData.totals.packCount} - ${invoiceData.totals.packTotal.toFixed(2)}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3" data-testid="summary-grand-total">
                   <div className="p-2 bg-primary/10 rounded-lg">
                     <DollarSign className="w-5 h-5 text-primary" />
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Grand Total</p>
-                    <p className="text-xl font-bold">${invoiceData.totals.grandTotal.toFixed(2)}</p>
+                    <p className="text-xl font-bold" data-testid="text-grand-total">${invoiceData.totals.grandTotal.toFixed(2)}</p>
                   </div>
                 </div>
               </div>
