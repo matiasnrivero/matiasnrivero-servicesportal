@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { format } from "date-fns";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { Header } from "@/components/Header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -237,37 +239,127 @@ export default function ClientInvoicingReport() {
 
     const { client, billingPeriod, items, totals } = invoiceDetail;
     const periodLabel = format(new Date(billingPeriod.year, billingPeriod.month - 1), "MMMM yyyy");
+    const invoiceNumber = `INV-${billingPeriod.year}${String(billingPeriod.month).padStart(2, "0")}-${client.id.substring(0, 8).toUpperCase()}`;
+    const invoiceDate = format(new Date(), "MMMM d, yyyy");
 
-    let content = `INVOICE\n\n`;
-    content += `Client: ${client.companyName || client.name}\n`;
-    content += `Email: ${client.email || "N/A"}\n`;
-    content += `Payment Method: ${paymentMethodLabels[client.paymentMethod] || client.paymentMethod}\n`;
-    content += `Billing Period: ${periodLabel}\n\n`;
-    content += `${"=".repeat(80)}\n\n`;
-    content += `ITEMIZED CHARGES\n\n`;
-    content += `${"Type".padEnd(20)}${"Service/Pack".padEnd(35)}${"Date".padEnd(15)}${"Amount".padStart(10)}\n`;
-    content += `${"-".repeat(80)}\n`;
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
 
-    for (const item of items) {
-      const typeLabel = typeLabels[item.type] || item.type;
-      const dateStr = format(new Date(item.date), "MMM d, yyyy");
-      content += `${typeLabel.padEnd(20)}${item.serviceName.substring(0, 33).padEnd(35)}${dateStr.padEnd(15)}${("$" + item.amount.toFixed(2)).padStart(10)}\n`;
+    doc.setFontSize(24);
+    doc.setFont("helvetica", "bold");
+    doc.text("INVOICE", pageWidth / 2, 25, { align: "center" });
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100);
+    doc.text(`Invoice #: ${invoiceNumber}`, pageWidth - 20, 15, { align: "right" });
+    doc.text(`Date: ${invoiceDate}`, pageWidth - 20, 21, { align: "right" });
+
+    doc.setDrawColor(200);
+    doc.line(20, 35, pageWidth - 20, 35);
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0);
+    doc.text("Bill To:", 20, 45);
+
+    doc.setFont("helvetica", "normal");
+    let yPos = 52;
+    doc.text(client.companyName || client.name, 20, yPos);
+    yPos += 6;
+    if (client.email) {
+      doc.text(client.email, 20, yPos);
+      yPos += 6;
+    }
+    if (client.billingAddress) {
+      const addr = client.billingAddress;
+      if (addr.street) { doc.text(addr.street, 20, yPos); yPos += 6; }
+      if (addr.city || addr.state || addr.zip) {
+        doc.text(`${addr.city || ""} ${addr.state || ""} ${addr.zip || ""}`.trim(), 20, yPos);
+        yPos += 6;
+      }
     }
 
-    content += `${"-".repeat(80)}\n\n`;
-    content += `SUMMARY\n`;
-    content += `Ad-hoc Services (${totals.adHocCount}): $${totals.adHocTotal.toFixed(2)}\n`;
-    content += `Bundle Services (${totals.bundleCount}): $${totals.bundleTotal.toFixed(2)}\n`;
-    content += `Monthly Packs (${totals.packCount}): $${totals.packTotal.toFixed(2)}\n`;
-    content += `\nTOTAL: $${totals.grandTotal.toFixed(2)}\n`;
+    doc.setFont("helvetica", "bold");
+    doc.text("Billing Period:", pageWidth - 80, 45);
+    doc.setFont("helvetica", "normal");
+    doc.text(periodLabel, pageWidth - 80, 52);
 
-    const blob = new Blob([content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `invoice-${client.name.replace(/\s+/g, "-")}-${billingPeriod.year}-${String(billingPeriod.month).padStart(2, "0")}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    doc.text("Payment Method:", pageWidth - 80, 62);
+    doc.text(paymentMethodLabels[client.paymentMethod] || client.paymentMethod, pageWidth - 80, 69);
+
+    const tableData = items.map(item => [
+      typeLabels[item.type] || item.type,
+      item.serviceName,
+      format(new Date(item.date), "MMM d, yyyy"),
+      `$${item.amount.toFixed(2)}`
+    ]);
+
+    autoTable(doc, {
+      startY: Math.max(yPos + 10, 85),
+      head: [["Type", "Service/Pack", "Date", "Amount"]],
+      body: tableData,
+      theme: "striped",
+      headStyles: {
+        fillColor: [41, 65, 148],
+        textColor: 255,
+        fontStyle: "bold",
+        halign: "left"
+      },
+      columnStyles: {
+        0: { cellWidth: 35 },
+        1: { cellWidth: 80 },
+        2: { cellWidth: 35 },
+        3: { cellWidth: 30, halign: "right" }
+      },
+      styles: {
+        fontSize: 9,
+        cellPadding: 4
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 250]
+      }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY + 15;
+
+    doc.setDrawColor(200);
+    doc.line(pageWidth - 100, finalY, pageWidth - 20, finalY);
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    let summaryY = finalY + 8;
+
+    doc.text(`Ad-hoc Services (${totals.adHocCount}):`, pageWidth - 100, summaryY);
+    doc.text(`$${totals.adHocTotal.toFixed(2)}`, pageWidth - 20, summaryY, { align: "right" });
+    summaryY += 7;
+
+    doc.text(`Bundle Services (${totals.bundleCount}):`, pageWidth - 100, summaryY);
+    doc.text(`$${totals.bundleTotal.toFixed(2)}`, pageWidth - 20, summaryY, { align: "right" });
+    summaryY += 7;
+
+    doc.text(`Monthly Packs (${totals.packCount}):`, pageWidth - 100, summaryY);
+    doc.text(`$${totals.packTotal.toFixed(2)}`, pageWidth - 20, summaryY, { align: "right" });
+    summaryY += 10;
+
+    doc.setDrawColor(41, 65, 148);
+    doc.setLineWidth(0.5);
+    doc.line(pageWidth - 100, summaryY, pageWidth - 20, summaryY);
+    summaryY += 8;
+
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("TOTAL:", pageWidth - 100, summaryY);
+    doc.text(`$${totals.grandTotal.toFixed(2)}`, pageWidth - 20, summaryY, { align: "right" });
+
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(120);
+    doc.text("Thank you for your business!", pageWidth / 2, pageHeight - 20, { align: "center" });
+    doc.text(`Generated on ${format(new Date(), "MMMM d, yyyy 'at' h:mm a")}`, pageWidth / 2, pageHeight - 14, { align: "center" });
+
+    doc.save(`invoice-${client.name.replace(/\s+/g, "-")}-${billingPeriod.year}-${String(billingPeriod.month).padStart(2, "0")}.pdf`);
   };
 
   if (!isAdmin) {
