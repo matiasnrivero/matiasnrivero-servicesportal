@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import tripodLogoPath from "@/assets/images/tripod-logo.png";
 import { Header } from "@/components/Header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -234,7 +235,7 @@ export default function ClientInvoicingReport() {
     URL.revokeObjectURL(url);
   };
 
-  const generateInvoicePDF = () => {
+  const generateInvoicePDF = async () => {
     if (!invoiceDetail) return;
 
     const { client, billingPeriod, items, totals } = invoiceDetail;
@@ -244,10 +245,31 @@ export default function ClientInvoicingReport() {
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
 
-    doc.setFontSize(24);
-    doc.setFont("helvetica", "bold");
-    doc.text("INVOICE", pageWidth / 2, 25, { align: "center" });
+    const loadImage = (src: string): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL("image/png"));
+        };
+        img.onerror = reject;
+        img.src = src;
+      });
+    };
+
+    try {
+      const logoData = await loadImage(tripodLogoPath);
+      doc.addImage(logoData, "PNG", 20, 10, 50, 15);
+    } catch (e) {
+      console.error("Failed to load logo:", e);
+    }
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
@@ -318,16 +340,25 @@ export default function ClientInvoicingReport() {
       },
       alternateRowStyles: {
         fillColor: [245, 245, 250]
-      }
+      },
+      margin: { bottom: 60 }
     });
 
-    const finalY = (doc as any).lastAutoTable.finalY + 15;
+    let finalY = (doc as any).lastAutoTable.finalY + 15;
+    const summaryHeight = 55;
+    const footerSpace = 35;
+
+    if (finalY + summaryHeight + footerSpace > pageHeight) {
+      doc.addPage();
+      finalY = 20;
+    }
 
     doc.setDrawColor(200);
     doc.line(pageWidth - 100, finalY, pageWidth - 20, finalY);
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
+    doc.setTextColor(0);
     let summaryY = finalY + 8;
 
     doc.text(`Ad-hoc Services (${totals.adHocCount}):`, pageWidth - 100, summaryY);
@@ -352,12 +383,18 @@ export default function ClientInvoicingReport() {
     doc.text("TOTAL:", pageWidth - 100, summaryY);
     doc.text(`$${totals.grandTotal.toFixed(2)}`, pageWidth - 20, summaryY, { align: "right" });
 
-    const pageHeight = doc.internal.pageSize.getHeight();
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(120);
-    doc.text("Thank you for your business!", pageWidth / 2, pageHeight - 20, { align: "center" });
-    doc.text(`Generated on ${format(new Date(), "MMMM d, yyyy 'at' h:mm a")}`, pageWidth / 2, pageHeight - 14, { align: "center" });
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(120);
+      doc.text("Thank you for your business!", pageWidth / 2, pageHeight - 20, { align: "center" });
+      doc.text(`Generated on ${format(new Date(), "MMMM d, yyyy 'at' h:mm a")}`, pageWidth / 2, pageHeight - 14, { align: "center" });
+      if (totalPages > 1) {
+        doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 8, { align: "center" });
+      }
+    }
 
     doc.save(`invoice-${client.name.replace(/\s+/g, "-")}-${billingPeriod.year}-${String(billingPeriod.month).padStart(2, "0")}.pdf`);
   };
