@@ -247,7 +247,7 @@ export default function ClientInvoicingReport() {
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
 
-    const loadImage = (src: string): Promise<string> => {
+    const loadImage = (src: string): Promise<{ data: string; width: number; height: number }> => {
       return new Promise((resolve, reject) => {
         const img = new Image();
         img.crossOrigin = "anonymous";
@@ -257,7 +257,7 @@ export default function ClientInvoicingReport() {
           canvas.height = img.height;
           const ctx = canvas.getContext("2d");
           ctx?.drawImage(img, 0, 0);
-          resolve(canvas.toDataURL("image/png"));
+          resolve({ data: canvas.toDataURL("image/png"), width: img.width, height: img.height });
         };
         img.onerror = reject;
         img.src = src;
@@ -265,8 +265,12 @@ export default function ClientInvoicingReport() {
     };
 
     try {
-      const logoData = await loadImage(tripodLogoPath);
-      doc.addImage(logoData, "PNG", 20, 10, 50, 15);
+      const logoInfo = await loadImage(tripodLogoPath);
+      const maxWidth = 45;
+      const aspectRatio = logoInfo.width / logoInfo.height;
+      const logoWidth = maxWidth;
+      const logoHeight = maxWidth / aspectRatio;
+      doc.addImage(logoInfo.data, "PNG", 20, 12, logoWidth, logoHeight);
     } catch (e) {
       console.error("Failed to load logo:", e);
     }
