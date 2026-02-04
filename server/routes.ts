@@ -11903,6 +11903,190 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== END CLIENT INVOICING REPORT ====================
 
+  // ==================== CLIENT INVOICE VIEW (for client role) ====================
+
+  // Get client's own invoice data for a specific month
+  app.get("/api/reports/my-invoice", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "client") {
+        return res.status(403).json({ error: "Client access required" });
+      }
+
+      const { month, year } = req.query;
+      
+      if (!month || !year) {
+        return res.status(400).json({ error: "Month and year are required" });
+      }
+
+      const selectedMonth = parseInt(month as string);
+      const selectedYear = parseInt(year as string);
+
+      // Calculate month boundaries
+      const monthStart = new Date(selectedYear, selectedMonth - 1, 1);
+      const monthEnd = new Date(selectedYear, selectedMonth, 0, 23, 59, 59, 999);
+
+      // Get client's payment configuration
+      const clientProfiles = await storage.getAllClientProfiles();
+      const profile = sessionUser.clientProfileId ? clientProfiles.find((p: any) => p.id === sessionUser.clientProfileId) : null;
+      const paymentConfig = profile?.paymentConfiguration || sessionUser.paymentMethod || "pay_as_you_go";
+      
+      // Get all services and bundles for enrichment
+      const allServices = await storage.getAllServices();
+      const serviceMap = new Map(allServices.map((s: any) => [s.id, s]));
+      const allBundles = await storage.getAllBundles();
+      const bundleMap = new Map(allBundles.map((b: any) => [b.id, b]));
+      const allPacks = await storage.getAllServicePacks();
+      const packMap = new Map(allPacks.map((p: any) => [p.id, p]));
+      
+      // Get service requests
+      const allServiceRequests = await storage.getServiceRequestsByUser(sessionUserId);
+      let filteredServiceRequests: any[] = [];
+      
+      if (paymentConfig === "pay_as_you_go") {
+        filteredServiceRequests = allServiceRequests.filter((sr: any) => {
+          if (!sr.createdAt) return false;
+          const createdDate = new Date(sr.createdAt);
+          return createdDate >= monthStart && createdDate <= monthEnd && 
+                 sr.finalPrice && parseFloat(sr.finalPrice) > 0;
+        });
+      } else {
+        // Monthly payment or deduct from royalties - use deliveredAt
+        filteredServiceRequests = allServiceRequests.filter((sr: any) => {
+          if (!sr.deliveredAt) return false;
+          const deliveredDate = new Date(sr.deliveredAt);
+          return deliveredDate >= monthStart && deliveredDate <= monthEnd && 
+                 sr.finalPrice && parseFloat(sr.finalPrice) > 0;
+        });
+      }
+      
+      // Enrich service requests
+      const enrichedServiceRequests = filteredServiceRequests.map((sr: any) => {
+        const service = serviceMap.get(sr.serviceId);
+        return {
+          id: sr.id,
+          type: "ad_hoc",
+          serviceName: service?.title || "Unknown Service",
+          date: paymentConfig === "pay_as_you_go" ? sr.createdAt : sr.deliveredAt,
+          status: sr.status,
+          amount: parseFloat(sr.finalPrice || "0"),
+        };
+      });
+      
+      // Get bundle requests
+      const allBundleRequests = await storage.getBundleRequestsByUser(sessionUserId);
+      let filteredBundleRequests: any[] = [];
+      
+      if (paymentConfig === "pay_as_you_go") {
+        filteredBundleRequests = allBundleRequests.filter((br: any) => {
+          if (!br.createdAt) return false;
+          const createdDate = new Date(br.createdAt);
+          return createdDate >= monthStart && createdDate <= monthEnd && 
+                 br.finalPrice && parseFloat(br.finalPrice) > 0;
+        });
+      } else {
+        filteredBundleRequests = allBundleRequests.filter((br: any) => {
+          if (!br.deliveredAt) return false;
+          const deliveredDate = new Date(br.deliveredAt);
+          return deliveredDate >= monthStart && deliveredDate <= monthEnd && 
+                 br.finalPrice && parseFloat(br.finalPrice) > 0;
+        });
+      }
+      
+      // Enrich bundle requests
+      const enrichedBundleRequests = filteredBundleRequests.map((br: any) => {
+        const bundle = bundleMap.get(br.bundleId);
+        return {
+          id: br.id,
+          type: "bundle",
+          serviceName: bundle?.name || "Unknown Bundle",
+          date: paymentConfig === "pay_as_you_go" ? br.createdAt : br.deliveredAt,
+          status: br.status,
+          amount: parseFloat(br.finalPrice || "0"),
+        };
+      });
+      
+      // Get pack subscriptions
+      const allPackSubscriptions = await storage.getAllClientPackSubscriptions();
+      const clientPackSubs = allPackSubscriptions.filter((ps: any) => {
+        if (ps.userId !== sessionUserId && ps.clientProfileId !== sessionUser.clientProfileId) return false;
+        if (!ps.startDate) return false;
+        
+        const startDate = new Date(ps.startDate);
+        if (isNaN(startDate.getTime())) return false;
+        const startedThisMonth = startDate >= monthStart && startDate <= monthEnd;
+        
+        let renewedThisMonth = false;
+        if (ps.currentPeriodStart) {
+          const periodStart = new Date(ps.currentPeriodStart);
+          if (!isNaN(periodStart.getTime())) {
+            renewedThisMonth = periodStart >= monthStart && periodStart <= monthEnd;
+          }
+        }
+        
+        return (startedThisMonth || renewedThisMonth) && ps.priceAtSubscription && parseFloat(ps.priceAtSubscription) > 0;
+      });
+      
+      // Enrich pack subscriptions
+      const enrichedPackSubs = clientPackSubs.map((ps: any) => {
+        const pack = packMap.get(ps.packId);
+        const isRenewal = ps.currentPeriodStart && new Date(ps.currentPeriodStart) >= monthStart;
+        return {
+          id: ps.id,
+          type: "pack",
+          serviceName: pack?.name || "Unknown Pack",
+          date: isRenewal ? ps.currentPeriodStart : ps.startDate,
+          status: ps.isActive ? "active" : "cancelled",
+          amount: parseFloat(ps.priceAtSubscription || "0"),
+          isRenewal,
+        };
+      });
+      
+      // Combine all items and calculate totals
+      const allItems = [...enrichedServiceRequests, ...enrichedBundleRequests, ...enrichedPackSubs];
+      allItems.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
+      const adHocTotal = enrichedServiceRequests.reduce((sum, item) => sum + item.amount, 0);
+      const bundleTotal = enrichedBundleRequests.reduce((sum, item) => sum + item.amount, 0);
+      const packTotal = enrichedPackSubs.reduce((sum, item) => sum + item.amount, 0);
+      
+      res.json({
+        client: {
+          id: sessionUser.id,
+          name: sessionUser.username,
+          email: sessionUser.email,
+          paymentMethod: paymentConfig,
+          companyName: profile?.companyName,
+          billingAddress: profile?.billingAddress,
+        },
+        billingPeriod: {
+          month: selectedMonth,
+          year: selectedYear,
+        },
+        items: allItems,
+        totals: {
+          adHocCount: enrichedServiceRequests.length,
+          adHocTotal,
+          bundleCount: enrichedBundleRequests.length,
+          bundleTotal,
+          packCount: enrichedPackSubs.length,
+          packTotal,
+          grandTotal: adHocTotal + bundleTotal + packTotal,
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching client invoice:", error);
+      res.status(500).json({ error: "Failed to fetch invoice data" });
+    }
+  });
+
+  // ==================== END CLIENT INVOICE VIEW ====================
+
   const httpServer = createServer(app);
 
   return httpServer;

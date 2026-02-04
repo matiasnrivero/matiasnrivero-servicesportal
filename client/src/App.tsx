@@ -35,6 +35,7 @@ import ClientDetail from "@/pages/ClientDetail";
 import RefundManagement from "@/pages/RefundManagement";
 import BillingHistoryReport from "@/pages/BillingHistoryReport";
 import ClientInvoicingReport from "@/pages/ClientInvoicingReport";
+import ClientInvoiceView from "@/pages/ClientInvoiceView";
 
 function Router() {
   return (
@@ -68,6 +69,7 @@ function Router() {
       <Route path="/reports/refunds" component={RefundManagement} />
       <Route path="/reports/stripe-billing" component={BillingHistoryReport} />
       <Route path="/reports/client-invoicing" component={ClientInvoicingReport} />
+      <Route path="/reports/my-invoices" component={ClientInvoiceView} />
       <Route path="/client-team" component={ClientTeamManagement} />
       <Route path="/payments" component={Payments} />
       <Route path="/client-companies" component={ClientCompaniesList} />
