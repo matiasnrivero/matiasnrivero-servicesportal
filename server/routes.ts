@@ -11522,6 +11522,387 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== END REFUND MANAGEMENT ====================
 
+  // ==================== CLIENT INVOICING REPORT ====================
+
+  // Get client invoicing summary for a specific month
+  app.get("/api/reports/client-invoicing", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { month, year } = req.query;
+      if (!month || !year) {
+        return res.status(400).json({ error: "Month and year are required" });
+      }
+
+      const selectedMonth = parseInt(month as string);
+      const selectedYear = parseInt(year as string);
+
+      // Calculate month boundaries
+      const monthStart = new Date(selectedYear, selectedMonth - 1, 1);
+      const monthEnd = new Date(selectedYear, selectedMonth, 0, 23, 59, 59, 999);
+
+      // Get all clients with their profiles
+      const allUsers = await storage.getAllUsers();
+      const clients = allUsers.filter((u: any) => u.role === "client" || u.role === "client_member");
+      
+      // Get all client profiles for payment configuration
+      const clientProfiles = await storage.getAllClientProfiles();
+      const profileMap = new Map(clientProfiles.map((p: any) => [p.id, p]));
+      
+      // Get all services and bundles for enrichment
+      const allServices = await storage.getAllServices();
+      const serviceMap = new Map(allServices.map((s: any) => [s.id, s]));
+      const allBundles = await storage.getAllBundles();
+      const bundleMap = new Map(allBundles.map((b: any) => [b.id, b]));
+      
+      // Get all service packs for enrichment
+      const allPacks = await storage.getAllServicePacks();
+      const packMap = new Map(allPacks.map((p: any) => [p.id, p]));
+      
+      // Get all service requests
+      const allServiceRequests = await storage.getAllServiceRequests();
+      
+      // Get all bundle requests
+      const allBundleRequests = await storage.getAllBundleRequests();
+      
+      // Get all pack subscriptions
+      const allPackSubscriptions = await storage.getAllClientPackSubscriptions();
+
+      const invoiceSummaries: any[] = [];
+
+      for (const client of clients) {
+        // Get client's payment configuration
+        const profile = client.clientProfileId ? profileMap.get(client.clientProfileId) : null;
+        const paymentConfig = profile?.paymentConfiguration || client.paymentMethod || "pay_as_you_go";
+        
+        // Filter service requests based on payment type
+        let clientServiceRequests = allServiceRequests.filter((sr: any) => sr.userId === client.id);
+        let filteredServiceRequests: any[] = [];
+        
+        if (paymentConfig === "pay_as_you_go") {
+          // For Pay-as-you-Go: services SUBMITTED within the month
+          filteredServiceRequests = clientServiceRequests.filter((sr: any) => {
+            if (!sr.createdAt) return false;
+            const createdDate = new Date(sr.createdAt);
+            return createdDate >= monthStart && createdDate <= monthEnd && 
+                   sr.finalPrice && parseFloat(sr.finalPrice) > 0;
+          });
+        } else if (paymentConfig === "monthly_payment") {
+          // For Monthly Payment: services DELIVERED within the month
+          filteredServiceRequests = clientServiceRequests.filter((sr: any) => {
+            if (!sr.deliveredAt) return false;
+            const deliveredDate = new Date(sr.deliveredAt);
+            return deliveredDate >= monthStart && deliveredDate <= monthEnd && 
+                   sr.finalPrice && parseFloat(sr.finalPrice) > 0;
+          });
+        } else if (paymentConfig === "deduct_from_royalties") {
+          // For Deduct from Royalties: services DELIVERED within the month
+          filteredServiceRequests = clientServiceRequests.filter((sr: any) => {
+            if (!sr.deliveredAt) return false;
+            const deliveredDate = new Date(sr.deliveredAt);
+            return deliveredDate >= monthStart && deliveredDate <= monthEnd && 
+                   sr.finalPrice && parseFloat(sr.finalPrice) > 0;
+          });
+        }
+        
+        // Filter bundle requests based on payment type
+        let clientBundleRequests = allBundleRequests.filter((br: any) => br.userId === client.id);
+        let filteredBundleRequests: any[] = [];
+        
+        if (paymentConfig === "pay_as_you_go") {
+          // For Pay-as-you-Go: bundles SUBMITTED within the month
+          filteredBundleRequests = clientBundleRequests.filter((br: any) => {
+            if (!br.createdAt) return false;
+            const createdDate = new Date(br.createdAt);
+            return createdDate >= monthStart && createdDate <= monthEnd && 
+                   br.finalPrice && parseFloat(br.finalPrice) > 0;
+          });
+        } else if (paymentConfig === "monthly_payment") {
+          // For Monthly Payment: bundles DELIVERED within the month
+          filteredBundleRequests = clientBundleRequests.filter((br: any) => {
+            if (!br.deliveredAt) return false;
+            const deliveredDate = new Date(br.deliveredAt);
+            return deliveredDate >= monthStart && deliveredDate <= monthEnd && 
+                   br.finalPrice && parseFloat(br.finalPrice) > 0;
+          });
+        } else if (paymentConfig === "deduct_from_royalties") {
+          // For Deduct from Royalties: bundles DELIVERED within the month
+          filteredBundleRequests = clientBundleRequests.filter((br: any) => {
+            if (!br.deliveredAt) return false;
+            const deliveredDate = new Date(br.deliveredAt);
+            return deliveredDate >= monthStart && deliveredDate <= monthEnd && 
+                   br.finalPrice && parseFloat(br.finalPrice) > 0;
+          });
+        }
+        
+        // Filter pack subscriptions - subscription/renewal date in month
+        const clientPackSubs = allPackSubscriptions.filter((ps: any) => {
+          if (ps.userId !== client.id && ps.clientProfileId !== client.clientProfileId) return false;
+          if (!ps.startDate) return false; // Guard against null startDate
+          
+          // Check if subscription started this month
+          const startDate = new Date(ps.startDate);
+          if (isNaN(startDate.getTime())) return false; // Guard against invalid dates
+          const startedThisMonth = startDate >= monthStart && startDate <= monthEnd;
+          
+          // Check if renewal (currentPeriodStart) is in this month
+          let renewedThisMonth = false;
+          if (ps.currentPeriodStart) {
+            const periodStart = new Date(ps.currentPeriodStart);
+            if (!isNaN(periodStart.getTime())) {
+              renewedThisMonth = periodStart >= monthStart && periodStart <= monthEnd;
+            }
+          }
+          
+          return (startedThisMonth || renewedThisMonth) && ps.priceAtSubscription && parseFloat(ps.priceAtSubscription) > 0;
+        });
+        
+        // Calculate totals
+        const adHocTotal = filteredServiceRequests.reduce((sum: number, sr: any) => 
+          sum + parseFloat(sr.finalPrice || "0"), 0);
+        const bundleTotal = filteredBundleRequests.reduce((sum: number, br: any) => 
+          sum + parseFloat(br.finalPrice || "0"), 0);
+        const packTotal = clientPackSubs.reduce((sum: number, ps: any) => 
+          sum + parseFloat(ps.priceAtSubscription || "0"), 0);
+        const grandTotal = adHocTotal + bundleTotal + packTotal;
+        
+        // Only include clients with activity
+        if (grandTotal > 0) {
+          invoiceSummaries.push({
+            clientId: client.id,
+            clientName: client.username,
+            clientEmail: client.email,
+            paymentMethod: paymentConfig,
+            adHocCount: filteredServiceRequests.length,
+            adHocTotal,
+            bundleCount: filteredBundleRequests.length,
+            bundleTotal,
+            packCount: clientPackSubs.length,
+            packTotal,
+            grandTotal,
+            // Store IDs for detail view
+            serviceRequestIds: filteredServiceRequests.map((sr: any) => sr.id),
+            bundleRequestIds: filteredBundleRequests.map((br: any) => br.id),
+            packSubscriptionIds: clientPackSubs.map((ps: any) => ps.id),
+          });
+        }
+      }
+      
+      // Sort by client name
+      invoiceSummaries.sort((a, b) => a.clientName.localeCompare(b.clientName));
+      
+      res.json({
+        month: selectedMonth,
+        year: selectedYear,
+        invoices: invoiceSummaries,
+        totals: {
+          adHocTotal: invoiceSummaries.reduce((sum, inv) => sum + inv.adHocTotal, 0),
+          bundleTotal: invoiceSummaries.reduce((sum, inv) => sum + inv.bundleTotal, 0),
+          packTotal: invoiceSummaries.reduce((sum, inv) => sum + inv.packTotal, 0),
+          grandTotal: invoiceSummaries.reduce((sum, inv) => sum + inv.grandTotal, 0),
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching client invoicing report:", error);
+      res.status(500).json({ error: "Failed to fetch client invoicing report" });
+    }
+  });
+
+  // Get invoice detail for a specific client and month
+  app.get("/api/reports/client-invoicing/:clientId/detail", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { clientId } = req.params;
+      const { month, year } = req.query;
+      
+      if (!month || !year) {
+        return res.status(400).json({ error: "Month and year are required" });
+      }
+
+      const selectedMonth = parseInt(month as string);
+      const selectedYear = parseInt(year as string);
+
+      // Calculate month boundaries
+      const monthStart = new Date(selectedYear, selectedMonth - 1, 1);
+      const monthEnd = new Date(selectedYear, selectedMonth, 0, 23, 59, 59, 999);
+
+      // Get client info
+      const client = await storage.getUser(clientId);
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      // Get client's payment configuration
+      const clientProfiles = await storage.getAllClientProfiles();
+      const profile = client.clientProfileId ? clientProfiles.find((p: any) => p.id === client.clientProfileId) : null;
+      const paymentConfig = profile?.paymentConfiguration || client.paymentMethod || "pay_as_you_go";
+      
+      // Get all services and bundles for enrichment
+      const allServices = await storage.getAllServices();
+      const serviceMap = new Map(allServices.map((s: any) => [s.id, s]));
+      const allBundles = await storage.getAllBundles();
+      const bundleMap = new Map(allBundles.map((b: any) => [b.id, b]));
+      const allPacks = await storage.getAllServicePacks();
+      const packMap = new Map(allPacks.map((p: any) => [p.id, p]));
+      
+      // Get service requests
+      const allServiceRequests = await storage.getServiceRequestsByUser(clientId);
+      let filteredServiceRequests: any[] = [];
+      
+      if (paymentConfig === "pay_as_you_go") {
+        filteredServiceRequests = allServiceRequests.filter((sr: any) => {
+          if (!sr.createdAt) return false;
+          const createdDate = new Date(sr.createdAt);
+          return createdDate >= monthStart && createdDate <= monthEnd && 
+                 sr.finalPrice && parseFloat(sr.finalPrice) > 0;
+        });
+      } else {
+        // Monthly payment or deduct from royalties - use deliveredAt
+        filteredServiceRequests = allServiceRequests.filter((sr: any) => {
+          if (!sr.deliveredAt) return false;
+          const deliveredDate = new Date(sr.deliveredAt);
+          return deliveredDate >= monthStart && deliveredDate <= monthEnd && 
+                 sr.finalPrice && parseFloat(sr.finalPrice) > 0;
+        });
+      }
+      
+      // Enrich service requests
+      const enrichedServiceRequests = filteredServiceRequests.map((sr: any) => {
+        const service = serviceMap.get(sr.serviceId);
+        return {
+          id: sr.id,
+          type: "ad_hoc",
+          serviceName: service?.title || "Unknown Service",
+          date: paymentConfig === "pay_as_you_go" ? sr.createdAt : sr.deliveredAt,
+          status: sr.status,
+          amount: parseFloat(sr.finalPrice || "0"),
+        };
+      });
+      
+      // Get bundle requests
+      const allBundleRequests = await storage.getBundleRequestsByUser(clientId);
+      let filteredBundleRequests: any[] = [];
+      
+      if (paymentConfig === "pay_as_you_go") {
+        filteredBundleRequests = allBundleRequests.filter((br: any) => {
+          if (!br.createdAt) return false;
+          const createdDate = new Date(br.createdAt);
+          return createdDate >= monthStart && createdDate <= monthEnd && 
+                 br.finalPrice && parseFloat(br.finalPrice) > 0;
+        });
+      } else {
+        filteredBundleRequests = allBundleRequests.filter((br: any) => {
+          if (!br.deliveredAt) return false;
+          const deliveredDate = new Date(br.deliveredAt);
+          return deliveredDate >= monthStart && deliveredDate <= monthEnd && 
+                 br.finalPrice && parseFloat(br.finalPrice) > 0;
+        });
+      }
+      
+      // Enrich bundle requests
+      const enrichedBundleRequests = filteredBundleRequests.map((br: any) => {
+        const bundle = bundleMap.get(br.bundleId);
+        return {
+          id: br.id,
+          type: "bundle",
+          serviceName: bundle?.name || "Unknown Bundle",
+          date: paymentConfig === "pay_as_you_go" ? br.createdAt : br.deliveredAt,
+          status: br.status,
+          amount: parseFloat(br.finalPrice || "0"),
+        };
+      });
+      
+      // Get pack subscriptions
+      const allPackSubscriptions = await storage.getAllClientPackSubscriptions();
+      const clientPackSubs = allPackSubscriptions.filter((ps: any) => {
+        if (ps.userId !== clientId && ps.clientProfileId !== client.clientProfileId) return false;
+        if (!ps.startDate) return false; // Guard against null startDate
+        
+        const startDate = new Date(ps.startDate);
+        if (isNaN(startDate.getTime())) return false; // Guard against invalid dates
+        const startedThisMonth = startDate >= monthStart && startDate <= monthEnd;
+        
+        let renewedThisMonth = false;
+        if (ps.currentPeriodStart) {
+          const periodStart = new Date(ps.currentPeriodStart);
+          if (!isNaN(periodStart.getTime())) {
+            renewedThisMonth = periodStart >= monthStart && periodStart <= monthEnd;
+          }
+        }
+        
+        return (startedThisMonth || renewedThisMonth) && ps.priceAtSubscription && parseFloat(ps.priceAtSubscription) > 0;
+      });
+      
+      // Enrich pack subscriptions
+      const enrichedPackSubs = clientPackSubs.map((ps: any) => {
+        const pack = packMap.get(ps.packId);
+        const isRenewal = ps.currentPeriodStart && new Date(ps.currentPeriodStart) >= monthStart;
+        return {
+          id: ps.id,
+          type: "pack",
+          serviceName: pack?.name || "Unknown Pack",
+          date: isRenewal ? ps.currentPeriodStart : ps.startDate,
+          status: ps.isActive ? "active" : "cancelled",
+          amount: parseFloat(ps.priceAtSubscription || "0"),
+          isRenewal,
+        };
+      });
+      
+      // Combine all items and calculate totals
+      const allItems = [...enrichedServiceRequests, ...enrichedBundleRequests, ...enrichedPackSubs];
+      allItems.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
+      const adHocTotal = enrichedServiceRequests.reduce((sum, item) => sum + item.amount, 0);
+      const bundleTotal = enrichedBundleRequests.reduce((sum, item) => sum + item.amount, 0);
+      const packTotal = enrichedPackSubs.reduce((sum, item) => sum + item.amount, 0);
+      
+      res.json({
+        client: {
+          id: client.id,
+          name: client.username,
+          email: client.email,
+          paymentMethod: paymentConfig,
+          companyName: profile?.companyName,
+          billingAddress: profile?.billingAddress,
+        },
+        billingPeriod: {
+          month: selectedMonth,
+          year: selectedYear,
+        },
+        items: allItems,
+        totals: {
+          adHocCount: enrichedServiceRequests.length,
+          adHocTotal,
+          bundleCount: enrichedBundleRequests.length,
+          bundleTotal,
+          packCount: enrichedPackSubs.length,
+          packTotal,
+          grandTotal: adHocTotal + bundleTotal + packTotal,
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching invoice detail:", error);
+      res.status(500).json({ error: "Failed to fetch invoice detail" });
+    }
+  });
+
+  // ==================== END CLIENT INVOICING REPORT ====================
+
   const httpServer = createServer(app);
 
   return httpServer;

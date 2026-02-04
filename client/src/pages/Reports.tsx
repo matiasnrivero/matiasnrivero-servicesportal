@@ -21,6 +21,14 @@ interface ReportCard {
 
 const reportCards: ReportCard[] = [
   {
+    id: "client-invoicing",
+    title: "Client Invoicing",
+    description: "View client billing summaries and generate invoices by month",
+    icon: FileText,
+    path: "/reports/client-invoicing",
+    roles: ["admin"],
+  },
+  {
     id: "services-profit",
     title: "Services Profit",
     description: "View retail prices, vendor costs, and profit margins for all service requests",

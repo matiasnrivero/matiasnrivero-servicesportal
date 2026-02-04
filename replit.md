@@ -91,6 +91,17 @@ Role-based access to reports (Admin, Client, Vendor).
   - **Status Tracking**: pending → processing → completed/failed with error messages
   - **Job-Level Integration**: "Refund" button on service request and bundle detail pages (admin only, when finalPrice exists)
   - **API Endpoints**: `GET /api/refunds`, `POST /api/refunds`, `POST /api/refunds/:id/process`, `GET /api/refunds/refundable/:clientId`
+- **Client Invoicing Report (Admin only)**: View and generate client billing summaries by month.
+  - **Billing Logic by Payment Method**:
+    - Pay-as-you-Go: Services SUBMITTED within the selected month
+    - Monthly Payment: Services DELIVERED within the selected month
+    - Deduct from Royalties: Services DELIVERED within the selected month
+    - Monthly Packs: Subscriptions with startDate or renewal date in the month
+  - **Summary View**: One row per client with ad-hoc count/total, bundle count/total, pack count/total, grand total
+  - **Detail Modal**: Itemized breakdown of all charges for a client
+  - **Filters**: Month selector (last 24 months), payment method filter, client search
+  - **Exports**: Summary CSV download, individual invoice text file download
+  - **API Endpoints**: `GET /api/reports/client-invoicing`, `GET /api/reports/client-invoicing/:clientId/detail`
 
 ## Role-Specific Dashboards
 

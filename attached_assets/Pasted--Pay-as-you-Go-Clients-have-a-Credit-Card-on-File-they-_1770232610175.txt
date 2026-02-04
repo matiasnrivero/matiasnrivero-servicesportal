@@ -1,0 +1,11 @@
+"Pay-as-you-Go" Clients have a Credit Card on File, they pay "upfront" for Ad-hoc and Bundle Services, and they can also have "Monthly Packs subscriptions", which are also "upfront payments".
+"Monthly Payment" Clients will "Pay in Arrears" on all delivered jobs (Ah-hoc and Bundles) during the calendar month with the Credit Card on Credit Card on File. They can also have "Monthly Packs subscriptions" that have to be "paid upfront" too. 
+"Deduct From Royalties" Clients that are charged on reconciliation with the earn outs that they do on our main platform, not the Services Portal. So Admins will mark this type of clients manually as paid in the platform, so we can track money. These clients will also have the possibility to do Monthly Packs Subscriptions, and this Clients (Deduct From Royalties) are the only exception to add a credit card on file in order to subscribe to a pack.
+The purpose of this report is the have the ability to see all incomes during a time period (could be a calendar month or specific data range). 
+For monthly packs we will consider as "Invoiced" if the subscription date or renewal date is in the calendar month that the user selected on the report.
+For "Pay as you Go" we will consider all the services (Ah-hoc and Bundles) that were submitted within the calendar month selected by the user in the report.
+For "Monthly Payment" Clients, we will consider all jobs delivered during the calendar month selected by the user.
+For each Client I should have an invoice (PDF) with the detail of all the services (ad-hoc and bundles) and monthly packs subscriptions within the calendar month.
+So we wont'd have a range selector on this report, we will have each calendar month selector as a filter.
+The report has to show one line item per client with the total charge, then the user should have a details button, and get into an Invoice on Screen with all the details and then an Invoice PDF that can be downloaded.
+Can you suggest me the report columns and the filters and actions?
