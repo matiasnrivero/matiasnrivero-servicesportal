@@ -410,7 +410,7 @@ export default function ClientInvoiceView() {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50">
-                        <TableHead className="w-32">Type</TableHead>
+                        <TableHead className="w-36">Type</TableHead>
                         <TableHead>Service / Pack</TableHead>
                         <TableHead className="w-32">Date</TableHead>
                         <TableHead className="w-28 text-right">Amount</TableHead>
@@ -422,7 +422,7 @@ export default function ClientInvoiceView() {
                           <TableCell>
                             <Badge 
                               variant="outline" 
-                              className={typeBadgeColors[item.type]}
+                              className={`whitespace-nowrap ${typeBadgeColors[item.type]}`}
                               data-testid={`badge-type-${item.id}`}
                             >
                               {typeLabels[item.type]}
