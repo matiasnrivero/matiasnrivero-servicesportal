@@ -90,6 +90,7 @@ export default function ClientInvoiceView() {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [selectedType, setSelectedType] = useState<string>("all");
 
   const { data: currentUser, isLoading: userLoading } = useQuery<CurrentUser>({
     queryKey: ["/api/default-user"],
@@ -121,6 +122,33 @@ export default function ClientInvoiceView() {
     setSelectedYear(year);
     setSelectedMonth(month);
   };
+
+  // Filter items by selected type
+  const filteredItems = useMemo(() => {
+    if (!invoiceData) return [];
+    if (selectedType === "all") return invoiceData.items;
+    return invoiceData.items.filter((item) => item.type === selectedType);
+  }, [invoiceData, selectedType]);
+
+  // Recalculate totals based on filtered items
+  const filteredTotals = useMemo(() => {
+    if (!invoiceData) return null;
+    if (selectedType === "all") return invoiceData.totals;
+    
+    const adHocItems = filteredItems.filter((item) => item.type === "ad_hoc");
+    const bundleItems = filteredItems.filter((item) => item.type === "bundle");
+    const packItems = filteredItems.filter((item) => item.type === "pack");
+    
+    return {
+      adHocCount: adHocItems.length,
+      adHocTotal: adHocItems.reduce((sum, item) => sum + item.amount, 0),
+      bundleCount: bundleItems.length,
+      bundleTotal: bundleItems.reduce((sum, item) => sum + item.amount, 0),
+      packCount: packItems.length,
+      packTotal: packItems.reduce((sum, item) => sum + item.amount, 0),
+      grandTotal: filteredItems.reduce((sum, item) => sum + item.amount, 0),
+    };
+  }, [invoiceData, filteredItems, selectedType]);
 
   const generateInvoicePDF = async () => {
     if (!invoiceData) return;
@@ -338,7 +366,7 @@ export default function ClientInvoiceView() {
         <Card className="mb-6">
           <CardContent className="pt-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm font-medium">Billing Period:</span>
@@ -358,6 +386,21 @@ export default function ClientInvoiceView() {
                     ))}
                   </SelectContent>
                 </Select>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Type:</span>
+                  <Select value={selectedType} onValueChange={setSelectedType}>
+                    <SelectTrigger className="w-40" data-testid="select-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all" data-testid="select-type-all">All Types</SelectItem>
+                      <SelectItem value="ad_hoc" data-testid="select-type-adhoc">Ad-hoc Service</SelectItem>
+                      <SelectItem value="bundle" data-testid="select-type-bundle">Bundle Service</SelectItem>
+                      <SelectItem value="pack" data-testid="select-type-pack">Monthly Pack</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <Button onClick={generateInvoicePDF} disabled={!invoiceData || invoiceData.items.length === 0} data-testid="button-download-invoice">
@@ -400,10 +443,12 @@ export default function ClientInvoiceView() {
 
               <h3 className="text-lg font-semibold mb-4">Itemized Charges</h3>
 
-              {invoiceData.items.length === 0 ? (
+              {filteredItems.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground" data-testid="status-empty">
                   <Receipt className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p data-testid="text-empty-message">No charges for this billing period</p>
+                  <p data-testid="text-empty-message">
+                    {selectedType === "all" ? "No charges for this billing period" : `No ${typeLabels[selectedType as keyof typeof typeLabels] || selectedType} charges for this billing period`}
+                  </p>
                 </div>
               ) : (
                 <div className="border rounded-lg overflow-hidden mb-6">
@@ -417,7 +462,7 @@ export default function ClientInvoiceView() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {invoiceData.items.map((item) => (
+                      {filteredItems.map((item) => (
                         <TableRow key={`${item.type}-${item.id}`} data-testid={`row-item-${item.id}`}>
                           <TableCell>
                             <Badge 
@@ -438,44 +483,46 @@ export default function ClientInvoiceView() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
-                <div className="flex items-center gap-3" data-testid="summary-adhoc">
-                  <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-                    <FileText className="w-5 h-5 text-amber-700 dark:text-amber-300" />
+              {filteredTotals && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
+                  <div className="flex items-center gap-3" data-testid="summary-adhoc">
+                    <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                      <FileText className="w-5 h-5 text-amber-700 dark:text-amber-300" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Ad-hoc Services</p>
+                      <p className="font-semibold" data-testid="text-adhoc-total">{filteredTotals.adHocCount} - ${filteredTotals.adHocTotal.toFixed(2)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Ad-hoc Services</p>
-                    <p className="font-semibold" data-testid="text-adhoc-total">{invoiceData.totals.adHocCount} - ${invoiceData.totals.adHocTotal.toFixed(2)}</p>
+                  <div className="flex items-center gap-3" data-testid="summary-bundle">
+                    <div className="p-2 bg-rose-100 dark:bg-rose-900/30 rounded-lg">
+                      <Package className="w-5 h-5 text-rose-700 dark:text-rose-300" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Bundle Services</p>
+                      <p className="font-semibold" data-testid="text-bundle-total">{filteredTotals.bundleCount} - ${filteredTotals.bundleTotal.toFixed(2)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3" data-testid="summary-pack">
+                    <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                      <Receipt className="w-5 h-5 text-green-700 dark:text-green-300" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Monthly Packs</p>
+                      <p className="font-semibold" data-testid="text-pack-total">{filteredTotals.packCount} - ${filteredTotals.packTotal.toFixed(2)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3" data-testid="summary-grand-total">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <DollarSign className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Grand Total</p>
+                      <p className="text-xl font-bold" data-testid="text-grand-total">${filteredTotals.grandTotal.toFixed(2)}</p>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3" data-testid="summary-bundle">
-                  <div className="p-2 bg-rose-100 dark:bg-rose-900/30 rounded-lg">
-                    <Package className="w-5 h-5 text-rose-700 dark:text-rose-300" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Bundle Services</p>
-                    <p className="font-semibold" data-testid="text-bundle-total">{invoiceData.totals.bundleCount} - ${invoiceData.totals.bundleTotal.toFixed(2)}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3" data-testid="summary-pack">
-                  <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                    <Receipt className="w-5 h-5 text-green-700 dark:text-green-300" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Monthly Packs</p>
-                    <p className="font-semibold" data-testid="text-pack-total">{invoiceData.totals.packCount} - ${invoiceData.totals.packTotal.toFixed(2)}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3" data-testid="summary-grand-total">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    <DollarSign className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Grand Total</p>
-                    <p className="text-xl font-bold" data-testid="text-grand-total">${invoiceData.totals.grandTotal.toFixed(2)}</p>
-                  </div>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         ) : null}
