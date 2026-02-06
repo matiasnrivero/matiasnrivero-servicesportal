@@ -202,16 +202,19 @@ export default function JobDetailView() {
   const isClient = currentUser?.role === "client" || currentUser?.role === "distributor";
   const canSeePricing = ["admin", "client"].includes(currentUser?.role || "");
   const canManageJobs = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(currentUser?.role || "");
-  const canTakeJob = ["admin", "internal_designer", "designer", "vendor", "vendor_designer"].includes(currentUser?.role || "") && request?.status === "pending" && !request?.assigneeId;
+  const hasAssignee = !!request?.assigneeId || !!request?.vendorAssigneeId;
+  const canTakeJob = ["admin", "internal_designer", "designer", "vendor", "vendor_designer"].includes(currentUser?.role || "") && request?.status === "pending" && !hasAssignee;
   const isAssignedToMe = request?.assigneeId === currentUser?.userId || request?.vendorAssigneeId === currentUser?.userId;
-  const canStartJob = request?.status === "pending" && !!request?.assigneeId && isAssignedToMe;
-  const canReassign = request?.status === "pending" && !!request?.assigneeId && canManageJobs && !isAssignedToMe;
+  const canStartJob = request?.status === "pending" && hasAssignee && isAssignedToMe;
+  const canReassign = request?.status === "pending" && hasAssignee && canManageJobs && !isAssignedToMe;
 
   useEffect(() => {
     if (request?.assigneeId) {
       setSelectedDesignerId(request.assigneeId);
+    } else if (request?.vendorAssigneeId) {
+      setSelectedDesignerId(request.vendorAssigneeId);
     }
-  }, [request?.assigneeId]);
+  }, [request?.assigneeId, request?.vendorAssigneeId]);
 
 
   const assignMutation = useMutation({

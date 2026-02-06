@@ -391,10 +391,11 @@ export default function BundleRequestDetail() {
 
   const { request, bundle, bundleFields, services, attachments, requester, assignee } = requestDetail;
   const canManageJobs = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(currentUser?.role || "");
-  const canTakeJob = ["admin", "internal_designer", "designer", "vendor", "vendor_designer"].includes(currentUser?.role || "") && request.status === "pending" && !request.assigneeId;
+  const hasAssignee = !!request.assigneeId || !!request.vendorAssigneeId;
+  const canTakeJob = ["admin", "internal_designer", "designer", "vendor", "vendor_designer"].includes(currentUser?.role || "") && request.status === "pending" && !hasAssignee;
   const isAssignedToMe = request.assigneeId === currentUser?.userId || request.vendorAssigneeId === currentUser?.userId;
-  const canStartJob = request.status === "pending" && !!request.assigneeId && isAssignedToMe;
-  const canReassign = request.status === "pending" && !!request.assigneeId && canManageJobs && !isAssignedToMe;
+  const canStartJob = request.status === "pending" && hasAssignee && isAssignedToMe;
+  const canReassign = request.status === "pending" && hasAssignee && canManageJobs && !isAssignedToMe;
   const canDeliver = canManageJobs && request.status !== "delivered";
   
   const requestAttachments = attachments.filter(a => a.kind === "request" || !a.kind);
