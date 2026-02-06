@@ -391,9 +391,10 @@ export default function BundleRequestDetail() {
 
   const { request, bundle, bundleFields, services, attachments, requester, assignee } = requestDetail;
   const canManageJobs = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(currentUser?.role || "");
-  const canTakeJob = ["admin", "internal_designer", "designer", "vendor_designer"].includes(currentUser?.role || "") && request.status === "pending" && !request.assigneeId;
+  const canTakeJob = ["admin", "internal_designer", "designer", "vendor", "vendor_designer"].includes(currentUser?.role || "") && request.status === "pending" && !request.assigneeId;
   const isAssignedToMe = request.assigneeId === currentUser?.userId || request.vendorAssigneeId === currentUser?.userId;
-  const canStartJob = request.status === "pending" && isAssignedToMe;
+  const canStartJob = request.status === "pending" && !!request.assigneeId && isAssignedToMe;
+  const canReassign = request.status === "pending" && !!request.assigneeId && canManageJobs && !isAssignedToMe;
   const canDeliver = canManageJobs && request.status !== "delivered";
   
   const requestAttachments = attachments.filter(a => a.kind === "request" || !a.kind);
@@ -1258,11 +1259,11 @@ export default function BundleRequestDetail() {
                     </Button>
                   )}
 
-                  {(request.status === "pending" || request.status === "in-progress") && (
+                  {(request.status === "pending" || request.status === "in-progress") && canManageJobs && (
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Users className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">Assign to Designer</span>
+                        <span className="text-sm font-medium">{request.assigneeId ? "Re-Assign Designer" : "Assign to Designer"}</span>
                       </div>
                       <Select
                         value={selectedAssignee || assignee?.id || ""}
@@ -1301,7 +1302,7 @@ export default function BundleRequestDetail() {
                         className="w-full"
                         data-testid="button-assign-designer"
                       >
-                        {assignMutation.isPending ? "Assigning..." : "Assign Selected Designer"}
+                        {assignMutation.isPending ? "Assigning..." : (request.assigneeId ? "Re-Assign Designer" : "Assign Selected Designer")}
                       </Button>
                     </div>
                   )}

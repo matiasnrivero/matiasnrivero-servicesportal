@@ -57,7 +57,7 @@ function getAssignableRoles(assignerRole: string): string[] {
     case "admin":
       return ["admin", "vendor", "internal_designer", "vendor_designer"];
     case "internal_designer":
-      return ["vendor", "vendor_designer", "internal_designer"];
+      return ["admin", "vendor", "internal_designer", "vendor_designer"];
     case "vendor":
       return ["vendor_designer", "vendor"];
     case "vendor_designer":
@@ -1018,9 +1018,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: assignmentCheck.reason || "You cannot assign to this user" });
       }
 
-      // Assign the target designer
-      const request = await storage.assignDesigner(req.params.id, targetDesignerId);
-      res.json(request);
+      // Determine if this is self-assignment ("Take This Job") or assigning to someone else
+      const isSelfAssignment = targetDesignerId === sessionUserId;
+      
+      if (isSelfAssignment) {
+        // Self-assignment: assign AND set in-progress
+        const request = await storage.assignDesigner(req.params.id, targetDesignerId);
+        res.json(request);
+      } else {
+        // Assigning to someone else: assign but keep status as pending
+        // The assignee will need to click "Start Job" to begin working
+        const request = await storage.updateServiceRequest(req.params.id, {
+          assigneeId: targetDesignerId,
+          assignedAt: new Date(),
+        });
+        res.json(request);
+      }
     } catch (error) {
       console.error("Error assigning designer:", error);
       res.status(500).json({ error: "Failed to assign designer" });
@@ -6213,7 +6226,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: assignmentCheck.reason || "You cannot assign to this user" });
       }
 
-      const request = await storage.assignBundleDesigner(req.params.id, assigneeId);
+      // Determine if this is self-assignment ("Take This Job") or assigning to someone else
+      const isSelfAssignment = assigneeId === sessionUserId;
+      
+      let request;
+      if (isSelfAssignment) {
+        // Self-assignment: assign AND set in-progress
+        request = await storage.assignBundleDesigner(req.params.id, assigneeId);
+      } else {
+        // Assigning to someone else: assign but keep status as pending
+        // The assignee will need to click "Start Job" to begin working
+        request = await storage.updateBundleRequest(req.params.id, {
+          assigneeId,
+          assignedAt: new Date(),
+        });
+      }
+      
       if (!request) {
         return res.status(404).json({ error: "Bundle request not found" });
       }

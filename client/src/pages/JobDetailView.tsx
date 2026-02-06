@@ -202,9 +202,10 @@ export default function JobDetailView() {
   const isClient = currentUser?.role === "client" || currentUser?.role === "distributor";
   const canSeePricing = ["admin", "client"].includes(currentUser?.role || "");
   const canManageJobs = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(currentUser?.role || "");
-  const canTakeJob = ["admin", "internal_designer", "designer", "vendor_designer"].includes(currentUser?.role || "") && !request?.assigneeId;
+  const canTakeJob = ["admin", "internal_designer", "designer", "vendor", "vendor_designer"].includes(currentUser?.role || "") && request?.status === "pending" && !request?.assigneeId;
   const isAssignedToMe = request?.assigneeId === currentUser?.userId || request?.vendorAssigneeId === currentUser?.userId;
-  const canStartJob = request?.status === "pending" && isAssignedToMe;
+  const canStartJob = request?.status === "pending" && !!request?.assigneeId && isAssignedToMe;
+  const canReassign = request?.status === "pending" && !!request?.assigneeId && canManageJobs && !isAssignedToMe;
 
   useEffect(() => {
     if (request?.assigneeId) {
@@ -2039,7 +2040,7 @@ export default function JobDetailView() {
                   <CardTitle className="text-lg">Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {request.status === "pending" && canTakeJob && (
+                  {canTakeJob && (
                     <Button
                       onClick={() => handleTakeJob()}
                       disabled={assignMutation.isPending}
@@ -2061,11 +2062,11 @@ export default function JobDetailView() {
                     </Button>
                   )}
 
-                  {(request.status === "pending" || request.status === "in-progress") && (
+                  {(request.status === "pending" || request.status === "in-progress") && canManageJobs && (
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Users className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">Assign to Designer</span>
+                        <span className="text-sm font-medium">{request.assigneeId ? "Re-Assign Designer" : "Assign to Designer"}</span>
                       </div>
                       <Select 
                         value={selectedDesignerId} 
@@ -2104,7 +2105,7 @@ export default function JobDetailView() {
                         className="w-full"
                         data-testid="button-assign-designer"
                       >
-                        {assignMutation.isPending ? "Assigning..." : "Assign Selected Designer"}
+                        {assignMutation.isPending ? "Assigning..." : (request.assigneeId ? "Re-Assign Designer" : "Assign Selected Designer")}
                       </Button>
                     </div>
                   )}
