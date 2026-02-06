@@ -2079,8 +2079,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Prevent caching
       res.set('Cache-Control', 'no-store');
-      // Return full user object for optimistic UI updates
-      res.json({ role: user!.role, user: user });
+      // Return user in same format as /api/default-user for cache compatibility
+      res.json({ role: user!.role, user: { userId: user!.id, role: user!.role, username: user!.username, email: user!.email, phone: user!.phone, clientProfileId: user!.clientProfileId, vendorId: user!.vendorId } });
     } catch (error) {
       console.error("Error switching role:", error);
       res.status(500).json({ error: "Failed to switch role" });
@@ -2162,8 +2162,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.userRole = originalUser.role;
       delete req.session.impersonatorId;
 
-      // Return full user object for optimistic UI updates
-      res.json({ user: originalUser });
+      // Return user in same format as /api/default-user for cache compatibility
+      res.json({ user: { userId: originalUser.id, role: originalUser.role, username: originalUser.username, email: originalUser.email, phone: originalUser.phone, clientProfileId: originalUser.clientProfileId, vendorId: originalUser.vendorId } });
     } catch (error) {
       console.error("Error exiting impersonation:", error);
       res.status(500).json({ error: "Failed to exit impersonation" });
