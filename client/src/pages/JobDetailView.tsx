@@ -205,10 +205,11 @@ export default function JobDetailView() {
   const canManageJobs = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(currentUser?.role || "");
   const canCancel = isAdmin || (isClient && request?.status === "pending");
   const hasAssignee = !!request?.assigneeId || !!request?.vendorAssigneeId;
-  const canTakeJob = ["admin", "internal_designer", "designer", "vendor", "vendor_designer"].includes(currentUser?.role || "") && request?.status === "pending" && !hasAssignee;
+  const hasDesignerAssigned = !!request?.assigneeId;
+  const canTakeJob = ["admin", "internal_designer", "designer", "vendor", "vendor_designer"].includes(currentUser?.role || "") && request?.status === "pending" && !hasDesignerAssigned;
   const isAssignedToMe = request?.assigneeId === currentUser?.userId;
-  const canStartJob = request?.status === "pending" && hasAssignee && isAssignedToMe;
-  const canReassign = request?.status === "pending" && hasAssignee && canManageJobs && !isAssignedToMe;
+  const canStartJob = request?.status === "pending" && hasDesignerAssigned && isAssignedToMe;
+  const canReassign = request?.status === "pending" && hasDesignerAssigned && canManageJobs && !isAssignedToMe;
 
   useEffect(() => {
     if (request?.assigneeId) {
