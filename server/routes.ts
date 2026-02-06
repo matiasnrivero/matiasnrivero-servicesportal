@@ -1067,13 +1067,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const isAssignee = existingRequest.assigneeId === sessionUserId;
-      const isVendorAssignee = existingRequest.vendorAssigneeId === sessionUserId;
-      const isAdmin = sessionUser.role === "admin";
-      const isInternalDesigner = sessionUser.role === "internal_designer";
-      const isVendor = sessionUser.role === "vendor";
 
-      if (!isAssignee && !isVendorAssignee && !isAdmin && !isInternalDesigner && !isVendor) {
-        return res.status(403).json({ error: "Only the assigned designer, admin, internal designer, or vendor can start this job" });
+      if (!isAssignee) {
+        return res.status(403).json({ error: "Only the assigned designer can start this job" });
       }
 
       const request = await storage.updateServiceRequest(req.params.id, {
@@ -6281,13 +6277,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const isAssignee = existingRequest.assigneeId === sessionUserId;
-      const isVendorAssignee = existingRequest.vendorAssigneeId === sessionUserId;
-      const isAdmin = sessionUser.role === "admin";
-      const isInternalDesigner = sessionUser.role === "internal_designer";
-      const isVendor = sessionUser.role === "vendor";
 
-      if (!isAssignee && !isVendorAssignee && !isAdmin && !isInternalDesigner && !isVendor) {
-        return res.status(403).json({ error: "Only the assigned designer, admin, internal designer, or vendor can start this job" });
+      if (!isAssignee) {
+        return res.status(403).json({ error: "Only the assigned designer can start this job" });
       }
 
       const request = await storage.updateBundleRequest(req.params.id, {

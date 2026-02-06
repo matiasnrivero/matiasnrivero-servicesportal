@@ -200,11 +200,13 @@ export default function JobDetailView() {
 
   const isDesigner = currentUser?.role === "designer";
   const isClient = currentUser?.role === "client" || currentUser?.role === "distributor";
+  const isAdmin = currentUser?.role === "admin";
   const canSeePricing = ["admin", "client"].includes(currentUser?.role || "");
   const canManageJobs = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(currentUser?.role || "");
+  const canCancel = isAdmin || (isClient && request?.status === "pending");
   const hasAssignee = !!request?.assigneeId || !!request?.vendorAssigneeId;
   const canTakeJob = ["admin", "internal_designer", "designer", "vendor", "vendor_designer"].includes(currentUser?.role || "") && request?.status === "pending" && !hasAssignee;
-  const isAssignedToMe = request?.assigneeId === currentUser?.userId || request?.vendorAssigneeId === currentUser?.userId;
+  const isAssignedToMe = request?.assigneeId === currentUser?.userId;
   const canStartJob = request?.status === "pending" && hasAssignee && isAssignedToMe;
   const canReassign = request?.status === "pending" && hasAssignee && canManageJobs && !isAssignedToMe;
 
@@ -955,35 +957,29 @@ export default function JobDetailView() {
               </Badge>
             )}
 
-            {request.status === "pending" && (
-              <>
-                <Button 
-                  variant="outline" 
-                  className="border-red-300 text-red-600"
-                  onClick={handleCancel}
-                  disabled={cancelMutation.isPending}
-                  data-testid="button-cancel-request"
-                >
-                  {cancelMutation.isPending ? "Canceling..." : "Cancel Request"}
-                </Button>
-                <Button 
-                  className="bg-sky-blue-accent hover:bg-sky-blue-accent/90"
-                  data-testid="button-save"
-                >
-                  Save
-                </Button>
-              </>
+            {request.status === "pending" && canCancel && (
+              <Button 
+                variant="outline" 
+                className="border-red-300 text-red-600"
+                onClick={handleCancel}
+                disabled={cancelMutation.isPending}
+                data-testid="button-cancel-request"
+              >
+                {cancelMutation.isPending ? "Canceling..." : "Cancel Request"}
+              </Button>
             )}
 
             {request.status === "in-progress" && canDeliver && (
               <>
-                <Button 
-                  variant="outline" 
-                  className="border-red-300 text-red-600"
-                  data-testid="button-cancel"
-                >
-                  Cancel
-                </Button>
+                {isAdmin && (
+                  <Button 
+                    variant="outline" 
+                    className="border-red-300 text-red-600"
+                    data-testid="button-cancel"
+                  >
+                    Cancel
+                  </Button>
+                )}
                 <Button 
                   onClick={handleDeliver}
                   disabled={deliverMutation.isPending || !hasValidDelivery}
@@ -1008,13 +1004,15 @@ export default function JobDetailView() {
 
             {request.status === "change-request" && canDeliver && (
               <>
-                <Button 
-                  variant="outline" 
-                  className="border-red-300 text-red-600"
-                  data-testid="button-cancel"
-                >
-                  Cancel
-                </Button>
+                {isAdmin && (
+                  <Button 
+                    variant="outline" 
+                    className="border-red-300 text-red-600"
+                    data-testid="button-cancel"
+                  >
+                    Cancel
+                  </Button>
+                )}
                 <Button 
                   onClick={handleDeliver}
                   disabled={deliverMutation.isPending || !hasValidDelivery}

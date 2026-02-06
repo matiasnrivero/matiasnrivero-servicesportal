@@ -390,10 +390,12 @@ export default function BundleRequestDetail() {
   }
 
   const { request, bundle, bundleFields, services, attachments, requester, assignee } = requestDetail;
+  const isAdmin = currentUser?.role === "admin";
   const canManageJobs = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(currentUser?.role || "");
+  const canCancel = isAdmin || (isClient && request.status === "pending");
   const hasAssignee = !!request.assigneeId || !!request.vendorAssigneeId;
   const canTakeJob = ["admin", "internal_designer", "designer", "vendor", "vendor_designer"].includes(currentUser?.role || "") && request.status === "pending" && !hasAssignee;
-  const isAssignedToMe = request.assigneeId === currentUser?.userId || request.vendorAssigneeId === currentUser?.userId;
+  const isAssignedToMe = request.assigneeId === currentUser?.userId;
   const canStartJob = request.status === "pending" && hasAssignee && isAssignedToMe;
   const canReassign = request.status === "pending" && hasAssignee && canManageJobs && !isAssignedToMe;
   const canDeliver = canManageJobs && request.status !== "delivered";
@@ -674,22 +676,17 @@ export default function BundleRequestDetail() {
               </Badge>
             )}
             
-            {request.status === "in-progress" && (
-              currentUser?.role === "admin" || 
-              currentUser?.role === "internal_designer" || 
-              currentUser?.role === "vendor" ||
-              currentUser?.role === "vendor_designer" ||
-              request.assigneeId === currentUser?.userId ||
-              request.vendorAssigneeId === currentUser?.userId
-            ) && (
+            {request.status === "in-progress" && canDeliver && (
               <>
-                <Button 
-                  variant="outline" 
-                  className="border-red-300 text-red-600"
-                  data-testid="button-cancel"
-                >
-                  Cancel
-                </Button>
+                {isAdmin && (
+                  <Button 
+                    variant="outline" 
+                    className="border-red-300 text-red-600"
+                    data-testid="button-cancel"
+                  >
+                    Cancel
+                  </Button>
+                )}
                 <Button 
                   onClick={handleDeliver}
                   disabled={deliverMutation.isPending}
@@ -701,22 +698,17 @@ export default function BundleRequestDetail() {
               </>
             )}
             
-            {request.status === "change-request" && (
-              currentUser?.role === "admin" || 
-              currentUser?.role === "internal_designer" || 
-              currentUser?.role === "vendor" ||
-              currentUser?.role === "vendor_designer" ||
-              request.assigneeId === currentUser?.userId ||
-              request.vendorAssigneeId === currentUser?.userId
-            ) && (
+            {request.status === "change-request" && canDeliver && (
               <>
-                <Button 
-                  variant="outline" 
-                  className="border-red-300 text-red-600"
-                  data-testid="button-cancel"
-                >
-                  Cancel
-                </Button>
+                {isAdmin && (
+                  <Button 
+                    variant="outline" 
+                    className="border-red-300 text-red-600"
+                    data-testid="button-cancel"
+                  >
+                    Cancel
+                  </Button>
+                )}
                 <Button 
                   onClick={handleDeliver}
                   disabled={deliverMutation.isPending}
