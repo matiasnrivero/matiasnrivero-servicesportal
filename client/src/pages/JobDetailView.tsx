@@ -202,7 +202,9 @@ export default function JobDetailView() {
   const isClient = currentUser?.role === "client" || currentUser?.role === "distributor";
   const canSeePricing = ["admin", "client"].includes(currentUser?.role || "");
   const canManageJobs = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(currentUser?.role || "");
-  const canTakeJob = ["admin", "internal_designer", "designer", "vendor_designer"].includes(currentUser?.role || "");
+  const canTakeJob = ["admin", "internal_designer", "designer", "vendor_designer"].includes(currentUser?.role || "") && !request?.assigneeId;
+  const isAssignedToMe = request?.assigneeId === currentUser?.userId || request?.vendorAssigneeId === currentUser?.userId;
+  const canStartJob = request?.status === "pending" && isAssignedToMe;
 
   useEffect(() => {
     if (request?.assigneeId) {
@@ -225,6 +227,20 @@ export default function JobDetailView() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to assign job.", variant: "destructive" });
+    },
+  });
+
+  const startJobMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", `/api/service-requests/${requestId}/start`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests", requestId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+      toast({ title: "Job started", description: "The job is now in progress." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to start job.", variant: "destructive" });
     },
   });
 
@@ -2031,6 +2047,17 @@ export default function JobDetailView() {
                       data-testid="button-take-job"
                     >
                       {assignMutation.isPending ? "Taking job..." : "Take This Job"}
+                    </Button>
+                  )}
+
+                  {canStartJob && (
+                    <Button
+                      onClick={() => startJobMutation.mutate()}
+                      disabled={startJobMutation.isPending}
+                      className="w-full bg-sky-blue-accent hover:bg-sky-blue-accent/90"
+                      data-testid="button-start-job"
+                    >
+                      {startJobMutation.isPending ? "Starting..." : "Start Job"}
                     </Button>
                   )}
 

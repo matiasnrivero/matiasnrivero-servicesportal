@@ -1027,6 +1027,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Start job - transition from pending to in-progress without reassignment
+  app.post("/api/service-requests/:id/start", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const existingRequest = await storage.getServiceRequest(req.params.id);
+      if (!existingRequest) {
+        return res.status(404).json({ error: "Service request not found" });
+      }
+
+      if (existingRequest.status !== "pending") {
+        return res.status(400).json({ error: "Can only start pending jobs" });
+      }
+
+      if (existingRequest.status === "payment_failed") {
+        return res.status(400).json({ error: "Cannot start jobs with failed payment" });
+      }
+
+      const isAssignee = existingRequest.assigneeId === sessionUserId;
+      const isVendorAssignee = existingRequest.vendorAssigneeId === sessionUserId;
+      const isAdmin = sessionUser.role === "admin";
+      const isInternalDesigner = sessionUser.role === "internal_designer";
+
+      if (!isAssignee && !isVendorAssignee && !isAdmin && !isInternalDesigner) {
+        return res.status(403).json({ error: "Only the assigned designer, admin, or internal designer can start this job" });
+      }
+
+      const request = await storage.updateServiceRequest(req.params.id, {
+        status: "in-progress",
+      });
+      res.json(request);
+    } catch (error) {
+      console.error("Error starting service request:", error);
+      res.status(500).json({ error: "Failed to start job" });
+    }
+  });
+
   // Assign request to vendor (without specific designer - keeps status as pending)
   app.post("/api/service-requests/:id/assign-vendor", async (req, res) => {
     try {
@@ -6177,6 +6222,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error assigning designer to bundle request:", error);
       res.status(500).json({ error: "Failed to assign designer" });
+    }
+  });
+
+  // Start bundle job - transition from pending to in-progress without reassignment
+  app.post("/api/bundle-requests/:id/start", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const existingRequest = await storage.getBundleRequest(req.params.id);
+      if (!existingRequest) {
+        return res.status(404).json({ error: "Bundle request not found" });
+      }
+
+      if (existingRequest.status !== "pending") {
+        return res.status(400).json({ error: "Can only start pending jobs" });
+      }
+
+      if (existingRequest.status === "payment_failed") {
+        return res.status(400).json({ error: "Cannot start jobs with failed payment" });
+      }
+
+      const isAssignee = existingRequest.assigneeId === sessionUserId;
+      const isVendorAssignee = existingRequest.vendorAssigneeId === sessionUserId;
+      const isAdmin = sessionUser.role === "admin";
+      const isInternalDesigner = sessionUser.role === "internal_designer";
+
+      if (!isAssignee && !isVendorAssignee && !isAdmin && !isInternalDesigner) {
+        return res.status(403).json({ error: "Only the assigned designer, admin, or internal designer can start this job" });
+      }
+
+      const request = await storage.updateBundleRequest(req.params.id, {
+        status: "in-progress",
+      });
+      res.json(request);
+    } catch (error) {
+      console.error("Error starting bundle request:", error);
+      res.status(500).json({ error: "Failed to start job" });
     }
   });
 

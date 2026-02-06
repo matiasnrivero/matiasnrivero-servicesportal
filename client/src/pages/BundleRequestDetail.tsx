@@ -202,21 +202,32 @@ export default function BundleRequestDetail() {
 
   const assignMutation = useMutation({
     mutationFn: async (assigneeId: string) => {
-      const response = await fetch(`/api/bundle-requests/${requestId}/assign`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assigneeId }),
-      });
-      if (!response.ok) throw new Error("Failed to assign designer");
-      return response.json();
+      return apiRequest("POST", `/api/bundle-requests/${requestId}/assign`, { assigneeId });
     },
     onSuccess: () => {
       toast({ title: "Designer Assigned", description: "The request has been assigned." });
       queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests", requestId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests", requestId, "full-detail"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] });
     },
+    onError: (error: Error) => {
+      const msg = error.message?.includes(":") ? error.message.split(": ").slice(1).join(": ") : "Failed to assign designer.";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    },
+  });
+
+  const startJobMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", `/api/bundle-requests/${requestId}/start`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests", requestId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests", requestId, "full-detail"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] });
+      toast({ title: "Job started", description: "The job is now in progress." });
+    },
     onError: () => {
-      toast({ title: "Error", description: "Failed to assign designer.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to start job.", variant: "destructive" });
     },
   });
 
@@ -381,6 +392,8 @@ export default function BundleRequestDetail() {
   const { request, bundle, bundleFields, services, attachments, requester, assignee } = requestDetail;
   const canManageJobs = ["admin", "internal_designer", "vendor", "vendor_designer", "designer"].includes(currentUser?.role || "");
   const canTakeJob = ["admin", "internal_designer", "designer", "vendor_designer"].includes(currentUser?.role || "") && request.status === "pending" && !request.assigneeId;
+  const isAssignedToMe = request.assigneeId === currentUser?.userId || request.vendorAssigneeId === currentUser?.userId;
+  const canStartJob = request.status === "pending" && isAssignedToMe;
   const canDeliver = canManageJobs && request.status !== "delivered";
   
   const requestAttachments = attachments.filter(a => a.kind === "request" || !a.kind);
@@ -1231,6 +1244,17 @@ export default function BundleRequestDetail() {
                       data-testid="button-take-job"
                     >
                       {assignMutation.isPending ? "Taking job..." : "Take This Job"}
+                    </Button>
+                  )}
+
+                  {canStartJob && (
+                    <Button
+                      onClick={() => startJobMutation.mutate()}
+                      disabled={startJobMutation.isPending}
+                      className="w-full bg-sky-blue-accent hover:bg-sky-blue-accent/90"
+                      data-testid="button-start-job"
+                    >
+                      {startJobMutation.isPending ? "Starting..." : "Start Job"}
                     </Button>
                   )}
 
