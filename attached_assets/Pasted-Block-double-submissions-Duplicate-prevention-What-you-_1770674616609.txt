@@ -1,0 +1,104 @@
+Block double submissions (Duplicate prevention)
+What you’re preventing (3 common cases)
+
+Double-click / impatient user: user hits “Submit” twice, browser re-sends, or the UI doesn’t lock fast enough.
+
+Refresh / back button resubmit: form POST gets repeated.
+
+Network retry: client times out and retries, but the server already created the job.
+
+Best-practice solution: Idempotency + UI locking + server duplicate rules
+
+You want server-side to be the source of truth.
+
+A) UI-level guard (nice-to-have)
+
+On first click:
+
+Disable the Submit button
+
+Replace text with “Submitting…”
+
+Show spinner + keep page interactive but block resubmission
+
+If the request fails:
+
+Re-enable submit
+
+Show a clear error + keep user data intact
+
+✅ This reduces duplicates.
+❌ But it does not guarantee safety. The server must still handle duplicates.
+
+B) Server-level guarantee (must-have): Idempotency key
+
+How it works
+
+When the user opens the submission page, generate a submission_token (UUID).
+
+Store it client-side (hidden field) and send it with the submit request in:
+
+header: Idempotency-Key: <uuid> (ideal), and/or
+
+body field: submissionToken
+
+On the server
+
+Create a table like idempotency_keys (or store on the Job table):
+
+key (unique)
+
+userId
+
+endpoint (e.g., POST /jobs)
+
+requestHash (optional)
+
+status (processing/success/failed)
+
+jobId (nullable)
+
+timestamps
+
+Behavior
+
+If the same key arrives again:
+
+If previously success → return the same jobId (no new job)
+
+If processing → return 202 Processing (or “still processing”)
+
+If failed → allow retry only if you mark failed keys as retryable (or require a new token)
+
+DB enforcement
+
+Put a unique constraint on (idempotency_key) or (userId, idempotency_key).
+
+This is the single most reliable pattern.
+
+C) Secondary “duplicate detection” rule (optional but useful)
+
+Even with idempotency, you may still want to detect “same content sent twice with a new token.”
+
+For example, compute a hash like:
+
+dedupeHash = SHA256(userId + serviceType + normalizedFormFields + fileChecksums + createdAtMinuteBucket)
+Then enforce:
+
+“Do not allow a new job with the same dedupeHash within 60 seconds”
+
+Recommended approach
+
+Keep this as a soft rule: warn the user (“Looks like you just submitted this. View existing job?”) rather than hard-blocking, because sometimes they really do want two identical jobs.
+
+D) UX outcomes (what the user sees)
+
+If duplicate: show success screen with:
+
+“Already submitted” message
+
+Existing Job ID + link to Job Detail
+
+If processing: show:
+
+“We’re still submitting your request…” + polling OR refresh-safe page
