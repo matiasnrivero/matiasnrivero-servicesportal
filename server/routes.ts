@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { automationEngine } from "./services/automationEngine";
 import { stripeService } from "./services/stripeService";
+import { notificationService } from "./services/notificationService";
 import type { User } from "@shared/schema";
 
 /**
@@ -908,6 +909,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Send notifications (non-blocking)
+      try {
+        const service = request.serviceId ? await storage.getService(request.serviceId) : null;
+        const submitter = await storage.getUser(request.userId);
+        const platformUrl = process.env.PLATFORM_URL || "https://services.tri-pod.com";
+        const jobUrl = `${platformUrl}/jobs/${request.id}`;
+        const serviceName = service?.title || "Service";
+        
+        if (submitter) {
+          notificationService.onServiceRequestSubmitted(
+            { userId: submitter.id, email: submitter.email || "", firstName: submitter.username },
+            { job_id: request.orderNumber || request.id, service_name: serviceName, submitted_date: new Date().toLocaleDateString(), job_url: jobUrl }
+          );
+          
+          const allUsers = await storage.getAllUsers();
+          const adminRecipients = allUsers
+            .filter(u => ["admin", "internal_designer"].includes(u.role) && u.isActive && u.id !== request.userId)
+            .map(u => ({ userId: u.id, email: u.email || "", firstName: u.username }));
+          
+          if (adminRecipients.length > 0) {
+            const clientName = submitter.username;
+            notificationService.onServiceRequestSubmittedAdmin(
+              adminRecipients,
+              { job_id: request.orderNumber || request.id, service_name: serviceName, requester_name: submitter.username, client_name: clientName, submitted_date: new Date().toLocaleDateString(), job_url: jobUrl }
+            );
+          }
+        }
+      } catch (notifError) {
+        console.error("Notification error (non-blocking):", notifError);
+      }
+
       res.status(201).json(request);
     } catch (error) {
       console.error("Error creating service request:", error);
@@ -1018,22 +1050,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: assignmentCheck.reason || "You cannot assign to this user" });
       }
 
-      // Determine if this is self-assignment ("Take This Job") or assigning to someone else
       const isSelfAssignment = targetDesignerId === sessionUserId;
       
+      let request;
       if (isSelfAssignment) {
-        // Self-assignment: assign AND set in-progress
-        const request = await storage.assignDesigner(req.params.id, targetDesignerId);
-        res.json(request);
+        request = await storage.assignDesigner(req.params.id, targetDesignerId);
       } else {
-        // Assigning to someone else: assign but keep status as pending
-        // The assignee will need to click "Start Job" to begin working
-        const request = await storage.updateServiceRequest(req.params.id, {
+        request = await storage.updateServiceRequest(req.params.id, {
           assigneeId: targetDesignerId,
           assignedAt: new Date(),
         });
-        res.json(request);
       }
+
+      try {
+        const sr = await storage.getServiceRequest(req.params.id);
+        if (sr) {
+          const service = sr.serviceId ? await storage.getService(sr.serviceId) : null;
+          const platformUrl = process.env.PLATFORM_URL || "https://services.tri-pod.com";
+          const jobUrl = `${platformUrl}/jobs/${sr.id}`;
+
+          const submitterForAssign = await storage.getUser(sr.userId);
+          notificationService.onJobAssignedDesigner(
+            { userId: targetDesigner.id, email: targetDesigner.email || "", firstName: targetDesigner.username },
+            { job_id: sr.orderNumber || sr.id, service_name: service?.title || "Service", client_name: submitterForAssign?.username || "Client", assigned_by_name: sessionUser.username, job_url: jobUrl }
+          );
+
+          if (isSelfAssignment) {
+            const submitter = await storage.getUser(sr.userId);
+            if (submitter && submitter.id !== targetDesignerId) {
+              notificationService.onJobInProgress(
+                { userId: submitter.id, email: submitter.email || "", firstName: submitter.username },
+                { job_id: sr.orderNumber || sr.id, service_name: service?.title || "Service", job_url: jobUrl }
+              );
+            }
+          }
+        }
+      } catch (notifError) {
+        console.error("Notification error (non-blocking):", notifError);
+      }
+
+      res.json(request);
     } catch (error) {
       console.error("Error assigning designer:", error);
       res.status(500).json({ error: "Failed to assign designer" });
@@ -1075,6 +1131,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const request = await storage.updateServiceRequest(req.params.id, {
         status: "in-progress",
       });
+
+      // #5: Notify the submitter that job is in progress
+      try {
+        if (request) {
+          const submitter = await storage.getUser(request.userId);
+          const service = request.serviceId ? await storage.getService(request.serviceId) : null;
+          const platformUrl = process.env.PLATFORM_URL || "https://services.tri-pod.com";
+          const jobUrl = `${platformUrl}/jobs/${request.id}`;
+          
+          if (submitter) {
+            notificationService.onJobInProgress(
+              { userId: submitter.id, email: submitter.email || "", firstName: submitter.username },
+              { job_id: request.orderNumber || request.id, service_name: service?.title || "Service", job_url: jobUrl }
+            );
+          }
+        }
+      } catch (notifError) {
+        console.error("Notification error (non-blocking):", notifError);
+      }
+
       res.json(request);
     } catch (error) {
       console.error("Error starting service request:", error);
@@ -1129,8 +1205,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Target user must be a vendor" });
       }
 
-      // Assign to vendor (keeps status as pending, doesn't assign a specific designer)
       const request = await storage.assignVendor(req.params.id, vendorId);
+
+      try {
+        const sr = await storage.getServiceRequest(req.params.id);
+        if (sr) {
+          const service = sr.serviceId ? await storage.getService(sr.serviceId) : null;
+          const platformUrl = process.env.PLATFORM_URL || "https://services.tri-pod.com";
+          const jobUrl = `${platformUrl}/jobs/${sr.id}`;
+
+          const submitterForVendor = await storage.getUser(sr.userId);
+          notificationService.onJobAssignedVendor(
+            { userId: targetVendor.id, email: targetVendor.email || "", firstName: targetVendor.username },
+            { job_id: sr.orderNumber || sr.id, service_name: service?.title || "Service", client_name: submitterForVendor?.username || "Client", assigned_by_name: sessionUser.username, job_url: jobUrl }
+          );
+        }
+      } catch (notifError) {
+        console.error("Notification error (non-blocking):", notifError);
+      }
+
       res.json(request);
     } catch (error) {
       console.error("Error assigning vendor:", error);
@@ -1284,6 +1377,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      try {
+        if (results.assigned.length > 0) {
+          const platformUrl = process.env.PLATFORM_URL || "https://services.tri-pod.com";
+          const jobCount = results.assigned.length;
+          const assignedDate = new Date().toLocaleDateString();
+          if (assignmentType === "vendor") {
+            notificationService.onBulkJobAssignedVendor(
+              { userId: target.id, email: target.email || "", firstName: target.username },
+              { job_count: String(jobCount), assigned_by_name: sessionUser.username, assigned_date: assignedDate, jobs_list_url: `${platformUrl}/jobs` }
+            );
+          } else {
+            notificationService.onBulkJobAssignedDesigner(
+              { userId: target.id, email: target.email || "", firstName: target.username },
+              { job_count: String(jobCount), assigned_by_name: sessionUser.username, assigned_date: assignedDate, jobs_list_url: `${platformUrl}/jobs` }
+            );
+          }
+        }
+      } catch (notifError) {
+        console.error("Notification error (non-blocking):", notifError);
+      }
+
       res.json({
         success: true,
         assigned: results.assigned.length,
@@ -1393,6 +1507,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error("Payment processing error (non-blocking):", paymentError);
         }
       }
+
+      // #8: Notify the submitter that job is delivered
+      try {
+        if (request) {
+          const submitter = await storage.getUser(request.userId);
+          const service = request.serviceId ? await storage.getService(request.serviceId) : null;
+          const platformUrl = process.env.PLATFORM_URL || "https://services.tri-pod.com";
+          const jobUrl = `${platformUrl}/jobs/${request.id}`;
+          
+          if (submitter) {
+            notificationService.onJobDelivered(
+              { userId: submitter.id, email: submitter.email || "", firstName: submitter.username },
+              { job_id: request.orderNumber || request.id, service_name: service?.title || "Service", job_url: jobUrl }
+            );
+          }
+        }
+      } catch (notifError) {
+        console.error("Notification error (non-blocking):", notifError);
+      }
       
       res.json(request);
     } catch (error) {
@@ -1481,6 +1614,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         body: `[Change Request] ${changeNote}`,
         visibility: "public",
       });
+
+      // #6 + #7: Notify assignee and vendor about change request
+      try {
+        const updatedRequest = await storage.getServiceRequest(req.params.id);
+        if (updatedRequest && updatedRequest.assigneeId) {
+          const assignee = await storage.getUser(updatedRequest.assigneeId);
+          const requester = await storage.getUser(updatedRequest.userId);
+          const service = updatedRequest.serviceId ? await storage.getService(updatedRequest.serviceId) : null;
+          const platformUrl = process.env.PLATFORM_URL || "https://services.tri-pod.com";
+          const jobUrl = `${platformUrl}/jobs/${updatedRequest.id}`;
+          const clientName = requester?.username || "Client";
+          
+          if (assignee) {
+            notificationService.onJobChangeRequestAssignee(
+              [{ userId: assignee.id, email: assignee.email || "", firstName: assignee.username }],
+              { job_id: updatedRequest.orderNumber || updatedRequest.id, service_name: service?.title || "Service", requester_name: requester?.username || "Client", client_name: clientName, change_request_message: changeNote, job_url: jobUrl }
+            );
+            
+            if (assignee.role === "vendor_designer" && assignee.vendorId) {
+              const vendorProfile = await storage.getVendorProfileById(assignee.vendorId);
+              if (vendorProfile) {
+                const vendorUser = await storage.getUser(vendorProfile.userId);
+                if (vendorUser && vendorUser.id !== assignee.id) {
+                  notificationService.onJobChangeRequestVendor(
+                    [{ userId: vendorUser.id, email: vendorUser.email || "", firstName: vendorUser.username }],
+                    { job_id: updatedRequest.orderNumber || updatedRequest.id, service_name: service?.title || "Service", assignee_name: assignee.username, requester_name: requester?.username || "Client", client_name: clientName, change_request_message: changeNote, job_url: jobUrl }
+                  );
+                }
+              }
+            }
+          }
+        }
+      } catch (notifError) {
+        console.error("Notification error (non-blocking):", notifError);
+      }
       
       res.json({ ...request, reassignmentInfo });
     } catch (error) {
@@ -1622,6 +1790,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const request = await storage.updateServiceRequest(req.params.id, { 
         status: "canceled"
       });
+
+      try {
+        const service = existingRequest.serviceId ? await storage.getService(existingRequest.serviceId) : null;
+        const platformUrl = process.env.PLATFORM_URL || "https://services.tri-pod.com";
+        const jobUrl = `${platformUrl}/jobs/${existingRequest.id}`;
+        const allUsers = await storage.getAllUsers();
+        const adminRecipients = allUsers
+          .filter(u => u.role === "admin" && u.isActive && u.id !== sessionUserId)
+          .map(u => ({ userId: u.id, email: u.email || "", firstName: u.username }));
+
+        const cancelRequester = await storage.getUser(existingRequest.userId);
+        const cancelClientName = cancelRequester?.username || "Client";
+        if (adminRecipients.length > 0) {
+          notificationService.onJobCanceledAdmin(
+            adminRecipients,
+            { job_id: existingRequest.orderNumber || existingRequest.id, service_name: service?.title || "Service", client_name: cancelClientName, canceled_by_name: sessionUser.username, job_url: jobUrl }
+          );
+        }
+
+        if (existingRequest.vendorAssigneeId) {
+          const vendor = await storage.getUser(existingRequest.vendorAssigneeId);
+          if (vendor) {
+            notificationService.onJobCanceledVendor(
+              [{ userId: vendor.id, email: vendor.email || "", firstName: vendor.username }],
+              { job_id: existingRequest.orderNumber || existingRequest.id, service_name: service?.title || "Service", client_name: cancelClientName, canceled_by_name: sessionUser.username, job_url: jobUrl }
+            );
+          }
+        }
+      } catch (notifError) {
+        console.error("Notification error (non-blocking):", notifError);
+      }
       
       res.json({ 
         ...request, 
@@ -2442,13 +2641,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         invitedBy: sessionUserId,
       });
 
-      // Auto-create client profile for standalone client users
       if (newUserRole === "client" && !req.body.clientProfileId) {
         const clientProfile = await storage.createClientProfile({
           primaryUserId: newUser.id,
           companyName: req.body.username,
         });
         await storage.updateUser(newUser.id, { clientProfileId: clientProfile.id });
+      }
+
+      try {
+        const platformUrl = process.env.PLATFORM_URL || "https://services.tri-pod.com";
+        const loginUrl = `${platformUrl}/login`;
+        const recipient = { userId: newUser.id, email: newUser.email || "", firstName: newUser.username };
+        const inviterName = sessionUser.username;
+        
+        if (newUserRole === "admin") {
+          notificationService.onAdminInvite(recipient, { inviter_name: inviterName, login_url: loginUrl });
+        } else if (newUserRole === "internal_designer") {
+          notificationService.onInternalDesignerInvite(recipient, { inviter_name: inviterName, login_url: loginUrl });
+        } else if (newUserRole === "vendor") {
+          notificationService.onVendorInvite(recipient, { inviter_name: inviterName, login_url: loginUrl });
+        } else if (newUserRole === "vendor_designer") {
+          notificationService.onVendorDesignerInvite(recipient, { inviter_name: inviterName, vendor_name: sessionUser.username, login_url: loginUrl });
+        } else if (newUserRole === "client") {
+          notificationService.onClientAdminInvite(recipient, { inviter_name: inviterName, login_url: loginUrl });
+        } else if (newUserRole === "client_member") {
+          notificationService.onClientMemberInvite(recipient, { inviter_name: inviterName, company_name: sessionUser.username, login_url: loginUrl });
+        }
+      } catch (notifError) {
+        console.error("Notification error (non-blocking):", notifError);
       }
 
       res.status(201).json(newUser);
@@ -3198,6 +3419,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         invitedBy: sessionUserId,
         clientProfileId: req.params.id,
       });
+
+      try {
+        const platformUrl = process.env.PLATFORM_URL || "https://services.tri-pod.com";
+        const loginUrl = `${platformUrl}/login`;
+        notificationService.onClientMemberInvite(
+          { userId: newUser.id, email: newUser.email || "", firstName: newUser.username },
+          { inviter_name: sessionUser.username, company_name: profile.companyName || sessionUser.username, login_url: loginUrl }
+        );
+      } catch (notifError) {
+        console.error("Notification error (non-blocking):", notifError);
+      }
 
       res.status(201).json(newUser);
     } catch (error) {
@@ -4709,6 +4941,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!updated) {
         return res.status(404).json({ error: "Subscription not found" });
       }
+
+      if (vendorAssigneeId && (immediateVendorAssignment || updateData.vendorAssigneeId)) {
+        try {
+          const platformUrl = process.env.PLATFORM_URL || "https://services.tri-pod.com";
+          const vendorUser = await storage.getUser(vendorAssigneeId);
+          const sub = await storage.getClientPackSubscription(req.params.id);
+          if (vendorUser && sub) {
+            const pack = await storage.getServicePack(sub.packId);
+            const service = pack?.serviceId ? await storage.getService(pack.serviceId) : null;
+            const serviceName = service?.title || "Service";
+            const packName = pack?.name || "Pack";
+            const packQuantity = String(pack?.quantity || 0);
+            const renewalDate = sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString() : "";
+            const clientProfile = sub.clientProfileId ? await storage.getClientProfileById(sub.clientProfileId) : null;
+            const clientName = clientProfile?.companyName || "Client";
+            notificationService.onPackAssignedVendor(
+              { userId: vendorUser.id, email: vendorUser.email || "", firstName: vendorUser.username },
+              { pack_name: packName, service_name: serviceName, pack_quantity: packQuantity, renewal_date: renewalDate, client_name: clientName, vendor_packs_url: `${platformUrl}/vendor/packs` }
+            );
+          }
+        } catch (notifError) {
+          console.error("Notification error (non-blocking):", notifError);
+        }
+      }
+
       res.json(updated);
     } catch (error) {
       console.error("Error updating pack subscription:", error);
@@ -4998,6 +5255,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         billingAnchorDay,
       });
 
+      try {
+        const platformUrl = process.env.PLATFORM_URL || "https://services.tri-pod.com";
+        const service = pack.serviceId ? await storage.getService(pack.serviceId) : null;
+        const serviceName = service?.title || "Service";
+        const packName = pack.name;
+        const packQuantity = String(pack.quantity || 0);
+        const renewalDate = currentPeriodEnd.toLocaleDateString();
+        const clientProfile = await storage.getClientProfileById(clientProfileId);
+        const clientName = clientProfile?.companyName || sessionUser.username;
+
+        notificationService.onPackActivatedClient(
+          { userId: sessionUser.id, email: sessionUser.email || "", firstName: sessionUser.username },
+          { pack_name: packName, service_name: serviceName, pack_quantity: packQuantity, renewal_date: renewalDate, packs_url: `${platformUrl}/packs` }
+        );
+
+        const allUsers = await storage.getAllUsers();
+        const adminRecipients = allUsers
+          .filter(u => ["admin", "internal_designer"].includes(u.role) && u.isActive && u.id !== sessionUser.id)
+          .map(u => ({ userId: u.id, email: u.email || "", firstName: u.username }));
+        if (adminRecipients.length > 0) {
+          notificationService.onPackActivatedAdmin(
+            adminRecipients,
+            { pack_name: packName, service_name: serviceName, pack_quantity: packQuantity, renewal_date: renewalDate, client_name: clientName, packs_admin_url: `${platformUrl}/admin/packs` }
+          );
+        }
+      } catch (notifError) {
+        console.error("Notification error (non-blocking):", notifError);
+      }
+
       res.status(201).json(subscription);
     } catch (error) {
       console.error("Error creating pack subscription:", error);
@@ -5064,6 +5350,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : { stripeStatus: "cancel_at_period_end", cancelAt: cancelAtDate };
 
       const updated = await storage.updateClientPackSubscription(req.params.id, updateData);
+
+      try {
+        const platformUrl = process.env.PLATFORM_URL || "https://services.tri-pod.com";
+        const pack = await storage.getServicePack(subscription.packId);
+        const service = pack?.serviceId ? await storage.getService(pack.serviceId) : null;
+        const serviceName = service?.title || "Service";
+        const packName = pack?.name || "Pack";
+        const packQuantity = String(pack?.quantity || 0);
+        const cancelEffectiveDate = immediate ? new Date().toLocaleDateString() : cancelAtDate.toLocaleDateString();
+        const clientProfile = subscription.clientProfileId ? await storage.getClientProfileById(subscription.clientProfileId) : null;
+        const clientName = clientProfile?.companyName || sessionUser.username;
+
+        notificationService.onPackCanceledClient(
+          { userId: sessionUser.id, email: sessionUser.email || "", firstName: sessionUser.username },
+          { pack_name: packName, service_name: serviceName, pack_quantity: packQuantity, cancelation_effective_date: cancelEffectiveDate, packs_url: `${platformUrl}/packs` }
+        );
+
+        const allUsers = await storage.getAllUsers();
+        const adminRecipients = allUsers
+          .filter(u => ["admin", "internal_designer"].includes(u.role) && u.isActive && u.id !== sessionUser.id)
+          .map(u => ({ userId: u.id, email: u.email || "", firstName: u.username }));
+        if (adminRecipients.length > 0) {
+          notificationService.onPackCanceledAdmin(
+            adminRecipients,
+            { pack_name: packName, service_name: serviceName, pack_quantity: packQuantity, cancelation_effective_date: cancelEffectiveDate, client_name: clientName, packs_admin_url: `${platformUrl}/admin/packs` }
+          );
+        }
+
+        if (subscription.vendorAssigneeId) {
+          const vendorUser = await storage.getUser(subscription.vendorAssigneeId);
+          if (vendorUser) {
+            notificationService.onPackCanceledVendor(
+              [{ userId: vendorUser.id, email: vendorUser.email || "", firstName: vendorUser.username }],
+              { pack_name: packName, service_name: serviceName, pack_quantity: packQuantity, cancelation_effective_date: cancelEffectiveDate, client_name: clientName, vendor_packs_url: `${platformUrl}/vendor/packs` }
+            );
+          }
+        }
+      } catch (notifError) {
+        console.error("Notification error (non-blocking):", notifError);
+      }
 
       res.json(updated);
     } catch (error) {
@@ -5239,6 +5565,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pendingChangeType: changeType,
         pendingChangeEffectiveAt: effectiveAt,
       });
+
+      try {
+        const platformUrl = process.env.PLATFORM_URL || "https://services.tri-pod.com";
+        const service = currentPack.serviceId ? await storage.getService(currentPack.serviceId) : null;
+        const serviceName = service?.title || "Service";
+        const renewalDate = effectiveAt instanceof Date ? effectiveAt.toLocaleDateString() : new Date(effectiveAt).toLocaleDateString();
+        const clientProfile = subscription.clientProfileId ? await storage.getClientProfileById(subscription.clientProfileId) : null;
+        const clientName = clientProfile?.companyName || sessionUser.username;
+        const commonVars = {
+          previous_pack_name: currentPack.name,
+          previous_pack_quantity: String(currentQty),
+          new_pack_name: newPack.name,
+          new_pack_quantity: String(newQty),
+          service_name: serviceName,
+          renewal_date: renewalDate,
+        };
+
+        if (changeType === "upgrade") {
+          notificationService.onPackUpgradedClient(
+            { userId: sessionUser.id, email: sessionUser.email || "", firstName: sessionUser.username },
+            { ...commonVars, packs_url: `${platformUrl}/packs` }
+          );
+          const allUsers = await storage.getAllUsers();
+          const adminRecipients = allUsers
+            .filter(u => ["admin", "internal_designer"].includes(u.role) && u.isActive && u.id !== sessionUser.id)
+            .map(u => ({ userId: u.id, email: u.email || "", firstName: u.username }));
+          if (adminRecipients.length > 0) {
+            notificationService.onPackUpgradedAdmin(adminRecipients, { ...commonVars, client_name: clientName, packs_admin_url: `${platformUrl}/admin/packs` });
+          }
+          if (subscription.vendorAssigneeId) {
+            const vendorUser = await storage.getUser(subscription.vendorAssigneeId);
+            if (vendorUser) {
+              notificationService.onPackUpgradedVendor(
+                [{ userId: vendorUser.id, email: vendorUser.email || "", firstName: vendorUser.username }],
+                { ...commonVars, client_name: clientName, vendor_packs_url: `${platformUrl}/vendor/packs` }
+              );
+            }
+          }
+        } else {
+          notificationService.onPackDowngradedClient(
+            { userId: sessionUser.id, email: sessionUser.email || "", firstName: sessionUser.username },
+            { ...commonVars, packs_url: `${platformUrl}/packs` }
+          );
+          const allUsers = await storage.getAllUsers();
+          const adminRecipients = allUsers
+            .filter(u => ["admin", "internal_designer"].includes(u.role) && u.isActive && u.id !== sessionUser.id)
+            .map(u => ({ userId: u.id, email: u.email || "", firstName: u.username }));
+          if (adminRecipients.length > 0) {
+            notificationService.onPackDowngradedAdmin(adminRecipients, { ...commonVars, client_name: clientName, packs_admin_url: `${platformUrl}/admin/packs` });
+          }
+          if (subscription.vendorAssigneeId) {
+            const vendorUser = await storage.getUser(subscription.vendorAssigneeId);
+            if (vendorUser) {
+              notificationService.onPackDowngradedVendor(
+                [{ userId: vendorUser.id, email: vendorUser.email || "", firstName: vendorUser.username }],
+                { ...commonVars, client_name: clientName, vendor_packs_url: `${platformUrl}/vendor/packs` }
+              );
+            }
+          }
+        }
+      } catch (notifError) {
+        console.error("Notification error (non-blocking):", notifError);
+      }
 
       res.json({ ...updated, changeType });
     } catch (error) {
@@ -9793,6 +10182,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { monthlyBillingService } = await import("./services/monthlyBillingService");
       const result = await monthlyBillingService.runPackExceededBilling();
 
+      try {
+        const platformUrl = process.env.PLATFORM_URL || "https://services.tri-pod.com";
+        for (const billingResult of result.results) {
+          if (!billingResult.success) continue;
+          const clientProfile = await storage.getClientProfileById(billingResult.clientProfileId);
+          if (!clientProfile) continue;
+          const activeSubs = await storage.getActiveClientPackSubscriptions(billingResult.clientProfileId);
+          for (const sub of activeSubs) {
+            const pack = await storage.getServicePack(sub.packId);
+            if (!pack) continue;
+            const service = pack.serviceId ? await storage.getService(pack.serviceId) : null;
+            const serviceName = service?.title || "Service";
+            const packName = pack.name;
+            const packQuantity = pack.quantity || 0;
+            const consumed = sub.consumedQuantities as Record<string, number> | null;
+            const totalUsed = consumed ? Object.values(consumed).reduce((sum, v) => sum + (typeof v === "number" ? v : 0), 0) : 0;
+            const remaining = Math.max(0, packQuantity - totalUsed);
+            const usagePercent = packQuantity > 0 ? (totalUsed / packQuantity) * 100 : 0;
+            const renewalDate = sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString() : "";
+            const clientUser = await storage.getUser(clientProfile.primaryUserId);
+            if (!clientUser) continue;
+            const recipient = { userId: clientUser.id, email: clientUser.email || "", firstName: clientUser.username };
+
+            if (totalUsed >= packQuantity) {
+              notificationService.onPackFullyUsed(
+                recipient,
+                { pack_name: packName, service_name: serviceName, pack_quantity: String(packQuantity), renewal_date: renewalDate, packs_url: `${platformUrl}/packs` }
+              );
+            } else if (usagePercent >= 80) {
+              notificationService.onPackUsageWarning(
+                recipient,
+                { pack_name: packName, service_name: serviceName, pack_quantity: String(packQuantity), services_used: String(totalUsed), services_remaining: String(remaining), renewal_date: renewalDate, packs_url: `${platformUrl}/packs` }
+              );
+            }
+          }
+        }
+      } catch (notifError) {
+        console.error("Notification error (non-blocking):", notifError);
+      }
+
       res.json({
         message: "Pack exceeded billing completed",
         ...result
@@ -11544,6 +11973,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
           processedAt: new Date()
         });
 
+        try {
+          const platformUrl = process.env.PLATFORM_URL || "https://services.tri-pod.com";
+          const clientUser = await storage.getUser(refund.clientId);
+          if (clientUser) {
+            let serviceName = "Service";
+            let jobId = "";
+            let jobUrl = platformUrl;
+            if (refund.serviceRequestId) {
+              const sr = await storage.getServiceRequest(refund.serviceRequestId);
+              if (sr) {
+                const svc = await storage.getService(sr.serviceId);
+                serviceName = svc?.title || "Service";
+                jobId = sr.orderNumber || sr.id;
+                jobUrl = `${platformUrl}/jobs/${sr.id}`;
+              }
+            } else if (refund.bundleRequestId) {
+              jobId = refund.bundleRequestId;
+              jobUrl = `${platformUrl}/jobs`;
+            }
+            notificationService.onRefundProcessed(
+              { userId: clientUser.id, email: clientUser.email || "", firstName: clientUser.username },
+              { job_id: jobId, service_name: serviceName, refund_amount: `$${parseFloat(refund.refundAmount).toFixed(2)}`, payment_method: "Stripe", job_url: jobUrl }
+            );
+          }
+        } catch (notifError) {
+          console.error("Notification error (non-blocking):", notifError);
+        }
+
         res.json(updatedRefund);
       } catch (stripeError: any) {
         // Update refund as failed
@@ -12198,6 +12655,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== END CLIENT INVOICE VIEW ====================
+
+  // ===== Notification Routes =====
+
+  // GET /api/notifications - get notifications for current user with pagination
+  app.get("/api/notifications", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const limit = parseInt(req.query.limit as string) || 20;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const unreadOnly = req.query.unreadOnly === "true";
+      
+      const notifications = await storage.getNotifications(sessionUserId, { limit, offset, unreadOnly });
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  // GET /api/notifications/unread-count - get unread notification count
+  app.get("/api/notifications/unread-count", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const count = await storage.getUnreadNotificationCount(sessionUserId);
+      res.json({ count });
+    } catch (error) {
+      console.error("Error fetching unread count:", error);
+      res.status(500).json({ error: "Failed to fetch unread count" });
+    }
+  });
+
+  // PATCH /api/notifications/read-all - mark all notifications as read for current user
+  // NOTE: This route MUST be registered BEFORE /api/notifications/:id/read
+  // to prevent Express from matching "read-all" as an :id parameter
+  app.patch("/api/notifications/read-all", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      await storage.markAllNotificationsRead(sessionUserId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking all notifications read:", error);
+      res.status(500).json({ error: "Failed to mark all notifications as read" });
+    }
+  });
+
+  // PATCH /api/notifications/:id/read - mark a notification as read
+  app.patch("/api/notifications/:id/read", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const notification = await storage.getNotification(req.params.id);
+      if (!notification) {
+        return res.status(404).json({ error: "Notification not found" });
+      }
+      if (notification.userId !== sessionUserId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const updated = await storage.markNotificationRead(req.params.id);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error marking notification read:", error);
+      res.status(500).json({ error: "Failed to mark notification as read" });
+    }
+  });
 
   const httpServer = createServer(app);
 

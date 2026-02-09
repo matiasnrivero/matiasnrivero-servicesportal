@@ -907,6 +907,42 @@ export const insertAdminNotificationSchema = createInsertSchema(adminNotificatio
 export type InsertAdminNotification = z.infer<typeof insertAdminNotificationSchema>;
 export type AdminNotification = typeof adminNotifications.$inferSelect;
 
+// In-App Notification types for all user roles
+export const notificationTypes = [
+  "service_request_submitted", "service_request_admin", "job_in_progress",
+  "job_change_request", "job_change_request_vendor", "job_delivered",
+  "job_assigned_vendor", "bulk_job_assigned_vendor", "job_assigned_designer", "bulk_job_assigned_designer",
+  "job_canceled", "job_canceled_vendor", "refund_processed",
+  "pack_activated", "pack_activated_admin", "pack_canceled", "pack_canceled_admin", "pack_canceled_vendor",
+  "pack_assigned_vendor", "pack_upgraded", "pack_upgraded_admin", "pack_upgraded_vendor",
+  "pack_downgraded", "pack_downgraded_admin", "pack_downgraded_vendor",
+  "pack_renewed", "pack_usage_warning", "pack_fully_used",
+  "new_services_cost_input"
+] as const;
+export type NotificationType = typeof notificationTypes[number];
+
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  link: text("link"),
+  isRead: boolean("is_read").notNull().default(false),
+  readAt: timestamp("read_at"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+  readAt: true,
+});
+
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,

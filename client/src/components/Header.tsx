@@ -18,6 +18,7 @@ import {
 import { Search, Loader2, FileText, Package } from "lucide-react";
 import type { User } from "@shared/schema";
 import { useState, useEffect, useRef } from "react";
+import { NotificationBell } from "@/components/NotificationBell";
 
 type UserSession = {
   userId: string;
@@ -383,6 +384,7 @@ export function Header() {
               )}
             </PopoverContent>
           </Popover>
+          <NotificationBell />
           <div className="flex items-center gap-2">
             <Select
               value={(() => {

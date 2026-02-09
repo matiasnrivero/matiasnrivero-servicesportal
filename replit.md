@@ -1,6 +1,6 @@
 # Overview
 
-This application is an artwork services management platform enabling clients to request and designers to deliver custom artwork. It streamlines the artwork creation workflow, including file management, status tracking, commenting, and designer assignment. The project aims to provide a robust, full-stack web solution for managing a creative services business, supporting a diverse user base with role-based access and detailed reporting.
+This application is an artwork services management platform designed to streamline the custom artwork creation workflow. It connects clients who request services with designers who deliver them, managing everything from file exchange and status tracking to commenting and designer assignment. The platform aims to be a robust, full-stack web solution for creative services businesses, offering role-based access, comprehensive reporting, and efficient project management capabilities.
 
 # User Preferences
 
@@ -10,196 +10,58 @@ Preferred communication style: Simple, everyday language.
 
 ## Technology Stack
 
-- **Frontend**: React with TypeScript, Vite, shadcn/ui (Radix UI), and Tailwind CSS.
-- **Backend**: Express.js with TypeScript and Node.js.
-- **Database**: PostgreSQL (Neon serverless) with Drizzle ORM.
-- **File Storage**: Google Cloud Storage, integrated via Replit's sidecar authentication, with a custom ACL system.
-- **State Management**: TanStack Query for server state.
-- **Routing**: Wouter for client-side routing.
-- **Session Management**: Express-session for user authentication.
+The application uses a monorepo structure comprising a React frontend with TypeScript, Vite, shadcn/ui (Radix UI), and Tailwind CSS. The backend is an Express.js API built with TypeScript and Node.js. PostgreSQL (Neon serverless) with Drizzle ORM handles database operations. Google Cloud Storage, integrated via Replit's sidecar authentication, is used for file storage with a custom ACL system. TanStack Query manages server state, Wouter handles client-side routing, and Express-session provides user authentication.
 
-## Project Structure
+## Core Features
 
-A monorepo structure with `client/` (React app), `server/` (Express API), and `shared/` (database schema). Path aliases (`@/`, `@shared/`, `@assets/`) are used for clean imports.
-
-## Database Schema
-
-Four main tables:
-- **Users**: User accounts with authentication, roles (client, designer, admin), and UUIDs.
-- **Services**: Catalog of artwork services with pricing and status.
-- **Service Requests**: Core entity for client orders, including status, designer assignment, due dates, and change requests.
-- **Service Attachments**: File references linked to service requests.
-- **Comments**: Discussion threads on service requests.
-
-All tables use UUID primary keys.
-
-## API Design
-
-RESTful API endpoints manage users, services, service requests (CRUD, assignment, delivery, attachments, comments), and object storage. JSON is used for data exchange, with robust error handling.
-
-## Authentication & Authorization
-
-- **Session-based Authentication**: `express-session` manages user sessions and roles.
-- **Role-based Access Control**: Five roles (Admin, Internal Designer, Vendor, Vendor Designer, Client) with distinct permissions, including user management, service request visibility, and pricing access.
-- **Object-level ACL**: Custom system for Google Cloud Storage files, defining owner, visibility, and group permissions.
-
-## User Management
-
-- **User Management Page**: Admins, Internal Designers, and Vendors can search, filter, invite, activate/deactivate users, and configure client payment methods (Admin only).
-- **Vendor Profile Page**: Vendors manage company info, team members, pricing agreements, and SLAs.
-
-## File Upload Strategy
-
-Client-side direct uploads to Google Cloud Storage using presigned URLs, enhancing performance and scalability. A custom `FileUploader` component provides UI and progress tracking.
-
-## State Management Pattern
-
-TanStack Query manages server data, caching, and synchronization. Optimistic updates and strategic cache invalidation are employed.
-
-## UI Component Architecture
-
-- **Design System**: shadcn/ui components (Radix UI + Tailwind CSS) for consistency and accessibility.
-- **Custom Theming**: CSS variables for color palette and typography.
-- **Responsive Design**: Mobile-first approach with `useIsMobile` hook.
-
-## Reports Module
-
-Role-based access to reports (Admin, Client, Vendor).
-- **Reports Hub**: Central page for role-specific reports.
-- **Services Profit Report (Admin only)**: Comprehensive financial report with summaries, filters (vendor, service, date), search (client, job ID), and a detailed data table. Pricing calculations consider retail price, vendor cost, and exception rules.
-- **Vendor Payments Report (Admin and Vendor)**: Monthly payment tracking for vendor-completed jobs.
-  - **Schema Fields**: `vendorPaymentStatus`, `vendorPaymentPeriod`, `vendorPaymentMarkedAt`, `vendorPaymentMarkedBy`, `vendorCost` on both `serviceRequests` and `bundleRequests`.
-  - **Filtering Logic**: Jobs appear based on `vendorPaymentPeriod` if set, otherwise `deliveredAt` month. Only delivered jobs are included.
-  - **Role Access**: Admin has full access with "Mark as Paid" functionality; Vendor has read-only access to their own jobs.
-  - **Exclusions**: Jobs assigned to admin or internal_designer roles have $0 cost and are excluded from payment reports.
-  - **Exports**: CSV and PDF exports with job details, vendor names, and payment status.
-  - **API Endpoints**: `GET /api/reports/vendor-payments`, `POST /api/reports/vendor-payments/mark-paid`, `GET /api/reports/vendor-payments/jobs`.
-  - **Packs Tab**: Shows pack subscriptions where vendors have completed jobs, with mark-as-paid functionality.
-- **Pack Profit Report (Admin only)**: Financial analysis for monthly pack subscriptions.
-  - Revenue, vendor cost, and profit margin calculations per pack subscription
-  - Monthly period filtering
-  - Summary totals with CSV/PDF export
-- **Royalties Deduction Report (Admin and Client)**: Tracks services and packs billed via "Deduct from Royalties" payment method.
-  - Two tabs: Services and Packs
-  - Monthly period filtering
-  - Client-scoped views for client role
-- **Refund Management (Admin only)**: Issue and manage refunds for ad-hoc service requests and bundles.
-  - **Refund Types**: Full (complete refund), Partial (custom amount), Manual (non-Stripe)
-  - **Database Table**: `refunds` with fields for requestType, amounts, reason, status, Stripe integration
-  - **Stripe Integration**: Direct refund processing via Stripe Refunds API using existing payment intent IDs
-  - **Refund Workflow**: Select client → Choose job → Set refund type/amount → Submit → Process via Stripe (or record manual)
-  - **Status Tracking**: pending → processing → completed/failed with error messages
-  - **Job-Level Integration**: "Refund" button on service request and bundle detail pages (admin only, when finalPrice exists)
-  - **API Endpoints**: `GET /api/refunds`, `POST /api/refunds`, `POST /api/refunds/:id/process`, `GET /api/refunds/refundable/:clientId`
-- **Client Invoicing Report (Admin only)**: View and generate client billing summaries by month.
-  - **Billing Logic by Payment Method**:
-    - Pay-as-you-Go: Services SUBMITTED within the selected month
-    - Monthly Payment: Services DELIVERED within the selected month
-    - Deduct from Royalties: Services DELIVERED within the selected month
-    - Monthly Packs: Subscriptions with startDate or renewal date in the month
-  - **Summary View**: One row per client with ad-hoc count/total, bundle count/total, pack count/total, grand total
-  - **Detail Modal**: Itemized breakdown of all charges for a client
-  - **Filters**: Month selector (last 24 months), payment method filter, client search
-  - **Exports**: Summary CSV download, individual invoice text file download
-  - **API Endpoints**: `GET /api/reports/client-invoicing`, `GET /api/reports/client-invoicing/:clientId/detail`
-
-## Role-Specific Dashboards
-
-The Admin Dashboard (`/dashboard`) provides analytics with role-based views:
-
-### Sections by Role
-| Section | Admin | Internal Designer | Vendor | Vendor Designer |
-|---------|-------|-------------------|--------|-----------------|
-| Date Range Selector | Yes | Yes | Yes | Yes |
-| Job Operations KPIs | Yes (all jobs) | Yes (all jobs) | Yes (vendor jobs) | Yes (own jobs) |
-| Pack Jobs KPIs | Yes (all packs) | Yes (all packs) | Yes (vendor packs) | Yes (own packs) |
-| Financial Performance | Yes | No | No | No |
-| Top Drivers | Yes | No | No | No |
-| Daily Sales Chart | Yes | No | No | No |
-| Daily Orders Chart | Yes | Yes | Yes | Yes |
-
-### Financial Performance Sections (Admin Only)
-- **Services & Bundles**: Sales, Orders, Avg Order, Vendor Cost, Profit, Margin
-- **Monthly Packs**: Pack Revenue, Pack Profit, Pack Margin
-- **Combined Totals**: Total Revenue, Total Profit, Total Margin
-
-### API Endpoints
-- **`GET /api/dashboard/summary`**: Returns job status counts, financial metrics (admin only), comparison percentages
-- **`GET /api/dashboard/daily-orders`**: Returns daily order counts for chart visualization
-
-### Data Filtering
-- **Admin/Internal Designer**: Access to all jobs system-wide
-- **Vendor**: Filtered by `vendorAssigneeId` matching the vendor's `vendorId` (or `userId` fallback)
-- **Vendor Designer**: Filtered by `assigneeId` matching the user's ID
-
-### Date Range Presets
-11 preset options: Today, Yesterday, Last 7 Days, Last 30 Days, Last 90 Days, Last 365 Days, This Month, Last Month, This Year, Last Year, Custom Range. Uses `startOfDay`/`endOfDay` from date-fns for precision.
-
-## Job Auto-Assignment Engine (Phase 3 Complete)
-
-Fully functional automation engine for automatic job routing based on vendor/designer capacity and configurable rules, with complete frontend management UI.
-
-### Backend (Phases 1-2)
-- **Database Tables**: `vendorServiceCapacities`, `vendorDesignerCapacities`, `automationRules`, `automationAssignmentLogs`.
-- **Service Request Extensions**: Fields like `autoAssignmentStatus`, `lastAutomationRunAt`, `lastAutomationNote`, `lockedAssignment`.
-- **API Endpoints**: Manage capacities and automation rules.
-- **Authorization**: Granular access control for automation configuration based on user roles.
-- **Routing Strategies**: `least_loaded`, `round_robin`, `priority_first` - all implemented with fair distribution.
-- **Automation Scopes**: `global` (admin) and `vendor` (vendor-managed).
-- **Automation Engine** (`server/services/automationEngine.ts`): Processes new service requests, matches against active rules, selects vendors/designers based on capacity and routing strategy, logs all decisions for audit trail.
-- **Auto-Trigger**: Automatically invoked on service request creation when no manual assignment is provided.
-
-### Frontend (Phase 3)
-- **AutomationSettingsTab** (`client/src/components/AutomationSettings.tsx`): Admin interface for global automation rules CRUD - create, edit, delete rules with vendor selection, service filters, routing strategy, and priority configuration.
-- **Settings.tsx Automation Tab**: Admin-only access to global automation rules management.
-- **VendorProfile.tsx Automation Tab**: Vendors manage their service capacities (daily capacity, priority, routing strategy) and designer capacities (per-designer service assignments with primary flag).
-
-## Client Company Management (Phase 7)
-
-Simplified client company entity for pack subscriptions and vendor assignments.
-
-### Database Schema
-- **clientCompanies**: Entity for company-wide pack subscriptions and vendor assignments.
-  - Fields: `name`, `industry`, `website`, `email`, `phone`, `address`, `primaryContactId`, `defaultVendorId`, `paymentConfiguration`, `notes`, `isActive`.
-  - Links users via `users.clientCompanyId` foreign key.
-- **clientPackSubscriptions**: Supports `clientCompanyId` for company-level subscriptions.
-
-### API Endpoints
-- **`GET /api/org-companies`**: List all client companies (Admin only).
-- **`GET /api/org-companies/:id`**: Get single company with members and contact info.
-- **`POST /api/org-companies`**: Create new client company.
-- **`PATCH /api/org-companies/:id`**: Update company details.
-- **`DELETE /api/org-companies/:id`**: Soft delete company.
-
-### Frontend
-- **OrgCompanies.tsx** (`/org-companies`): Admin page for managing client companies.
-- **Navigation**: "Client Companies" link in header (Admin only).
-
-### Company-Level Features
-- **Pack Subscriptions**: Support `clientCompanyId` for company-wide subscriptions.
-- **Vendor Assignment**: `defaultVendorId` on companies for automatic vendor routing.
-- **Payment Configuration**: Company-level payment method (pay_as_you_go, monthly_payment, deduct_from_royalties).
+-   **Database Schema**: Features `Users` (with roles), `Services`, `Service Requests` (core entity with status, assignments, attachments, comments), and `Service Attachments` tables, all using UUIDs.
+-   **API Design**: A RESTful API manages all core entities, utilizing JSON for data exchange and robust error handling.
+-   **Authentication & Authorization**: Session-based authentication with `express-session` and role-based access control for five distinct roles (Admin, Internal Designer, Vendor, Vendor Designer, Client). A custom object-level ACL system is implemented for Google Cloud Storage.
+-   **User Management**: Admins, Internal Designers, and Vendors can manage users, including invitations, activation/deactivation, and client payment configurations. Vendors manage their company profiles, team members, pricing, and SLAs.
+-   **File Management**: Client-side direct uploads to Google Cloud Storage using presigned URLs, supported by a custom `FileUploader` component.
+-   **State Management**: TanStack Query is used for server data management, including caching, synchronization, optimistic updates, and cache invalidation.
+-   **UI Component Architecture**: Leverages `shadcn/ui` for a consistent design system, custom CSS variable theming, and responsive design with a mobile-first approach.
+-   **Reports Module**: Provides role-based access to various reports:
+    -   **Services Profit Report (Admin)**: Financial overview of services.
+    -   **Vendor Payments Report (Admin & Vendor)**: Tracks monthly payments for vendor jobs, with "Mark as Paid" functionality for Admins.
+    -   **Pack Profit Report (Admin)**: Financial analysis for pack subscriptions.
+    -   **Royalties Deduction Report (Admin & Client)**: Tracks services and packs billed via "Deduct from Royalties."
+    -   **Refund Management (Admin)**: Manages full, partial, and manual refunds, integrated with Stripe.
+    -   **Client Invoicing Report (Admin)**: Generates client billing summaries based on payment methods.
+-   **Role-Specific Dashboards**: Provide tailored analytics and KPIs based on user roles, including job operations, pack jobs, financial performance (Admin only), and daily order charts.
+-   **Job Auto-Assignment Engine**: Automates job routing based on vendor/designer capacity and configurable rules. It supports `least_loaded`, `round_robin`, and `priority_first` strategies, with both global (Admin) and vendor-specific automation scopes. A frontend UI allows for CRUD operations on automation rules and capacity management.
+-   **Client Company Management**: Introduces a `clientCompanies` entity to manage company-wide pack subscriptions, default vendor assignments, and payment configurations.
 
 # External Dependencies
 
 ## Cloud Services
 
-- **Google Cloud Storage**: For file storage, using the Node.js client library.
-- **Neon Database**: Serverless PostgreSQL.
+-   **Google Cloud Storage**: Used for storing all project files.
+-   **Neon Database**: Provides serverless PostgreSQL database hosting.
 
 ## Authentication Infrastructure
 
-- **Replit Sidecar**: Provides OAuth token exchange for Google Cloud Platform services.
+-   **Replit Sidecar**: Facilitates OAuth token exchange for accessing Google Cloud Platform services.
 
 ## Key Third-party Libraries
 
-- **Drizzle ORM**: Type-safe ORM with `drizzle-kit` and `drizzle-zod`.
-- **React Hook Form & Zod**: For type-safe form validation.
-- **date-fns**: For date manipulation.
-- **Uppy**: File upload framework for client-side uploads.
+-   **Drizzle ORM**: Type-safe ORM for database interactions.
+-   **React Hook Form & Zod**: For form validation and schema definition.
+-   **date-fns**: For efficient date manipulation.
+-   **Uppy**: A versatile file uploader for client-side file handling.
+
+## Notifications & Email System
+
+-   **SendGrid**: Integrated for sending transactional emails using a suite of 37 branded HTML templates.
+-   **In-app Notifications**: A comprehensive system providing real-time user alerts and a central notification bell component.
 
 ## Environment Configuration
 
-- `DATABASE_URL`: PostgreSQL connection string.
-- `SESSION_SECRET`: Secret key for session signing.
-- `PUBLIC_OBJECT_SEARCH_PATHS`: Optional public object access paths.
+-   **DATABASE_URL**: PostgreSQL connection string.
+-   **SESSION_SECRET**: Secret for session management.
+-   **PUBLIC_OBJECT_SEARCH_PATHS**: Optional paths for public object access.
+-   **SENDGRID_API_KEY**: API key for SendGrid.
+-   **SENDGRID_SENDER_EMAIL**: Email address for outbound communications (e.g., services@tri-pod.com).
+-   **SENDGRID_SENDER_NAME**: Display name for the sender.
+-   **SUPPORT_EMAIL**: Email for customer support.
+-   **PLATFORM_URL**: Base URL of the application for generating links in emails.
