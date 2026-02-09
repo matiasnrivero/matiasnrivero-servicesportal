@@ -19,6 +19,7 @@ import { Search, Loader2, FileText, Package } from "lucide-react";
 import type { User } from "@shared/schema";
 import { useState, useEffect, useRef } from "react";
 import { NotificationBell } from "@/components/NotificationBell";
+import logoImg from "@assets/left_alligned_(3)_1770668014068.png";
 
 type UserSession = {
   userId: string;
@@ -185,17 +186,16 @@ export function Header() {
           </Button>
         </div>
       )}
-    <header className="flex w-full items-center justify-between gap-4 px-4 py-3 bg-white shadow-shadow-top-bar">
-      <div className="flex items-center gap-4">
+    <header className="flex w-full items-center justify-between gap-2 px-3 py-2 bg-white shadow-shadow-top-bar">
+      <div className="flex items-center gap-2">
         <Link href={isAdmin ? "/dashboard" : "/"}>
-          <h1 className="font-title-semibold text-dark-blue-night text-lg cursor-pointer whitespace-nowrap" data-testid="link-services-portal">
-            Services Portal
-          </h1>
+          <img src={logoImg} alt="Tri-Pod Services" className="h-8 cursor-pointer" data-testid="link-services-portal" />
         </Link>
-        <nav className="flex items-center gap-3">
+        <nav className="flex items-center gap-1">
           {(isAdmin || isInternalDesigner || isVendor || isVendorDesigner) && (
             <Link href="/dashboard">
               <Button
+                size="sm"
                 variant={location === "/dashboard" ? "default" : "ghost"}
                 className={location === "/dashboard" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-dashboard"
@@ -207,6 +207,7 @@ export function Header() {
           {canViewServices && (
             <Link href="/">
               <Button
+                size="sm"
                 variant={location === "/" ? "default" : "ghost"}
                 className={location === "/" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-services"
@@ -217,6 +218,7 @@ export function Header() {
           )}
           <Link href="/service-requests">
             <Button
+              size="sm"
               variant={location.startsWith("/service-requests") && location !== "/service-requests/new" ? "default" : "ghost"}
               className={location.startsWith("/service-requests") && location !== "/service-requests/new" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
               data-testid="nav-requests"
@@ -227,6 +229,7 @@ export function Header() {
           {(isAdmin || isInternalDesigner) && (
             <Link href="/pack-assignment">
               <Button
+                size="sm"
                 variant={location === "/pack-assignment" ? "default" : "ghost"}
                 className={location === "/pack-assignment" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-pack-assignment"
@@ -238,6 +241,7 @@ export function Header() {
           {canManageUsers && (
             <Link href="/users">
               <Button
+                size="sm"
                 variant={location === "/users" ? "default" : "ghost"}
                 className={location === "/users" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-users"
@@ -249,6 +253,7 @@ export function Header() {
           {isClient && (
             <Link href="/client-team">
               <Button
+                size="sm"
                 variant={location === "/client-team" ? "default" : "ghost"}
                 className={location === "/client-team" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-client-team"
@@ -260,6 +265,7 @@ export function Header() {
           {canViewPayments && (
             <Link href="/payments">
               <Button
+                size="sm"
                 variant={location === "/payments" ? "default" : "ghost"}
                 className={location === "/payments" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-payments"
@@ -271,6 +277,7 @@ export function Header() {
           {canViewVendorProfile && (
             <Link href="/vendor-profile">
               <Button
+                size="sm"
                 variant={location === "/vendor-profile" ? "default" : "ghost"}
                 className={location === "/vendor-profile" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-vendor-profile"
@@ -282,6 +289,7 @@ export function Header() {
           {canViewVendorsList && (
             <Link href="/vendors">
               <Button
+                size="sm"
                 variant={location.startsWith("/vendors") ? "default" : "ghost"}
                 className={location.startsWith("/vendors") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-vendors"
@@ -293,6 +301,7 @@ export function Header() {
           {canViewClientCompanies && (
             <Link href="/org-companies">
               <Button
+                size="sm"
                 variant={location.startsWith("/org-companies") ? "default" : "ghost"}
                 className={location.startsWith("/org-companies") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-companies"
@@ -304,6 +313,7 @@ export function Header() {
           {(isAdmin || isInternalDesigner) && (
             <Link href="/settings">
               <Button
+                size="sm"
                 variant={location.startsWith("/settings") ? "default" : "ghost"}
                 className={location.startsWith("/settings") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-settings"
@@ -315,6 +325,7 @@ export function Header() {
           {canViewReports && (
             <Link href="/reports">
               <Button
+                size="sm"
                 variant={location.startsWith("/reports") ? "default" : "ghost"}
                 className={location.startsWith("/reports") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-reports"
@@ -326,7 +337,7 @@ export function Header() {
         </nav>
       </div>
       {currentUser && !currentUser.impersonating && (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Popover open={searchOpen} onOpenChange={setSearchOpen}>
             <PopoverTrigger asChild>
               <div className="relative">
@@ -345,7 +356,7 @@ export function Header() {
                       setSearchOpen(true);
                     }
                   }}
-                  className="w-36 pl-8"
+                  className="w-32 pl-8"
                   data-testid="input-global-search"
                 />
               </div>
@@ -385,7 +396,7 @@ export function Header() {
             </PopoverContent>
           </Popover>
           <NotificationBell />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <Select
               value={(() => {
                 // Map username to switcher value for all roles
@@ -412,7 +423,7 @@ export function Header() {
               })()}
               onValueChange={(role) => switchRoleMutation.mutate(role)}
             >
-              <SelectTrigger className="w-36" data-testid="select-role-switcher">
+              <SelectTrigger className="w-32" data-testid="select-role-switcher">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
