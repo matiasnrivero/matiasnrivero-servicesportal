@@ -1107,7 +1107,7 @@ export default function ServiceRequestsList() {
               </div>
 
               {currentUser?.role === "internal_designer" && (
-                <div className="space-y-2 flex items-center gap-2">
+                <div className="flex items-center gap-2 self-end pb-2">
                   <Checkbox
                     id="hide-pack-requests"
                     checked={hidePackRequests}
