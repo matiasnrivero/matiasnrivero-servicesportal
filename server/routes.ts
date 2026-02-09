@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { createHash } from "crypto";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { automationEngine } from "./services/automationEngine";
@@ -222,6 +223,20 @@ async function resolveVendorProfileId(user: User): Promise<string | null> {
     return profile?.id || null;
   }
   return null;
+}
+
+function computeRequestHash(userId: string, endpoint: string, body: Record<string, any>): string {
+  const relevantFields: Record<string, any> = {};
+  if (endpoint === "/api/service-requests") {
+    relevantFields.serviceId = body.serviceId || "";
+    relevantFields.formData = body.formData ? JSON.stringify(body.formData) : "";
+    relevantFields.orderNumber = body.orderNumber || "";
+  } else if (endpoint === "/api/bundle-requests") {
+    relevantFields.bundleId = body.bundleId || "";
+    relevantFields.formData = body.formData ? JSON.stringify(body.formData) : "";
+  }
+  const raw = `${userId}:${endpoint}:${JSON.stringify(relevantFields)}`;
+  return createHash("sha256").update(raw).digest("hex");
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -667,6 +682,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "User not found" });
       }
 
+      // === IDEMPOTENCY CHECK ===
+      const submissionToken = req.body.submissionToken || req.headers["idempotency-key"];
+      if (submissionToken) {
+        const existingKey = await storage.getIdempotencyKey(submissionToken as string);
+        if (existingKey) {
+          if (existingKey.status === "success" && existingKey.resultId) {
+            const existingRequest = await storage.getServiceRequest(existingKey.resultId);
+            if (existingRequest) {
+              return res.status(200).json({
+                ...existingRequest,
+                _duplicate: true,
+                _message: "This request was already submitted successfully.",
+              });
+            }
+          }
+          if (existingKey.status === "processing") {
+            return res.status(202).json({
+              _processing: true,
+              _message: "Your request is still being processed. Please wait.",
+            });
+          }
+          if (existingKey.status === "failed") {
+            await storage.updateIdempotencyKey(submissionToken as string, { status: "processing" });
+          }
+        }
+      }
+
+      const requestHash = computeRequestHash(sessionUserId, "/api/service-requests", req.body);
+
+      if (submissionToken) {
+        const existingKey = await storage.getIdempotencyKey(submissionToken as string);
+        if (!existingKey) {
+          try {
+            await storage.createIdempotencyKey({
+              key: submissionToken as string,
+              userId: sessionUserId,
+              endpoint: "/api/service-requests",
+              status: "processing",
+              requestHash,
+            });
+          } catch (keyError: any) {
+            if (keyError?.message?.includes("unique") || keyError?.message?.includes("duplicate")) {
+              return res.status(409).json({
+                error: "Duplicate submission detected. Please wait for the previous request to complete.",
+                code: "DUPLICATE_SUBMISSION",
+              });
+            }
+            throw keyError;
+          }
+        }
+      } else {
+        const recentDuplicate = await storage.findRecentDuplicateRequest(sessionUserId, requestHash, 60);
+        if (recentDuplicate && recentDuplicate.resultId && !req.body.skipDuplicateCheck) {
+          const existingRequest = await storage.getServiceRequest(recentDuplicate.resultId);
+          if (existingRequest) {
+            return res.status(409).json({
+              error: "A similar request was submitted recently.",
+              code: "POSSIBLE_DUPLICATE",
+              existingRequestId: existingRequest.id,
+              existingOrderNumber: existingRequest.orderNumber,
+            });
+          }
+        }
+      }
+      // === END IDEMPOTENCY CHECK ===
+
       // Check if client has payment overdue - block new service requests for clients with overdue payments
       if (["client", "client_member"].includes(sessionUser.role) && sessionUser.clientProfileId) {
         const clientProfile = await storage.getClientProfileById(sessionUser.clientProfileId);
@@ -1047,8 +1128,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Notification error (non-blocking):", notifError);
       }
 
+      if (submissionToken) {
+        try {
+          await storage.updateIdempotencyKey(submissionToken as string, {
+            status: "success",
+            resultId: request.id,
+          });
+        } catch (idempError) {
+          console.error("Failed to update idempotency key:", idempError);
+        }
+      } else {
+        try {
+          await storage.createIdempotencyKey({
+            key: `auto-${request.id}`,
+            userId: sessionUserId,
+            endpoint: "/api/service-requests",
+            status: "success",
+            resultId: request.id,
+            requestHash,
+          });
+        } catch (idempError) {
+          console.error("Failed to create auto idempotency key:", idempError);
+        }
+      }
+
       res.status(201).json(request);
     } catch (error) {
+      if (req.body.submissionToken) {
+        try {
+          await storage.updateIdempotencyKey(req.body.submissionToken, { status: "failed" });
+        } catch (idempError) {
+          console.error("Failed to mark idempotency key as failed:", idempError);
+        }
+      }
       console.error("Error creating service request:", error);
       res.status(500).json({ error: "Failed to create service request", details: error instanceof Error ? error.message : String(error) });
     }
@@ -6513,6 +6625,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "User not found" });
       }
 
+      // === IDEMPOTENCY CHECK ===
+      const submissionToken = req.body.submissionToken || req.headers["idempotency-key"];
+      if (submissionToken) {
+        const existingKey = await storage.getIdempotencyKey(submissionToken as string);
+        if (existingKey) {
+          if (existingKey.status === "success" && existingKey.resultId) {
+            const existingRequest = await storage.getBundleRequest(existingKey.resultId);
+            if (existingRequest) {
+              return res.status(200).json({
+                ...existingRequest,
+                _duplicate: true,
+                _message: "This request was already submitted successfully.",
+              });
+            }
+          }
+          if (existingKey.status === "processing") {
+            return res.status(202).json({
+              _processing: true,
+              _message: "Your request is still being processed. Please wait.",
+            });
+          }
+          if (existingKey.status === "failed") {
+            await storage.updateIdempotencyKey(submissionToken as string, { status: "processing" });
+          }
+        }
+      }
+
+      const requestHash = computeRequestHash(sessionUserId, "/api/bundle-requests", req.body);
+
+      if (submissionToken) {
+        const existingKey = await storage.getIdempotencyKey(submissionToken as string);
+        if (!existingKey) {
+          try {
+            await storage.createIdempotencyKey({
+              key: submissionToken as string,
+              userId: sessionUserId,
+              endpoint: "/api/bundle-requests",
+              status: "processing",
+              requestHash,
+            });
+          } catch (keyError: any) {
+            if (keyError?.message?.includes("unique") || keyError?.message?.includes("duplicate")) {
+              return res.status(409).json({
+                error: "Duplicate submission detected. Please wait for the previous request to complete.",
+                code: "DUPLICATE_SUBMISSION",
+              });
+            }
+            throw keyError;
+          }
+        }
+      } else {
+        const recentDuplicate = await storage.findRecentDuplicateRequest(sessionUserId, requestHash, 60);
+        if (recentDuplicate && recentDuplicate.resultId && !req.body.skipDuplicateCheck) {
+          const existingRequest = await storage.getBundleRequest(recentDuplicate.resultId);
+          if (existingRequest) {
+            return res.status(409).json({
+              error: "A similar request was submitted recently.",
+              code: "POSSIBLE_DUPLICATE",
+              existingRequestId: existingRequest.id,
+              existingOrderNumber: (existingRequest as any).orderNumber || existingRequest.id,
+            });
+          }
+        }
+      }
+      // === END IDEMPOTENCY CHECK ===
+
       // Check if client has payment overdue - block new bundle requests for clients with overdue payments
       if (["client", "client_member"].includes(sessionUser.role) && sessionUser.clientProfileId) {
         const clientProfile = await storage.getClientProfileById(sessionUser.clientProfileId);
@@ -6669,8 +6847,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      if (submissionToken) {
+        try {
+          await storage.updateIdempotencyKey(submissionToken as string, {
+            status: "success",
+            resultId: request.id,
+          });
+        } catch (idempError) {
+          console.error("Failed to update idempotency key:", idempError);
+        }
+      } else {
+        try {
+          await storage.createIdempotencyKey({
+            key: `auto-${request.id}`,
+            userId: sessionUserId,
+            endpoint: "/api/bundle-requests",
+            status: "success",
+            resultId: request.id,
+            requestHash,
+          });
+        } catch (idempError) {
+          console.error("Failed to create auto idempotency key:", idempError);
+        }
+      }
+
       res.status(201).json(request);
     } catch (error) {
+      if (req.body.submissionToken) {
+        try {
+          await storage.updateIdempotencyKey(req.body.submissionToken, { status: "failed" });
+        } catch (idempError) {
+          console.error("Failed to mark idempotency key as failed:", idempError);
+        }
+      }
       console.error("Error creating bundle request:", error);
       res.status(500).json({ error: "Failed to create bundle request", details: error instanceof Error ? error.message : String(error) });
     }

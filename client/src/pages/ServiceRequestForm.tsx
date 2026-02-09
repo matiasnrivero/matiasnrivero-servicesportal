@@ -96,16 +96,33 @@ async function getDefaultUser(): Promise<CurrentUser> {
   return response.json();
 }
 
-async function createServiceRequest(data: InsertServiceRequest) {
+async function createServiceRequest(data: InsertServiceRequest & { submissionToken?: string }) {
   const response = await fetch("/api/service-requests", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  if (!response.ok) {
-    throw new Error("Failed to create service request");
+  const result = await response.json();
+  if (response.status === 409 && result.code === "DUPLICATE_SUBMISSION") {
+    throw new Error("DUPLICATE_SUBMISSION");
   }
-  return response.json();
+  if (response.status === 409 && result.code === "POSSIBLE_DUPLICATE") {
+    const err = new Error("POSSIBLE_DUPLICATE") as any;
+    err.existingRequestId = result.existingRequestId;
+    err.existingOrderNumber = result.existingOrderNumber;
+    throw err;
+  }
+  if (result._duplicate) {
+    return { ...result, _alreadySubmitted: true };
+  }
+  if (!response.ok) {
+    throw new Error(result.error || "Failed to create service request");
+  }
+  return result;
+}
+
+function generateSubmissionToken(): string {
+  return crypto.randomUUID();
 }
 
 const SERVICE_ORDER = [
@@ -342,6 +359,7 @@ export default function ServiceRequestForm() {
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, Array<{ url: string; name: string }>>>({});
   const [calculatedPrice, setCalculatedPrice] = useState<number>(0);
   const [selectedAssignee, setSelectedAssignee] = useState<string>("");
+  const [submissionToken, setSubmissionToken] = useState<string>(() => generateSubmissionToken());
   
   const [couponCode, setCouponCode] = useState<string>("");
   const [validatedCoupon, setValidatedCoupon] = useState<{
@@ -442,10 +460,13 @@ export default function ServiceRequestForm() {
 
   const mutation = useMutation({
     mutationFn: createServiceRequest,
-    onSuccess: () => {
+    onSuccess: (result) => {
+      const isDuplicate = result?._alreadySubmitted;
       toast({
-        title: "Success",
-        description: "Service request created successfully",
+        title: isDuplicate ? "Already Submitted" : "Success",
+        description: isDuplicate
+          ? "This request was already submitted. Redirecting to your jobs."
+          : "Service request created successfully",
       });
       reset();
       setSelectedServiceId("");
@@ -455,13 +476,32 @@ export default function ServiceRequestForm() {
       setThreadColorInput("");
       setThreadColorChips([]);
       setSelectedAddOns(new Set());
+      setSubmissionToken(generateSubmissionToken());
       queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
       navigate("/service-requests");
     },
-    onError: () => {
+    onError: (error: Error) => {
+      if (error.message === "DUPLICATE_SUBMISSION") {
+        toast({
+          title: "Duplicate Submission",
+          description: "This request is already being processed. Please wait.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (error.message === "POSSIBLE_DUPLICATE") {
+        const err = error as any;
+        toast({
+          title: "Possible Duplicate",
+          description: `A similar request (${err.existingOrderNumber || err.existingRequestId}) was just submitted. Check your jobs before resubmitting.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      setSubmissionToken(generateSubmissionToken());
       toast({
         title: "Error",
-        description: "Failed to create service request",
+        description: error.message || "Failed to create service request",
         variant: "destructive",
       });
     },
@@ -615,7 +655,8 @@ export default function ServiceRequestForm() {
         discountCouponCode: validatedCoupon?.code || null,
         discountAmount: discountAmount > 0 ? discountAmount.toFixed(2) : null,
         finalPrice: discountedFinalPrice > 0 ? discountedFinalPrice.toFixed(2) : (calculatedPrice > 0 ? calculatedPrice.toFixed(2) : null),
-      });
+        submissionToken,
+      } as any);
     } catch (error) {
       toast({
         title: "Error",

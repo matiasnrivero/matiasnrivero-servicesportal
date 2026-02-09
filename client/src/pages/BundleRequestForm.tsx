@@ -79,17 +79,33 @@ async function getDefaultUser(): Promise<CurrentUser> {
   return response.json();
 }
 
-async function createBundleRequest(data: InsertBundleRequest) {
+async function createBundleRequest(data: InsertBundleRequest & { submissionToken?: string }) {
   const response = await fetch("/api/bundle-requests", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || "Failed to create bundle request");
+  const result = await response.json();
+  if (response.status === 409 && result.code === "DUPLICATE_SUBMISSION") {
+    throw new Error("DUPLICATE_SUBMISSION");
   }
-  return response.json();
+  if (response.status === 409 && result.code === "POSSIBLE_DUPLICATE") {
+    const err = new Error("POSSIBLE_DUPLICATE") as any;
+    err.existingRequestId = result.existingRequestId;
+    err.existingOrderNumber = result.existingOrderNumber;
+    throw err;
+  }
+  if (result._duplicate) {
+    return { ...result, _alreadySubmitted: true };
+  }
+  if (!response.ok) {
+    throw new Error(result.error || "Failed to create bundle request");
+  }
+  return result;
+}
+
+function generateSubmissionToken(): string {
+  return crypto.randomUUID();
 }
 
 export default function BundleRequestForm() {
@@ -99,6 +115,7 @@ export default function BundleRequestForm() {
   const { toast } = useToast();
 
   const [formData, setFormData] = useState<Record<string, any>>({});
+  const [submissionToken, setSubmissionToken] = useState<string>(() => generateSubmissionToken());
   const [bundleHeaderData, setBundleHeaderData] = useState<Record<string, any>>({});
   const [selectedAssignee, setSelectedAssignee] = useState<string>("");
   
@@ -159,14 +176,36 @@ export default function BundleRequestForm() {
       return await createBundleRequest(data);
     },
     onSuccess: (result) => {
+      const isDuplicate = result?._alreadySubmitted;
       queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] });
       toast({
-        title: "Request Submitted",
-        description: "Your bundle request has been submitted successfully.",
+        title: isDuplicate ? "Already Submitted" : "Request Submitted",
+        description: isDuplicate
+          ? "This request was already submitted. Redirecting to your jobs."
+          : "Your bundle request has been submitted successfully.",
       });
+      setSubmissionToken(generateSubmissionToken());
       setLocation("/service-requests?tab=bundle");
     },
     onError: (error: Error) => {
+      if (error.message === "DUPLICATE_SUBMISSION") {
+        toast({
+          title: "Duplicate Submission",
+          description: "This request is already being processed. Please wait.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (error.message === "POSSIBLE_DUPLICATE") {
+        const err = error as any;
+        toast({
+          title: "Possible Duplicate",
+          description: `A similar request (${err.existingOrderNumber || err.existingRequestId}) was just submitted. Check your jobs before resubmitting.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      setSubmissionToken(generateSubmissionToken());
       toast({
         title: "Error",
         description: error.message || "Failed to submit bundle request.",
@@ -303,9 +342,10 @@ export default function BundleRequestForm() {
       discountCouponCode: validatedCoupon?.code || null,
       discountAmount: discountAmount > 0 ? discountAmount.toFixed(2) : null,
       finalPrice: finalPrice.toFixed(2),
+      submissionToken,
     };
 
-    createMutation.mutate(requestData as InsertBundleRequest);
+    createMutation.mutate(requestData as unknown as InsertBundleRequest);
   };
 
   if (isLoadingStructure) {

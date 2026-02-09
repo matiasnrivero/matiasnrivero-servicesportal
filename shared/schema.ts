@@ -1468,6 +1468,35 @@ export type Refund = typeof refunds.$inferSelect;
 
 // ==================== END REFUND MANAGEMENT ====================
 
+// ==================== IDEMPOTENCY KEYS (Duplicate Submission Prevention) ====================
+
+export const idempotencyKeyStatuses = ["processing", "success", "failed"] as const;
+export type IdempotencyKeyStatus = typeof idempotencyKeyStatuses[number];
+
+export const idempotencyKeys = pgTable("idempotency_keys", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: varchar("key").notNull().unique(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  endpoint: text("endpoint").notNull(),
+  status: text("status").notNull().default("processing"),
+  resultId: varchar("result_id"),
+  requestHash: text("request_hash"),
+  responseData: jsonb("response_data"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertIdempotencyKeySchema = createInsertSchema(idempotencyKeys).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertIdempotencyKey = z.infer<typeof insertIdempotencyKeySchema>;
+export type IdempotencyKey = typeof idempotencyKeys.$inferSelect;
+
+// ==================== END IDEMPOTENCY KEYS ====================
+
 // Billing address structure for Stripe integration
 export type BillingAddress = {
   line1: string;

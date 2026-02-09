@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { eq, desc, and, or, isNull, inArray } from "drizzle-orm";
+import { eq, desc, and, or, isNull, inArray, gte } from "drizzle-orm";
 import {
   type User,
   type InsertUser,
@@ -101,6 +101,8 @@ import {
   type Refund,
   type InsertRefund,
   type UpdateRefund,
+  type IdempotencyKey,
+  type InsertIdempotencyKey,
   type MonthlyBillingRecord,
   type InsertMonthlyBillingRecord,
   type UpdateMonthlyBillingRecord,
@@ -148,6 +150,7 @@ import {
   clientMonthlyPackSubscriptions,
   monthlyPackUsage,
   refunds,
+  idempotencyKeys,
   monthlyBillingRecords,
   adminNotifications,
   notifications,
@@ -489,6 +492,12 @@ export interface IStorage {
   getRefundsByBundleRequest(bundleRequestId: string): Promise<Refund[]>;
   createRefund(data: InsertRefund): Promise<Refund>;
   updateRefund(id: string, data: UpdateRefund): Promise<Refund | undefined>;
+
+  // Idempotency key methods
+  getIdempotencyKey(key: string): Promise<IdempotencyKey | undefined>;
+  createIdempotencyKey(data: InsertIdempotencyKey): Promise<IdempotencyKey>;
+  updateIdempotencyKey(key: string, data: Partial<InsertIdempotencyKey>): Promise<IdempotencyKey | undefined>;
+  findRecentDuplicateRequest(userId: string, requestHash: string, withinSeconds: number): Promise<IdempotencyKey | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -2262,6 +2271,38 @@ export class DbStorage implements IStorage {
       .set({ ...data, updatedAt: new Date() })
       .where(eq(refunds.id, id))
       .returning();
+    return result[0];
+  }
+
+  async getIdempotencyKey(key: string): Promise<IdempotencyKey | undefined> {
+    const result = await db.select().from(idempotencyKeys).where(eq(idempotencyKeys.key, key)).limit(1);
+    return result[0];
+  }
+
+  async createIdempotencyKey(data: InsertIdempotencyKey): Promise<IdempotencyKey> {
+    const result = await db.insert(idempotencyKeys).values(data).returning();
+    return result[0];
+  }
+
+  async updateIdempotencyKey(key: string, data: Partial<InsertIdempotencyKey>): Promise<IdempotencyKey | undefined> {
+    const result = await db.update(idempotencyKeys)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(idempotencyKeys.key, key))
+      .returning();
+    return result[0];
+  }
+
+  async findRecentDuplicateRequest(userId: string, requestHash: string, withinSeconds: number): Promise<IdempotencyKey | undefined> {
+    const cutoff = new Date(Date.now() - withinSeconds * 1000);
+    const result = await db.select().from(idempotencyKeys)
+      .where(and(
+        eq(idempotencyKeys.userId, userId),
+        eq(idempotencyKeys.requestHash, requestHash),
+        eq(idempotencyKeys.status, "success"),
+        gte(idempotencyKeys.createdAt, cutoff),
+      ))
+      .orderBy(desc(idempotencyKeys.createdAt))
+      .limit(1);
     return result[0];
   }
 }
