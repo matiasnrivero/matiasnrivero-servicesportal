@@ -386,7 +386,7 @@ export default function VendorSlaReport() {
                           ))}
                         </Pie>
                         <RechartsTooltip />
-                        <Legend />
+                        <Legend verticalAlign="top" height={36} />
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
@@ -416,7 +416,7 @@ export default function VendorSlaReport() {
                         />
                         <YAxis allowDecimals={false} />
                         <RechartsTooltip />
-                        <Legend />
+                        <Legend verticalAlign="top" height={36} />
                         <Bar dataKey="onTime" name="On Time" fill="#22c55e" stackId="a" />
                         <Bar dataKey="overSla" name="Over SLA" fill="#ef4444" stackId="a" />
                         <Bar dataKey="pending" name="Pending" fill="#94a3b8" stackId="a" />
@@ -488,14 +488,14 @@ export default function VendorSlaReport() {
                             </TableCell>
                             <TableCell>
                               {job.onTime === true && (
-                                <Badge className="bg-green-100 text-green-700 border-green-200 no-default-hover-elevate no-default-active-elevate">
-                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                <Badge className="bg-green-100 text-green-700 border-green-200 whitespace-nowrap no-default-hover-elevate no-default-active-elevate">
+                                  <CheckCircle2 className="h-3 w-3 mr-1 shrink-0" />
                                   On Time
                                 </Badge>
                               )}
                               {job.onTime === false && (
-                                <Badge className="bg-red-100 text-red-700 border-red-200 no-default-hover-elevate no-default-active-elevate">
-                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                <Badge className="bg-red-100 text-red-700 border-red-200 whitespace-nowrap no-default-hover-elevate no-default-active-elevate">
+                                  <AlertTriangle className="h-3 w-3 mr-1 shrink-0" />
                                   Over SLA
                                 </Badge>
                               )}
