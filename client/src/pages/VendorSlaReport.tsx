@@ -173,15 +173,23 @@ export default function VendorSlaReport() {
     queryKey: ["/api/services"],
   });
 
-  const allServiceTypeNames = useMemo(() => {
-    const names = new Set<string>();
+  const { adHocNames, bundleNames } = useMemo(() => {
+    const serviceNames = new Set<string>();
+    const bundleNamesSet = new Set<string>();
     if (allServices) {
-      allServices.forEach(s => names.add(s.title));
+      allServices.forEach(s => serviceNames.add(s.title));
     }
     if (data) {
-      data.jobs.forEach(j => names.add(j.serviceName));
+      data.jobs.forEach(j => {
+        if (j.type === "bundle") {
+          bundleNamesSet.add(j.serviceName);
+        }
+      });
     }
-    return Array.from(names).sort();
+    return {
+      adHocNames: Array.from(serviceNames).sort(),
+      bundleNames: Array.from(bundleNamesSet).sort(),
+    };
   }, [allServices, data]);
 
   const handleExportCSV = () => {
@@ -272,15 +280,15 @@ export default function VendorSlaReport() {
                 />
               </div>
               <div>
-                <Label className="text-sm text-muted-foreground mb-1.5 block">Job Type</Label>
+                <Label className="text-sm text-muted-foreground mb-1.5 block">Service Method</Label>
                 <Select value={jobType} onValueChange={setJobType}>
                   <SelectTrigger data-testid="select-job-type">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Jobs</SelectItem>
-                    <SelectItem value="services">Services Only</SelectItem>
-                    <SelectItem value="bundles">Bundles Only</SelectItem>
+                    <SelectItem value="all">All Methods</SelectItem>
+                    <SelectItem value="services">Ad-hoc Service</SelectItem>
+                    <SelectItem value="bundles">Bundle Service</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -291,9 +299,18 @@ export default function VendorSlaReport() {
                     <SelectValue placeholder="All Types" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    {allServiceTypeNames.map(name => (
-                      <SelectItem key={name} value={name}>{name}</SelectItem>
+                    <SelectItem value="all">All Services</SelectItem>
+                    {adHocNames.length > 0 && (
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Ad-hoc Services</div>
+                    )}
+                    {adHocNames.map(name => (
+                      <SelectItem key={`service-${name}`} value={name}>{name}</SelectItem>
+                    ))}
+                    {bundleNames.length > 0 && (
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1 pt-1">Bundle Services</div>
+                    )}
+                    {bundleNames.map(name => (
+                      <SelectItem key={`bundle-${name}`} value={name}>{name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
