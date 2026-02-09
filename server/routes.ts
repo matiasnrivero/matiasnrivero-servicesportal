@@ -137,6 +137,93 @@ async function canAssignTo(assigner: User, target: User): Promise<{ allowed: boo
   return { allowed: true };
 }
 
+const TRIPOD_INTERNAL_VENDOR_PROFILE_ID = "tripod-internal-vendor-profile-001";
+
+/**
+ * Check if a vendor has a valid (non-zero) cost configured for a given service.
+ * Returns { valid: true } if the vendor can accept the job, or { valid: false, reason: string } if not.
+ * The Tri-POD Internal Vendor is always exempt from this check.
+ */
+async function checkVendorServiceCost(
+  vendorProfileId: string,
+  serviceTitle: string
+): Promise<{ valid: boolean; reason?: string }> {
+  // Tri-POD Internal Vendor is always exempt — internal employees don't have individual service costs
+  if (vendorProfileId === TRIPOD_INTERNAL_VENDOR_PROFILE_ID) {
+    return { valid: true };
+  }
+
+  const vendorProfile = await storage.getVendorProfileById(vendorProfileId);
+  if (!vendorProfile) {
+    return { valid: false, reason: "Vendor profile not found" };
+  }
+
+  if (!vendorProfile.pricingAgreements) {
+    return { valid: false, reason: `Cannot assign to this vendor — no cost has been configured for "${serviceTitle}". Please update the vendor's Cost tab first.` };
+  }
+
+  const agreements = vendorProfile.pricingAgreements as Record<string, any>;
+  const serviceAgreement = agreements[serviceTitle];
+
+  if (!serviceAgreement) {
+    return { valid: false, reason: `Cannot assign to this vendor — no cost has been configured for "${serviceTitle}". Please update the vendor's Cost tab first.` };
+  }
+
+  // Check basePrice for flat-rate services
+  if (serviceAgreement.basePrice !== undefined) {
+    const cost = parseFloat(String(serviceAgreement.basePrice));
+    if (!cost || cost <= 0) {
+      return { valid: false, reason: `Cannot assign to this vendor — the cost for "${serviceTitle}" is $0.00. Please update the vendor's Cost tab first.` };
+    }
+    return { valid: true };
+  }
+
+  // Check complexity-based services (e.g., Creative Art)
+  if (serviceAgreement.complexity) {
+    const complexityValues = Object.values(serviceAgreement.complexity) as (number | string)[];
+    const hasAnyNonZero = complexityValues.some(v => {
+      const num = parseFloat(String(v));
+      return num > 0;
+    });
+    if (!hasAnyNonZero) {
+      return { valid: false, reason: `Cannot assign to this vendor — all complexity costs for "${serviceTitle}" are $0.00. Please update the vendor's Cost tab first.` };
+    }
+    return { valid: true };
+  }
+
+  // Check quantity-based services (e.g., Store Creation)
+  if (serviceAgreement.quantity) {
+    const quantityValues = Object.values(serviceAgreement.quantity) as (number | string)[];
+    const hasAnyNonZero = quantityValues.some(v => {
+      const num = parseFloat(String(v));
+      return num > 0;
+    });
+    if (!hasAnyNonZero) {
+      return { valid: false, reason: `Cannot assign to this vendor — all quantity costs for "${serviceTitle}" are $0.00. Please update the vendor's Cost tab first.` };
+    }
+    return { valid: true };
+  }
+
+  // If service agreement exists but has no recognizable cost structure, block it
+  return { valid: false, reason: `Cannot assign to this vendor — no cost has been configured for "${serviceTitle}". Please update the vendor's Cost tab first.` };
+}
+
+/**
+ * Resolve the vendor profile ID for a user (vendor or vendor_designer).
+ * Returns the profile ID or null if not found.
+ */
+async function resolveVendorProfileId(user: User): Promise<string | null> {
+  if (user.role === "vendor") {
+    const profile = await storage.getVendorProfile(user.id);
+    return profile?.id || null;
+  }
+  if (user.role === "vendor_designer" && user.vendorId) {
+    const profile = await storage.getVendorProfile(user.vendorId);
+    return profile?.id || null;
+  }
+  return null;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Users routes
   app.get("/api/users", async (req, res) => {
@@ -826,6 +913,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         delete requestData.discountCouponId;
       }
 
+      // Vendor cost validation during creation: block if assigning to a vendor/designer with $0 cost
+      if (hasManualAssignment && req.body.serviceId) {
+        const serviceForCostCheck = await storage.getService(req.body.serviceId);
+        if (serviceForCostCheck) {
+          const assignTargetId = requestData.assigneeId || requestData.vendorAssigneeId;
+          if (assignTargetId) {
+            const assignTarget = await storage.getUser(assignTargetId);
+            if (assignTarget && ["vendor", "vendor_designer"].includes(assignTarget.role)) {
+              const vpId = await resolveVendorProfileId(assignTarget);
+              if (vpId) {
+                const costCheckResult = await checkVendorServiceCost(vpId, serviceForCostCheck.title);
+                if (!costCheckResult.valid) {
+                  return res.status(400).json({ error: costCheckResult.reason });
+                }
+              }
+            }
+          }
+        }
+      }
+
       let request = await storage.createServiceRequest(requestData);
 
       // If a discount coupon was used, increment the usage counter
@@ -1050,6 +1157,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: assignmentCheck.reason || "You cannot assign to this user" });
       }
 
+      // Vendor cost validation: block assignment if vendor has $0 cost for this service
+      if (["vendor", "vendor_designer"].includes(targetDesigner.role) && existingRequest.serviceId) {
+        const service = await storage.getService(existingRequest.serviceId);
+        if (service) {
+          const vendorProfileId = await resolveVendorProfileId(targetDesigner);
+          if (vendorProfileId) {
+            const costCheck = await checkVendorServiceCost(vendorProfileId, service.title);
+            if (!costCheck.valid) {
+              return res.status(400).json({ error: costCheck.reason });
+            }
+          }
+        }
+      }
+
       const isSelfAssignment = targetDesignerId === sessionUserId;
       
       let request;
@@ -1205,6 +1326,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Target user must be a vendor" });
       }
 
+      // Vendor cost validation: block assignment if vendor has $0 cost for this service
+      if (existingRequest.serviceId) {
+        const service = await storage.getService(existingRequest.serviceId);
+        if (service) {
+          const vendorProfileId = await resolveVendorProfileId(targetVendor);
+          if (vendorProfileId) {
+            const costCheck = await checkVendorServiceCost(vendorProfileId, service.title);
+            if (!costCheck.valid) {
+              return res.status(400).json({ error: costCheck.reason });
+            }
+          }
+        }
+      }
+
       const request = await storage.assignVendor(req.params.id, vendorId);
 
       try {
@@ -1347,6 +1482,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (request.assigneeId) {
               results.skipped.push({ id: requestId, reason: "Already assigned to a designer" });
               continue;
+            }
+          }
+
+          // Vendor cost validation for bulk assignment
+          if (!isBundle && ["vendor", "vendor_designer"].includes(target.role)) {
+            const fullRequest = await storage.getServiceRequest(requestId);
+            if (fullRequest?.serviceId) {
+              const bulkService = await storage.getService(fullRequest.serviceId);
+              if (bulkService) {
+                const bulkVendorProfileId = await resolveVendorProfileId(target);
+                if (bulkVendorProfileId) {
+                  const bulkCostCheck = await checkVendorServiceCost(bulkVendorProfileId, bulkService.title);
+                  if (!bulkCostCheck.valid) {
+                    results.skipped.push({ id: requestId, reason: bulkCostCheck.reason || "Vendor has no cost configured for this service" });
+                    continue;
+                  }
+                }
+              }
             }
           }
 

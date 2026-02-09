@@ -11,6 +11,20 @@ import type {
   RoutingStrategy,
 } from "@shared/schema";
 
+const TRIPOD_INTERNAL_VENDOR_PROFILE_ID = "tripod-internal-vendor-profile-001";
+
+function hasValidServiceCost(vendorProfile: VendorProfile, serviceTitle: string): boolean {
+  if (vendorProfile.id === TRIPOD_INTERNAL_VENDOR_PROFILE_ID) return true;
+  if (!vendorProfile.pricingAgreements) return false;
+  const agreements = vendorProfile.pricingAgreements as Record<string, any>;
+  const sa = agreements[serviceTitle];
+  if (!sa) return false;
+  if (sa.basePrice !== undefined) return parseFloat(String(sa.basePrice)) > 0;
+  if (sa.complexity) return Object.values(sa.complexity).some((v: any) => parseFloat(String(v)) > 0);
+  if (sa.quantity) return Object.values(sa.quantity).some((v: any) => parseFloat(String(v)) > 0);
+  return false;
+}
+
 interface AutomationResult {
   success: boolean;
   status: AutoAssignmentStatus;
@@ -203,6 +217,9 @@ export class AutomationEngine {
     const allProfiles = await storage.getAllVendorProfiles();
     const profileMap = new Map(allProfiles.map(p => [p.id, p]));
 
+    const service = request.serviceId ? await storage.getService(request.serviceId) : null;
+    const serviceTitle = service?.title;
+
     for (const capacity of serviceCapacities) {
       const profile = profileMap.get(capacity.vendorProfileId);
       if (!profile) continue;
@@ -213,6 +230,9 @@ export class AutomationEngine {
       if (excludedVendorIds && excludedVendorIds.length > 0) {
         if (excludedVendorIds.includes(profile.userId)) continue;
       }
+
+      if (serviceTitle && !hasValidServiceCost(profile, serviceTitle)) continue;
+      if (!serviceTitle && profile.id !== TRIPOD_INTERNAL_VENDOR_PROFILE_ID) continue;
 
       const currentLoad = await this.getVendorDailyLoad(profile.userId, request.serviceId);
       const availableCapacity = capacity.dailyCapacity - currentLoad;
