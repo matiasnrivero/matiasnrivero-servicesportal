@@ -169,10 +169,14 @@ export default function VendorSlaReport() {
     ];
   }, [filteredSummary]);
 
+  const { data: allServices } = useQuery<{ id: string; title: string }[]>({
+    queryKey: ["/api/services"],
+  });
+
   const allServiceTypeNames = useMemo(() => {
-    if (!data) return [];
-    return Array.from(new Set(data.jobs.map(j => j.serviceName))).sort();
-  }, [data]);
+    if (!allServices) return [];
+    return allServices.map(s => s.title).sort();
+  }, [allServices]);
 
   const handleExportCSV = () => {
     if (!filteredJobs.length) return;
