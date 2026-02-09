@@ -301,6 +301,7 @@ export function DynamicFormField({
       case "file":
         return (
           <FileUploader
+            maxFiles={valueMode === "single" ? 1 : undefined}
             onUploadComplete={(url, name) => onFileUpload?.(fieldKey, url, name)}
             onFileRemove={(fileName) => onFileRemove?.(fieldKey, fileName)}
           />

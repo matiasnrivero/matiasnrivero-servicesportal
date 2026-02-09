@@ -7,6 +7,7 @@ import { ImagePreviewTooltip } from "@/components/ImagePreviewTooltip";
 interface FileUploaderProps {
   maxFileSize?: number;
   acceptedTypes?: string;
+  maxFiles?: number;
   onUploadComplete?: (fileUrl: string, fileName: string) => void;
   onFileRemove?: (fileName: string) => void;
 }
@@ -19,6 +20,7 @@ interface UploadedFile {
 export function FileUploader({
   maxFileSize = 10485760,
   acceptedTypes = "image/*,.pdf,.ai,.eps,.svg,.psd",
+  maxFiles,
   onUploadComplete,
   onFileRemove,
 }: FileUploaderProps) {
@@ -29,6 +31,9 @@ export function FileUploader({
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [totalFiles, setTotalFiles] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isSingleMode = maxFiles === 1;
+  const hasReachedLimit = maxFiles !== undefined && uploadedFiles.length >= maxFiles;
 
   const uploadSingleFile = async (file: File): Promise<UploadedFile | null> => {
     if (file.size > maxFileSize) {
@@ -86,24 +91,40 @@ export function FileUploader({
     if (!files || files.length === 0) return;
 
     setError(null);
+
+    const remainingSlots = maxFiles !== undefined ? maxFiles - uploadedFiles.length : Infinity;
+    if (remainingSlots <= 0) {
+      setError(isSingleMode ? "Only one file is allowed. Remove the existing file first." : `Maximum ${maxFiles} files allowed.`);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    const filesToUpload = Array.from(files).slice(0, remainingSlots);
+    if (files.length > filesToUpload.length) {
+      setError(isSingleMode
+        ? "Only one file is allowed. Only the first file was uploaded."
+        : `Only ${remainingSlots} more file(s) allowed. Extra files were skipped.`
+      );
+    }
+
     setUploading(true);
-    setTotalFiles(files.length);
+    setTotalFiles(filesToUpload.length);
     setCurrentFileIndex(0);
     setProgress(0);
 
     const newFiles: UploadedFile[] = [];
 
-    for (let i = 0; i < files.length; i++) {
+    for (let i = 0; i < filesToUpload.length; i++) {
       setCurrentFileIndex(i + 1);
-      setProgress(Math.round(((i + 0.5) / files.length) * 100));
+      setProgress(Math.round(((i + 0.5) / filesToUpload.length) * 100));
       
-      const result = await uploadSingleFile(files[i]);
+      const result = await uploadSingleFile(filesToUpload[i]);
       if (result) {
         newFiles.push(result);
         onUploadComplete?.(result.url, result.name);
       }
       
-      setProgress(Math.round(((i + 1) / files.length) * 100));
+      setProgress(Math.round(((i + 1) / filesToUpload.length) * 100));
     }
 
     setUploadedFiles((prev) => [...prev, ...newFiles]);
@@ -134,43 +155,45 @@ export function FileUploader({
         ref={fileInputRef}
         type="file"
         accept={acceptedTypes}
-        multiple
+        multiple={!isSingleMode}
         onChange={handleFileSelect}
         className="hidden"
       />
 
-      <div
-        onClick={() => !uploading && fileInputRef.current?.click()}
-        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-          uploading
-            ? "border-gray-300 bg-gray-50 cursor-not-allowed"
-            : "border-sky-blue-accent hover:border-sky-blue-accent/80 hover:bg-blue-lavender"
-        }`}
-      >
-        {uploading ? (
-          <div className="space-y-3">
-            <div className="flex justify-center">
-              <Upload className="h-8 w-8 text-sky-blue-accent animate-pulse" />
+      {!hasReachedLimit && (
+        <div
+          onClick={() => !uploading && fileInputRef.current?.click()}
+          className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+            uploading
+              ? "border-gray-300 bg-gray-50 cursor-not-allowed"
+              : "border-sky-blue-accent hover:border-sky-blue-accent/80 hover:bg-blue-lavender"
+          }`}
+        >
+          {uploading ? (
+            <div className="space-y-3">
+              <div className="flex justify-center">
+                <Upload className="h-8 w-8 text-sky-blue-accent animate-pulse" />
+              </div>
+              <p className="text-sm text-dark-gray">
+                Uploading {currentFileIndex} of {totalFiles}...
+              </p>
+              <Progress value={progress} className="h-2 w-full max-w-xs mx-auto" />
             </div>
-            <p className="text-sm text-dark-gray">
-              Uploading {currentFileIndex} of {totalFiles}...
-            </p>
-            <Progress value={progress} className="h-2 w-full max-w-xs mx-auto" />
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <div className="flex justify-center">
-              <Upload className="h-8 w-8 text-sky-blue-accent" />
+          ) : (
+            <div className="space-y-2">
+              <div className="flex justify-center">
+                <Upload className="h-8 w-8 text-sky-blue-accent" />
+              </div>
+              <p className="text-sm font-medium text-dark-blue-night">
+                Click to upload artwork file
+              </p>
+              <p className="text-xs text-dark-gray">
+                Supports images, PDF, AI, EPS, SVG, PSD (max {Math.round(maxFileSize / 1024 / 1024)}MB)
+              </p>
             </div>
-            <p className="text-sm font-medium text-dark-blue-night">
-              Click to upload artwork file
-            </p>
-            <p className="text-xs text-dark-gray">
-              Supports images, PDF, AI, EPS, SVG, PSD (max {Math.round(maxFileSize / 1024 / 1024)}MB)
-            </p>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="text-sm text-red-500 flex items-center gap-2">
