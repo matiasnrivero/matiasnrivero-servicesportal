@@ -12731,6 +12731,257 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== VENDOR SLA REPORT ====================
+  app.get("/api/reports/vendor-sla", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const { vendorId, dateFrom, dateTo, jobType } = req.query;
+
+      const allServiceRequests = await storage.getAllServiceRequests();
+      const allBundleRequests = await storage.getAllBundleRequests();
+      const allUsers = await storage.getAllUsers();
+      const allServices = await storage.getAllServices();
+      const allBundles = await storage.getAllBundles();
+      const vendorProfiles = await storage.getAllVendorProfiles();
+
+      const userMap: Record<string, typeof allUsers[0]> = {};
+      allUsers.forEach(u => { userMap[u.id] = u; });
+      const serviceMap: Record<string, typeof allServices[0]> = {};
+      allServices.forEach(s => { serviceMap[s.id] = s; });
+      const bundleMap: Record<string, typeof allBundles[0]> = {};
+      allBundles.forEach(b => { bundleMap[b.id] = b; });
+      const vendorProfileMap: Record<string, typeof vendorProfiles[0]> = {};
+      vendorProfiles.forEach(v => { vendorProfileMap[v.userId] = v; });
+
+      const vendors = allUsers
+        .filter(u => u.role === "vendor" && u.isActive)
+        .map(u => ({
+          id: u.id,
+          username: u.username,
+          companyName: vendorProfileMap[u.id]?.companyName || u.username,
+        }));
+
+      const getSlaHours = (profile: typeof vendorProfiles[0] | undefined, serviceTitle: string): number | null => {
+        if (!profile || !profile.slaConfig) return null;
+        const config = profile.slaConfig as Record<string, { days: number; hours?: number }>;
+        const entry = config[serviceTitle];
+        if (!entry) return null;
+        return (entry.days || 0) * 24 + (entry.hours || 0);
+      };
+
+      const getBundleSlaHours = async (profile: typeof vendorProfiles[0] | undefined, bundleId: string): Promise<number | null> => {
+        if (!profile || !profile.slaConfig) return null;
+        const config = profile.slaConfig as Record<string, { days: number; hours?: number }>;
+        const bundleItems = await storage.getBundleItems(bundleId);
+        let maxHours = 0;
+        let found = false;
+        for (const item of bundleItems) {
+          if (item.serviceId) {
+            const svc = serviceMap[item.serviceId];
+            if (svc) {
+              const entry = config[svc.title];
+              if (entry) {
+                found = true;
+                const h = (entry.days || 0) * 24 + (entry.hours || 0);
+                if (h > maxHours) maxHours = h;
+              }
+            }
+          }
+        }
+        return found ? maxHours : null;
+      };
+
+      type SlaJobRow = {
+        id: string;
+        type: "service" | "bundle";
+        serviceName: string;
+        orderNumber: string | null;
+        vendorName: string;
+        vendorId: string;
+        assignedAt: string | null;
+        deliveredAt: string | null;
+        slaTargetHours: number | null;
+        actualHours: number | null;
+        onTime: boolean | null;
+        hadChangeRequest: boolean;
+        changeRequestCount: number;
+        status: string;
+      };
+
+      const jobs: SlaJobRow[] = [];
+
+      const dateFromFilter = dateFrom ? new Date(dateFrom as string) : null;
+      const dateToFilter = dateTo ? new Date(dateTo as string) : null;
+      if (dateToFilter) {
+        dateToFilter.setHours(23, 59, 59, 999);
+      }
+
+      if (jobType !== "bundles") {
+        for (const sr of allServiceRequests) {
+          if (!sr.vendorAssigneeId) continue;
+          if (vendorId && sr.vendorAssigneeId !== vendorId) continue;
+          if (!sr.vendorAssignedAt) continue;
+
+          const assignedDate = new Date(sr.vendorAssignedAt);
+          if (dateFromFilter && assignedDate < dateFromFilter) continue;
+          if (dateToFilter && assignedDate > dateToFilter) continue;
+
+          const service = serviceMap[sr.serviceId];
+          const serviceName = service?.title || "Unknown Service";
+          const vendorProfile = vendorProfileMap[sr.vendorAssigneeId];
+          const vendorUser = userMap[sr.vendorAssigneeId];
+          const slaTargetHours = getSlaHours(vendorProfile, serviceName);
+
+          let deliveredAt: Date | null = null;
+          let actualHours: number | null = null;
+          let onTime: boolean | null = null;
+
+          const deliveries = await storage.getDeliveriesByRequest(sr.id);
+          const firstDelivery = deliveries.length > 0
+            ? deliveries.reduce((a, b) => new Date(a.deliveredAt).getTime() < new Date(b.deliveredAt).getTime() ? a : b)
+            : null;
+
+          if (firstDelivery) {
+            deliveredAt = new Date(firstDelivery.deliveredAt);
+            actualHours = (deliveredAt.getTime() - assignedDate.getTime()) / (1000 * 60 * 60);
+            if (slaTargetHours !== null) {
+              onTime = actualHours <= slaTargetHours;
+            }
+          } else if (sr.deliveredAt) {
+            deliveredAt = new Date(sr.deliveredAt);
+            actualHours = (deliveredAt.getTime() - assignedDate.getTime()) / (1000 * 60 * 60);
+            if (slaTargetHours !== null) {
+              onTime = actualHours <= slaTargetHours;
+            }
+          }
+
+          const changeRequestCount = deliveries.length > 1 ? deliveries.length - 1 : 0;
+          const hadChangeRequest = changeRequestCount > 0 || sr.status === "change-request";
+
+          jobs.push({
+            id: sr.id,
+            type: "service",
+            serviceName,
+            orderNumber: sr.orderNumber,
+            vendorName: vendorProfile?.companyName || vendorUser?.username || "Unknown",
+            vendorId: sr.vendorAssigneeId,
+            assignedAt: sr.vendorAssignedAt ? new Date(sr.vendorAssignedAt).toISOString() : null,
+            deliveredAt: deliveredAt ? deliveredAt.toISOString() : null,
+            slaTargetHours,
+            actualHours: actualHours !== null ? Math.round(actualHours * 100) / 100 : null,
+            onTime,
+            hadChangeRequest,
+            changeRequestCount,
+            status: sr.status,
+          });
+        }
+      }
+
+      if (jobType !== "services") {
+        for (const br of allBundleRequests) {
+          if (!br.vendorAssigneeId) continue;
+          if (vendorId && br.vendorAssigneeId !== vendorId) continue;
+          if (!br.vendorAssignedAt) continue;
+
+          const assignedDate = new Date(br.vendorAssignedAt);
+          if (dateFromFilter && assignedDate < dateFromFilter) continue;
+          if (dateToFilter && assignedDate > dateToFilter) continue;
+
+          const bundle = bundleMap[br.bundleId];
+          const bundleName = bundle?.name || "Unknown Bundle";
+          const vendorProfile = vendorProfileMap[br.vendorAssigneeId];
+          const vendorUser = userMap[br.vendorAssigneeId];
+          const slaTargetHours = await getBundleSlaHours(vendorProfile, br.bundleId);
+
+          let deliveredAt: Date | null = null;
+          let actualHours: number | null = null;
+          let onTime: boolean | null = null;
+
+          if (br.deliveredAt) {
+            deliveredAt = new Date(br.deliveredAt);
+            actualHours = (deliveredAt.getTime() - assignedDate.getTime()) / (1000 * 60 * 60);
+            if (slaTargetHours !== null) {
+              onTime = actualHours <= slaTargetHours;
+            }
+          }
+
+          const hadChangeRequest = br.status === "change-request" || !!br.changeRequestNote;
+
+          jobs.push({
+            id: br.id,
+            type: "bundle",
+            serviceName: bundleName,
+            orderNumber: null,
+            vendorName: vendorProfile?.companyName || vendorUser?.username || "Unknown",
+            vendorId: br.vendorAssigneeId,
+            assignedAt: br.vendorAssignedAt ? new Date(br.vendorAssignedAt).toISOString() : null,
+            deliveredAt: deliveredAt ? deliveredAt.toISOString() : null,
+            slaTargetHours,
+            actualHours: actualHours !== null ? Math.round(actualHours * 100) / 100 : null,
+            onTime,
+            hadChangeRequest,
+            changeRequestCount: hadChangeRequest ? 1 : 0,
+            status: br.status,
+          });
+        }
+      }
+
+      const totalJobs = jobs.length;
+      const deliveredJobs = jobs.filter(j => j.deliveredAt !== null && j.slaTargetHours !== null);
+      const onTimeJobs = deliveredJobs.filter(j => j.onTime === true);
+      const overSlaJobs = deliveredJobs.filter(j => j.onTime === false);
+      const jobsWithChangeRequests = jobs.filter(j => j.hadChangeRequest);
+      const pendingJobs = jobs.filter(j => j.deliveredAt === null);
+
+      const serviceTypeBreakdown: Record<string, { total: number; onTime: number; overSla: number; pending: number }> = {};
+      for (const job of jobs) {
+        if (!serviceTypeBreakdown[job.serviceName]) {
+          serviceTypeBreakdown[job.serviceName] = { total: 0, onTime: 0, overSla: 0, pending: 0 };
+        }
+        serviceTypeBreakdown[job.serviceName].total++;
+        if (job.deliveredAt === null) {
+          serviceTypeBreakdown[job.serviceName].pending++;
+        } else if (job.onTime === true) {
+          serviceTypeBreakdown[job.serviceName].onTime++;
+        } else if (job.onTime === false) {
+          serviceTypeBreakdown[job.serviceName].overSla++;
+        }
+      }
+
+      const serviceTypes = Object.entries(serviceTypeBreakdown).map(([name, data]) => ({
+        name,
+        ...data,
+      }));
+
+      res.json({
+        vendors,
+        summary: {
+          totalJobs,
+          deliveredWithSla: deliveredJobs.length,
+          onTime: onTimeJobs.length,
+          overSla: overSlaJobs.length,
+          onTimePercentage: deliveredJobs.length > 0 ? Math.round((onTimeJobs.length / deliveredJobs.length) * 100) : 0,
+          overSlaPercentage: deliveredJobs.length > 0 ? Math.round((overSlaJobs.length / deliveredJobs.length) * 100) : 0,
+          changeRequests: jobsWithChangeRequests.length,
+          pending: pendingJobs.length,
+        },
+        serviceTypes,
+        jobs,
+      });
+    } catch (error) {
+      console.error("Error fetching vendor SLA report:", error);
+      res.status(500).json({ error: "Failed to fetch vendor SLA report" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

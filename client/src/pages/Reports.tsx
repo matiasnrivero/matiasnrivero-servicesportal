@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Header } from "@/components/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, DollarSign, Receipt, FileText, TrendingUp, Users, Package, RefreshCw } from "lucide-react";
+import { BarChart3, DollarSign, Receipt, FileText, TrendingUp, Users, Package, RefreshCw, Timer } from "lucide-react";
 
 interface CurrentUser {
   userId: string;
@@ -91,6 +91,14 @@ const reportCards: ReportCard[] = [
     icon: TrendingUp,
     path: "/reports/services-consumption",
     roles: ["client"],
+  },
+  {
+    id: "vendor-sla",
+    title: "Vendor SLA Performance",
+    description: "Track job delivery times vs SLA targets by vendor and service type",
+    icon: Timer,
+    path: "/reports/vendor-sla",
+    roles: ["admin"],
   },
   {
     id: "vendor-designer-workload",

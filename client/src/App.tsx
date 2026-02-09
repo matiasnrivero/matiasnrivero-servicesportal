@@ -36,6 +36,7 @@ import RefundManagement from "@/pages/RefundManagement";
 import BillingHistoryReport from "@/pages/BillingHistoryReport";
 import ClientInvoicingReport from "@/pages/ClientInvoicingReport";
 import ClientInvoiceView from "@/pages/ClientInvoiceView";
+import VendorSlaReport from "@/pages/VendorSlaReport";
 
 function Router() {
   return (
@@ -70,6 +71,7 @@ function Router() {
       <Route path="/reports/stripe-billing" component={BillingHistoryReport} />
       <Route path="/reports/client-invoicing" component={ClientInvoicingReport} />
       <Route path="/reports/my-invoices" component={ClientInvoiceView} />
+      <Route path="/reports/vendor-sla" component={VendorSlaReport} />
       <Route path="/client-team" component={ClientTeamManagement} />
       <Route path="/payments" component={Payments} />
       <Route path="/client-companies" component={ClientCompaniesList} />

@@ -28,6 +28,7 @@ The application uses a monorepo structure comprising a React frontend with TypeS
     -   **Royalties Deduction Report (Admin & Client)**: Tracks services and packs billed via "Deduct from Royalties."
     -   **Refund Management (Admin)**: Manages full, partial, and manual refunds, integrated with Stripe.
     -   **Client Invoicing Report (Admin)**: Generates client billing summaries based on payment methods.
+    -   **Vendor SLA Performance Report (Admin)**: Tracks job delivery times vs vendor SLA targets, with filters by vendor, date range, job type, and service type. Shows on-time vs over-SLA performance via pie/bar charts and a detailed job table. SLA is measured to first delivery; change requests tracked separately. Bundle SLA uses the longest SLA from component services.
 -   **Role-Specific Dashboards**: Provide tailored analytics and KPIs based on user roles, including job operations, pack jobs, financial performance (Admin only), and daily order charts.
 -   **Job Auto-Assignment Engine**: Automates job routing based on vendor/designer capacity and configurable rules. It supports `least_loaded`, `round_robin`, and `priority_first` strategies, with both global (Admin) and vendor-specific automation scopes. A frontend UI allows for CRUD operations on automation rules and capacity management.
 -   **Client Company Management**: Introduces a `clientCompanies` entity to manage company-wide pack subscriptions, default vendor assignments, and payment configurations.
