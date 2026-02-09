@@ -186,12 +186,11 @@ export function Header() {
           </Button>
         </div>
       )}
-    <header className="flex w-full items-center justify-between gap-2 px-3 py-2 bg-white shadow-shadow-top-bar">
-      <div className="flex items-center gap-2">
-        <Link href={isAdmin ? "/dashboard" : "/"}>
-          <img src={logoImg} alt="Tri-Pod Services" className="h-8 cursor-pointer" data-testid="link-services-portal" />
-        </Link>
-        <nav className="flex items-center gap-1">
+    <header className="flex w-full items-center gap-3 px-3 py-2 bg-white shadow-shadow-top-bar">
+      <Link href={isAdmin ? "/dashboard" : "/"} className="flex-shrink-0">
+        <img src={logoImg} alt="Tri-Pod Services" className="h-8 cursor-pointer" data-testid="link-services-portal" />
+      </Link>
+      <nav className="flex flex-1 items-center gap-2">
           {(isAdmin || isInternalDesigner || isVendor || isVendorDesigner) && (
             <Link href="/dashboard">
               <Button
@@ -334,10 +333,9 @@ export function Header() {
               </Button>
             </Link>
           )}
-        </nav>
-      </div>
+      </nav>
       {currentUser && !currentUser.impersonating && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <Popover open={searchOpen} onOpenChange={setSearchOpen}>
             <PopoverTrigger asChild>
               <div className="relative">
