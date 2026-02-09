@@ -159,22 +159,24 @@ async function checkVendorServiceCost(
     return { valid: false, reason: "Vendor profile not found" };
   }
 
+  const costMissingMsg = `Service Missing Cost assignment on Vendor Profile`;
+
   if (!vendorProfile.pricingAgreements) {
-    return { valid: false, reason: `Cannot assign to this vendor — no cost has been configured for "${serviceTitle}". Please update the vendor's Cost tab first.` };
+    return { valid: false, reason: costMissingMsg };
   }
 
   const agreements = vendorProfile.pricingAgreements as Record<string, any>;
   const serviceAgreement = agreements[serviceTitle];
 
   if (!serviceAgreement) {
-    return { valid: false, reason: `Cannot assign to this vendor — no cost has been configured for "${serviceTitle}". Please update the vendor's Cost tab first.` };
+    return { valid: false, reason: costMissingMsg };
   }
 
   // Check basePrice for flat-rate services
   if (serviceAgreement.basePrice !== undefined) {
     const cost = parseFloat(String(serviceAgreement.basePrice));
     if (!cost || cost <= 0) {
-      return { valid: false, reason: `Cannot assign to this vendor — the cost for "${serviceTitle}" is $0.00. Please update the vendor's Cost tab first.` };
+      return { valid: false, reason: costMissingMsg };
     }
     return { valid: true };
   }
@@ -187,7 +189,7 @@ async function checkVendorServiceCost(
       return num > 0;
     });
     if (!hasAnyNonZero) {
-      return { valid: false, reason: `Cannot assign to this vendor — all complexity costs for "${serviceTitle}" are $0.00. Please update the vendor's Cost tab first.` };
+      return { valid: false, reason: costMissingMsg };
     }
     return { valid: true };
   }
@@ -200,13 +202,13 @@ async function checkVendorServiceCost(
       return num > 0;
     });
     if (!hasAnyNonZero) {
-      return { valid: false, reason: `Cannot assign to this vendor — all quantity costs for "${serviceTitle}" are $0.00. Please update the vendor's Cost tab first.` };
+      return { valid: false, reason: costMissingMsg };
     }
     return { valid: true };
   }
 
   // If service agreement exists but has no recognizable cost structure, block it
-  return { valid: false, reason: `Cannot assign to this vendor — no cost has been configured for "${serviceTitle}". Please update the vendor's Cost tab first.` };
+  return { valid: false, reason: costMissingMsg };
 }
 
 /**

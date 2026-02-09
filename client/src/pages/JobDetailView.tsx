@@ -232,8 +232,8 @@ export default function JobDetailView() {
       setSelectedDesignerId("");
       toast({ title: "Job assigned", description: "The job has been assigned successfully." });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to assign job.", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to assign job.", variant: "destructive" });
     },
   });
 
@@ -263,8 +263,8 @@ export default function JobDetailView() {
       setSelectedVendorId("");
       toast({ title: "Vendor assigned", description: "The job has been assigned to the vendor organization." });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to assign vendor.", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to assign vendor.", variant: "destructive" });
     },
   });
 
