@@ -32,6 +32,7 @@ The application uses a monorepo structure comprising a React frontend with TypeS
 -   **Role-Specific Dashboards**: Provide tailored analytics and KPIs based on user roles, including job operations, pack jobs, financial performance (Admin only), and daily order charts.
 -   **Job Auto-Assignment Engine**: Automates job routing based on vendor/designer capacity and configurable rules. It supports `least_loaded`, `round_robin`, and `priority_first` strategies, with both global (Admin) and vendor-specific automation scopes. A frontend UI allows for CRUD operations on automation rules and capacity management.
 -   **Client Company Management**: Introduces a `clientCompanies` entity to manage company-wide pack subscriptions, default vendor assignments, and payment configurations.
+-   **Duplicate Submission Prevention**: Protects against double job submissions using two mechanisms: (1) idempotency tokens (UUID) generated client-side and validated server-side via the `idempotencyKeys` table with unique constraints, supporting processing/success/failed status lifecycle with retry on failure; (2) content-based duplicate detection using SHA-256 request hashing with a 60-second detection window for submissions without tokens.
 
 # External Dependencies
 
