@@ -174,9 +174,15 @@ export default function VendorSlaReport() {
   });
 
   const allServiceTypeNames = useMemo(() => {
-    if (!allServices) return [];
-    return allServices.map(s => s.title).sort();
-  }, [allServices]);
+    const names = new Set<string>();
+    if (allServices) {
+      allServices.forEach(s => names.add(s.title));
+    }
+    if (data) {
+      data.jobs.forEach(j => names.add(j.serviceName));
+    }
+    return Array.from(names).sort();
+  }, [allServices, data]);
 
   const handleExportCSV = () => {
     if (!filteredJobs.length) return;
