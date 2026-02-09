@@ -190,11 +190,10 @@ export function Header() {
       <Link href={isAdmin ? "/dashboard" : "/"} className="flex-shrink-0">
         <img src={logoImg} alt="Tri-Pod Services" className="h-8 cursor-pointer" data-testid="link-services-portal" />
       </Link>
-      <nav className="flex flex-1 items-center gap-2">
+      <nav className="flex flex-1 items-center gap-3">
           {(isAdmin || isInternalDesigner || isVendor || isVendorDesigner) && (
             <Link href="/dashboard">
               <Button
-                size="sm"
                 variant={location === "/dashboard" ? "default" : "ghost"}
                 className={location === "/dashboard" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-dashboard"
@@ -206,7 +205,6 @@ export function Header() {
           {canViewServices && (
             <Link href="/">
               <Button
-                size="sm"
                 variant={location === "/" ? "default" : "ghost"}
                 className={location === "/" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-services"
@@ -217,7 +215,6 @@ export function Header() {
           )}
           <Link href="/service-requests">
             <Button
-              size="sm"
               variant={location.startsWith("/service-requests") && location !== "/service-requests/new" ? "default" : "ghost"}
               className={location.startsWith("/service-requests") && location !== "/service-requests/new" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
               data-testid="nav-requests"
@@ -228,7 +225,6 @@ export function Header() {
           {(isAdmin || isInternalDesigner) && (
             <Link href="/pack-assignment">
               <Button
-                size="sm"
                 variant={location === "/pack-assignment" ? "default" : "ghost"}
                 className={location === "/pack-assignment" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-pack-assignment"
@@ -240,7 +236,6 @@ export function Header() {
           {canManageUsers && (
             <Link href="/users">
               <Button
-                size="sm"
                 variant={location === "/users" ? "default" : "ghost"}
                 className={location === "/users" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-users"
@@ -252,7 +247,6 @@ export function Header() {
           {isClient && (
             <Link href="/client-team">
               <Button
-                size="sm"
                 variant={location === "/client-team" ? "default" : "ghost"}
                 className={location === "/client-team" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-client-team"
@@ -264,7 +258,6 @@ export function Header() {
           {canViewPayments && (
             <Link href="/payments">
               <Button
-                size="sm"
                 variant={location === "/payments" ? "default" : "ghost"}
                 className={location === "/payments" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-payments"
@@ -276,7 +269,6 @@ export function Header() {
           {canViewVendorProfile && (
             <Link href="/vendor-profile">
               <Button
-                size="sm"
                 variant={location === "/vendor-profile" ? "default" : "ghost"}
                 className={location === "/vendor-profile" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-vendor-profile"
@@ -288,7 +280,6 @@ export function Header() {
           {canViewVendorsList && (
             <Link href="/vendors">
               <Button
-                size="sm"
                 variant={location.startsWith("/vendors") ? "default" : "ghost"}
                 className={location.startsWith("/vendors") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-vendors"
@@ -300,7 +291,6 @@ export function Header() {
           {canViewClientCompanies && (
             <Link href="/org-companies">
               <Button
-                size="sm"
                 variant={location.startsWith("/org-companies") ? "default" : "ghost"}
                 className={location.startsWith("/org-companies") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-companies"
@@ -312,7 +302,6 @@ export function Header() {
           {(isAdmin || isInternalDesigner) && (
             <Link href="/settings">
               <Button
-                size="sm"
                 variant={location.startsWith("/settings") ? "default" : "ghost"}
                 className={location.startsWith("/settings") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-settings"
@@ -324,7 +313,6 @@ export function Header() {
           {canViewReports && (
             <Link href="/reports">
               <Button
-                size="sm"
                 variant={location.startsWith("/reports") ? "default" : "ghost"}
                 className={location.startsWith("/reports") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
                 data-testid="nav-reports"
