@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useQuery, useMutation, useInfiniteQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
@@ -19,6 +19,12 @@ type Notification = {
   createdAt: string;
 };
 
+type DefaultUser = {
+  userId: string;
+  username: string;
+  role: string;
+};
+
 const PAGE_SIZE = 20;
 
 export function NotificationBell() {
@@ -26,9 +32,21 @@ export function NotificationBell() {
   const [, setLocation] = useLocation();
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const { data: currentUser } = useQuery<DefaultUser>({
+    queryKey: ["/api/default-user"],
+    queryFn: async () => {
+      const res = await fetch("/api/default-user");
+      if (!res.ok) throw new Error("Failed to get user");
+      return res.json();
+    },
+  });
+
+  const userId = currentUser?.userId;
+
   const { data: unreadCount } = useQuery<{ count: number }>({
-    queryKey: ["/api/notifications/unread-count"],
+    queryKey: ["/api/notifications/unread-count", userId],
     refetchInterval: 30000,
+    enabled: !!userId,
   });
 
   const {
@@ -39,7 +57,7 @@ export function NotificationBell() {
     isLoading,
     isError,
   } = useInfiniteQuery<Notification[]>({
-    queryKey: ["/api/notifications"],
+    queryKey: ["/api/notifications", userId],
     queryFn: async ({ pageParam }) => {
       const offset = pageParam as number;
       const res = await fetch(`/api/notifications?limit=${PAGE_SIZE}&offset=${offset}`);
@@ -51,7 +69,7 @@ export function NotificationBell() {
       if (lastPage.length < PAGE_SIZE) return undefined;
       return allPages.reduce((total, page) => total + page.length, 0);
     },
-    enabled: isOpen,
+    enabled: isOpen && !!userId,
   });
 
   const notifications = data?.pages.flat() ?? [];
@@ -61,8 +79,8 @@ export function NotificationBell() {
       await apiRequest("PATCH", `/api/notifications/${id}/read`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications", userId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count", userId] });
     },
   });
 
@@ -71,8 +89,8 @@ export function NotificationBell() {
       await apiRequest("PATCH", "/api/notifications/mark-all-read");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications", userId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count", userId] });
     },
   });
 
@@ -91,8 +109,12 @@ export function NotificationBell() {
       markAsReadMutation.mutate(notification.id);
     }
     if (notification.link) {
-      const url = new URL(notification.link, window.location.origin);
-      setLocation(url.pathname + url.search);
+      try {
+        const url = new URL(notification.link, window.location.origin);
+        setLocation(url.pathname + url.search);
+      } catch {
+        setLocation(notification.link);
+      }
     }
     setIsOpen(false);
   };

@@ -12692,10 +12692,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PATCH /api/notifications/read-all - mark all notifications as read for current user
+  // PATCH /api/notifications/mark-all-read - mark all notifications as read for current user
   // NOTE: This route MUST be registered BEFORE /api/notifications/:id/read
-  // to prevent Express from matching "read-all" as an :id parameter
-  app.patch("/api/notifications/read-all", async (req, res) => {
+  // to prevent Express from matching "mark-all-read" as an :id parameter
+  app.patch("/api/notifications/mark-all-read", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
       if (!sessionUserId) {
