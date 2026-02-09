@@ -403,8 +403,8 @@ export default function VendorSlaReport() {
                 </CardHeader>
                 <CardContent>
                   {filteredServiceTypes.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={280}>
-                      <BarChart data={filteredServiceTypes} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                    <ResponsiveContainer width="100%" height={340}>
+                      <BarChart data={filteredServiceTypes} margin={{ top: 5, right: 10, left: 0, bottom: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                         <XAxis
                           dataKey="name"
@@ -412,7 +412,7 @@ export default function VendorSlaReport() {
                           interval={0}
                           angle={-30}
                           textAnchor="end"
-                          height={60}
+                          height={90}
                         />
                         <YAxis allowDecimals={false} />
                         <RechartsTooltip />
