@@ -1209,11 +1209,11 @@ export default function ServiceRequestsList() {
                 <p className="font-body-reg text-dark-gray">No service requests found</p>
               </div>
             ) : (
-              <Table>
+              <Table className="table-fixed">
                 <TableHeader>
                   <TableRow>
                     {canBulkAssign && (
-                      <TableHead className="w-[40px]">
+                      <TableHead className="w-[36px]">
                         <Checkbox
                           checked={selectedRequests.size > 0 && selectedRequests.size === combinedFilteredRequests.length}
                           onCheckedChange={(checked) => {
@@ -1227,20 +1227,20 @@ export default function ServiceRequestsList() {
                         />
                       </TableHead>
                     )}
-                    <TableHead>Job ID</TableHead>
+                    <TableHead className="w-[70px]">Job ID</TableHead>
                     <TableHead>Service</TableHead>
-                    <TableHead>Method</TableHead>
-                    <TableHead>Priority</TableHead>
+                    <TableHead className="w-[64px]">Method</TableHead>
+                    <TableHead className="w-[74px]">Priority</TableHead>
                     <TableHead>{isDistributor(currentUser?.role) ? "Requester" : "Company"}</TableHead>
-                    <TableHead>Due Date</TableHead>
+                    <TableHead className="w-[86px]">Due Date</TableHead>
                     {isDistributor(currentUser?.role) ? (
-                      <TableHead>Price</TableHead>
+                      <TableHead className="w-[90px]">Price</TableHead>
                     ) : (
                       <TableHead>Assignee</TableHead>
                     )}
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead className="w-[140px]">Status</TableHead>
+                    <TableHead className="w-[90px]">Created</TableHead>
+                    <TableHead className="w-[80px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1286,7 +1286,7 @@ export default function ServiceRequestsList() {
                             </span>
                           </Link>
                         </TableCell>
-                        <TableCell data-testid={`text-service-${request.id}`}>
+                        <TableCell className="truncate" data-testid={`text-service-${request.id}`} title={request.serviceName}>
                           {request.serviceName}
                         </TableCell>
                         <TableCell data-testid={`text-method-${request.id}`}>
@@ -1302,10 +1302,10 @@ export default function ServiceRequestsList() {
                             {request.priority ? request.priority.charAt(0).toUpperCase() + request.priority.slice(1) : "Normal"}
                           </Badge>
                         </TableCell>
-                        <TableCell data-testid={`text-customer-${request.id}`}>
+                        <TableCell className="truncate" data-testid={`text-customer-${request.id}`} title={getCustomerDisplayName(request.userId, request.customerName)}>
                           {getCustomerDisplayName(request.userId, request.customerName)}
                         </TableCell>
-                        <TableCell data-testid={`text-due-date-${request.id}`}>
+                        <TableCell className="whitespace-nowrap" data-testid={`text-due-date-${request.id}`}>
                           {request.dueDate
                             ? format(new Date(request.dueDate), "MM/dd/yyyy")
                             : "Not set"}
@@ -1345,7 +1345,7 @@ export default function ServiceRequestsList() {
                             </div>
                           </TableCell>
                         ) : (
-                          <TableCell data-testid={`text-assignee-${request.id}`}>
+                          <TableCell className="truncate" data-testid={`text-assignee-${request.id}`} title={getAssigneeName(request.assigneeId)}>
                             {getAssigneeName(request.assigneeId)}
                           </TableCell>
                         )}
@@ -1359,10 +1359,10 @@ export default function ServiceRequestsList() {
                           </Badge>
                         </TableCell>
                         <TableCell className="whitespace-nowrap" data-testid={`text-created-${request.id}`}>
-                          {format(new Date(request.createdAt), "MMM dd, yyyy")}
+                          {format(new Date(request.createdAt), "MM/dd/yyyy")}
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
                             <Link href={detailLink}>
                               <Tooltip>
                                 <TooltipTrigger asChild>
