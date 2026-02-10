@@ -1209,11 +1209,24 @@ export default function ServiceRequestsList() {
                 <p className="font-body-reg text-dark-gray">No service requests found</p>
               </div>
             ) : (
-              <Table>
+              <Table className="table-fixed [&_th]:px-2 [&_td]:px-2">
+                <colgroup>
+                  {canBulkAssign && <col style={{ width: "3%" }} />}
+                  <col style={{ width: "7%" }} />
+                  <col style={{ width: "13%" }} />
+                  <col style={{ width: "7%" }} />
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: canBulkAssign ? "12%" : "13%" }} />
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: canBulkAssign ? "10%" : "11%" }} />
+                  <col style={{ width: "16%" }} />
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "8%" }} />
+                </colgroup>
                 <TableHeader>
                   <TableRow>
                     {canBulkAssign && (
-                      <TableHead className="w-[36px]">
+                      <TableHead>
                         <Checkbox
                           checked={selectedRequests.size > 0 && selectedRequests.size === combinedFilteredRequests.length}
                           onCheckedChange={(checked) => {
@@ -1287,7 +1300,7 @@ export default function ServiceRequestsList() {
                           </Link>
                         </TableCell>
                         <TableCell data-testid={`text-service-${request.id}`}>
-                          <span className="line-clamp-2">{request.serviceName}</span>
+                          <span className="line-clamp-2 break-words">{request.serviceName}</span>
                         </TableCell>
                         <TableCell data-testid={`text-method-${request.id}`}>
                           <Badge variant="outline" className="text-xs whitespace-nowrap">
@@ -1303,11 +1316,11 @@ export default function ServiceRequestsList() {
                           </Badge>
                         </TableCell>
                         <TableCell data-testid={`text-customer-${request.id}`}>
-                          <span className="line-clamp-2">{getCustomerDisplayName(request.userId, request.customerName)}</span>
+                          <span className="line-clamp-2 break-words">{getCustomerDisplayName(request.userId, request.customerName)}</span>
                         </TableCell>
                         <TableCell className="whitespace-nowrap" data-testid={`text-due-date-${request.id}`}>
                           {request.dueDate
-                            ? format(new Date(request.dueDate), "MM/dd/yyyy")
+                            ? format(new Date(request.dueDate), "MM/dd/yy")
                             : "Not set"}
                         </TableCell>
                         {isDistributor(currentUser?.role) ? (
@@ -1346,12 +1359,12 @@ export default function ServiceRequestsList() {
                           </TableCell>
                         ) : (
                           <TableCell data-testid={`text-assignee-${request.id}`}>
-                            <span className="line-clamp-2">{getAssigneeName(request.assigneeId)}</span>
+                            <span className="line-clamp-2 break-words">{getAssigneeName(request.assigneeId)}</span>
                           </TableCell>
                         )}
-                        <TableCell className="whitespace-nowrap">
+                        <TableCell className="overflow-hidden">
                           <Badge 
-                            className={`${statusInfo.color}`}
+                            className={`${statusInfo.color} whitespace-nowrap`}
                             data-testid={`badge-status-${request.id}`}
                           >
                             <StatusIcon className="h-3 w-3 mr-1" />
@@ -1359,10 +1372,10 @@ export default function ServiceRequestsList() {
                           </Badge>
                         </TableCell>
                         <TableCell className="whitespace-nowrap" data-testid={`text-created-${request.id}`}>
-                          {format(new Date(request.createdAt), "MM/dd/yyyy")}
+                          {format(new Date(request.createdAt), "MM/dd/yy")}
                         </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
+                        <TableCell className="whitespace-nowrap">
+                          <div className="flex items-center">
                             <Link href={detailLink}>
                               <Tooltip>
                                 <TooltipTrigger asChild>
