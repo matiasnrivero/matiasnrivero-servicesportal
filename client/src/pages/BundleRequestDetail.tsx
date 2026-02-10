@@ -87,7 +87,7 @@ interface CurrentUser {
 function getPriorityBadgeClass(priority: string): string {
   switch (priority) {
     case "urgent": return "border-red-500 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30";
-    case "high": return "border-orange-500 text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30";
+    case "high": return "border-yellow-500 text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950/30";
     case "normal": return "border-blue-500 text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30";
     case "low": return "border-gray-400 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-950/30";
     default: return "border-blue-500 text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30";

@@ -150,7 +150,7 @@ export function PriorityDistributionTab() {
             <div className="space-y-2">
               <Label htmlFor="maxHigh">
                 Max High Jobs
-                <Badge variant="outline" className="ml-2 border-orange-500 text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 text-xs">
+                <Badge variant="outline" className="ml-2 border-yellow-500 text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950/30 text-xs">
                   High
                 </Badge>
               </Label>
@@ -189,7 +189,7 @@ export function PriorityDistributionTab() {
                 )}
                 {highPercentage > 0 && (
                   <div
-                    className="bg-orange-500 flex items-center justify-center text-white text-xs font-medium"
+                    className="bg-yellow-500 flex items-center justify-center text-white text-xs font-medium"
                     style={{ width: `${highPercentage}%` }}
                     data-testid="bar-high"
                   >
