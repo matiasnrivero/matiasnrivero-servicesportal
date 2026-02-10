@@ -63,6 +63,17 @@ interface SlaJobRow {
   hadChangeRequest: boolean;
   changeRequestCount: number;
   status: string;
+  priority: string;
+}
+
+function getPriorityBadgeClass(priority: string): string {
+  switch (priority) {
+    case "urgent": return "border-red-500 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30";
+    case "high": return "border-orange-500 text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30";
+    case "normal": return "border-blue-500 text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30";
+    case "low": return "border-gray-400 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-950/30";
+    default: return "border-blue-500 text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30";
+  }
 }
 
 interface ServiceTypeBreakdown {
@@ -114,6 +125,7 @@ export default function VendorSlaReport() {
   const [dateTo, setDateTo] = useState<string>("");
   const [jobType, setJobType] = useState<string>("all");
   const [serviceTypeFilter, setServiceTypeFilter] = useState<string>("all");
+  const [priorityFilter, setPriorityFilter] = useState<string>("all");
 
   const queryUrl = useMemo(() => {
     const params = new URLSearchParams();
@@ -131,13 +143,19 @@ export default function VendorSlaReport() {
 
   const filteredJobs = useMemo(() => {
     if (!data) return [];
-    if (serviceTypeFilter === "all") return data.jobs;
-    return data.jobs.filter(j => j.serviceName === serviceTypeFilter);
-  }, [data, serviceTypeFilter]);
+    let jobs = data.jobs;
+    if (serviceTypeFilter !== "all") {
+      jobs = jobs.filter(j => j.serviceName === serviceTypeFilter);
+    }
+    if (priorityFilter !== "all") {
+      jobs = jobs.filter(j => j.priority === priorityFilter);
+    }
+    return jobs;
+  }, [data, serviceTypeFilter, priorityFilter]);
 
   const filteredSummary = useMemo(() => {
     if (!data) return null;
-    if (serviceTypeFilter === "all") return data.summary;
+    if (serviceTypeFilter === "all" && priorityFilter === "all") return data.summary;
     const jobs = filteredJobs;
     const totalJobs = jobs.length;
     const deliveredJobs = jobs.filter(j => j.deliveredAt !== null && j.slaTargetHours !== null);
@@ -194,11 +212,12 @@ export default function VendorSlaReport() {
 
   const handleExportCSV = () => {
     if (!filteredJobs.length) return;
-    const headers = ["Job ID", "Type", "Service/Bundle", "Order #", "Vendor", "Assigned At", "Delivered At", "SLA Target", "Actual Time", "Status", "On Time", "Change Request", "CR Count"];
+    const headers = ["Job ID", "Type", "Service/Bundle", "Priority", "Order #", "Vendor", "Assigned At", "Delivered At", "SLA Target", "Actual Time", "Status", "On Time", "Change Request", "CR Count"];
     const rows = filteredJobs.map(j => [
       j.id,
       j.type,
       j.serviceName,
+      j.priority ? j.priority.charAt(0).toUpperCase() + j.priority.slice(1) : "Normal",
       j.orderNumber || "",
       j.vendorName,
       j.assignedAt ? format(new Date(j.assignedAt), "yyyy-MM-dd HH:mm") : "",
@@ -246,7 +265,7 @@ export default function VendorSlaReport() {
 
         <Card className="mb-6">
           <CardContent className="pt-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
               <div>
                 <Label className="text-sm text-muted-foreground mb-1.5 block">Vendor</Label>
                 <Select value={selectedVendor} onValueChange={setSelectedVendor}>
@@ -312,6 +331,21 @@ export default function VendorSlaReport() {
                     {bundleNames.map(name => (
                       <SelectItem key={`bundle-${name}`} value={name}>{name}</SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground mb-1.5 block">Priority</Label>
+                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                  <SelectTrigger data-testid="select-priority-filter">
+                    <SelectValue placeholder="All Priorities" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Priorities</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -470,6 +504,7 @@ export default function VendorSlaReport() {
                       <TableRow>
                         <TableHead>Type</TableHead>
                         <TableHead>Service / Bundle</TableHead>
+                        <TableHead>Priority</TableHead>
                         <TableHead>Order #</TableHead>
                         <TableHead>Vendor</TableHead>
                         <TableHead>Assigned</TableHead>
@@ -483,7 +518,7 @@ export default function VendorSlaReport() {
                     <TableBody>
                       {filteredJobs.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                          <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
                             No jobs found for the selected filters
                           </TableCell>
                         </TableRow>
@@ -496,6 +531,11 @@ export default function VendorSlaReport() {
                               </Badge>
                             </TableCell>
                             <TableCell className="font-medium">{job.serviceName}</TableCell>
+                            <TableCell data-testid={`text-priority-${job.id}`}>
+                              <Badge variant="outline" className={`text-xs whitespace-nowrap ${getPriorityBadgeClass(job.priority)}`}>
+                                {job.priority ? job.priority.charAt(0).toUpperCase() + job.priority.slice(1) : "Normal"}
+                              </Badge>
+                            </TableCell>
                             <TableCell className="text-muted-foreground">{job.orderNumber || "—"}</TableCell>
                             <TableCell>{job.vendorName}</TableCell>
                             <TableCell className="text-sm">

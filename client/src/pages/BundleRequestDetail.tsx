@@ -84,6 +84,16 @@ interface CurrentUser {
   username: string;
 }
 
+function getPriorityBadgeClass(priority: string): string {
+  switch (priority) {
+    case "urgent": return "border-red-500 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30";
+    case "high": return "border-orange-500 text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30";
+    case "normal": return "border-blue-500 text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30";
+    case "low": return "border-gray-400 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-950/30";
+    default: return "border-blue-500 text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30";
+  }
+}
+
 async function fetchBundleRequestDetail(id: string): Promise<BundleRequestFullDetail> {
   const response = await fetch(`/api/bundle-requests/${id}/full-detail`);
   if (!response.ok) {
@@ -641,6 +651,44 @@ export default function BundleRequestDetail() {
                     </Badge>
                   );
                 })()}
+                {(currentUser?.role === "client" || currentUser?.role === "client_member" || currentUser?.role === "admin") && 
+                 ["pending", "in-progress", "change-request"].includes(request.status) ? (
+                  <Select
+                    value={request.priority || "normal"}
+                    onValueChange={async (value) => {
+                      try {
+                        await apiRequest("PATCH", `/api/bundle-requests/${request.id}/priority`, { priority: value });
+                        queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests", requestId] });
+                        queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests", requestId, "full-detail"] });
+                        queryClient.invalidateQueries({ queryKey: ["/api/bundle-requests"] });
+                        toast({ title: "Priority updated", description: `Priority changed to ${value.charAt(0).toUpperCase() + value.slice(1)}` });
+                      } catch (error: any) {
+                        toast({ title: "Failed to update priority", description: error?.message || "An error occurred", variant: "destructive" });
+                      }
+                    }}
+                  >
+                    <SelectTrigger 
+                      className={`h-7 w-auto gap-1 text-xs px-2 ${getPriorityBadgeClass(request.priority || "normal")}`}
+                      data-testid="select-priority-change"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="normal">Normal</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs ${getPriorityBadgeClass(request.priority || "normal")}`}
+                    data-testid="badge-priority"
+                  >
+                    {request.priority ? request.priority.charAt(0).toUpperCase() + request.priority.slice(1) : "Normal"}
+                  </Badge>
+                )}
               </div>
               <p className="text-sm text-dark-gray mt-1" data-testid="text-created-date">
                 Created on {request.createdAt ? format(new Date(request.createdAt), "MMMM do, yyyy 'at' h:mm a") : "N/A"}

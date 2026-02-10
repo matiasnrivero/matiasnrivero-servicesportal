@@ -79,6 +79,16 @@ function isInternalRole(role: string | undefined): boolean {
   return ["admin", "internal_designer", "vendor", "vendor_designer"].includes(role || "");
 }
 
+function getPriorityBadgeClass(priority: string): string {
+  switch (priority) {
+    case "urgent": return "border-red-500 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30";
+    case "high": return "border-orange-500 text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30";
+    case "normal": return "border-blue-500 text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30";
+    case "low": return "border-gray-400 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-950/30";
+    default: return "border-blue-500 text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30";
+  }
+}
+
 interface CombinedRequest {
   id: string;
   type: "adhoc" | "bundle";
@@ -92,6 +102,7 @@ interface CombinedRequest {
   createdAt: Date;
   userId: string;
   originalRequest: ServiceRequest | BundleRequest;
+  priority: string;
   price: string;
   hasDiscount: boolean;
   isPackCovered: boolean;
@@ -263,6 +274,7 @@ export default function ServiceRequestsList() {
   });
 
   const [vendorFilter, setVendorFilter] = useState<string>("all");
+  const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [serviceFilter, setServiceFilter] = useState<string>("all");
   const [serviceMethodFilter, setServiceMethodFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<Date | undefined>(
@@ -663,6 +675,8 @@ export default function ServiceRequestsList() {
         return false;
       }
 
+      if (priorityFilter !== "all" && r.priority !== priorityFilter) return false;
+
       if (searchJobId) {
         const jobNumber = `A-${r.id.slice(0, 5).toUpperCase()}`;
         if (!jobNumber.toLowerCase().includes(searchJobId.toLowerCase()) && 
@@ -673,7 +687,7 @@ export default function ServiceRequestsList() {
 
       return true;
     });
-  }, [requests, statusFilter, vendorFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId, currentUser?.role]);
+  }, [requests, statusFilter, vendorFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId, currentUser?.role, priorityFilter]);
 
   const filteredBundleRequests = useMemo(() => {
     return bundleRequests.filter(r => {
@@ -720,6 +734,8 @@ export default function ServiceRequestsList() {
         return false;
       }
 
+      if (priorityFilter !== "all" && r.priority !== priorityFilter) return false;
+
       if (searchJobId) {
         const jobNumber = `B-${r.id.slice(0, 5).toUpperCase()}`;
         if (!jobNumber.toLowerCase().includes(searchJobId.toLowerCase()) && 
@@ -730,13 +746,14 @@ export default function ServiceRequestsList() {
 
       return true;
     });
-  }, [bundleRequests, statusFilter, vendorFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId, currentUser?.role]);
+  }, [bundleRequests, statusFilter, vendorFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId, currentUser?.role, priorityFilter]);
 
-  const hasActiveFilters = vendorFilter !== "all" || serviceFilter !== "all" || serviceMethodFilter !== "all" || dateFrom || dateTo || selectedClients.length > 0 || searchJobId;
+  const hasActiveFilters = vendorFilter !== "all" || serviceFilter !== "all" || serviceMethodFilter !== "all" || priorityFilter !== "all" || dateFrom || dateTo || selectedClients.length > 0 || searchJobId;
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (vendorFilter !== "all") count++;
+    if (priorityFilter !== "all") count++;
     if (serviceFilter !== "all") count++;
     if (serviceMethodFilter !== "all") count++;
     if (dateFrom) count++;
@@ -744,10 +761,11 @@ export default function ServiceRequestsList() {
     if (selectedClients.length > 0) count++;
     if (searchJobId) count++;
     return count;
-  }, [vendorFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId]);
+  }, [vendorFilter, priorityFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId]);
 
   const clearAllFilters = () => {
     setVendorFilter("all");
+    setPriorityFilter("all");
     setServiceFilter("all");
     setServiceMethodFilter("all");
     setDateFrom(undefined);
@@ -781,6 +799,7 @@ export default function ServiceRequestsList() {
       createdAt: r.createdAt,
       userId: r.userId,
       originalRequest: r,
+      priority: r.priority || "normal",
       price: getServicePrice(r),
       hasDiscount: !!r.discountCouponId,
       isPackCovered: !!(r as ServiceRequest).isPackCovered,
@@ -799,6 +818,7 @@ export default function ServiceRequestsList() {
       createdAt: r.createdAt,
       userId: r.userId,
       originalRequest: r,
+      priority: r.priority || "normal",
       price: getBundlePrice(r),
       hasDiscount: !!r.discountCouponId,
       isPackCovered: false, // Bundles don't have pack coverage
@@ -816,10 +836,21 @@ export default function ServiceRequestsList() {
       combined = combined.filter(r => !r.isPackCovered);
     }
     
-    return combined.sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-  }, [filteredRequests, filteredBundleRequests, overSlaFilter, isOverSla, hidePackRequests]);
+    return combined.sort((a, b) => {
+      if (selectedClients.length > 0) {
+        const priorityOrder: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
+        const aPriority = priorityOrder[a.priority] ?? 2;
+        const bPriority = priorityOrder[b.priority] ?? 2;
+        if (aPriority !== bPriority) return aPriority - bPriority;
+        
+        const aIsChangeRequest = a.status === "change-request" ? 0 : 1;
+        const bIsChangeRequest = b.status === "change-request" ? 0 : 1;
+        if (aIsChangeRequest !== bIsChangeRequest) return aIsChangeRequest - bIsChangeRequest;
+      }
+      
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [filteredRequests, filteredBundleRequests, overSlaFilter, isOverSla, hidePackRequests, selectedClients]);
 
   // Compute eligible count from selected requests for bulk assignment
   const eligibleSelectedRequests = useMemo(() => {
@@ -1037,6 +1068,22 @@ export default function ServiceRequestsList() {
               </div>
 
               <div className="space-y-2">
+                <Label className="text-sm">Priority</Label>
+                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                  <SelectTrigger data-testid="select-priority-filter">
+                    <SelectValue placeholder="All Priorities" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Priorities</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label className="text-sm">Date From</Label>
                 <Popover>
                   <PopoverTrigger asChild>
@@ -1183,6 +1230,7 @@ export default function ServiceRequestsList() {
                     <TableHead>Job ID</TableHead>
                     <TableHead>Service</TableHead>
                     <TableHead>Method</TableHead>
+                    <TableHead>Priority</TableHead>
                     <TableHead>{isDistributor(currentUser?.role) ? "Requester" : "Company"}</TableHead>
                     <TableHead>Due Date</TableHead>
                     {isDistributor(currentUser?.role) ? (
@@ -1244,6 +1292,14 @@ export default function ServiceRequestsList() {
                         <TableCell data-testid={`text-method-${request.id}`}>
                           <Badge variant="outline" className="text-xs whitespace-nowrap">
                             {request.method}
+                          </Badge>
+                        </TableCell>
+                        <TableCell data-testid={`text-priority-${request.id}`}>
+                          <Badge 
+                            variant="outline" 
+                            className={`text-xs whitespace-nowrap ${getPriorityBadgeClass(request.priority)}`}
+                          >
+                            {request.priority ? request.priority.charAt(0).toUpperCase() + request.priority.slice(1) : "Normal"}
                           </Badge>
                         </TableCell>
                         <TableCell data-testid={`text-customer-${request.id}`}>

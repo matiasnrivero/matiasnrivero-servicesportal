@@ -330,6 +330,19 @@ export default function BundleRequestForm() {
     // Merge bundle header data with service form data
     const combinedFormData = { ...formData, ...bundleHeaderData };
 
+    // Extract priority from bundle header fields for the dedicated priority column
+    let extractedPriority = "normal";
+    if (bundleStructure?.bundleFields) {
+      const priorityField = bundleStructure.bundleFields.find(
+        (bf: any) => bf.inputField?.fieldKey === "priority"
+      );
+      if (priorityField) {
+        const priorityKey = `bundle_${priorityField.id}`;
+        extractedPriority = (bundleHeaderData[priorityKey] ?? priorityField.defaultValue ?? "Normal");
+      }
+    }
+    combinedFormData.priority = extractedPriority;
+
     // Calculate the final price with Tri-POD discount applied
     const basePrice = parseFloat(bundle?.finalPrice || "0");
     const { discountAmount, finalPrice } = calculateDiscountedPrice(basePrice);

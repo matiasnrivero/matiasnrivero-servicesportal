@@ -768,6 +768,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         autoAssignmentStatus: "not_attempted" as const,
       };
 
+      // Extract priority from dynamic form fields
+      const rawPriority = req.body.formData?.priority;
+      if (rawPriority && typeof rawPriority === 'string') {
+        const normalized = rawPriority.toLowerCase();
+        if (['urgent', 'high', 'normal', 'low'].includes(normalized)) {
+          requestData.priority = normalized;
+        } else {
+          requestData.priority = 'normal';
+        }
+      } else {
+        requestData.priority = 'normal';
+      }
+
       // Only admin and internal_designer can set assigneeId during creation
       const hasManualAssignment = ["admin", "internal_designer"].includes(sessionUser.role) && 
         (req.body.assigneeId || req.body.vendorAssigneeId);
@@ -1016,6 +1029,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Priority quota validation - check active (non-delivered) jobs for this client's profile
+      if (requestData.priority === 'urgent' || requestData.priority === 'high') {
+        try {
+          const prioritySetting = await storage.getSystemSetting('priority_distribution');
+          if (prioritySetting) {
+            const config = prioritySetting.settingValue as { windowSize: number; maxUrgent: number; maxHigh: number };
+            let clientProfileId = sessionUser.clientProfileId;
+            
+            if (clientProfileId) {
+              const clientUsers = await storage.getClientTeamMembers(clientProfileId);
+              const clientUserIds = clientUsers.map(u => u.id);
+              
+              const allRequests = await storage.getAllServiceRequests();
+              const activeRequests = allRequests.filter(r => 
+                clientUserIds.includes(r.userId) && 
+                ['pending', 'in-progress', 'change-request'].includes(r.status)
+              );
+              
+              const allBundleRequests = await storage.getAllBundleRequests();
+              const activeBundleRequests = allBundleRequests.filter(r =>
+                clientUserIds.includes(r.userId) &&
+                ['pending', 'in-progress', 'change-request'].includes(r.status)
+              );
+              
+              const allActiveJobs = [...activeRequests, ...activeBundleRequests];
+              
+              if (requestData.priority === 'urgent') {
+                const urgentCount = allActiveJobs.filter(r => r.priority === 'urgent').length;
+                if (urgentCount >= config.maxUrgent) {
+                  if (submissionToken) {
+                    await storage.updateIdempotencyKey(submissionToken as string, { status: "failed" });
+                  }
+                  return res.status(400).json({
+                    error: `You exceeded the quota of Urgent priorities for current Pending or In Progress Jobs. You can manage your priorities on the Request Jobs section.`,
+                    code: "PRIORITY_QUOTA_EXCEEDED"
+                  });
+                }
+              }
+              
+              if (requestData.priority === 'high') {
+                const highCount = allActiveJobs.filter(r => r.priority === 'high').length;
+                if (highCount >= config.maxHigh) {
+                  if (submissionToken) {
+                    await storage.updateIdempotencyKey(submissionToken as string, { status: "failed" });
+                  }
+                  return res.status(400).json({
+                    error: `You exceeded the quota of High priorities for current Pending or In Progress Jobs. You can manage your priorities on the Request Jobs section.`,
+                    code: "PRIORITY_QUOTA_EXCEEDED"
+                  });
+                }
+              }
+            }
+          }
+        } catch (quotaError) {
+          console.error("Error checking priority quota:", quotaError);
+        }
+      }
+
       let request = await storage.createServiceRequest(requestData);
 
       // If a discount coupon was used, increment the usage counter
@@ -1207,6 +1278,286 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(request);
     } catch (error) {
       res.status(500).json({ error: "Failed to update service request" });
+    }
+  });
+
+  // Change priority for a service request
+  app.patch("/api/service-requests/:id/priority", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      if (!['client', 'client_member', 'admin'].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Not authorized to change priority" });
+      }
+
+      const request = await storage.getServiceRequest(req.params.id);
+      if (!request) {
+        return res.status(404).json({ error: "Request not found" });
+      }
+
+      if (!['pending', 'in-progress', 'change-request'].includes(request.status)) {
+        return res.status(400).json({ error: "Cannot change priority on completed or cancelled jobs" });
+      }
+
+      const { priority } = req.body;
+      const normalized = priority?.toLowerCase();
+      if (!normalized || !['urgent', 'high', 'normal', 'low'].includes(normalized)) {
+        return res.status(400).json({ error: "Invalid priority value" });
+      }
+
+      if (normalized === 'urgent' || normalized === 'high') {
+        const prioritySetting = await storage.getSystemSetting('priority_distribution');
+        if (prioritySetting) {
+          const config = prioritySetting.settingValue as { windowSize: number; maxUrgent: number; maxHigh: number };
+          let clientProfileId = sessionUser.clientProfileId;
+          if (sessionUser.role === 'admin') {
+            const jobOwner = await storage.getUser(request.userId);
+            clientProfileId = jobOwner?.clientProfileId || null;
+          }
+
+          if (clientProfileId) {
+            const clientUsers = await storage.getClientTeamMembers(clientProfileId);
+            const clientUserIds = clientUsers.map(u => u.id);
+
+            const allRequests = await storage.getAllServiceRequests();
+            const activeRequests = allRequests.filter(r =>
+              clientUserIds.includes(r.userId) &&
+              ['pending', 'in-progress', 'change-request'].includes(r.status) &&
+              r.id !== request.id
+            );
+
+            const allBundleRequests = await storage.getAllBundleRequests();
+            const activeBundleRequests = allBundleRequests.filter(r =>
+              clientUserIds.includes(r.userId) &&
+              ['pending', 'in-progress', 'change-request'].includes(r.status)
+            );
+
+            const allActiveJobs = [...activeRequests, ...activeBundleRequests];
+
+            if (normalized === 'urgent') {
+              const urgentCount = allActiveJobs.filter(r => r.priority === 'urgent').length;
+              if (urgentCount >= config.maxUrgent) {
+                return res.status(400).json({
+                  error: `You exceeded the quota of Urgent priorities for current Pending or In Progress Jobs. You can manage your priorities on the Request Jobs section.`,
+                  code: "PRIORITY_QUOTA_EXCEEDED"
+                });
+              }
+            }
+            if (normalized === 'high') {
+              const highCount = allActiveJobs.filter(r => r.priority === 'high').length;
+              if (highCount >= config.maxHigh) {
+                return res.status(400).json({
+                  error: `You exceeded the quota of High priorities for current Pending or In Progress Jobs. You can manage your priorities on the Request Jobs section.`,
+                  code: "PRIORITY_QUOTA_EXCEEDED"
+                });
+              }
+            }
+          }
+        }
+      }
+
+      const updated = await storage.updateServiceRequest(request.id, { priority: normalized });
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error changing service request priority:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    }
+  });
+
+  // Change priority for a bundle request
+  app.patch("/api/bundle-requests/:id/priority", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      if (!['client', 'client_member', 'admin'].includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Not authorized to change priority" });
+      }
+
+      const request = await storage.getBundleRequest(req.params.id);
+      if (!request) {
+        return res.status(404).json({ error: "Request not found" });
+      }
+
+      if (!['pending', 'in-progress', 'change-request'].includes(request.status)) {
+        return res.status(400).json({ error: "Cannot change priority on completed or cancelled jobs" });
+      }
+
+      const { priority } = req.body;
+      const normalized = priority?.toLowerCase();
+      if (!normalized || !['urgent', 'high', 'normal', 'low'].includes(normalized)) {
+        return res.status(400).json({ error: "Invalid priority value" });
+      }
+
+      if (normalized === 'urgent' || normalized === 'high') {
+        const prioritySetting = await storage.getSystemSetting('priority_distribution');
+        if (prioritySetting) {
+          const config = prioritySetting.settingValue as { windowSize: number; maxUrgent: number; maxHigh: number };
+          let clientProfileId = sessionUser.clientProfileId;
+          if (sessionUser.role === 'admin') {
+            const jobOwner = await storage.getUser(request.userId);
+            clientProfileId = jobOwner?.clientProfileId || null;
+          }
+
+          if (clientProfileId) {
+            const clientUsers = await storage.getClientTeamMembers(clientProfileId);
+            const clientUserIds = clientUsers.map(u => u.id);
+
+            const allRequests = await storage.getAllServiceRequests();
+            const activeRequests = allRequests.filter(r =>
+              clientUserIds.includes(r.userId) &&
+              ['pending', 'in-progress', 'change-request'].includes(r.status)
+            );
+
+            const allBundleRequests = await storage.getAllBundleRequests();
+            const activeBundleRequests = allBundleRequests.filter(r =>
+              clientUserIds.includes(r.userId) &&
+              ['pending', 'in-progress', 'change-request'].includes(r.status) &&
+              r.id !== request.id
+            );
+
+            const allActiveJobs = [...activeRequests, ...activeBundleRequests];
+
+            if (normalized === 'urgent') {
+              const urgentCount = allActiveJobs.filter(r => r.priority === 'urgent').length;
+              if (urgentCount >= config.maxUrgent) {
+                return res.status(400).json({
+                  error: `You exceeded the quota of Urgent priorities for current Pending or In Progress Jobs. You can manage your priorities on the Request Jobs section.`,
+                  code: "PRIORITY_QUOTA_EXCEEDED"
+                });
+              }
+            }
+            if (normalized === 'high') {
+              const highCount = allActiveJobs.filter(r => r.priority === 'high').length;
+              if (highCount >= config.maxHigh) {
+                return res.status(400).json({
+                  error: `You exceeded the quota of High priorities for current Pending or In Progress Jobs. You can manage your priorities on the Request Jobs section.`,
+                  code: "PRIORITY_QUOTA_EXCEEDED"
+                });
+              }
+            }
+          }
+        }
+      }
+
+      const updated = await storage.updateBundleRequest(request.id, { priority: normalized });
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error changing bundle request priority:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    }
+  });
+
+  // Get priority quota usage for current user's client profile
+  app.get("/api/priority-quota", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const prioritySetting = await storage.getSystemSetting('priority_distribution');
+      const config = (prioritySetting?.settingValue as { windowSize: number; maxUrgent: number; maxHigh: number }) || { windowSize: 10, maxUrgent: 2, maxHigh: 3 };
+
+      let urgentCount = 0;
+      let highCount = 0;
+
+      const clientProfileId = sessionUser.clientProfileId;
+      if (clientProfileId) {
+        const clientUsers = await storage.getClientTeamMembers(clientProfileId);
+        const clientUserIds = clientUsers.map(u => u.id);
+
+        const allRequests = await storage.getAllServiceRequests();
+        const activeRequests = allRequests.filter(r =>
+          clientUserIds.includes(r.userId) &&
+          ['pending', 'in-progress', 'change-request'].includes(r.status)
+        );
+
+        const allBundleRequests = await storage.getAllBundleRequests();
+        const activeBundleRequests = allBundleRequests.filter(r =>
+          clientUserIds.includes(r.userId) &&
+          ['pending', 'in-progress', 'change-request'].includes(r.status)
+        );
+
+        const allActiveJobs = [...activeRequests, ...activeBundleRequests];
+        urgentCount = allActiveJobs.filter(r => r.priority === 'urgent').length;
+        highCount = allActiveJobs.filter(r => r.priority === 'high').length;
+      }
+
+      res.json({
+        config,
+        usage: { urgent: urgentCount, high: highCount },
+        remaining: { urgent: Math.max(0, config.maxUrgent - urgentCount), high: Math.max(0, config.maxHigh - highCount) }
+      });
+    } catch (error: any) {
+      console.error("Error checking priority quota:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    }
+  });
+
+  // Admin: Get priority distribution settings
+  app.get("/api/admin/priority-distribution", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== 'admin') {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const setting = await storage.getSystemSetting('priority_distribution');
+      const config = (setting?.settingValue as { windowSize: number; maxUrgent: number; maxHigh: number }) || { windowSize: 10, maxUrgent: 2, maxHigh: 3 };
+      res.json(config);
+    } catch (error: any) {
+      console.error("Error fetching priority distribution:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    }
+  });
+
+  // Admin: Update priority distribution settings
+  app.put("/api/admin/priority-distribution", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== 'admin') {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { windowSize, maxUrgent, maxHigh } = req.body;
+      if (typeof windowSize !== 'number' || typeof maxUrgent !== 'number' || typeof maxHigh !== 'number') {
+        return res.status(400).json({ error: "windowSize, maxUrgent, and maxHigh must be numbers" });
+      }
+      if (windowSize < 1 || maxUrgent < 0 || maxHigh < 0) {
+        return res.status(400).json({ error: "windowSize must be >= 1, maxUrgent and maxHigh must be >= 0" });
+      }
+
+      const updated = await storage.setSystemSetting('priority_distribution', { windowSize, maxUrgent, maxHigh });
+      res.json(updated.settingValue);
+    } catch (error: any) {
+      console.error("Error updating priority distribution:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
     }
   });
 
@@ -6710,6 +7061,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
       };
 
+      // Extract priority from dynamic form fields
+      const rawBundlePriority = req.body.formData?.priority;
+      if (rawBundlePriority && typeof rawBundlePriority === 'string') {
+        const normalizedBP = rawBundlePriority.toLowerCase();
+        if (['urgent', 'high', 'normal', 'low'].includes(normalizedBP)) {
+          requestData.priority = normalizedBP;
+        } else {
+          requestData.priority = 'normal';
+        }
+      } else {
+        requestData.priority = 'normal';
+      }
+
       // Only admin and internal_designer can set assigneeId during creation
       if (!["admin", "internal_designer"].includes(sessionUser.role)) {
         delete requestData.assigneeId;
@@ -6805,6 +7169,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       requestData.discountAmount = totalDiscountAmount.toFixed(2);
       requestData.finalPrice = serverFinalPrice.toFixed(2);
+
+      // Priority quota validation for bundle requests
+      if (requestData.priority === 'urgent' || requestData.priority === 'high') {
+        try {
+          const prioritySetting = await storage.getSystemSetting('priority_distribution');
+          if (prioritySetting) {
+            const config = prioritySetting.settingValue as { windowSize: number; maxUrgent: number; maxHigh: number };
+            let clientProfileId = sessionUser.clientProfileId;
+            
+            if (clientProfileId) {
+              const clientUsers = await storage.getClientTeamMembers(clientProfileId);
+              const clientUserIds = clientUsers.map(u => u.id);
+              
+              const allRequests = await storage.getAllServiceRequests();
+              const activeRequests = allRequests.filter(r => 
+                clientUserIds.includes(r.userId) && 
+                ['pending', 'in-progress', 'change-request'].includes(r.status)
+              );
+              
+              const allBundleReqs = await storage.getAllBundleRequests();
+              const activeBundleReqs = allBundleReqs.filter(r =>
+                clientUserIds.includes(r.userId) &&
+                ['pending', 'in-progress', 'change-request'].includes(r.status)
+              );
+              
+              const allActiveJobs = [...activeRequests, ...activeBundleReqs];
+              
+              if (requestData.priority === 'urgent') {
+                const urgentCount = allActiveJobs.filter(r => r.priority === 'urgent').length;
+                if (urgentCount >= config.maxUrgent) {
+                  if (submissionToken) {
+                    await storage.updateIdempotencyKey(submissionToken as string, { status: "failed" });
+                  }
+                  return res.status(400).json({
+                    error: `You exceeded the quota of Urgent priorities for current Pending or In Progress Jobs. You can manage your priorities on the Request Jobs section.`,
+                    code: "PRIORITY_QUOTA_EXCEEDED"
+                  });
+                }
+              }
+              
+              if (requestData.priority === 'high') {
+                const highCount = allActiveJobs.filter(r => r.priority === 'high').length;
+                if (highCount >= config.maxHigh) {
+                  if (submissionToken) {
+                    await storage.updateIdempotencyKey(submissionToken as string, { status: "failed" });
+                  }
+                  return res.status(400).json({
+                    error: `You exceeded the quota of High priorities for current Pending or In Progress Jobs. You can manage your priorities on the Request Jobs section.`,
+                    code: "PRIORITY_QUOTA_EXCEEDED"
+                  });
+                }
+              }
+            }
+          }
+        } catch (quotaError) {
+          console.error("Error checking bundle priority quota:", quotaError);
+        }
+      }
 
       let request = await storage.createBundleRequest(requestData);
       
@@ -13178,6 +13600,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         hadChangeRequest: boolean;
         changeRequestCount: number;
         status: string;
+        priority: string;
       };
 
       const jobs: SlaJobRow[] = [];
@@ -13245,6 +13668,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             hadChangeRequest,
             changeRequestCount,
             status: sr.status,
+            priority: sr.priority || "normal",
           });
         }
       }
@@ -13294,6 +13718,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             hadChangeRequest,
             changeRequestCount: hadChangeRequest ? 1 : 0,
             status: br.status,
+            priority: br.priority || "normal",
           });
         }
       }

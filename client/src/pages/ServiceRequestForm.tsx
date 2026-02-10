@@ -398,10 +398,24 @@ export default function ServiceRequestForm() {
       setThreadColorInput("");
       setThreadColorChips([]);
       setFormData(prev => ({ ...prev, threadColors: [] }));
-      setCalculatedPrice(0); // Reset price when switching services
+      setCalculatedPrice(0);
     }
     prevServiceIdRef.current = selectedServiceId;
   }, [selectedServiceId]);
+
+  useEffect(() => {
+    if (serviceFormFields.length > 0) {
+      setFormData(prev => {
+        const updated = { ...prev };
+        serviceFormFields.forEach(field => {
+          if (field.inputField && field.defaultValue != null && updated[field.inputField.fieldKey] === undefined) {
+            updated[field.inputField.fieldKey] = field.defaultValue;
+          }
+        });
+        return updated;
+      });
+    }
+  }, [serviceFormFields]);
 
   const selectedService = services.find((s) => s.id === selectedServiceId);
   // Pricing visible only for Clients and Admins

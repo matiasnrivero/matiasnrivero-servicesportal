@@ -9,6 +9,16 @@ import { calculateServicePrice } from "@/lib/pricing";
 import { getBoardColumns, getDisplayStatus, statusConfig, type DisplayStatus } from "@/lib/statusUtils";
 import type { ServiceRequest, Service, User as UserType, BundleRequest, Bundle } from "@shared/schema";
 
+function getPriorityBadgeClass(priority: string): string {
+  switch (priority) {
+    case "urgent": return "border-red-500 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30";
+    case "high": return "border-orange-500 text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30";
+    case "normal": return "border-blue-500 text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30";
+    case "low": return "border-gray-400 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-950/30";
+    default: return "border-blue-500 text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30";
+  }
+}
+
 type RequestType = "adhoc" | "bundle";
 
 interface CombinedBoardRequest {
@@ -213,9 +223,18 @@ export function BoardView({
                             <span className="text-xs font-medium text-sky-blue-accent">
                               {getJobId(item)}
                             </span>
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                              {item.type === "adhoc" ? "Ad-hoc" : "Bundle"}
-                            </Badge>
+                            <div className="flex items-center gap-1">
+                              <Badge 
+                                variant="outline" 
+                                className={`text-[10px] px-1.5 py-0 ${getPriorityBadgeClass(item.originalRequest.priority || "normal")}`}
+                                data-testid={`badge-priority-${item.id}`}
+                              >
+                                {item.originalRequest.priority ? item.originalRequest.priority.charAt(0).toUpperCase() + item.originalRequest.priority.slice(1) : "Normal"}
+                              </Badge>
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                {item.type === "adhoc" ? "Ad-hoc" : "Bundle"}
+                              </Badge>
+                            </div>
                           </div>
 
                           <h4 className="font-medium text-sm line-clamp-2">

@@ -234,6 +234,8 @@ export const serviceRequests = pgTable("service_requests", {
   // Stripe charge tracking
   stripePaymentIntentId: text("stripe_payment_intent_id"), // For Pay as you Go immediate charges
   stripeInvoiceId: text("stripe_invoice_id"), // For Monthly Payment consolidated charges
+  // Priority management
+  priority: text("priority").notNull().default("normal"), // urgent | high | normal | low
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -613,6 +615,8 @@ export const bundleRequests = pgTable("bundle_requests", {
   // Stripe charge tracking
   stripePaymentIntentId: text("stripe_payment_intent_id"), // For Pay as you Go immediate charges
   stripeInvoiceId: text("stripe_invoice_id"), // For Monthly Payment consolidated charges
+  // Priority management
+  priority: text("priority").notNull().default("normal"), // urgent | high | normal | low
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
