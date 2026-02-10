@@ -50,42 +50,126 @@ export const EMAIL_TEMPLATES = {
 } as const;
 
 function getEmailWrapper(content: string): string {
+  const logoUrl = `{{platform_url}}/email-assets/logo-services-white.png`;
+
+  const assetsBase = `{{platform_url}}/email-assets`;
+  const instagramIcon = `<img src="${assetsBase}/icon-instagram.png" alt="Instagram" width="28" height="28" style="display:inline-block;border:0;" />`;
+  const facebookIcon = `<img src="${assetsBase}/icon-facebook.png" alt="Facebook" width="28" height="28" style="display:inline-block;border:0;" />`;
+  const xIcon = `<img src="${assetsBase}/icon-x.png" alt="X" width="28" height="28" style="display:inline-block;border:0;" />`;
+  const linkedinIcon = `<img src="${assetsBase}/icon-linkedin.png" alt="LinkedIn" width="28" height="28" style="display:inline-block;border:0;" />`;
+
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5; color: #333; }
-    .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; overflow: hidden; }
-    .header { background-color: #1a2b4a; padding: 24px 32px; text-align: center; }
-    .header h1 { color: #ffffff; font-size: 20px; margin: 0; font-weight: 600; }
-    .body { padding: 32px; line-height: 1.6; }
-    .body h3 { color: #1a2b4a; margin-top: 24px; margin-bottom: 12px; font-size: 16px; }
-    .body ul { padding-left: 20px; }
-    .body li { margin-bottom: 6px; }
-    .body a { color: #2563eb; }
-    .cta { display: inline-block; background-color: #2563eb; color: #ffffff !important; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 500; margin: 16px 0; }
-    .footer { background-color: #f8f9fa; padding: 24px 32px; text-align: center; font-size: 13px; color: #666; border-top: 1px solid #eee; }
-    .footer a { color: #2563eb; }
-    .divider { border: none; border-top: 1px solid #eee; margin: 24px 0; }
+    body { margin: 0; padding: 0; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table { border-spacing: 0; border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    td { padding: 0; }
+    img { border: 0; line-height: 100%; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; }
+    a { color: #2563eb; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    h3 { color: #1a2b4a; margin-top: 24px; margin-bottom: 12px; font-size: 16px; font-weight: 600; }
+    ul { padding-left: 20px; margin: 12px 0; }
+    li { margin-bottom: 6px; color: #444444; }
+    .cta { display: inline-block; background-color: #1a2b4a; color: #ffffff !important; padding: 12px 28px; border-radius: 6px; text-decoration: none !important; font-weight: 600; font-size: 14px; margin: 16px 0; }
+    .divider { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
   </style>
 </head>
-<body>
-  <div style="padding: 20px; background-color: #f5f5f5;">
-    <div class="container">
-      <div class="header">
-        <h1>Tri-POD Services</h1>
-      </div>
-      <div class="body">
-        ${content}
-      </div>
-      <div class="footer">
-        <p>Tri-POD Services Team</p>
-        <p><a href="mailto:{{support_email}}?subject={{email_subject_encoded}}">Support</a> | <a href="{{platform_url}}" target="_blank" rel="noopener noreferrer">Services Portal</a></p>
-      </div>
-    </div>
-  </div>
+<body style="margin:0;padding:0;background-color:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0f2f5;">
+    <tr>
+      <td align="center" style="padding:24px 16px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+          <!-- HEADER with gradient -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#1a2b4a 0%,#2d4a7a 40%,#7b9ec9 70%,#c4d4e8 100%);padding:32px 40px 28px 40px;border-radius:8px 8px 0 0;">
+              <img src="${logoUrl}" alt="Tri-POD Services" height="36" style="display:block;height:36px;width:auto;border:0;" />
+            </td>
+          </tr>
+
+          <!-- BODY content -->
+          <tr>
+            <td style="background-color:#ffffff;padding:36px 40px 32px 40px;font-size:15px;line-height:1.7;color:#333333;">
+              ${content}
+            </td>
+          </tr>
+
+          <!-- Thin separator -->
+          <tr>
+            <td style="background-color:#ffffff;padding:0 40px;">
+              <div style="border-top:1px solid #e5e7eb;"></div>
+            </td>
+          </tr>
+
+          <!-- Sign-off -->
+          <tr>
+            <td style="background-color:#ffffff;padding:20px 40px 28px 40px;font-size:14px;color:#555555;line-height:1.6;">
+              <p style="margin:0 0 4px 0;">Best regards,</p>
+              <p style="margin:0;font-weight:600;color:#1a2b4a;">The Tri-POD Team</p>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="background-color:#1a2b4a;padding:28px 40px 20px 40px;border-radius:0 0 8px 8px;">
+              <!-- Footer top row: Logo + Social icons -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="vertical-align:middle;" width="50%">
+                    <img src="${logoUrl}" alt="Tri-POD" height="28" style="display:block;height:28px;width:auto;border:0;" />
+                  </td>
+                  <td style="vertical-align:middle;text-align:right;" width="50%">
+                    <span style="font-size:13px;color:#a0aec0;vertical-align:middle;margin-right:10px;">Visit us</span>
+                    <a href="https://www.instagram.com/tripod.platform/" target="_blank" rel="noopener noreferrer" style="display:inline-block;margin-left:6px;vertical-align:middle;">${instagramIcon}</a>
+                    <a href="https://www.facebook.com/people/Tripod-Platform/61562503354512/" target="_blank" rel="noopener noreferrer" style="display:inline-block;margin-left:6px;vertical-align:middle;">${facebookIcon}</a>
+                    <a href="https://x.com/tripod_platform" target="_blank" rel="noopener noreferrer" style="display:inline-block;margin-left:6px;vertical-align:middle;">${xIcon}</a>
+                    <a href="https://www.linkedin.com/company/tri-pod/" target="_blank" rel="noopener noreferrer" style="display:inline-block;margin-left:6px;vertical-align:middle;">${linkedinIcon}</a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Divider -->
+              <div style="border-top:1px solid #2d4a6a;margin:18px 0 16px 0;"></div>
+
+              <!-- Support links -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="font-size:13px;color:#a0aec0;line-height:1.8;">
+                    <a href="mailto:{{support_email}}?subject={{email_subject_encoded}}" style="color:#7bb3e0;text-decoration:none;">Support</a>
+                    <span style="color:#4a6080;margin:0 8px;">|</span>
+                    <a href="{{platform_url}}" target="_blank" rel="noopener noreferrer" style="color:#7bb3e0;text-decoration:none;">Services Portal</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-top:8px;font-size:13px;color:#a0aec0;">
+                    Any questions? Contact us at <a href="mailto:{{support_email}}" style="color:#7bb3e0;text-decoration:none;">{{support_email}}</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-top:14px;font-size:12px;color:#6b7a8d;">
+                    Copyright &copy; ${new Date().getFullYear()}, All rights reserved.
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>`;
 }
