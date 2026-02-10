@@ -845,7 +845,7 @@ export default function BundleRequestDetail() {
                 <CardTitle className="text-lg">General Info</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
-                {/* Row 1: Client Company (left), Client (right) */}
+                {/* Row 1: Client/Company info */}
                 {["admin", "internal_designer"].includes(currentUser?.role || "") && getClientCompanyName(request?.userId) && (
                   <div className="p-3 bg-blue-lavender/30 rounded-lg">
                     <p className="text-xs text-dark-gray mb-1">Client Company</p>
@@ -855,9 +855,13 @@ export default function BundleRequestDetail() {
                   </div>
                 )}
                 <div className="p-3 bg-blue-lavender/30 rounded-lg">
-                  <p className="text-xs text-dark-gray mb-1">Client</p>
+                  <p className="text-xs text-dark-gray mb-1">
+                    {["vendor", "vendor_designer"].includes(currentUser?.role || "") ? "Company" : "Client"}
+                  </p>
                   <p className="text-sm font-medium text-dark-blue-night" data-testid="text-client">
-                    {requester?.username || "N/A"}
+                    {["vendor", "vendor_designer"].includes(currentUser?.role || "")
+                      ? (getClientCompanyName(request?.userId) || requester?.username || "N/A")
+                      : (requester?.username || "N/A")}
                   </p>
                 </div>
                 
