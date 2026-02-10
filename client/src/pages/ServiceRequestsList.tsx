@@ -1209,7 +1209,7 @@ export default function ServiceRequestsList() {
                 <p className="font-body-reg text-dark-gray">No service requests found</p>
               </div>
             ) : (
-              <Table className="table-fixed">
+              <Table>
                 <TableHeader>
                   <TableRow>
                     {canBulkAssign && (
@@ -1227,20 +1227,20 @@ export default function ServiceRequestsList() {
                         />
                       </TableHead>
                     )}
-                    <TableHead className="w-[70px]">Job ID</TableHead>
+                    <TableHead className="whitespace-nowrap">Job ID</TableHead>
                     <TableHead>Service</TableHead>
-                    <TableHead className="w-[64px]">Method</TableHead>
-                    <TableHead className="w-[74px]">Priority</TableHead>
-                    <TableHead>{isDistributor(currentUser?.role) ? "Requester" : "Company"}</TableHead>
-                    <TableHead className="w-[86px]">Due Date</TableHead>
+                    <TableHead className="whitespace-nowrap">Method</TableHead>
+                    <TableHead className="whitespace-nowrap">Priority</TableHead>
+                    <TableHead className="whitespace-nowrap">{isDistributor(currentUser?.role) ? "Requester" : "Company"}</TableHead>
+                    <TableHead className="whitespace-nowrap">Due Date</TableHead>
                     {isDistributor(currentUser?.role) ? (
-                      <TableHead className="w-[90px]">Price</TableHead>
+                      <TableHead className="whitespace-nowrap">Price</TableHead>
                     ) : (
-                      <TableHead>Assignee</TableHead>
+                      <TableHead className="whitespace-nowrap">Assignee</TableHead>
                     )}
-                    <TableHead className="w-[140px]">Status</TableHead>
-                    <TableHead className="w-[90px]">Created</TableHead>
-                    <TableHead className="w-[80px]">Actions</TableHead>
+                    <TableHead className="whitespace-nowrap">Status</TableHead>
+                    <TableHead className="whitespace-nowrap">Created</TableHead>
+                    <TableHead className="whitespace-nowrap">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1286,8 +1286,8 @@ export default function ServiceRequestsList() {
                             </span>
                           </Link>
                         </TableCell>
-                        <TableCell className="truncate" data-testid={`text-service-${request.id}`} title={request.serviceName}>
-                          {request.serviceName}
+                        <TableCell data-testid={`text-service-${request.id}`}>
+                          <span className="line-clamp-2">{request.serviceName}</span>
                         </TableCell>
                         <TableCell data-testid={`text-method-${request.id}`}>
                           <Badge variant="outline" className="text-xs whitespace-nowrap">
@@ -1302,8 +1302,8 @@ export default function ServiceRequestsList() {
                             {request.priority ? request.priority.charAt(0).toUpperCase() + request.priority.slice(1) : "Normal"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="truncate" data-testid={`text-customer-${request.id}`} title={getCustomerDisplayName(request.userId, request.customerName)}>
-                          {getCustomerDisplayName(request.userId, request.customerName)}
+                        <TableCell data-testid={`text-customer-${request.id}`}>
+                          <span className="line-clamp-2">{getCustomerDisplayName(request.userId, request.customerName)}</span>
                         </TableCell>
                         <TableCell className="whitespace-nowrap" data-testid={`text-due-date-${request.id}`}>
                           {request.dueDate
@@ -1345,13 +1345,13 @@ export default function ServiceRequestsList() {
                             </div>
                           </TableCell>
                         ) : (
-                          <TableCell className="truncate" data-testid={`text-assignee-${request.id}`} title={getAssigneeName(request.assigneeId)}>
-                            {getAssigneeName(request.assigneeId)}
+                          <TableCell data-testid={`text-assignee-${request.id}`}>
+                            <span className="line-clamp-2">{getAssigneeName(request.assigneeId)}</span>
                           </TableCell>
                         )}
-                        <TableCell>
+                        <TableCell className="whitespace-nowrap">
                           <Badge 
-                            className={`${statusInfo.color} whitespace-nowrap`}
+                            className={`${statusInfo.color}`}
                             data-testid={`badge-status-${request.id}`}
                           >
                             <StatusIcon className="h-3 w-3 mr-1" />
