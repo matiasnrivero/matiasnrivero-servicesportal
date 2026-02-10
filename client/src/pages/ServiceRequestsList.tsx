@@ -1312,7 +1312,7 @@ export default function ServiceRequestsList() {
                         </TableCell>
                         {isDistributor(currentUser?.role) ? (
                           <TableCell data-testid={`text-price-${request.id}`}>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 whitespace-nowrap">
                               <span className="text-dark-blue-night font-medium">{request.price}</span>
                               {request.isPackCovered && (
                                 <Tooltip>
