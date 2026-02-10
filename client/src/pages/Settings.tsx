@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,7 +13,6 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -56,14 +55,232 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap, Percent, Users, UserCheck, Building2, AlertTriangle } from "lucide-react";
+import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap, Percent, Users, UserCheck, Building2, AlertTriangle, GripVertical, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { AutomationSettingsTab } from "@/components/AutomationSettings";
 import { DiscountCouponsTab } from "@/components/DiscountCouponsTab";
 import { PriorityDistributionTab } from "@/components/PriorityDistributionTab";
 import { VendorsListContent } from "@/pages/VendorsList";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem, InputField, ServiceField, BundleField, ServicePricingTier, LineItemField } from "@shared/schema";
 import { insertBundleLineItemSchema, inputFieldTypes, valueModes, pricingStructures, assignToModes, inputForTypes } from "@shared/schema";
+
+interface SettingsCard {
+  id: string;
+  title: string;
+  description: string;
+  icon: typeof Layers;
+  roles: string[];
+}
+
+const settingsCards: SettingsCard[] = [
+  {
+    id: "services",
+    title: "Services",
+    description: "Create and configure service types with their pricing structures",
+    icon: Layers,
+    roles: ["admin"],
+  },
+  {
+    id: "pricing",
+    title: "Pricing",
+    description: "Manage retail prices and pricing tiers for all services",
+    icon: DollarSign,
+    roles: ["admin"],
+  },
+  {
+    id: "line-items",
+    title: "Line Items",
+    description: "Configure line items and their field assignments",
+    icon: Package,
+    roles: ["admin"],
+  },
+  {
+    id: "bundles",
+    title: "Bundles",
+    description: "Create and manage service bundles with line items",
+    icon: Boxes,
+    roles: ["admin"],
+  },
+  {
+    id: "packs",
+    title: "Packs",
+    description: "Set up subscription packs with services and pricing",
+    icon: CalendarRange,
+    roles: ["admin"],
+  },
+  {
+    id: "subscriptions",
+    title: "Subscriptions",
+    description: "Manage client pack subscriptions and assignments",
+    icon: Users,
+    roles: ["admin"],
+  },
+  {
+    id: "automation",
+    title: "Automation",
+    description: "Configure job auto-assignment rules and capacity settings",
+    icon: Zap,
+    roles: ["admin"],
+  },
+  {
+    id: "discount-coupons",
+    title: "Discounts",
+    description: "Create and manage discount coupons and promotions",
+    icon: Percent,
+    roles: ["admin"],
+  },
+  {
+    id: "vendors",
+    title: "Vendors",
+    description: "Manage vendor companies, teams, and SLA configurations",
+    icon: Building2,
+    roles: ["admin"],
+  },
+  {
+    id: "priority",
+    title: "Priority",
+    description: "Configure priority quotas and distribution settings",
+    icon: AlertTriangle,
+    roles: ["admin"],
+  },
+  {
+    id: "input-fields",
+    title: "Input Fields",
+    description: "Manage form input fields, service fields, and bundle assignments",
+    icon: FormInput,
+    roles: ["admin", "internal_designer"],
+  },
+];
+
+function SortableSettingsCard({ card, onSelect }: { card: SettingsCard; onSelect: (id: string) => void }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: card.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  const Icon = card.icon;
+
+  return (
+    <div ref={setNodeRef} style={style} data-testid={`card-setting-${card.id}`}>
+      <Card className="cursor-pointer hover-elevate transition-all h-full">
+        <CardHeader className="flex flex-row items-center gap-3 pb-2">
+          <div
+            className="cursor-grab active:cursor-grabbing p-1 rounded-md text-muted-foreground"
+            {...attributes}
+            {...listeners}
+            data-testid={`drag-handle-setting-${card.id}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical className="w-4 h-4" />
+          </div>
+          <div
+            className="flex items-center gap-3 flex-1"
+            onClick={() => onSelect(card.id)}
+          >
+            <div className="p-2 rounded-md bg-sky-blue-accent/10">
+              <Icon className="w-6 h-6 text-sky-blue-accent" />
+            </div>
+            <div>
+              <CardTitle className="text-base">{card.title}</CardTitle>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent onClick={() => onSelect(card.id)}>
+          <CardDescription>{card.description}</CardDescription>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function applySettingsOrder(cards: SettingsCard[], savedOrder: string[] | null | undefined): SettingsCard[] {
+  if (!savedOrder || !Array.isArray(savedOrder) || savedOrder.length === 0) return cards;
+  const cardMap = new Map(cards.map((c) => [c.id, c]));
+  const ordered: SettingsCard[] = [];
+  for (const id of savedOrder) {
+    const card = cardMap.get(id);
+    if (card) {
+      ordered.push(card);
+      cardMap.delete(id);
+    }
+  }
+  cardMap.forEach((card) => ordered.push(card));
+  return ordered;
+}
+
+function SortableSettingsGrid({
+  cards,
+  onReorder,
+  onSelect,
+}: {
+  cards: SettingsCard[];
+  onReorder: (newOrder: string[]) => void;
+  onSelect: (id: string) => void;
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (over && active.id !== over.id) {
+        const oldIndex = cards.findIndex((c) => c.id === active.id);
+        const newIndex = cards.findIndex((c) => c.id === over.id);
+        const newCards = arrayMove(cards, oldIndex, newIndex);
+        onReorder(newCards.map((c) => c.id));
+      }
+    },
+    [cards, onReorder]
+  );
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={cards.map((c) => c.id)} strategy={rectSortingStrategy}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {cards.map((card) => (
+            <SortableSettingsCard key={card.id} card={card} onSelect={onSelect} />
+          ))}
+        </div>
+      </SortableContext>
+    </DndContext>
+  );
+}
 
 async function getDefaultUser(): Promise<User | null> {
   const res = await fetch("/api/default-user");
@@ -4328,14 +4545,13 @@ export default function Settings() {
   const { toast } = useToast();
   const [location] = useLocation();
   
-  // Read tab from URL query params
   const getInitialTab = () => {
     const params = new URLSearchParams(window.location.search);
-    const tab = params.get("tab");
-    return tab || "pricing";
+    return params.get("tab") || null;
   };
   
-  const [activeTab, setActiveTab] = useState(getInitialTab);
+  const [pendingTab] = useState<string | null>(getInitialTab);
+  const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [preselectedServiceId, setPreselectedServiceId] = useState<string>("");
 
   const { data: currentUser } = useQuery<User | null>({
@@ -4356,7 +4572,7 @@ export default function Settings() {
   
   const handleNavigateToServiceFields = (serviceId: string) => {
     setPreselectedServiceId(serviceId);
-    setActiveTab("input-fields");
+    setSelectedCard("input-fields");
   };
 
   useEffect(() => {
@@ -4385,6 +4601,81 @@ export default function Settings() {
   const isAdmin = currentUser?.role === "admin";
   const isInternalDesigner = currentUser?.role === "internal_designer";
   const canAccessSettings = isAdmin || isInternalDesigner;
+
+  const userRole = currentUser?.role || "";
+  const userId = (currentUser as any)?.userId || currentUser?.id || "";
+
+  const { data: savedOrder } = useQuery<{ value: string[] | null }>({
+    queryKey: ["/api/user-preferences", userId, "settings-order"],
+    queryFn: async () => {
+      const res = await fetch("/api/user-preferences/settings-order");
+      if (!res.ok) throw new Error("Failed to fetch preferences");
+      return res.json();
+    },
+    enabled: !!userId,
+  });
+
+  const saveOrderMutation = useMutation({
+    mutationFn: async (order: string[]) => {
+      await apiRequest("PUT", "/api/user-preferences/settings-order", { value: order });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user-preferences", userId, "settings-order"] });
+    },
+  });
+
+  const visibleCards = useMemo(
+    () => settingsCards.filter((card) => card.roles.includes(userRole)),
+    [userRole]
+  );
+
+  const [localOrder, setLocalOrder] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    setLocalOrder(null);
+  }, [userId]);
+
+  const displayCards = useMemo(() => {
+    if (localOrder) {
+      return applySettingsOrder(visibleCards, localOrder);
+    }
+    return applySettingsOrder(visibleCards, savedOrder?.value);
+  }, [visibleCards, localOrder, savedOrder]);
+
+  const handleReorder = useCallback(
+    (newOrder: string[]) => {
+      setLocalOrder(newOrder);
+      saveOrderMutation.mutate(newOrder);
+    },
+    [saveOrderMutation]
+  );
+
+  const handleSelectCard = useCallback((id: string) => {
+    if (isInternalDesigner && id !== "input-fields") return;
+    setSelectedCard(id);
+  }, [isInternalDesigner]);
+
+  const handleBackToGrid = useCallback(() => {
+    setSelectedCard(null);
+  }, []);
+
+  useEffect(() => {
+    if (visibleCards.length > 0) {
+      if (pendingTab && !selectedCard) {
+        const isVisible = visibleCards.some((c) => c.id === pendingTab);
+        if (isVisible) {
+          setSelectedCard(pendingTab);
+        }
+      } else if (selectedCard) {
+        const isVisible = visibleCards.some((c) => c.id === selectedCard);
+        if (!isVisible) {
+          setSelectedCard(null);
+        }
+      }
+    }
+  }, [selectedCard, visibleCards, pendingTab]);
+
+  const selectedCardData = selectedCard ? settingsCards.find((c) => c.id === selectedCard) : null;
 
   if (!canAccessSettings) {
     return (
@@ -4416,6 +4707,54 @@ export default function Settings() {
     );
   }
 
+  const renderSelectedContent = () => {
+    if (!selectedCard) return null;
+
+    const cardDef = settingsCards.find((c) => c.id === selectedCard);
+    if (cardDef && !cardDef.roles.includes(userRole)) return null;
+
+    switch (selectedCard) {
+      case "services":
+        return <ServiceManagementTabContent onNavigateToServiceFields={handleNavigateToServiceFields} />;
+      case "pricing":
+        return (
+          <PricingTabContent
+            pricingData={pricingData}
+            setPricingData={setPricingData}
+            handleSavePricing={handleSavePricing}
+            isPending={updatePricingMutation.isPending}
+          />
+        );
+      case "line-items":
+        return <LineItemsTabContent />;
+      case "bundles":
+        return <BundlesTabContent />;
+      case "packs":
+        return <PacksTabContent />;
+      case "subscriptions":
+        return <SubscriptionsTabContent />;
+      case "automation":
+        return <AutomationSettingsTab />;
+      case "discount-coupons":
+        return <DiscountCouponsTab />;
+      case "vendors":
+        return <VendorsListContent />;
+      case "priority":
+        return <PriorityDistributionTab />;
+      case "input-fields":
+        return (
+          <>
+            <InputFieldsTabContent />
+            <ServiceFieldsManager initialServiceId={preselectedServiceId} onServiceIdConsumed={() => setPreselectedServiceId("")} />
+            <LineItemFieldsManager />
+            <BundleFieldsAssignmentsManager />
+          </>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -4423,121 +4762,52 @@ export default function Settings() {
         <div className="max-w-6xl mx-auto space-y-6">
           <div className="flex items-center gap-3">
             <SettingsIcon className="h-8 w-8 text-sky-blue-accent" />
-            <h1 className="text-2xl font-semibold text-dark-blue-night">Settings <span className="text-sky-blue-accent">Hub</span></h1>
+            <h1 className="text-2xl font-semibold text-dark-blue-night" data-testid="text-settings-title">
+              Settings <span className="text-sky-blue-accent">Hub</span>
+            </h1>
           </div>
 
-          <Tabs value={isInternalDesigner ? "input-fields" : activeTab} onValueChange={(tab) => {
-            // Internal designers can only access input-fields tab
-            if (isInternalDesigner && tab !== "input-fields") return;
-            setActiveTab(tab);
-          }} className="space-y-6">
-            <TabsList>
-              {isAdmin && (
-                <>
-                  <TabsTrigger value="services" data-testid="tab-services">
-                    <Layers className="h-4 w-4 mr-1" />
-                    Services
-                  </TabsTrigger>
-                  <TabsTrigger value="pricing" data-testid="tab-pricing">
-                    <DollarSign className="h-4 w-4 mr-1" />
-                    Pricing
-                  </TabsTrigger>
-                  <TabsTrigger value="line-items" data-testid="tab-line-items">
-                    <Package className="h-4 w-4 mr-1" />
-                    Line Items
-                  </TabsTrigger>
-                  <TabsTrigger value="bundles" data-testid="tab-bundles">
-                    <Boxes className="h-4 w-4 mr-1" />
-                    Bundles
-                  </TabsTrigger>
-                  <TabsTrigger value="packs" data-testid="tab-packs">
-                    <CalendarRange className="h-4 w-4 mr-1" />
-                    Packs
-                  </TabsTrigger>
-                  <TabsTrigger value="subscriptions" data-testid="tab-subscriptions">
-                    <Users className="h-4 w-4 mr-1" />
-                    Subscriptions
-                  </TabsTrigger>
-                  <TabsTrigger value="automation" data-testid="tab-automation">
-                    <Zap className="h-4 w-4 mr-1" />
-                    Automation
-                  </TabsTrigger>
-                  <TabsTrigger value="discount-coupons" data-testid="tab-discount-coupons">
-                    <Percent className="h-4 w-4 mr-1" />
-                    Discounts
-                  </TabsTrigger>
-                  <TabsTrigger value="vendors" data-testid="tab-vendors">
-                    <Building2 className="h-4 w-4 mr-1" />
-                    Vendors
-                  </TabsTrigger>
-                  <TabsTrigger value="priority" data-testid="tab-priority">
-                    <AlertTriangle className="h-4 w-4 mr-1" />
-                    Priority
-                  </TabsTrigger>
-                </>
-              )}
-              <TabsTrigger value="input-fields" data-testid="tab-input-fields">
-                <FormInput className="h-4 w-4 mr-1" />
-                Input Fields
-              </TabsTrigger>
-            </TabsList>
-
-            {isAdmin && (
-              <>
-                <TabsContent value="services">
-                  <ServiceManagementTabContent onNavigateToServiceFields={handleNavigateToServiceFields} />
-                </TabsContent>
-
-                <TabsContent value="pricing">
-                  <PricingTabContent
-                    pricingData={pricingData}
-                    setPricingData={setPricingData}
-                    handleSavePricing={handleSavePricing}
-                    isPending={updatePricingMutation.isPending}
+          {!selectedCard ? (
+            <>
+              <p className="text-dark-gray mt-1">
+                Configure and manage your platform settings
+              </p>
+              {displayCards.length > 0 && (
+                <div className="mb-8">
+                  <h2 className="text-lg font-semibold text-dark-blue-night mb-4 flex items-center gap-2">
+                    <SettingsIcon className="w-5 h-5" />
+                    System Settings
+                  </h2>
+                  <SortableSettingsGrid
+                    cards={displayCards}
+                    onReorder={handleReorder}
+                    onSelect={handleSelectCard}
                   />
-                </TabsContent>
-
-                <TabsContent value="line-items">
-                  <LineItemsTabContent />
-                </TabsContent>
-
-                <TabsContent value="bundles">
-                  <BundlesTabContent />
-                </TabsContent>
-
-                <TabsContent value="packs">
-                  <PacksTabContent />
-                </TabsContent>
-
-                <TabsContent value="subscriptions">
-                  <SubscriptionsTabContent />
-                </TabsContent>
-
-                <TabsContent value="automation">
-                  <AutomationSettingsTab />
-                </TabsContent>
-
-                <TabsContent value="discount-coupons">
-                  <DiscountCouponsTab />
-                </TabsContent>
-
-                <TabsContent value="vendors">
-                  <VendorsListContent />
-                </TabsContent>
-
-                <TabsContent value="priority">
-                  <PriorityDistributionTab />
-                </TabsContent>
-              </>
-            )}
-
-            <TabsContent value="input-fields">
-              <InputFieldsTabContent />
-              <ServiceFieldsManager initialServiceId={preselectedServiceId} onServiceIdConsumed={() => setPreselectedServiceId("")} />
-              <LineItemFieldsManager />
-              <BundleFieldsAssignmentsManager />
-            </TabsContent>
-          </Tabs>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleBackToGrid}
+                  data-testid="button-back-to-settings"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-1" />
+                  Back to Settings
+                </Button>
+                {selectedCardData && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <selectedCardData.icon className="w-4 h-4" />
+                    <span className="text-sm font-medium">{selectedCardData.title}</span>
+                  </div>
+                )}
+              </div>
+              {renderSelectedContent()}
+            </div>
+          )}
         </div>
       </main>
     </div>
