@@ -3703,9 +3703,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "User not found" });
       }
 
-      // Only admin can list all client profiles
-      if (sessionUser.role !== "admin") {
-        return res.status(403).json({ error: "Only admins can list all client profiles" });
+      const allowedRoles = ["admin", "internal_designer", "vendor", "vendor_designer"];
+      if (!allowedRoles.includes(sessionUser.role)) {
+        return res.status(403).json({ error: "Not authorized to list client profiles" });
       }
 
       const profiles = await storage.getAllClientProfiles();

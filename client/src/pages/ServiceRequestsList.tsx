@@ -613,12 +613,17 @@ export default function ServiceRequestsList() {
 
   const getCustomerDisplayName = (userId: string, customerName: string): string => {
     if (isDistributor(currentUser?.role)) {
-      // For client/client_member, always show the actual username (the requester)
       const user = userMap[userId];
-      return user?.username || "Unknown";
+      return user?.username || customerName || "Unknown";
     }
     const companyName = getClientCompanyName(userId);
-    return companyName || customerName || "Unknown";
+    if (companyName) return companyName;
+    const user = userMap[userId];
+    if (user?.clientProfileId) {
+      const profile = clientProfileMap[user.clientProfileId];
+      if (profile?.companyName) return profile.companyName;
+    }
+    return customerName || "Unknown";
   };
 
   const getVendorIdFromAssignee = (assigneeId: string | null): string | null => {
