@@ -82,7 +82,7 @@ function getEmailWrapper(content: string): string {
       </div>
       <div class="footer">
         <p>Tri-POD Services Team</p>
-        <p><a href="mailto:{{support_email}}">{{support_email}}</a> | <a href="{{platform_url}}">{{platform_url}}</a></p>
+        <p><a href="mailto:{{support_email}}?subject={{email_subject_encoded}}">Support</a> | <a href="{{platform_url}}" target="_blank" rel="noopener noreferrer">Services Portal</a></p>
       </div>
     </div>
   </div>
@@ -788,6 +788,7 @@ export async function sendTemplatedEmail(
     };
 
     const subject = replaceVariables(template.subject, allVariables);
+    allVariables.email_subject_encoded = encodeURIComponent(`Support: ${subject}`);
     const bodyContent = replaceVariables(template.body, allVariables);
     const fullHtml = getEmailWrapper(bodyContent);
     const finalHtml = replaceVariables(fullHtml, allVariables);
