@@ -103,6 +103,7 @@ import {
   type UpdateRefund,
   type IdempotencyKey,
   type InsertIdempotencyKey,
+  type UserPreference,
   type MonthlyBillingRecord,
   type InsertMonthlyBillingRecord,
   type UpdateMonthlyBillingRecord,
@@ -151,6 +152,7 @@ import {
   monthlyPackUsage,
   refunds,
   idempotencyKeys,
+  userPreferences,
   monthlyBillingRecords,
   adminNotifications,
   notifications,
@@ -498,6 +500,9 @@ export interface IStorage {
   createIdempotencyKey(data: InsertIdempotencyKey): Promise<IdempotencyKey>;
   updateIdempotencyKey(key: string, data: Partial<InsertIdempotencyKey>): Promise<IdempotencyKey | undefined>;
   findRecentDuplicateRequest(userId: string, requestHash: string, withinSeconds: number): Promise<IdempotencyKey | undefined>;
+
+  getUserPreference(userId: string, preferenceKey: string): Promise<UserPreference | undefined>;
+  upsertUserPreference(userId: string, preferenceKey: string, preferenceValue: unknown): Promise<UserPreference>;
 }
 
 export class DbStorage implements IStorage {
@@ -2303,6 +2308,31 @@ export class DbStorage implements IStorage {
       ))
       .orderBy(desc(idempotencyKeys.createdAt))
       .limit(1);
+    return result[0];
+  }
+
+  async getUserPreference(userId: string, preferenceKey: string): Promise<UserPreference | undefined> {
+    const result = await db.select().from(userPreferences)
+      .where(and(
+        eq(userPreferences.userId, userId),
+        eq(userPreferences.preferenceKey, preferenceKey),
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async upsertUserPreference(userId: string, preferenceKey: string, preferenceValue: unknown): Promise<UserPreference> {
+    const existing = await this.getUserPreference(userId, preferenceKey);
+    if (existing) {
+      const result = await db.update(userPreferences)
+        .set({ preferenceValue, updatedAt: new Date() })
+        .where(eq(userPreferences.id, existing.id))
+        .returning();
+      return result[0];
+    }
+    const result = await db.insert(userPreferences)
+      .values({ userId, preferenceKey, preferenceValue })
+      .returning();
     return result[0];
   }
 }

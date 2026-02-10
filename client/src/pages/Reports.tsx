@@ -1,8 +1,27 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link, useLocation } from "wouter";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Header } from "@/components/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, DollarSign, Receipt, FileText, TrendingUp, Users, Package, RefreshCw, Timer } from "lucide-react";
+import { BarChart3, DollarSign, Receipt, FileText, TrendingUp, Users, Package, RefreshCw, Timer, GripVertical } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface CurrentUser {
   userId: string;
@@ -110,6 +129,119 @@ const reportCards: ReportCard[] = [
   },
 ];
 
+function SortableReportCard({ report, onNavigate }: { report: ReportCard; onNavigate: (path: string) => void }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: report.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  const Icon = report.icon;
+
+  return (
+    <div ref={setNodeRef} style={style} data-testid={`card-report-${report.id}`}>
+      <Card className="cursor-pointer hover-elevate transition-all h-full">
+        <CardHeader className="flex flex-row items-center gap-3 pb-2">
+          <div
+            className="cursor-grab active:cursor-grabbing p-1 rounded-md text-muted-foreground"
+            {...attributes}
+            {...listeners}
+            data-testid={`drag-handle-${report.id}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical className="w-4 h-4" />
+          </div>
+          <div
+            className="flex items-center gap-3 flex-1"
+            onClick={() => onNavigate(report.path)}
+          >
+            <div className="p-2 rounded-md bg-sky-blue-accent/10">
+              <Icon className="w-6 h-6 text-sky-blue-accent" />
+            </div>
+            <div>
+              <CardTitle className="text-base">{report.title}</CardTitle>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent onClick={() => onNavigate(report.path)}>
+          <CardDescription>{report.description}</CardDescription>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function applyOrder(reports: ReportCard[], savedOrder: string[] | null | undefined): ReportCard[] {
+  if (!savedOrder || !Array.isArray(savedOrder) || savedOrder.length === 0) return reports;
+  const reportMap = new Map(reports.map((r) => [r.id, r]));
+  const ordered: ReportCard[] = [];
+  for (const id of savedOrder) {
+    const report = reportMap.get(id);
+    if (report) {
+      ordered.push(report);
+      reportMap.delete(id);
+    }
+  }
+  reportMap.forEach((report) => ordered.push(report));
+  return ordered;
+}
+
+function SortableReportGrid({
+  reports,
+  onReorder,
+  onNavigate,
+}: {
+  reports: ReportCard[];
+  onReorder: (newOrder: string[]) => void;
+  onNavigate: (path: string) => void;
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (over && active.id !== over.id) {
+        const oldIndex = reports.findIndex((r) => r.id === active.id);
+        const newIndex = reports.findIndex((r) => r.id === over.id);
+        const newReports = arrayMove(reports, oldIndex, newIndex);
+        onReorder(newReports.map((r) => r.id));
+      }
+    },
+    [reports, onReorder]
+  );
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={reports.map((r) => r.id)} strategy={rectSortingStrategy}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {reports.map((report) => (
+            <SortableReportCard key={report.id} report={report} onNavigate={onNavigate} />
+          ))}
+        </div>
+      </SortableContext>
+    </DndContext>
+  );
+}
+
 export default function Reports() {
   const [, navigate] = useLocation();
 
@@ -118,18 +250,71 @@ export default function Reports() {
   });
 
   const userRole = currentUser?.role || "";
+  const userId = currentUser?.userId || "";
 
-  const visibleReports = reportCards.filter(report => 
-    report.roles.includes(userRole)
+  const { data: savedOrder } = useQuery<{ value: string[] | null }>({
+    queryKey: ["/api/user-preferences", userId, "report-order"],
+    queryFn: async () => {
+      const res = await fetch("/api/user-preferences/report-order");
+      if (!res.ok) throw new Error("Failed to fetch preferences");
+      return res.json();
+    },
+    enabled: !!userId,
+  });
+
+  const saveOrderMutation = useMutation({
+    mutationFn: async (order: string[]) => {
+      await apiRequest("PUT", "/api/user-preferences/report-order", { value: order });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user-preferences", userId, "report-order"] });
+    },
+  });
+
+  const visibleReports = useMemo(
+    () => reportCards.filter((report) => report.roles.includes(userRole)),
+    [userRole]
   );
 
-  const groupedReports = {
-    admin: visibleReports.filter(r => r.roles.includes("admin") && userRole === "admin"),
-    client: visibleReports.filter(r => r.roles.includes("client") && userRole === "client"),
-    vendor: visibleReports.filter(r => r.roles.includes("vendor") && userRole === "vendor"),
-  };
+  const roleGroupReports = useMemo(() => {
+    if (userRole === "admin") return visibleReports.filter((r) => r.roles.includes("admin"));
+    if (userRole === "client") return visibleReports.filter((r) => r.roles.includes("client"));
+    if (userRole === "vendor") return visibleReports.filter((r) => r.roles.includes("vendor"));
+    return [];
+  }, [userRole, visibleReports]);
+
+  const [localOrder, setLocalOrder] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    setLocalOrder(null);
+  }, [userId]);
+
+  const displayReports = useMemo(() => {
+    if (localOrder) {
+      return applyOrder(roleGroupReports, localOrder);
+    }
+    return applyOrder(roleGroupReports, savedOrder?.value);
+  }, [roleGroupReports, localOrder, savedOrder]);
+
+  const handleReorder = useCallback(
+    (newOrder: string[]) => {
+      setLocalOrder(newOrder);
+      saveOrderMutation.mutate(newOrder);
+    },
+    [saveOrderMutation]
+  );
 
   const hasReports = visibleReports.length > 0;
+
+  const sectionLabel =
+    userRole === "admin" ? "Admin Reports" :
+    userRole === "client" ? "Billing & Usage Reports" :
+    userRole === "vendor" ? "Vendor Reports" : "";
+
+  const SectionIcon =
+    userRole === "admin" ? Users :
+    userRole === "client" ? Receipt :
+    FileText;
 
   return (
     <div className="min-h-screen bg-background">
@@ -137,7 +322,7 @@ export default function Reports() {
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-dark-blue-night" data-testid="text-reports-title">
-            Reports
+            Reports <span className="text-sky-blue-accent">Hub</span>
           </h1>
           <p className="text-dark-gray mt-1">
             Access and analyze your business data
@@ -155,105 +340,17 @@ export default function Reports() {
           </Card>
         )}
 
-        {userRole === "admin" && groupedReports.admin.length > 0 && (
+        {displayReports.length > 0 && (
           <div className="mb-8">
             <h2 className="text-lg font-semibold text-dark-blue-night mb-4 flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              Admin Reports
+              <SectionIcon className="w-5 h-5" />
+              {sectionLabel}
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {groupedReports.admin.map((report) => {
-                const Icon = report.icon;
-                return (
-                  <Card
-                    key={report.id}
-                    className="cursor-pointer hover-elevate transition-all"
-                    onClick={() => navigate(report.path)}
-                    data-testid={`card-report-${report.id}`}
-                  >
-                    <CardHeader className="flex flex-row items-center gap-4 pb-2">
-                      <div className="p-2 rounded-md bg-sky-blue-accent/10">
-                        <Icon className="w-6 h-6 text-sky-blue-accent" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-base">{report.title}</CardTitle>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <CardDescription>{report.description}</CardDescription>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {userRole === "client" && groupedReports.client.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-lg font-semibold text-dark-blue-night mb-4 flex items-center gap-2">
-              <Receipt className="w-5 h-5" />
-              Billing & Usage Reports
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {groupedReports.client.map((report) => {
-                const Icon = report.icon;
-                return (
-                  <Card
-                    key={report.id}
-                    className="cursor-pointer hover-elevate transition-all"
-                    onClick={() => navigate(report.path)}
-                    data-testid={`card-report-${report.id}`}
-                  >
-                    <CardHeader className="flex flex-row items-center gap-4 pb-2">
-                      <div className="p-2 rounded-md bg-sky-blue-accent/10">
-                        <Icon className="w-6 h-6 text-sky-blue-accent" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-base">{report.title}</CardTitle>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <CardDescription>{report.description}</CardDescription>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {userRole === "vendor" && groupedReports.vendor.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-lg font-semibold text-dark-blue-night mb-4 flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              Vendor Reports
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {groupedReports.vendor.map((report) => {
-                const Icon = report.icon;
-                return (
-                  <Card
-                    key={report.id}
-                    className="cursor-pointer hover-elevate transition-all"
-                    onClick={() => navigate(report.path)}
-                    data-testid={`card-report-${report.id}`}
-                  >
-                    <CardHeader className="flex flex-row items-center gap-4 pb-2">
-                      <div className="p-2 rounded-md bg-sky-blue-accent/10">
-                        <Icon className="w-6 h-6 text-sky-blue-accent" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-base">{report.title}</CardTitle>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <CardDescription>{report.description}</CardDescription>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+            <SortableReportGrid
+              reports={displayReports}
+              onReorder={handleReorder}
+              onNavigate={navigate}
+            />
           </div>
         )}
       </main>

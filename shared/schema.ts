@@ -1497,6 +1497,28 @@ export type IdempotencyKey = typeof idempotencyKeys.$inferSelect;
 
 // ==================== END IDEMPOTENCY KEYS ====================
 
+// ==================== USER PREFERENCES ====================
+
+export const userPreferences = pgTable("user_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  preferenceKey: text("preference_key").notNull(),
+  preferenceValue: jsonb("preference_value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique("user_preferences_user_key_unique").on(table.userId, table.preferenceKey),
+]);
+
+export const insertUserPreferenceSchema = createInsertSchema(userPreferences).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertUserPreference = z.infer<typeof insertUserPreferenceSchema>;
+export type UserPreference = typeof userPreferences.$inferSelect;
+
+// ==================== END USER PREFERENCES ====================
+
 // Billing address structure for Stripe integration
 export type BillingAddress = {
   line1: string;

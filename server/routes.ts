@@ -13346,6 +13346,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/user-preferences/:key", async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const preference = await storage.getUserPreference(userId, req.params.key);
+      if (!preference) {
+        return res.json({ value: null });
+      }
+      res.json({ value: preference.preferenceValue });
+    } catch (error) {
+      console.error("Error fetching user preference:", error);
+      res.status(500).json({ error: "Failed to fetch preference" });
+    }
+  });
+
+  app.put("/api/user-preferences/:key", async (req, res) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const { value } = req.body;
+      if (value === undefined) {
+        return res.status(400).json({ error: "Value is required" });
+      }
+      const preference = await storage.upsertUserPreference(userId, req.params.key, value);
+      res.json({ value: preference.preferenceValue });
+    } catch (error) {
+      console.error("Error saving user preference:", error);
+      res.status(500).json({ error: "Failed to save preference" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
