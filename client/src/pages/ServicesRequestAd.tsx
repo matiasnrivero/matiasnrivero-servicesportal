@@ -122,7 +122,7 @@ function BundlesTab(): JSX.Element {
   const discountTier = billingInfo?.tripodDiscountTier || "none";
   const hasDiscount = discountTier !== "none";
   const showPricing = currentUser && (currentUser.role === "client" || currentUser.role === "admin");
-  const activeBundles = bundles;
+  const activeBundles = bundles.filter((b: BundleWithItems) => b.isActive === true);
 
   if (isLoading) {
     return (
