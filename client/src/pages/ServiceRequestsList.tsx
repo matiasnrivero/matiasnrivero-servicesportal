@@ -850,7 +850,7 @@ export default function ServiceRequestsList() {
       
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
-  }, [filteredRequests, filteredBundleRequests, overSlaFilter, isOverSla, hidePackRequests, selectedClients]);
+  }, [filteredRequests, filteredBundleRequests, overSlaFilter, isOverSla, hidePackRequests, selectedClients, services, bundles]);
 
   // Compute eligible count from selected requests for bulk assignment
   const eligibleSelectedRequests = useMemo(() => {
