@@ -10,16 +10,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Save, Loader2, AlertTriangle } from "lucide-react";
 
 interface PriorityDistribution {
-  windowSize: number;
-  maxUrgent: number;
-  maxHigh: number;
+  maxUrgentPercent: number;
+  maxHighPercent: number;
 }
 
 export function PriorityDistributionTab() {
   const { toast } = useToast();
-  const [windowSize, setWindowSize] = useState(10);
-  const [maxUrgent, setMaxUrgent] = useState(2);
-  const [maxHigh, setMaxHigh] = useState(3);
+  const [maxUrgentPercent, setMaxUrgentPercent] = useState(20);
+  const [maxHighPercent, setMaxHighPercent] = useState(30);
   const [hasChanges, setHasChanges] = useState(false);
 
   const { data: settings, isLoading } = useQuery<PriorityDistribution>({
@@ -28,9 +26,8 @@ export function PriorityDistributionTab() {
 
   useEffect(() => {
     if (settings) {
-      setWindowSize(settings.windowSize);
-      setMaxUrgent(settings.maxUrgent);
-      setMaxHigh(settings.maxHigh);
+      setMaxUrgentPercent(settings.maxUrgentPercent);
+      setMaxHighPercent(settings.maxHighPercent);
       setHasChanges(false);
     }
   }, [settings]);
@@ -58,23 +55,23 @@ export function PriorityDistributionTab() {
   });
 
   const handleSave = () => {
-    if (maxUrgent < 0 || maxHigh < 0 || windowSize < 1) {
+    if (maxUrgentPercent < 0 || maxHighPercent < 0) {
       toast({
         title: "Invalid values",
-        description: "Window size must be at least 1, and quotas cannot be negative.",
+        description: "Percentages cannot be negative.",
         variant: "destructive",
       });
       return;
     }
-    if (maxUrgent + maxHigh > windowSize) {
+    if (maxUrgentPercent + maxHighPercent > 100) {
       toast({
         title: "Invalid quotas",
-        description: "Combined urgent and high quotas cannot exceed the window size.",
+        description: "Combined Urgent and High percentages cannot exceed 100%.",
         variant: "destructive",
       });
       return;
     }
-    updateMutation.mutate({ windowSize, maxUrgent, maxHigh });
+    updateMutation.mutate({ maxUrgentPercent, maxHighPercent });
   };
 
   const handleChange = (setter: (v: number) => void, value: string) => {
@@ -95,9 +92,7 @@ export function PriorityDistributionTab() {
     );
   }
 
-  const urgentPercentage = windowSize > 0 ? Math.round((maxUrgent / windowSize) * 100) : 0;
-  const highPercentage = windowSize > 0 ? Math.round((maxHigh / windowSize) * 100) : 0;
-  const normalLowPercentage = windowSize > 0 ? Math.max(0, 100 - urgentPercentage - highPercentage) : 0;
+  const normalLowPercent = Math.max(0, 100 - maxUrgentPercent - maxHighPercent);
 
   return (
     <div className="space-y-6">
@@ -105,66 +100,51 @@ export function PriorityDistributionTab() {
         <CardHeader>
           <CardTitle data-testid="text-priority-settings-title">Priority Quota Settings</CardTitle>
           <CardDescription>
-            Configure how many active jobs a client can have at each priority level.
-            These quotas are enforced when clients submit new jobs or change job priorities.
+            Configure the maximum percentage of active jobs a client can have at each priority level.
+            These quotas are enforced dynamically based on the client's total active jobs (Pending, In Progress, and Change Request).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="windowSize">Active Jobs Window</Label>
-              <Input
-                id="windowSize"
-                type="number"
-                min={1}
-                value={windowSize}
-                onChange={(e) => handleChange(setWindowSize, e.target.value)}
-                data-testid="input-window-size"
-              />
-              <p className="text-xs text-muted-foreground">
-                Number of active jobs considered for quota enforcement
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="maxUrgent">
-                Max Urgent Jobs
+              <Label htmlFor="maxUrgentPercent">
+                Max Urgent (%)
                 <Badge variant="outline" className="ml-2 border-red-500 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30 text-xs">
                   Urgent
                 </Badge>
               </Label>
               <Input
-                id="maxUrgent"
+                id="maxUrgentPercent"
                 type="number"
                 min={0}
-                max={windowSize}
-                value={maxUrgent}
-                onChange={(e) => handleChange(setMaxUrgent, e.target.value)}
-                data-testid="input-max-urgent"
+                max={100}
+                value={maxUrgentPercent}
+                onChange={(e) => handleChange(setMaxUrgentPercent, e.target.value)}
+                data-testid="input-max-urgent-percent"
               />
               <p className="text-xs text-muted-foreground">
-                Maximum active jobs a client can have marked as Urgent
+                Maximum percentage of active jobs a client can mark as Urgent
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="maxHigh">
-                Max High Jobs
+              <Label htmlFor="maxHighPercent">
+                Max High (%)
                 <Badge variant="outline" className="ml-2 border-yellow-500 text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950/30 text-xs">
                   High
                 </Badge>
               </Label>
               <Input
-                id="maxHigh"
+                id="maxHighPercent"
                 type="number"
                 min={0}
-                max={windowSize}
-                value={maxHigh}
-                onChange={(e) => handleChange(setMaxHigh, e.target.value)}
-                data-testid="input-max-high"
+                max={100}
+                value={maxHighPercent}
+                onChange={(e) => handleChange(setMaxHighPercent, e.target.value)}
+                data-testid="input-max-high-percent"
               />
               <p className="text-xs text-muted-foreground">
-                Maximum active jobs a client can have marked as High
+                Maximum percentage of active jobs a client can mark as High
               </p>
             </div>
           </div>
@@ -174,40 +154,40 @@ export function PriorityDistributionTab() {
               <div className="flex items-start gap-2 mb-3">
                 <AlertTriangle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                 <p className="text-sm text-muted-foreground">
-                  Quota Distribution Preview (per client, across their active jobs)
+                  Quota Distribution Preview (per client, based on % of their active jobs)
                 </p>
               </div>
               <div className="flex gap-1 h-8 rounded-md overflow-hidden">
-                {urgentPercentage > 0 && (
+                {maxUrgentPercent > 0 && (
                   <div
                     className="bg-red-500 flex items-center justify-center text-white text-xs font-medium"
-                    style={{ width: `${urgentPercentage}%` }}
+                    style={{ width: `${maxUrgentPercent}%` }}
                     data-testid="bar-urgent"
                   >
-                    {maxUrgent} Urgent
+                    {maxUrgentPercent}% Urgent
                   </div>
                 )}
-                {highPercentage > 0 && (
+                {maxHighPercent > 0 && (
                   <div
                     className="bg-yellow-500 flex items-center justify-center text-white text-xs font-medium"
-                    style={{ width: `${highPercentage}%` }}
+                    style={{ width: `${maxHighPercent}%` }}
                     data-testid="bar-high"
                   >
-                    {maxHigh} High
+                    {maxHighPercent}% High
                   </div>
                 )}
-                {normalLowPercentage > 0 && (
+                {normalLowPercent > 0 && (
                   <div
                     className="bg-blue-500 flex items-center justify-center text-white text-xs font-medium"
-                    style={{ width: `${normalLowPercentage}%` }}
+                    style={{ width: `${normalLowPercent}%` }}
                     data-testid="bar-normal-low"
                   >
-                    {windowSize - maxUrgent - maxHigh} Normal/Low
+                    {normalLowPercent}% Normal/Low
                   </div>
                 )}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Out of {windowSize} active jobs, a client can have up to {maxUrgent} Urgent, {maxHigh} High, and {windowSize - maxUrgent - maxHigh} Normal or Low priority jobs.
+                For example, if a client has 50 active jobs, they can have up to {Math.floor(50 * maxUrgentPercent / 100)} Urgent, {Math.floor(50 * maxHighPercent / 100)} High, and the rest Normal or Low priority.
               </p>
             </CardContent>
           </Card>

@@ -1029,12 +1029,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Priority quota validation - check active (non-delivered) jobs for this client's profile
+      // Priority quota validation - percentage-based, check active (non-delivered) jobs for this client's profile
       if (requestData.priority === 'urgent' || requestData.priority === 'high') {
         try {
           const prioritySetting = await storage.getSystemSetting('priority_distribution');
           if (prioritySetting) {
-            const config = prioritySetting.settingValue as { windowSize: number; maxUrgent: number; maxHigh: number };
+            const raw = prioritySetting.settingValue as any;
+            const pctConfig = raw?.maxUrgentPercent !== undefined
+              ? { maxUrgentPercent: raw.maxUrgentPercent as number, maxHighPercent: raw.maxHighPercent as number }
+              : { maxUrgentPercent: 20, maxHighPercent: 30 };
             let clientProfileId = sessionUser.clientProfileId;
             
             if (clientProfileId) {
@@ -1054,15 +1057,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
               );
               
               const allActiveJobs = [...activeRequests, ...activeBundleRequests];
+              const totalActive = allActiveJobs.length + 1; // +1 for the job being submitted
               
               if (requestData.priority === 'urgent') {
                 const urgentCount = allActiveJobs.filter(r => r.priority === 'urgent').length;
-                if (urgentCount >= config.maxUrgent) {
+                const maxUrgentAllowed = pctConfig.maxUrgentPercent > 0 ? Math.max(1, Math.floor(totalActive * pctConfig.maxUrgentPercent / 100)) : 0;
+                if (urgentCount >= maxUrgentAllowed) {
                   if (submissionToken) {
                     await storage.updateIdempotencyKey(submissionToken as string, { status: "failed" });
                   }
                   return res.status(400).json({
-                    error: `You exceeded the quota of Urgent priorities for current Pending or In Progress Jobs. You can manage your priorities on the Request Jobs section.`,
+                    error: `You exceeded the ${pctConfig.maxUrgentPercent}% quota of Urgent priorities. With ${totalActive} active jobs, you can have up to ${maxUrgentAllowed} Urgent jobs. You can manage your priorities on the Request Jobs section.`,
                     code: "PRIORITY_QUOTA_EXCEEDED"
                   });
                 }
@@ -1070,12 +1075,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               if (requestData.priority === 'high') {
                 const highCount = allActiveJobs.filter(r => r.priority === 'high').length;
-                if (highCount >= config.maxHigh) {
+                const maxHighAllowed = pctConfig.maxHighPercent > 0 ? Math.max(1, Math.floor(totalActive * pctConfig.maxHighPercent / 100)) : 0;
+                if (highCount >= maxHighAllowed) {
                   if (submissionToken) {
                     await storage.updateIdempotencyKey(submissionToken as string, { status: "failed" });
                   }
                   return res.status(400).json({
-                    error: `You exceeded the quota of High priorities for current Pending or In Progress Jobs. You can manage your priorities on the Request Jobs section.`,
+                    error: `You exceeded the ${pctConfig.maxHighPercent}% quota of High priorities. With ${totalActive} active jobs, you can have up to ${maxHighAllowed} High jobs. You can manage your priorities on the Request Jobs section.`,
                     code: "PRIORITY_QUOTA_EXCEEDED"
                   });
                 }
@@ -1315,7 +1321,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (normalized === 'urgent' || normalized === 'high') {
         const prioritySetting = await storage.getSystemSetting('priority_distribution');
         if (prioritySetting) {
-          const config = prioritySetting.settingValue as { windowSize: number; maxUrgent: number; maxHigh: number };
+          const raw = prioritySetting.settingValue as any;
+          const pctConfig = raw?.maxUrgentPercent !== undefined
+            ? { maxUrgentPercent: raw.maxUrgentPercent as number, maxHighPercent: raw.maxHighPercent as number }
+            : { maxUrgentPercent: 20, maxHighPercent: 30 };
           let clientProfileId = sessionUser.clientProfileId;
           if (sessionUser.role === 'admin') {
             const jobOwner = await storage.getUser(request.userId);
@@ -1340,21 +1349,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
 
             const allActiveJobs = [...activeRequests, ...activeBundleRequests];
+            const totalActive = allActiveJobs.length + 1; // +1 for the current job being changed
 
             if (normalized === 'urgent') {
               const urgentCount = allActiveJobs.filter(r => r.priority === 'urgent').length;
-              if (urgentCount >= config.maxUrgent) {
+              const maxUrgentAllowed = pctConfig.maxUrgentPercent > 0 ? Math.max(1, Math.floor(totalActive * pctConfig.maxUrgentPercent / 100)) : 0;
+              if (urgentCount >= maxUrgentAllowed) {
                 return res.status(400).json({
-                  error: `You exceeded the quota of Urgent priorities for current Pending or In Progress Jobs. You can manage your priorities on the Request Jobs section.`,
+                  error: `You exceeded the ${pctConfig.maxUrgentPercent}% quota of Urgent priorities. With ${totalActive} active jobs, you can have up to ${maxUrgentAllowed} Urgent jobs. You can manage your priorities on the Request Jobs section.`,
                   code: "PRIORITY_QUOTA_EXCEEDED"
                 });
               }
             }
             if (normalized === 'high') {
               const highCount = allActiveJobs.filter(r => r.priority === 'high').length;
-              if (highCount >= config.maxHigh) {
+              const maxHighAllowed = pctConfig.maxHighPercent > 0 ? Math.max(1, Math.floor(totalActive * pctConfig.maxHighPercent / 100)) : 0;
+              if (highCount >= maxHighAllowed) {
                 return res.status(400).json({
-                  error: `You exceeded the quota of High priorities for current Pending or In Progress Jobs. You can manage your priorities on the Request Jobs section.`,
+                  error: `You exceeded the ${pctConfig.maxHighPercent}% quota of High priorities. With ${totalActive} active jobs, you can have up to ${maxHighAllowed} High jobs. You can manage your priorities on the Request Jobs section.`,
                   code: "PRIORITY_QUOTA_EXCEEDED"
                 });
               }
@@ -1405,7 +1417,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (normalized === 'urgent' || normalized === 'high') {
         const prioritySetting = await storage.getSystemSetting('priority_distribution');
         if (prioritySetting) {
-          const config = prioritySetting.settingValue as { windowSize: number; maxUrgent: number; maxHigh: number };
+          const raw = prioritySetting.settingValue as any;
+          const pctConfig = raw?.maxUrgentPercent !== undefined
+            ? { maxUrgentPercent: raw.maxUrgentPercent as number, maxHighPercent: raw.maxHighPercent as number }
+            : { maxUrgentPercent: 20, maxHighPercent: 30 };
           let clientProfileId = sessionUser.clientProfileId;
           if (sessionUser.role === 'admin') {
             const jobOwner = await storage.getUser(request.userId);
@@ -1430,21 +1445,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
 
             const allActiveJobs = [...activeRequests, ...activeBundleRequests];
+            const totalActive = allActiveJobs.length + 1; // +1 for the current job being changed
 
             if (normalized === 'urgent') {
               const urgentCount = allActiveJobs.filter(r => r.priority === 'urgent').length;
-              if (urgentCount >= config.maxUrgent) {
+              const maxUrgentAllowed = pctConfig.maxUrgentPercent > 0 ? Math.max(1, Math.floor(totalActive * pctConfig.maxUrgentPercent / 100)) : 0;
+              if (urgentCount >= maxUrgentAllowed) {
                 return res.status(400).json({
-                  error: `You exceeded the quota of Urgent priorities for current Pending or In Progress Jobs. You can manage your priorities on the Request Jobs section.`,
+                  error: `You exceeded the ${pctConfig.maxUrgentPercent}% quota of Urgent priorities. With ${totalActive} active jobs, you can have up to ${maxUrgentAllowed} Urgent jobs. You can manage your priorities on the Request Jobs section.`,
                   code: "PRIORITY_QUOTA_EXCEEDED"
                 });
               }
             }
             if (normalized === 'high') {
               const highCount = allActiveJobs.filter(r => r.priority === 'high').length;
-              if (highCount >= config.maxHigh) {
+              const maxHighAllowed = pctConfig.maxHighPercent > 0 ? Math.max(1, Math.floor(totalActive * pctConfig.maxHighPercent / 100)) : 0;
+              if (highCount >= maxHighAllowed) {
                 return res.status(400).json({
-                  error: `You exceeded the quota of High priorities for current Pending or In Progress Jobs. You can manage your priorities on the Request Jobs section.`,
+                  error: `You exceeded the ${pctConfig.maxHighPercent}% quota of High priorities. With ${totalActive} active jobs, you can have up to ${maxHighAllowed} High jobs. You can manage your priorities on the Request Jobs section.`,
                   code: "PRIORITY_QUOTA_EXCEEDED"
                 });
               }
@@ -1474,10 +1492,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const prioritySetting = await storage.getSystemSetting('priority_distribution');
-      const config = (prioritySetting?.settingValue as { windowSize: number; maxUrgent: number; maxHigh: number }) || { windowSize: 10, maxUrgent: 2, maxHigh: 3 };
+      const raw = prioritySetting?.settingValue as any;
+      const config = raw?.maxUrgentPercent !== undefined
+        ? { maxUrgentPercent: raw.maxUrgentPercent as number, maxHighPercent: raw.maxHighPercent as number }
+        : { maxUrgentPercent: 20, maxHighPercent: 30 };
 
       let urgentCount = 0;
       let highCount = 0;
+      let totalActiveJobs = 0;
 
       const clientProfileId = sessionUser.clientProfileId;
       if (clientProfileId) {
@@ -1497,14 +1519,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
 
         const allActiveJobs = [...activeRequests, ...activeBundleRequests];
+        totalActiveJobs = allActiveJobs.length;
         urgentCount = allActiveJobs.filter(r => r.priority === 'urgent').length;
         highCount = allActiveJobs.filter(r => r.priority === 'high').length;
       }
 
+      const maxUrgentAllowed = config.maxUrgentPercent > 0 ? Math.max(1, Math.floor(totalActiveJobs * config.maxUrgentPercent / 100)) : 0;
+      const maxHighAllowed = config.maxHighPercent > 0 ? Math.max(1, Math.floor(totalActiveJobs * config.maxHighPercent / 100)) : 0;
+
       res.json({
         config,
+        totalActiveJobs,
         usage: { urgent: urgentCount, high: highCount },
-        remaining: { urgent: Math.max(0, config.maxUrgent - urgentCount), high: Math.max(0, config.maxHigh - highCount) }
+        maxAllowed: { urgent: maxUrgentAllowed, high: maxHighAllowed },
+        remaining: { urgent: Math.max(0, maxUrgentAllowed - urgentCount), high: Math.max(0, maxHighAllowed - highCount) }
       });
     } catch (error: any) {
       console.error("Error checking priority quota:", error);
@@ -1525,7 +1553,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const setting = await storage.getSystemSetting('priority_distribution');
-      const config = (setting?.settingValue as { windowSize: number; maxUrgent: number; maxHigh: number }) || { windowSize: 10, maxUrgent: 2, maxHigh: 3 };
+      const raw = setting?.settingValue as any;
+      const config = raw?.maxUrgentPercent !== undefined
+        ? { maxUrgentPercent: raw.maxUrgentPercent, maxHighPercent: raw.maxHighPercent }
+        : { maxUrgentPercent: 20, maxHighPercent: 30 };
       res.json(config);
     } catch (error: any) {
       console.error("Error fetching priority distribution:", error);
@@ -1545,15 +1576,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Admin access required" });
       }
 
-      const { windowSize, maxUrgent, maxHigh } = req.body;
-      if (typeof windowSize !== 'number' || typeof maxUrgent !== 'number' || typeof maxHigh !== 'number') {
-        return res.status(400).json({ error: "windowSize, maxUrgent, and maxHigh must be numbers" });
+      const { maxUrgentPercent, maxHighPercent } = req.body;
+      if (typeof maxUrgentPercent !== 'number' || typeof maxHighPercent !== 'number') {
+        return res.status(400).json({ error: "maxUrgentPercent and maxHighPercent must be numbers" });
       }
-      if (windowSize < 1 || maxUrgent < 0 || maxHigh < 0) {
-        return res.status(400).json({ error: "windowSize must be >= 1, maxUrgent and maxHigh must be >= 0" });
+      if (maxUrgentPercent < 0 || maxHighPercent < 0) {
+        return res.status(400).json({ error: "Percentages must be >= 0" });
+      }
+      if (maxUrgentPercent + maxHighPercent > 100) {
+        return res.status(400).json({ error: "Combined percentages cannot exceed 100%" });
       }
 
-      const updated = await storage.setSystemSetting('priority_distribution', { windowSize, maxUrgent, maxHigh });
+      const updated = await storage.setSystemSetting('priority_distribution', { maxUrgentPercent, maxHighPercent });
       res.json(updated.settingValue);
     } catch (error: any) {
       console.error("Error updating priority distribution:", error);
@@ -7170,12 +7204,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       requestData.discountAmount = totalDiscountAmount.toFixed(2);
       requestData.finalPrice = serverFinalPrice.toFixed(2);
 
-      // Priority quota validation for bundle requests
+      // Priority quota validation for bundle requests (percentage-based)
       if (requestData.priority === 'urgent' || requestData.priority === 'high') {
         try {
           const prioritySetting = await storage.getSystemSetting('priority_distribution');
           if (prioritySetting) {
-            const config = prioritySetting.settingValue as { windowSize: number; maxUrgent: number; maxHigh: number };
+            const raw = prioritySetting.settingValue as any;
+            const pctConfig = raw?.maxUrgentPercent !== undefined
+              ? { maxUrgentPercent: raw.maxUrgentPercent as number, maxHighPercent: raw.maxHighPercent as number }
+              : { maxUrgentPercent: 20, maxHighPercent: 30 };
             let clientProfileId = sessionUser.clientProfileId;
             
             if (clientProfileId) {
@@ -7195,15 +7232,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
               );
               
               const allActiveJobs = [...activeRequests, ...activeBundleReqs];
+              const totalActive = allActiveJobs.length + 1; // +1 for the bundle being submitted
               
               if (requestData.priority === 'urgent') {
                 const urgentCount = allActiveJobs.filter(r => r.priority === 'urgent').length;
-                if (urgentCount >= config.maxUrgent) {
+                const maxUrgentAllowed = pctConfig.maxUrgentPercent > 0 ? Math.max(1, Math.floor(totalActive * pctConfig.maxUrgentPercent / 100)) : 0;
+                if (urgentCount >= maxUrgentAllowed) {
                   if (submissionToken) {
                     await storage.updateIdempotencyKey(submissionToken as string, { status: "failed" });
                   }
                   return res.status(400).json({
-                    error: `You exceeded the quota of Urgent priorities for current Pending or In Progress Jobs. You can manage your priorities on the Request Jobs section.`,
+                    error: `You exceeded the ${pctConfig.maxUrgentPercent}% quota of Urgent priorities. With ${totalActive} active jobs, you can have up to ${maxUrgentAllowed} Urgent jobs. You can manage your priorities on the Request Jobs section.`,
                     code: "PRIORITY_QUOTA_EXCEEDED"
                   });
                 }
@@ -7211,12 +7250,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               if (requestData.priority === 'high') {
                 const highCount = allActiveJobs.filter(r => r.priority === 'high').length;
-                if (highCount >= config.maxHigh) {
+                const maxHighAllowed = pctConfig.maxHighPercent > 0 ? Math.max(1, Math.floor(totalActive * pctConfig.maxHighPercent / 100)) : 0;
+                if (highCount >= maxHighAllowed) {
                   if (submissionToken) {
                     await storage.updateIdempotencyKey(submissionToken as string, { status: "failed" });
                   }
                   return res.status(400).json({
-                    error: `You exceeded the quota of High priorities for current Pending or In Progress Jobs. You can manage your priorities on the Request Jobs section.`,
+                    error: `You exceeded the ${pctConfig.maxHighPercent}% quota of High priorities. With ${totalActive} active jobs, you can have up to ${maxHighAllowed} High jobs. You can manage your priorities on the Request Jobs section.`,
                     code: "PRIORITY_QUOTA_EXCEEDED"
                   });
                 }
