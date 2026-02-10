@@ -19,7 +19,7 @@ import { Search, Loader2, FileText, Package } from "lucide-react";
 import type { User } from "@shared/schema";
 import { useState, useEffect, useRef } from "react";
 import { NotificationBell } from "@/components/NotificationBell";
-import logoImg from "@assets/left_alligned_(3)_1770668014068.png";
+import logoImg from "@assets/left_alligned_Services_1770755353119.png";
 
 type UserSession = {
   userId: string;
