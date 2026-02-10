@@ -56,10 +56,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap, Percent, Users, UserCheck } from "lucide-react";
+import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap, Percent, Users, UserCheck, Building2 } from "lucide-react";
 import { format } from "date-fns";
 import { AutomationSettingsTab } from "@/components/AutomationSettings";
 import { DiscountCouponsTab } from "@/components/DiscountCouponsTab";
+import { VendorsListContent } from "@/pages/VendorsList";
 import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem, InputField, ServiceField, BundleField, ServicePricingTier, LineItemField } from "@shared/schema";
 import { insertBundleLineItemSchema, inputFieldTypes, valueModes, pricingStructures, assignToModes, inputForTypes } from "@shared/schema";
 
@@ -4421,7 +4422,7 @@ export default function Settings() {
         <div className="max-w-6xl mx-auto space-y-6">
           <div className="flex items-center gap-3">
             <SettingsIcon className="h-8 w-8 text-sky-blue-accent" />
-            <h1 className="text-2xl font-semibold text-dark-blue-night">Settings</h1>
+            <h1 className="text-2xl font-semibold text-dark-blue-night">Settings <span className="text-sky-blue-accent">Hub</span></h1>
           </div>
 
           <Tabs value={isInternalDesigner ? "input-fields" : activeTab} onValueChange={(tab) => {
@@ -4463,6 +4464,10 @@ export default function Settings() {
                   <TabsTrigger value="discount-coupons" data-testid="tab-discount-coupons">
                     <Percent className="h-4 w-4 mr-1" />
                     Discounts
+                  </TabsTrigger>
+                  <TabsTrigger value="vendors" data-testid="tab-vendors">
+                    <Building2 className="h-4 w-4 mr-1" />
+                    Vendors
                   </TabsTrigger>
                 </>
               )}
@@ -4509,6 +4514,10 @@ export default function Settings() {
 
                 <TabsContent value="discount-coupons">
                   <DiscountCouponsTab />
+                </TabsContent>
+
+                <TabsContent value="vendors">
+                  <VendorsListContent />
                 </TabsContent>
               </>
             )}

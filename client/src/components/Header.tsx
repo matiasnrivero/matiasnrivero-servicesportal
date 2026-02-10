@@ -158,7 +158,6 @@ export function Header() {
   const isAnyClient = isClient || isClientMember;
   const canManageUsers = isAdmin || isInternalDesigner;
   const canViewVendorProfile = isVendor;
-  const canViewVendorsList = isAdmin;
   const canViewClientCompanies = isAdmin;
   // Vendor and Vendor Designer should not see Services menu (they can't create new requests)
   const canViewServices = !isVendor && !isVendorDesigner;
@@ -274,17 +273,6 @@ export function Header() {
                 data-testid="nav-vendor-profile"
               >
                 Profile
-              </Button>
-            </Link>
-          )}
-          {canViewVendorsList && (
-            <Link href="/vendors">
-              <Button
-                variant={location.startsWith("/vendors") ? "default" : "ghost"}
-                className={location.startsWith("/vendors") ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
-                data-testid="nav-vendors"
-              >
-                Vendors
               </Button>
             </Link>
           )}

@@ -49,7 +49,7 @@ async function getDefaultUser(): Promise<UserSession | null> {
   return res.json();
 }
 
-export default function VendorsList() {
+export function VendorsListContent() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
@@ -172,46 +172,35 @@ export default function VendorsList() {
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <div className="p-8">
-          <div className="max-w-4xl mx-auto text-center py-12">
-            <Building2 className="h-16 w-16 text-dark-gray mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-dark-blue-night mb-2">
-              Admin Access Required
-            </h2>
-            <p className="text-dark-gray">
-              This page is only accessible to Admin users.
-            </p>
-          </div>
-        </div>
+      <div className="text-center py-12">
+        <Building2 className="h-16 w-16 text-dark-gray mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-dark-blue-night mb-2">
+          Admin Access Required
+        </h2>
+        <p className="text-dark-gray">
+          This page is only accessible to Admin users.
+        </p>
       </div>
     );
   }
 
   if (usersLoading || profilesLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-blue-accent"></div>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-blue-accent"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <div className="p-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between gap-3 mb-6">
-            <div className="flex items-center gap-3">
-              <Building2 className="h-8 w-8 text-sky-blue-accent" />
-              <h1 className="font-title-semibold text-dark-blue-night text-2xl">
-                Vendors
-              </h1>
-            </div>
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-3">
+          <Building2 className="h-6 w-6 text-sky-blue-accent" />
+          <h2 className="font-title-semibold text-dark-blue-night text-lg">
+            Vendors
+          </h2>
+        </div>
             <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
               <DialogTrigger asChild>
                 <Button data-testid="button-add-vendor">
@@ -489,6 +478,17 @@ export default function VendorsList() {
               )}
             </CardContent>
           </Card>
+    </div>
+  );
+}
+
+export default function VendorsList() {
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+      <div className="p-8">
+        <div className="max-w-6xl mx-auto">
+          <VendorsListContent />
         </div>
       </div>
     </div>
