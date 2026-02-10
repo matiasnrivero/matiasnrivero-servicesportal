@@ -1,0 +1,27 @@
+Priorities Management:
+For Ad-hoc Jobs and Bundles I added the input field "Priority" that assumes the following values:
+Urgent
+High
+Normal
+Low
+When a Client submits a Job (or Admin or Internal Designer) by Default all jobs are created under "Normal" Priority unless the Client (or Admin or Internal Designer for jobs without price) change the Priority on a Dropdown on the service form. If no action is submitted as "Normal".
+Show Priority column on Request List and also on the Cards view (Kanban). Show the Jobs ordered by date, but user can sort by priority and Create Date.
+Jobs should be order based on Priority by default only when the user filters by "Client". Priorities are also manage inside the client. If I filter by client, then priorities have to be sorted. 
+Check the Default value on the "priority" input field on the Ah-hoc Services (same as you are doing for Bundles) and add the default value on the form. 
+We shouldn't show the "select priority" option, the field has to be completed with the default value and the user only can change it by other priority. But a Job (Ah-hoc and Bundles) cannot be submitted without priorities. Also make sure that bundles don't show the "select priority), check the default value and add it on screen by default, letting the user just change among the priorities dropdown.
+Client can have a gauss bell (e.g Every 10 Jobs they can have as many as they want as LOW/NORMAL, but only 2 can be urgent and then 3 can be High). Prompt this with Chat GPT.
+Recommended distribution (simple, works well)
+Rolling window = last 10 jobs (or last 30 days, whichever is easier)
+Urgent: max 2 / 10 (20%)
+High: max 3 / 10 (30%)
+Normal + Low: remaining 5 / 10 (50%) any mix
+This matches your example and is a good “default SaaS” baseline.
+Why it works:
+It still lets a client “push” when needed.
+It prevents “everything is urgent.”
+It’s easy to explain and enforce.
+Make Gauss bell distribution configurable by Admins on settings. 
+Change request are pop-up into the Request List, and order also Change Requests by priority.
+Urgent Change Request Job comes before in the order list than Urgent First Request Job (and so on for every priority).
+Add priority filter on services request list.
+Vendor SLA performance Report add "Priority" filter, so we can track how the solve priorities comparing to lower properties jobs. Measure in Day/Hour. Not because we track different SLAs with different priorities but because we want to see how they work and suggest improvements.
