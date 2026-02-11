@@ -267,7 +267,7 @@ export default function ServiceRequestsList() {
   
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusFromUrl);
   const [overSlaFilter, setOverSlaFilter] = useState<boolean>(initialOverSla);
-  const [hidePackRequests, setHidePackRequests] = useState<boolean>(false);
+  const [packFilter, setPackFilter] = useState<"all" | "not_pack" | "pack_only">("all");
   const [viewMode, setViewMode] = useState<"list" | "board">(() => {
     const saved = localStorage.getItem("serviceRequestsViewMode");
     return (saved as "list" | "board") || "list";
@@ -753,7 +753,7 @@ export default function ServiceRequestsList() {
     });
   }, [bundleRequests, statusFilter, vendorFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId, currentUser?.role, priorityFilter]);
 
-  const hasActiveFilters = vendorFilter !== "all" || serviceFilter !== "all" || serviceMethodFilter !== "all" || priorityFilter !== "all" || dateFrom || dateTo || selectedClients.length > 0 || searchJobId;
+  const hasActiveFilters = vendorFilter !== "all" || serviceFilter !== "all" || serviceMethodFilter !== "all" || priorityFilter !== "all" || dateFrom || dateTo || selectedClients.length > 0 || searchJobId || packFilter !== "all";
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -765,8 +765,9 @@ export default function ServiceRequestsList() {
     if (dateTo) count++;
     if (selectedClients.length > 0) count++;
     if (searchJobId) count++;
+    if (packFilter !== "all") count++;
     return count;
-  }, [vendorFilter, priorityFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId]);
+  }, [vendorFilter, priorityFilter, serviceFilter, serviceMethodFilter, dateFrom, dateTo, selectedClients, searchJobId, packFilter]);
 
   const clearAllFilters = () => {
     setVendorFilter("all");
@@ -779,7 +780,7 @@ export default function ServiceRequestsList() {
     setSearchJobId("");
     setStatusFilter("all");
     setOverSlaFilter(false);
-    setHidePackRequests(false);
+    setPackFilter("all");
   };
   
   // Helper function to check if a job is over SLA
@@ -836,9 +837,10 @@ export default function ServiceRequestsList() {
       combined = combined.filter(r => isOverSla(r.dueDate, r.status));
     }
     
-    // Apply hidePackRequests filter if active (for internal designers)
-    if (hidePackRequests) {
+    if (packFilter === "not_pack") {
       combined = combined.filter(r => !r.isPackCovered);
+    } else if (packFilter === "pack_only") {
+      combined = combined.filter(r => r.isPackCovered);
     }
     
     return combined.sort((a, b) => {
@@ -855,7 +857,7 @@ export default function ServiceRequestsList() {
       
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
-  }, [filteredRequests, filteredBundleRequests, overSlaFilter, isOverSla, hidePackRequests, selectedClients, services, bundles]);
+  }, [filteredRequests, filteredBundleRequests, overSlaFilter, isOverSla, packFilter, selectedClients, services, bundles]);
 
   // Compute eligible count from selected requests for bulk assignment
   const eligibleSelectedRequests = useMemo(() => {
@@ -1159,16 +1161,18 @@ export default function ServiceRequestsList() {
               </div>
 
               {(currentUser?.role === "internal_designer" || currentUser?.role === "admin") && (
-                <div className="flex items-center gap-2 self-end pb-2">
-                  <Checkbox
-                    id="hide-pack-requests"
-                    checked={hidePackRequests}
-                    onCheckedChange={(checked) => setHidePackRequests(checked === true)}
-                    data-testid="checkbox-hide-pack-requests"
-                  />
-                  <Label htmlFor="hide-pack-requests" className="text-sm cursor-pointer">
-                    Hide pack-based requests
-                  </Label>
+                <div>
+                  <Label className="text-sm font-medium mb-1.5 block">Pack Filter</Label>
+                  <Select value={packFilter} onValueChange={(val) => setPackFilter(val as "all" | "not_pack" | "pack_only")}>
+                    <SelectTrigger data-testid="select-pack-filter">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all" data-testid="option-pack-filter-all">Show all requests</SelectItem>
+                      <SelectItem value="not_pack" data-testid="option-pack-filter-not-pack">Show not pack-based requests</SelectItem>
+                      <SelectItem value="pack_only" data-testid="option-pack-filter-pack-only">Show pack-based requests</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
                     </div>
