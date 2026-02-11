@@ -409,7 +409,9 @@ export default function ServiceRequestForm() {
         const updated = { ...prev };
         serviceFormFields.forEach(field => {
           if (field.inputField && field.defaultValue != null && updated[field.inputField.fieldKey] === undefined) {
-            updated[field.inputField.fieldKey] = field.defaultValue;
+            if (field.inputField.fieldKey === 'priority') {
+              updated[field.inputField.fieldKey] = field.defaultValue;
+            }
           }
         });
         return updated;
