@@ -75,17 +75,34 @@ export const notificationService = {
     admins: NotificationRecipient[],
     vars: { job_id: string; service_name: string; requester_name: string; client_name: string; submitted_date: string; job_url: string }
   ) {
-    await notifyAndEmail(
-      admins,
-      EMAIL_TEMPLATES.SERVICE_REQUEST_ADMIN,
-      vars,
-      {
-        type: "service_request_admin",
-        title: "New service request",
-        message: "{{client_name}} submitted Job {{job_id}}\nService: {{service_name}}",
-        link: vars.job_url,
-      }
+    const prefs = await storage.getAdminEmailPreferencesForType("new_service_request");
+    const optedOutAdminIds = new Set(
+      prefs.filter(p => !p.enabled).map(p => p.adminId)
     );
+    const emailAdmins = admins.filter(a => !optedOutAdminIds.has(a.userId));
+    const noEmailAdmins = admins.filter(a => optedOutAdminIds.has(a.userId));
+
+    const notification = {
+      type: "service_request_admin",
+      title: "New service request",
+      message: "{{client_name}} submitted Job {{job_id}}\nService: {{service_name}}",
+      link: vars.job_url,
+    };
+
+    if (emailAdmins.length > 0) {
+      await notifyAndEmail(emailAdmins, EMAIL_TEMPLATES.SERVICE_REQUEST_ADMIN, vars, notification);
+    }
+    if (noEmailAdmins.length > 0) {
+      const notifData = noEmailAdmins.map(r => ({
+        userId: r.userId,
+        type: notification.type,
+        title: notification.title,
+        message: replaceVariables(notification.message, vars),
+        link: notification.link ? replaceVariables(notification.link, vars) : undefined,
+        isRead: false,
+      }));
+      await storage.createNotifications(notifData);
+    }
   },
 
   async onJobInProgress(
@@ -228,17 +245,34 @@ export const notificationService = {
     admins: NotificationRecipient[],
     vars: { job_id: string; service_name: string; client_name: string; canceled_by_name: string; job_url: string }
   ) {
-    await notifyAndEmail(
-      admins,
-      EMAIL_TEMPLATES.JOB_CANCELED_ADMIN,
-      vars,
-      {
-        type: "job_canceled",
-        title: "Job canceled",
-        message: "Job {{job_id}} was canceled by {{canceled_by_name}}\nNo further action required",
-        link: vars.job_url,
-      }
+    const prefs = await storage.getAdminEmailPreferencesForType("job_cancellation");
+    const optedOutAdminIds = new Set(
+      prefs.filter(p => !p.enabled).map(p => p.adminId)
     );
+    const emailAdmins = admins.filter(a => !optedOutAdminIds.has(a.userId));
+    const noEmailAdmins = admins.filter(a => optedOutAdminIds.has(a.userId));
+
+    const notification = {
+      type: "job_canceled",
+      title: "Job canceled",
+      message: "Job {{job_id}} was canceled by {{canceled_by_name}}\nNo further action required",
+      link: vars.job_url,
+    };
+
+    if (emailAdmins.length > 0) {
+      await notifyAndEmail(emailAdmins, EMAIL_TEMPLATES.JOB_CANCELED_ADMIN, vars, notification);
+    }
+    if (noEmailAdmins.length > 0) {
+      const notifData = noEmailAdmins.map(r => ({
+        userId: r.userId,
+        type: notification.type,
+        title: notification.title,
+        message: replaceVariables(notification.message, vars),
+        link: notification.link ? replaceVariables(notification.link, vars) : undefined,
+        isRead: false,
+      }));
+      await storage.createNotifications(notifData);
+    }
   },
 
   async onJobCanceledVendor(
@@ -296,17 +330,34 @@ export const notificationService = {
     admins: NotificationRecipient[],
     vars: { pack_name: string; service_name: string; pack_quantity: string; renewal_date: string; client_name: string; packs_admin_url: string }
   ) {
-    await notifyAndEmail(
-      admins,
-      EMAIL_TEMPLATES.PACK_ACTIVATED_ADMIN,
-      vars,
-      {
-        type: "pack_activated_admin",
-        title: "New pack subscription",
-        message: "{{client_name}} activated {{pack_name}}\n{{pack_quantity}} {{service_name}} / month",
-        link: vars.packs_admin_url,
-      }
+    const prefs = await storage.getAdminEmailPreferencesForType("new_pack_subscription");
+    const optedOutAdminIds = new Set(
+      prefs.filter(p => !p.enabled).map(p => p.adminId)
     );
+    const emailAdmins = admins.filter(a => !optedOutAdminIds.has(a.userId));
+    const noEmailAdmins = admins.filter(a => optedOutAdminIds.has(a.userId));
+
+    const notification = {
+      type: "pack_activated_admin",
+      title: "New pack subscription",
+      message: "{{client_name}} activated {{pack_name}}\n{{pack_quantity}} {{service_name}} / month",
+      link: vars.packs_admin_url,
+    };
+
+    if (emailAdmins.length > 0) {
+      await notifyAndEmail(emailAdmins, EMAIL_TEMPLATES.PACK_ACTIVATED_ADMIN, vars, notification);
+    }
+    if (noEmailAdmins.length > 0) {
+      const notifData = noEmailAdmins.map(r => ({
+        userId: r.userId,
+        type: notification.type,
+        title: notification.title,
+        message: replaceVariables(notification.message, vars),
+        link: notification.link ? replaceVariables(notification.link, vars) : undefined,
+        isRead: false,
+      }));
+      await storage.createNotifications(notifData);
+    }
   },
 
   async onPackCanceledClient(
@@ -330,17 +381,34 @@ export const notificationService = {
     admins: NotificationRecipient[],
     vars: { pack_name: string; service_name: string; pack_quantity: string; cancelation_effective_date: string; client_name: string; packs_admin_url: string }
   ) {
-    await notifyAndEmail(
-      admins,
-      EMAIL_TEMPLATES.PACK_CANCELED_ADMIN,
-      vars,
-      {
-        type: "pack_canceled_admin",
-        title: "Pack canceled",
-        message: "{{client_name}} canceled {{pack_name}}\nActive until {{cancelation_effective_date}}",
-        link: vars.packs_admin_url,
-      }
+    const prefs = await storage.getAdminEmailPreferencesForType("pack_cancellation");
+    const optedOutAdminIds = new Set(
+      prefs.filter(p => !p.enabled).map(p => p.adminId)
     );
+    const emailAdmins = admins.filter(a => !optedOutAdminIds.has(a.userId));
+    const noEmailAdmins = admins.filter(a => optedOutAdminIds.has(a.userId));
+
+    const notification = {
+      type: "pack_canceled_admin",
+      title: "Pack canceled",
+      message: "{{client_name}} canceled {{pack_name}}\nActive until {{cancelation_effective_date}}",
+      link: vars.packs_admin_url,
+    };
+
+    if (emailAdmins.length > 0) {
+      await notifyAndEmail(emailAdmins, EMAIL_TEMPLATES.PACK_CANCELED_ADMIN, vars, notification);
+    }
+    if (noEmailAdmins.length > 0) {
+      const notifData = noEmailAdmins.map(r => ({
+        userId: r.userId,
+        type: notification.type,
+        title: notification.title,
+        message: replaceVariables(notification.message, vars),
+        link: notification.link ? replaceVariables(notification.link, vars) : undefined,
+        isRead: false,
+      }));
+      await storage.createNotifications(notifData);
+    }
   },
 
   async onPackCanceledVendor(
@@ -398,17 +466,34 @@ export const notificationService = {
     admins: NotificationRecipient[],
     vars: { previous_pack_name: string; previous_pack_quantity: string; new_pack_name: string; new_pack_quantity: string; service_name: string; renewal_date: string; client_name: string; packs_admin_url: string }
   ) {
-    await notifyAndEmail(
-      admins,
-      EMAIL_TEMPLATES.PACK_UPGRADED_ADMIN,
-      vars,
-      {
-        type: "pack_upgraded_admin",
-        title: "Pack upgraded",
-        message: "{{client_name}} increased {{service_name}} capacity\n{{previous_pack_quantity}} \u2192 {{new_pack_quantity}} / month",
-        link: vars.packs_admin_url,
-      }
+    const prefs = await storage.getAdminEmailPreferencesForType("pack_upgrade");
+    const optedOutAdminIds = new Set(
+      prefs.filter(p => !p.enabled).map(p => p.adminId)
     );
+    const emailAdmins = admins.filter(a => !optedOutAdminIds.has(a.userId));
+    const noEmailAdmins = admins.filter(a => optedOutAdminIds.has(a.userId));
+
+    const notification = {
+      type: "pack_upgraded_admin",
+      title: "Pack upgraded",
+      message: "{{client_name}} increased {{service_name}} capacity\n{{previous_pack_quantity}} \u2192 {{new_pack_quantity}} / month",
+      link: vars.packs_admin_url,
+    };
+
+    if (emailAdmins.length > 0) {
+      await notifyAndEmail(emailAdmins, EMAIL_TEMPLATES.PACK_UPGRADED_ADMIN, vars, notification);
+    }
+    if (noEmailAdmins.length > 0) {
+      const notifData = noEmailAdmins.map(r => ({
+        userId: r.userId,
+        type: notification.type,
+        title: notification.title,
+        message: replaceVariables(notification.message, vars),
+        link: notification.link ? replaceVariables(notification.link, vars) : undefined,
+        isRead: false,
+      }));
+      await storage.createNotifications(notifData);
+    }
   },
 
   async onPackUpgradedVendor(
@@ -449,17 +534,34 @@ export const notificationService = {
     admins: NotificationRecipient[],
     vars: { previous_pack_name: string; previous_pack_quantity: string; new_pack_name: string; new_pack_quantity: string; service_name: string; renewal_date: string; client_name: string; packs_admin_url: string }
   ) {
-    await notifyAndEmail(
-      admins,
-      EMAIL_TEMPLATES.PACK_DOWNGRADED_ADMIN,
-      vars,
-      {
-        type: "pack_downgraded_admin",
-        title: "Pack downgraded",
-        message: "{{client_name}} reduced {{service_name}} capacity\n{{previous_pack_quantity}} \u2192 {{new_pack_quantity}} / month",
-        link: vars.packs_admin_url,
-      }
+    const prefs = await storage.getAdminEmailPreferencesForType("pack_downgrade");
+    const optedOutAdminIds = new Set(
+      prefs.filter(p => !p.enabled).map(p => p.adminId)
     );
+    const emailAdmins = admins.filter(a => !optedOutAdminIds.has(a.userId));
+    const noEmailAdmins = admins.filter(a => optedOutAdminIds.has(a.userId));
+
+    const notification = {
+      type: "pack_downgraded_admin",
+      title: "Pack downgraded",
+      message: "{{client_name}} reduced {{service_name}} capacity\n{{previous_pack_quantity}} \u2192 {{new_pack_quantity}} / month",
+      link: vars.packs_admin_url,
+    };
+
+    if (emailAdmins.length > 0) {
+      await notifyAndEmail(emailAdmins, EMAIL_TEMPLATES.PACK_DOWNGRADED_ADMIN, vars, notification);
+    }
+    if (noEmailAdmins.length > 0) {
+      const notifData = noEmailAdmins.map(r => ({
+        userId: r.userId,
+        type: notification.type,
+        title: notification.title,
+        message: replaceVariables(notification.message, vars),
+        link: notification.link ? replaceVariables(notification.link, vars) : undefined,
+        isRead: false,
+      }));
+      await storage.createNotifications(notifData);
+    }
   },
 
   async onPackDowngradedVendor(

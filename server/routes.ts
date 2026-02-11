@@ -7,6 +7,7 @@ import { automationEngine } from "./services/automationEngine";
 import { stripeService } from "./services/stripeService";
 import { notificationService } from "./services/notificationService";
 import type { User } from "@shared/schema";
+import { adminEmailPreferenceTypes } from "@shared/schema";
 
 /**
  * Apply Tri-POD product discount tier to a price
@@ -1591,6 +1592,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updated.settingValue);
     } catch (error: any) {
       console.error("Error updating priority distribution:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    }
+  });
+
+  // Admin: Get email preferences matrix
+  app.get("/api/admin-email-preferences", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== 'admin') {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const allUsers = await storage.getAllUsers();
+      const admins = allUsers.filter(u => u.role === 'admin' && u.isActive);
+      const preferences = await storage.getAdminEmailPreferences();
+      const emailTypes = [...adminEmailPreferenceTypes];
+
+      res.json({ admins, preferences, emailTypes });
+    } catch (error: any) {
+      console.error("Error fetching admin email preferences:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    }
+  });
+
+  // Admin: Update email preference
+  app.put("/api/admin-email-preferences", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== 'admin') {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { adminId, emailType, enabled } = req.body;
+      if (!adminId || !emailType || typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: "adminId, emailType, and enabled (boolean) are required" });
+      }
+
+      const result = await storage.upsertAdminEmailPreference(adminId, emailType, enabled);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error updating admin email preference:", error);
       res.status(500).json({ error: error.message || "Internal server error" });
     }
   });

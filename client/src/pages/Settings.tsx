@@ -55,11 +55,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap, Percent, Users, UserCheck, Building2, AlertTriangle, GripVertical, ArrowLeft } from "lucide-react";
+import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap, Percent, Users, UserCheck, Building2, AlertTriangle, GripVertical, ArrowLeft, Mail } from "lucide-react";
 import { format } from "date-fns";
 import { AutomationSettingsTab } from "@/components/AutomationSettings";
 import { DiscountCouponsTab } from "@/components/DiscountCouponsTab";
 import { PriorityDistributionTab } from "@/components/PriorityDistributionTab";
+import AdminEmailPreferencesTab from "@/components/AdminEmailPreferencesTab";
 import { VendorsListContent } from "@/pages/VendorsList";
 import {
   DndContext,
@@ -158,6 +159,13 @@ const settingsCards: SettingsCard[] = [
     title: "Priority Management",
     description: "Configure priority quotas and distribution settings",
     icon: AlertTriangle,
+    roles: ["admin"],
+  },
+  {
+    id: "email-preferences",
+    title: "Email Preferences",
+    description: "Configure which workflow emails each admin receives",
+    icon: Mail,
     roles: ["admin"],
   },
   {
@@ -4741,6 +4749,8 @@ export default function Settings() {
         return <VendorsListContent />;
       case "priority":
         return <PriorityDistributionTab />;
+      case "email-preferences":
+        return <AdminEmailPreferencesTab />;
       case "input-fields":
         return (
           <>

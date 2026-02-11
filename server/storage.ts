@@ -111,6 +111,7 @@ import {
   type InsertAdminNotification,
   type Notification,
   type InsertNotification,
+  type AdminEmailPreference,
   users,
   services,
   servicePricingTiers,
@@ -156,6 +157,7 @@ import {
   monthlyBillingRecords,
   adminNotifications,
   notifications,
+  adminEmailPreferences,
 } from "@shared/schema";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -503,6 +505,10 @@ export interface IStorage {
 
   getUserPreference(userId: string, preferenceKey: string): Promise<UserPreference | undefined>;
   upsertUserPreference(userId: string, preferenceKey: string, preferenceValue: unknown): Promise<UserPreference>;
+
+  getAdminEmailPreferences(): Promise<AdminEmailPreference[]>;
+  upsertAdminEmailPreference(adminId: string, emailType: string, enabled: boolean): Promise<AdminEmailPreference>;
+  getAdminEmailPreferencesForType(emailType: string): Promise<AdminEmailPreference[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -2334,6 +2340,26 @@ export class DbStorage implements IStorage {
       .values({ userId, preferenceKey, preferenceValue })
       .returning();
     return result[0];
+  }
+
+  async getAdminEmailPreferences(): Promise<AdminEmailPreference[]> {
+    return await db.select().from(adminEmailPreferences);
+  }
+
+  async upsertAdminEmailPreference(adminId: string, emailType: string, enabled: boolean): Promise<AdminEmailPreference> {
+    const result = await db.insert(adminEmailPreferences)
+      .values({ adminId, emailType, enabled })
+      .onConflictDoUpdate({
+        target: [adminEmailPreferences.adminId, adminEmailPreferences.emailType],
+        set: { enabled, updatedAt: new Date() },
+      })
+      .returning();
+    return result[0];
+  }
+
+  async getAdminEmailPreferencesForType(emailType: string): Promise<AdminEmailPreference[]> {
+    return await db.select().from(adminEmailPreferences)
+      .where(eq(adminEmailPreferences.emailType, emailType));
   }
 }
 

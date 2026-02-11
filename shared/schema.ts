@@ -1523,6 +1523,37 @@ export type UserPreference = typeof userPreferences.$inferSelect;
 
 // ==================== END USER PREFERENCES ====================
 
+// ==================== ADMIN EMAIL PREFERENCES ====================
+
+export const adminEmailPreferenceTypes = [
+  "new_service_request",
+  "job_cancellation",
+  "new_pack_subscription",
+  "pack_cancellation",
+  "pack_upgrade",
+  "pack_downgrade",
+] as const;
+
+export const adminEmailPreferences = pgTable("admin_email_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  adminId: varchar("admin_id").notNull().references(() => users.id),
+  emailType: text("email_type").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  unique("admin_email_pref_unique").on(table.adminId, table.emailType),
+]);
+
+export const insertAdminEmailPreferenceSchema = createInsertSchema(adminEmailPreferences).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertAdminEmailPreference = z.infer<typeof insertAdminEmailPreferenceSchema>;
+export type AdminEmailPreference = typeof adminEmailPreferences.$inferSelect;
+
+// ==================== END ADMIN EMAIL PREFERENCES ====================
+
 // Billing address structure for Stripe integration
 export type BillingAddress = {
   line1: string;
