@@ -45,6 +45,11 @@ export function NotificationBell() {
 
   const { data: unreadCount } = useQuery<{ count: number }>({
     queryKey: ["/api/notifications/unread-count", userId],
+    queryFn: async () => {
+      const res = await fetch("/api/notifications/unread-count", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch unread count");
+      return res.json();
+    },
     refetchInterval: 30000,
     enabled: !!userId,
   });
