@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Header } from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -40,16 +39,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   Popover,
@@ -57,7 +46,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Building2, Users, DollarSign, Clock, UserPlus, Save, LogIn, Pencil, CalendarDays, Plus, Trash2, Globe, Package, Layers, Eye, Zap, Loader2, ArrowRight, GripVertical, ArrowLeft } from "lucide-react";
+import { Building2, Users, DollarSign, Clock, Save, Pencil, CalendarDays, Plus, Trash2, Globe, Package, Layers, Eye, Zap, Loader2, ArrowRight, GripVertical, ArrowLeft } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -66,11 +55,6 @@ import {
 import { format } from "date-fns";
 import type { User, VendorProfile as VendorProfileType, Service, ServicePricingTier, Bundle, BundleItem, BundleLineItem, ServicePack, ServicePackItem, VendorBundleCost, VendorPackCost } from "@shared/schema";
 
-
-const roleLabels: Record<string, string> = {
-  vendor: "Vendor Admin",
-  vendor_designer: "Vendor Designer",
-};
 
 // Common timezones for vendor availability
 const TIMEZONES = [
@@ -132,7 +116,6 @@ interface VendorProfileCard {
 
 const vendorProfileCards: VendorProfileCard[] = [
   { id: "profile", title: "Company Profile", description: "Manage your company name, website, email, and phone", icon: Building2 },
-  { id: "team", title: "Team Members", description: "Add and manage your team members and their roles", icon: Users },
   { id: "cost", title: "Cost Configuration", description: "Set up service costs for your vendor operations", icon: DollarSign },
   { id: "sla", title: "SLA Settings", description: "Configure service level agreements and delivery targets", icon: Clock },
   { id: "availability", title: "Availability Schedule", description: "Set working hours, holidays, and time zones", icon: CalendarDays },
@@ -244,15 +227,6 @@ async function getDefaultUser(): Promise<User | null> {
 
 export default function VendorProfile() {
   const { toast } = useToast();
-  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const [newUser, setNewUser] = useState({
-    username: "",
-    email: "",
-    phone: "",
-    password: "",
-    role: "vendor_designer" as string,
-  });
-
   const { data: currentUser, isLoading: userLoading } = useQuery<User | null>({
     queryKey: ["/api/default-user"],
     queryFn: getDefaultUser,
@@ -593,21 +567,6 @@ export default function VendorProfile() {
     workMode: "Totally Off",
   });
 
-  // Edit team member state
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState<User | null>(null);
-  const [editForm, setEditForm] = useState({
-    username: "",
-    email: "",
-    phone: "",
-  });
-
-  // Delete team member state
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [memberToDelete, setMemberToDelete] = useState<User | null>(null);
-
-  const [, setLocation] = useLocation();
-
   useEffect(() => {
     if (vendorProfile) {
       setProfileForm({
@@ -652,111 +611,6 @@ export default function VendorProfile() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
-
-  const createUserMutation = useMutation({
-    mutationFn: async (userData: typeof newUser) => {
-      return apiRequest("POST", "/api/users", {
-        ...userData,
-        vendorId: vendorStructureId,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/vendor", vendorStructureId] });
-      setInviteDialogOpen(false);
-      setNewUser({
-        username: "",
-        email: "",
-        phone: "",
-        password: "",
-        role: "vendor_designer",
-      });
-      toast({ title: "Team member added successfully" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const toggleUserActiveMutation = useMutation({
-    mutationFn: async ({ userId, isActive }: { userId: string; isActive: boolean }) => {
-      return apiRequest("PATCH", `/api/users/${userId}`, { isActive });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/vendor", vendorStructureId] });
-      toast({ title: "User status updated" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  // Impersonate team member mutation
-  const impersonateMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      return apiRequest("POST", `/api/users/${userId}/impersonate`, {});
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/default-user"] });
-      await queryClient.refetchQueries({ queryKey: ["/api/default-user"] });
-      toast({ title: "Logged in as team member" });
-      setLocation("/service-requests");
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  // Edit team member mutation
-  const editTeamMemberMutation = useMutation({
-    mutationFn: async ({ userId, data }: { userId: string; data: typeof editForm }) => {
-      return apiRequest("PATCH", `/api/vendor/users/${userId}`, data);
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/vendor", vendorStructureId] });
-      // If editing the current user, also invalidate the default-user query
-      if (variables.userId === currentUser?.id) {
-        queryClient.invalidateQueries({ queryKey: ["/api/default-user"] });
-      }
-      setEditDialogOpen(false);
-      setEditingMember(null);
-      toast({ title: "Team member updated successfully" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  // Delete team member mutation
-  const deleteTeamMemberMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      return apiRequest("DELETE", `/api/users/${userId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/vendor", vendorStructureId] });
-      toast({ title: "Team member removed successfully" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const handleEditMember = (member: User) => {
-    setEditingMember(member);
-    setEditForm({
-      username: member.username,
-      email: member.email || "",
-      phone: member.phone || "",
-    });
-    setEditDialogOpen(true);
-  };
-
-  const handleSaveEditMember = () => {
-    if (!editingMember) return;
-    editTeamMemberMutation.mutate({
-      userId: editingMember.id,
-      data: editForm,
-    });
-  };
 
   const handleSaveProfile = () => {
     updateProfileMutation.mutate({
@@ -1017,314 +871,6 @@ export default function VendorProfile() {
                 </div>
               </CardContent>
             </Card>
-            )}
-
-            {selectedCard === "team" && (
-            <>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2">
-                <CardTitle>Team Members</CardTitle>
-                <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" data-testid="button-invite-team">
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      Add Team Member
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Add Team Member</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 mt-4">
-                      <div className="space-y-2">
-                        <Label>Username<span className="text-destructive">*</span></Label>
-                        <Input
-                          value={newUser.username}
-                          onChange={(e) =>
-                            setNewUser({ ...newUser, username: e.target.value })
-                          }
-                          placeholder="Enter username"
-                          data-testid="input-team-username"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Email</Label>
-                        <Input
-                          type="email"
-                          value={newUser.email}
-                          onChange={(e) =>
-                            setNewUser({ ...newUser, email: e.target.value })
-                          }
-                          placeholder="Enter email"
-                          data-testid="input-team-email"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Password<span className="text-destructive">*</span></Label>
-                        <Input
-                          type="password"
-                          value={newUser.password}
-                          onChange={(e) =>
-                            setNewUser({ ...newUser, password: e.target.value })
-                          }
-                          placeholder="Enter password"
-                          data-testid="input-team-password"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Role<span className="text-destructive">*</span></Label>
-                        <Select
-                          value={newUser.role}
-                          onValueChange={(v) => setNewUser({ ...newUser, role: v })}
-                        >
-                          <SelectTrigger data-testid="select-team-role">
-                            <SelectValue placeholder="Select role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="vendor">Vendor Admin</SelectItem>
-                            <SelectItem value="vendor_designer">Vendor Designer</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex justify-end gap-2 pt-4">
-                        <Button
-                          variant="outline"
-                          onClick={() => setInviteDialogOpen(false)}
-                          data-testid="button-cancel-team-invite"
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          onClick={() => createUserMutation.mutate(newUser)}
-                          disabled={createUserMutation.isPending}
-                          data-testid="button-confirm-team-invite"
-                        >
-                          {createUserMutation.isPending ? "Adding..." : "Add Member"}
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {currentUser && (
-                    <div
-                      className="flex items-center justify-between p-4 border rounded-md bg-muted/30"
-                      data-testid={`row-team-member-${currentUser.id}`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <Switch checked={true} disabled />
-                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                          <span className="text-blue-700 font-medium text-sm">
-                            {currentUser.username?.charAt(0).toUpperCase() || "?"}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="font-semibold text-dark-blue-night">
-                            {currentUser.username}
-                          </p>
-                          <p className="text-sm text-dark-gray">
-                            {currentUser.email || "No email"}
-                          </p>
-                        </div>
-                        <Badge variant="secondary">
-                          Vendor Admin
-                        </Badge>
-                        <Badge variant="outline" className="bg-sky-blue-accent/10 text-sky-blue-accent border-sky-blue-accent/20">
-                          Primary
-                        </Badge>
-                        <span className="text-sm text-dark-gray" data-testid={`text-created-${currentUser.id}`}>
-                          {currentUser.createdAt ? format(new Date(currentUser.createdAt), "MMM d, yyyy") : "N/A"}
-                        </span>
-                        <span className="text-sm text-dark-gray" data-testid={`text-last-login-${currentUser.id}`}>
-                          {currentUser.lastLoginAt ? format(new Date(currentUser.lastLoginAt), "MMM d, yyyy") : "Never"}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleEditMember(currentUser)}
-                              data-testid={`button-edit-member-${currentUser.id}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Edit</TooltipContent>
-                        </Tooltip>
-                      </div>
-                    </div>
-                  )}
-                  {teamMembers.filter(m => m.id !== currentUser?.id).length === 0 ? (
-                    <p className="text-dark-gray text-center py-8">
-                      No team members yet. Add your first team member above.
-                    </p>
-                  ) : (
-                    teamMembers.filter(m => m.id !== currentUser?.id).map((member) => (
-                      <div
-                        key={member.id}
-                        className="flex items-center justify-between p-4 border rounded-md"
-                        data-testid={`row-team-member-${member.id}`}
-                      >
-                        <div className="flex items-center gap-4">
-                          <Switch
-                            id={`toggle-team-${member.id}`}
-                            checked={member.isActive}
-                            onCheckedChange={(checked) =>
-                              toggleUserActiveMutation.mutate({
-                                userId: member.id,
-                                isActive: checked,
-                              })
-                            }
-                            data-testid={`switch-team-active-${member.id}`}
-                          />
-                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                            <span className="text-blue-700 font-medium text-sm">
-                              {member.username?.charAt(0).toUpperCase() || "?"}
-                            </span>
-                          </div>
-                          <div>
-                            <p className="font-semibold text-dark-blue-night">
-                              {member.username}
-                            </p>
-                            <p className="text-sm text-dark-gray">
-                              {member.email || "No email"}
-                            </p>
-                          </div>
-                          <Badge variant="secondary">
-                            {roleLabels[member.role] || member.role}
-                          </Badge>
-                          {!member.isActive && (
-                            <Badge
-                              variant="outline"
-                              className="bg-destructive/10 text-destructive border-destructive/20"
-                            >
-                              Inactive
-                            </Badge>
-                          )}
-                          <span className="text-sm text-dark-gray" data-testid={`text-created-${member.id}`}>
-                            {member.createdAt ? format(new Date(member.createdAt), "MMM d, yyyy") : "N/A"}
-                          </span>
-                          <span className="text-sm text-dark-gray" data-testid={`text-last-login-${member.id}`}>
-                            {member.lastLoginAt ? format(new Date(member.lastLoginAt), "MMM d, yyyy") : "Never"}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => impersonateMutation.mutate(member.id)}
-                                disabled={!member.isActive || impersonateMutation.isPending}
-                                data-testid={`button-login-as-${member.id}`}
-                              >
-                                <LogIn className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Login as</TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => handleEditMember(member)}
-                                data-testid={`button-edit-member-${member.id}`}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Edit</TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => {
-                                  setMemberToDelete(member);
-                                  setDeleteModalOpen(true);
-                                }}
-                                data-testid={`button-delete-member-${member.id}`}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Delete</TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Edit Team Member Dialog */}
-            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Edit Team Member</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 pt-4">
-                  <div className="space-y-2">
-                    <Label>Username<span className="text-destructive">*</span></Label>
-                    <Input
-                      value={editForm.username}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, username: e.target.value })
-                      }
-                      placeholder="Enter username"
-                      data-testid="input-edit-username"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Email</Label>
-                    <Input
-                      type="email"
-                      value={editForm.email}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, email: e.target.value })
-                      }
-                      placeholder="Enter email"
-                      data-testid="input-edit-email"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Phone</Label>
-                    <Input
-                      value={editForm.phone}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, phone: e.target.value })
-                      }
-                      placeholder="Enter phone"
-                      data-testid="input-edit-phone"
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2 pt-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => setEditDialogOpen(false)}
-                      data-testid="button-cancel-edit-member"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleSaveEditMember}
-                      disabled={editTeamMemberMutation.isPending || !editForm.username.trim()}
-                      data-testid="button-save-edit-member"
-                    >
-                      {editTeamMemberMutation.isPending ? "Saving..." : "Save Changes"}
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-            </>
             )}
 
             {selectedCard === "cost" && (
@@ -2068,31 +1614,6 @@ export default function VendorProfile() {
         </div>
       </div>
 
-      <AlertDialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Team Member</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to remove {memberToDelete?.username} from your team? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
-                if (memberToDelete) {
-                  deleteTeamMemberMutation.mutate(memberToDelete.id);
-                }
-                setDeleteModalOpen(false);
-                setMemberToDelete(null);
-              }}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

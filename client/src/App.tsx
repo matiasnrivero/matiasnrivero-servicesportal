@@ -37,6 +37,7 @@ import BillingHistoryReport from "@/pages/BillingHistoryReport";
 import ClientInvoicingReport from "@/pages/ClientInvoicingReport";
 import ClientInvoiceView from "@/pages/ClientInvoiceView";
 import VendorSlaReport from "@/pages/VendorSlaReport";
+import VendorTeam from "@/pages/VendorTeam";
 
 function Router() {
   return (
@@ -51,6 +52,7 @@ function Router() {
       <Route path="/jobs/:id" component={JobDetailView} />
       <Route path="/users" component={UserManagement} />
       <Route path="/vendor-profile" component={VendorProfile} />
+      <Route path="/vendor-team" component={VendorTeam} />
       <Route path="/vendors" component={VendorsList} />
       <Route path="/vendors/:id" component={VendorDetail} />
       <Route path="/settings" component={Settings} />

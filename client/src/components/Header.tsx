@@ -221,6 +221,17 @@ export function Header() {
               Requests
             </Button>
           </Link>
+          {isVendor && (
+            <Link href="/vendor-team">
+              <Button
+                variant={location === "/vendor-team" ? "default" : "ghost"}
+                className={location === "/vendor-team" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
+                data-testid="nav-vendor-team"
+              >
+                Team
+              </Button>
+            </Link>
+          )}
           {(isAdmin || isInternalDesigner) && (
             <Link href="/pack-assignment">
               <Button
