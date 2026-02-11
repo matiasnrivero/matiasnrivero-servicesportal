@@ -1,15 +1,31 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Header } from "@/components/Header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   Select,
   SelectContent,
@@ -41,7 +57,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Building2, Users, DollarSign, Clock, UserPlus, Save, LogIn, Pencil, CalendarDays, Plus, Trash2, Globe, Package, Layers, Eye, Zap, Loader2, ArrowRight } from "lucide-react";
+import { Building2, Users, DollarSign, Clock, UserPlus, Save, LogIn, Pencil, CalendarDays, Plus, Trash2, Globe, Package, Layers, Eye, Zap, Loader2, ArrowRight, GripVertical, ArrowLeft } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -107,6 +123,117 @@ function convertTimeToUSZones(time: string, fromTimezone: string): { pst: string
 type Holiday = { date: string; title: string; workMode: string };
 type WorkingHours = { timezone: string; startHour: string; endHour: string };
 
+interface VendorProfileCard {
+  id: string;
+  title: string;
+  description: string;
+  icon: typeof Building2;
+}
+
+const vendorProfileCards: VendorProfileCard[] = [
+  { id: "profile", title: "Company Profile", description: "Manage your company name, website, email, and phone", icon: Building2 },
+  { id: "team", title: "Team Members", description: "Add and manage your team members and their roles", icon: Users },
+  { id: "cost", title: "Cost Configuration", description: "Set up service costs for your vendor operations", icon: DollarSign },
+  { id: "sla", title: "SLA Settings", description: "Configure service level agreements and delivery targets", icon: Clock },
+  { id: "availability", title: "Availability Schedule", description: "Set working hours, holidays, and time zones", icon: CalendarDays },
+  { id: "bundles", title: "Bundle Costs", description: "Configure pricing for service bundles", icon: Package },
+  { id: "packs", title: "Pack Costs", description: "Set up pricing for subscription packs", icon: Layers },
+  { id: "automation", title: "Automation Rules", description: "Configure auto-assignment rules and capacity", icon: Zap },
+];
+
+function applyVendorProfileOrder(cards: VendorProfileCard[], order: string[] | null | undefined): VendorProfileCard[] {
+  if (!order || order.length === 0) return cards;
+  const cardMap = new Map(cards.map((c) => [c.id, c]));
+  const ordered: VendorProfileCard[] = [];
+  for (const id of order) {
+    const card = cardMap.get(id);
+    if (card) {
+      ordered.push(card);
+      cardMap.delete(id);
+    }
+  }
+  for (const card of cardMap.values()) {
+    ordered.push(card);
+  }
+  return ordered;
+}
+
+function SortableVendorProfileCard({ card, onSelect }: { card: VendorProfileCard; onSelect: (id: string) => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+  const Icon = card.icon;
+  return (
+    <div ref={setNodeRef} style={style} data-testid={`card-vendor-profile-${card.id}`}>
+      <Card className="cursor-pointer hover-elevate transition-all h-full">
+        <CardHeader className="flex flex-row items-center gap-3 pb-2">
+          <div
+            className="cursor-grab active:cursor-grabbing p-1 rounded-md text-muted-foreground"
+            {...attributes}
+            {...listeners}
+            data-testid={`drag-handle-vendor-profile-${card.id}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical className="w-4 h-4" />
+          </div>
+          <div className="flex items-center gap-3 flex-1" onClick={() => onSelect(card.id)}>
+            <div className="p-2 rounded-md bg-sky-blue-accent/10">
+              <Icon className="w-6 h-6 text-sky-blue-accent" />
+            </div>
+            <div>
+              <CardTitle className="text-base">{card.title}</CardTitle>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent onClick={() => onSelect(card.id)}>
+          <CardDescription>{card.description}</CardDescription>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SortableVendorProfileGrid({
+  cards,
+  onReorder,
+  onSelect,
+}: {
+  cards: VendorProfileCard[];
+  onReorder: (newOrder: string[]) => void;
+  onSelect: (id: string) => void;
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = cards.findIndex((c) => c.id === active.id);
+      const newIndex = cards.findIndex((c) => c.id === over.id);
+      const newCards = arrayMove(cards, oldIndex, newIndex);
+      onReorder(newCards.map((c) => c.id));
+    }
+  };
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={cards.map((c) => c.id)} strategy={rectSortingStrategy}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+          {cards.map((card) => (
+            <SortableVendorProfileCard key={card.id} card={card} onSelect={onSelect} />
+          ))}
+        </div>
+      </SortableContext>
+    </DndContext>
+  );
+}
+
 async function getDefaultUser(): Promise<User | null> {
   const res = await fetch("/api/default-user");
   if (!res.ok) return null;
@@ -132,6 +259,66 @@ export default function VendorProfile() {
     staleTime: 0,
     refetchOnMount: 'always',
   });
+
+  const [selectedCard, setSelectedCard] = useState<string | null>(null);
+
+  const getInitialTab = () => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("tab") || null;
+  };
+  const [pendingTab] = useState<string | null>(getInitialTab);
+
+  const userId = (currentUser as any)?.userId || currentUser?.id || "";
+
+  const { data: savedOrder } = useQuery<{ value: string[] | null }>({
+    queryKey: ["/api/user-preferences", userId, "vendor-profile-order"],
+    queryFn: async () => {
+      const res = await fetch("/api/user-preferences/vendor-profile-order");
+      if (!res.ok) throw new Error("Failed to fetch preferences");
+      return res.json();
+    },
+    enabled: !!userId,
+  });
+
+  const saveOrderMutation = useMutation({
+    mutationFn: async (order: string[]) => {
+      await apiRequest("PUT", "/api/user-preferences/vendor-profile-order", { value: order });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user-preferences", userId, "vendor-profile-order"] });
+    },
+  });
+
+  const [localOrder, setLocalOrder] = useState<string[] | null>(null);
+
+  useEffect(() => { setLocalOrder(null); }, [userId]);
+
+  const displayCards = useMemo(() => {
+    if (localOrder) return applyVendorProfileOrder(vendorProfileCards, localOrder);
+    return applyVendorProfileOrder(vendorProfileCards, savedOrder?.value);
+  }, [localOrder, savedOrder]);
+
+  const handleReorder = useCallback((newOrder: string[]) => {
+    setLocalOrder(newOrder);
+    saveOrderMutation.mutate(newOrder);
+  }, [saveOrderMutation]);
+
+  const handleSelectCard = useCallback((id: string) => {
+    setSelectedCard(id);
+  }, []);
+
+  const handleBackToGrid = useCallback(() => {
+    setSelectedCard(null);
+  }, []);
+
+  useEffect(() => {
+    if (pendingTab && !selectedCard) {
+      const isValid = vendorProfileCards.some((c) => c.id === pendingTab);
+      if (isValid) setSelectedCard(pendingTab);
+    }
+  }, [pendingTab, selectedCard]);
+
+  const selectedCardData = selectedCard ? vendorProfileCards.find((c) => c.id === selectedCard) : null;
 
   const vendorUserId = currentUser?.role === "vendor" ? currentUser.id : undefined;
   
@@ -742,43 +929,31 @@ export default function VendorProfile() {
             </h1>
           </div>
 
-        <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="profile" data-testid="tab-profile">
-              <Building2 className="h-4 w-4 mr-2" />
-              Profile
-            </TabsTrigger>
-            <TabsTrigger value="team" data-testid="tab-team">
-              <Users className="h-4 w-4 mr-2" />
-              Team
-            </TabsTrigger>
-            <TabsTrigger value="cost" data-testid="tab-cost">
-              <DollarSign className="h-4 w-4 mr-2" />
-              Cost
-            </TabsTrigger>
-            <TabsTrigger value="sla" data-testid="tab-sla">
-              <Clock className="h-4 w-4 mr-2" />
-              SLA
-            </TabsTrigger>
-            <TabsTrigger value="availability" data-testid="tab-availability">
-              <CalendarDays className="h-4 w-4 mr-2" />
-              Availability
-            </TabsTrigger>
-            <TabsTrigger value="bundles" data-testid="tab-bundles">
-              <Package className="h-4 w-4 mr-2" />
-              Bundles
-            </TabsTrigger>
-            <TabsTrigger value="packs" data-testid="tab-packs">
-              <Layers className="h-4 w-4 mr-2" />
-              Packs
-            </TabsTrigger>
-            <TabsTrigger value="automation" data-testid="tab-automation">
-              <Zap className="h-4 w-4 mr-2" />
-              Automation
-            </TabsTrigger>
-          </TabsList>
+        {!selectedCard ? (
+          <>
+            <p className="text-dark-gray mt-1">Manage your company profile, team, and operations</p>
+            <SortableVendorProfileGrid
+              cards={displayCards}
+              onReorder={handleReorder}
+              onSelect={handleSelectCard}
+            />
+          </>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="sm" onClick={handleBackToGrid} data-testid="button-back-to-profile">
+                <ArrowLeft className="w-4 h-4 mr-1" />
+                Back to Profile
+              </Button>
+              {selectedCardData && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <selectedCardData.icon className="w-4 h-4" />
+                  <span className="text-sm font-medium">{selectedCardData.title}</span>
+                </div>
+              )}
+            </div>
 
-          <TabsContent value="profile">
+            {selectedCard === "profile" && (
             <Card>
               <CardHeader>
                 <CardTitle>Company Information</CardTitle>
@@ -842,9 +1017,10 @@ export default function VendorProfile() {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+            )}
 
-          <TabsContent value="team">
+            {selectedCard === "team" && (
+            <>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <CardTitle>Team Members</CardTitle>
@@ -1148,9 +1324,10 @@ export default function VendorProfile() {
                 </div>
               </DialogContent>
             </Dialog>
-          </TabsContent>
+            </>
+            )}
 
-          <TabsContent value="cost">
+            {selectedCard === "cost" && (
             <Card>
               <CardHeader>
                 <CardTitle>Cost Agreements</CardTitle>
@@ -1295,9 +1472,9 @@ export default function VendorProfile() {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
+            )}
 
-          <TabsContent value="sla">
+            {selectedCard === "sla" && (
             <Card>
               <CardHeader>
                 <CardTitle>Service Level Agreements (SLA)</CardTitle>
@@ -1362,9 +1539,9 @@ export default function VendorProfile() {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
+            )}
 
-          <TabsContent value="availability">
+            {selectedCard === "availability" && (
             <div className="space-y-6">
               {/* Working Hours Section */}
               <Card>
@@ -1637,9 +1814,10 @@ export default function VendorProfile() {
                 </DialogContent>
               </Dialog>
             </div>
-          </TabsContent>
+            )}
 
-          <TabsContent value="bundles">
+            {selectedCard === "bundles" && (
+            <>
             <Card>
               <CardHeader>
                 <CardTitle>Bundle Cost Pricing</CardTitle>
@@ -1755,9 +1933,11 @@ export default function VendorProfile() {
                 </div>
               </DialogContent>
             </Dialog>
-          </TabsContent>
+            </>
+            )}
 
-          <TabsContent value="packs">
+            {selectedCard === "packs" && (
+            <>
             <Card>
               <CardHeader>
                 <CardTitle>Pack Cost Pricing</CardTitle>
@@ -1873,16 +2053,18 @@ export default function VendorProfile() {
                 </div>
               </DialogContent>
             </Dialog>
-          </TabsContent>
+            </>
+            )}
 
-          <TabsContent value="automation">
+            {selectedCard === "automation" && (
             <VendorAutomationTab 
               vendorProfile={vendorProfile ?? null} 
               teamMembers={teamMembers}
               allServices={allServices}
             />
-          </TabsContent>
-          </Tabs>
+            )}
+          </div>
+        )}
         </div>
       </div>
 
