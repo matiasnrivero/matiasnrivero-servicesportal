@@ -1146,6 +1146,22 @@ export default function ServiceRequestsList() {
                 />
               )}
 
+              {(currentUser?.role === "internal_designer" || currentUser?.role === "admin") && (
+                <div className="space-y-2">
+                  <Label className="text-sm">Pack Filter</Label>
+                  <Select value={packFilter} onValueChange={(val) => setPackFilter(val as "all" | "not_pack" | "pack_only")}>
+                    <SelectTrigger data-testid="select-pack-filter">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all" data-testid="option-pack-filter-all">Show all requests</SelectItem>
+                      <SelectItem value="not_pack" data-testid="option-pack-filter-not-pack">Show not pack-based requests</SelectItem>
+                      <SelectItem value="pack_only" data-testid="option-pack-filter-pack-only">Show pack-based requests</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label className="text-sm">Search Job ID</Label>
                 <div className="relative">
@@ -1159,22 +1175,6 @@ export default function ServiceRequestsList() {
                   />
                 </div>
               </div>
-
-              {(currentUser?.role === "internal_designer" || currentUser?.role === "admin") && (
-                <div>
-                  <Label className="text-sm font-medium mb-1.5 block">Pack Filter</Label>
-                  <Select value={packFilter} onValueChange={(val) => setPackFilter(val as "all" | "not_pack" | "pack_only")}>
-                    <SelectTrigger data-testid="select-pack-filter">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all" data-testid="option-pack-filter-all">Show all requests</SelectItem>
-                      <SelectItem value="not_pack" data-testid="option-pack-filter-not-pack">Show not pack-based requests</SelectItem>
-                      <SelectItem value="pack_only" data-testid="option-pack-filter-pack-only">Show pack-based requests</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
                     </div>
                   );
                 })()}
