@@ -494,6 +494,7 @@ export default function ServiceRequestForm() {
       setSelectedAddOns(new Set());
       setSubmissionToken(generateSubmissionToken());
       queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
       navigate("/service-requests");
     },
     onError: (error: Error) => {

@@ -31,6 +31,7 @@ export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [, setLocation] = useLocation();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lastSeenCountRef = useRef<number>(0);
 
   const { data: currentUser } = useQuery<DefaultUser>({
     queryKey: ["/api/default-user"],
@@ -109,6 +110,18 @@ export function NotificationBell() {
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  const count = unreadCount?.count ?? 0;
+  const showDot = count > lastSeenCountRef.current;
+
+  const handleOpenPanel = () => {
+    lastSeenCountRef.current = count;
+    setIsOpen(true);
+  };
+
+  const handleClosePanel = () => {
+    setIsOpen(false);
+  };
+
   const handleNotificationClick = (notification: Notification) => {
     if (!notification.isRead) {
       markAsReadMutation.mutate(notification.id);
@@ -121,10 +134,8 @@ export function NotificationBell() {
         setLocation(notification.link);
       }
     }
-    setIsOpen(false);
+    handleClosePanel();
   };
-
-  const count = unreadCount?.count ?? 0;
 
   return (
     <>
@@ -132,12 +143,12 @@ export function NotificationBell() {
         <Button
           size="icon"
           variant="ghost"
-          onClick={() => setIsOpen(true)}
+          onClick={handleOpenPanel}
           data-testid="button-notification-bell"
         >
           <Bell className="h-5 w-5" />
         </Button>
-        {count > 0 && (
+        {showDot && (
           <span
             className="absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-red-500 pointer-events-none ring-2 ring-background"
             data-testid="notification-unread-dot"
@@ -149,7 +160,7 @@ export function NotificationBell() {
         <div className="fixed inset-0 z-50 flex justify-end">
           <div
             className="absolute inset-0 bg-black/20"
-            onClick={() => setIsOpen(false)}
+            onClick={handleClosePanel}
           />
           <div
             className="relative w-96 max-w-[90vw] h-full bg-background border-l shadow-lg flex flex-col animate-in slide-in-from-right duration-200"
@@ -170,7 +181,7 @@ export function NotificationBell() {
                 <Button
                   size="icon"
                   variant="ghost"
-                  onClick={() => setIsOpen(false)}
+                  onClick={handleClosePanel}
                   data-testid="button-close-notifications"
                 >
                   <X className="h-4 w-4" />
