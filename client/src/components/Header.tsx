@@ -186,7 +186,7 @@ export function Header() {
         </div>
       )}
     <header className="flex w-full items-center gap-3 px-3 py-2 bg-white shadow-shadow-top-bar">
-      <Link href={isAdmin ? "/dashboard" : "/"} className="flex-shrink-0">
+      <Link href={isAdmin ? "/dashboard" : "/"} className="flex-shrink-0 mr-3">
         <img src={logoImg} alt="Tri-Pod Services" className="h-8 cursor-pointer" data-testid="link-services-portal" />
       </Link>
       <nav className="flex flex-1 items-center gap-3">
