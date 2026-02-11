@@ -169,6 +169,13 @@ const settingsCards: SettingsCard[] = [
     roles: ["admin"],
   },
   {
+    id: "services-sorting",
+    title: "Services Sorting",
+    description: "Drag and drop services to set their display order for clients",
+    icon: List,
+    roles: ["admin"],
+  },
+  {
     id: "input-fields",
     title: "Input Fields Management",
     description: "Manage form input fields, service fields, and bundle assignments",
@@ -4549,6 +4556,166 @@ function BundleFieldsAssignmentsManager() {
   );
 }
 
+function SortableServiceCard({ service }: { service: Service }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: service.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  const priceDisplay = service.priceRange || (service.basePrice ? `$${service.basePrice}` : "");
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} data-testid={`drag-service-${service.id}`}>
+      <Card
+        className="border border-[#f0f0f5] rounded-2xl bg-white cursor-grab active:cursor-grabbing h-full"
+        data-testid={`card-sortable-service-${service.id}`}
+      >
+        <CardContent className="p-6">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-2 flex-1">
+                <GripVertical className="w-4 h-4 text-muted-foreground shrink-0" data-testid={`icon-grip-${service.id}`} />
+                <h3 className="font-semibold text-dark-blue-night" data-testid={`text-service-title-${service.id}`}>
+                  {service.title}
+                </h3>
+              </div>
+              {priceDisplay && (
+                <span className="font-semibold text-sky-blue-accent whitespace-nowrap" data-testid={`text-service-price-${service.id}`}>
+                  {priceDisplay}
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-dark-blue-night pl-6" data-testid={`text-service-desc-${service.id}`}>
+              {service.description}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function ServicesSortingTab() {
+  const { toast } = useToast();
+
+  const { data: allServices = [], isLoading } = useQuery<Service[]>({
+    queryKey: ["/api/services", "sorting"],
+    queryFn: async () => {
+      const res = await fetch("/api/services?excludeSons=true");
+      if (!res.ok) throw new Error("Failed to fetch services");
+      return res.json();
+    },
+  });
+
+  const activeServices = useMemo(
+    () =>
+      [...allServices]
+        .filter((s) => s.isActive === 1)
+        .sort((a, b) => (a.displayOrder || 999) - (b.displayOrder || 999)),
+    [allServices]
+  );
+
+  const [localOrder, setLocalOrder] = useState<Service[]>([]);
+
+  useEffect(() => {
+    if (activeServices.length > 0 && localOrder.length === 0) {
+      setLocalOrder(activeServices);
+    }
+  }, [activeServices, localOrder.length]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const saveSortOrderMutation = useMutation({
+    mutationFn: async (services: Service[]) => {
+      const order = services.map((s, idx) => ({ id: s.id, displayOrder: idx + 1 }));
+      return apiRequest("PUT", "/api/services/sort-order", { order });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services", "sorting"] });
+      toast({ title: "Service order saved" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = localOrder.findIndex((s) => s.id === active.id);
+    const newIndex = localOrder.findIndex((s) => s.id === over.id);
+    const reordered = arrayMove(localOrder, oldIndex, newIndex);
+    setLocalOrder(reordered);
+    saveSortOrderMutation.mutate(reordered);
+  };
+
+  const displayServices = localOrder.length > 0 ? localOrder : activeServices;
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <List className="w-5 h-5" />
+            Services Sorting
+          </CardTitle>
+          <CardDescription>
+            Drag and drop service cards to set the order clients see on the Services Selection screen. Changes save automatically.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {displayServices.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">No active services found.</p>
+          ) : (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={displayServices.map((s) => s.id)}
+                strategy={rectSortingStrategy}
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {displayServices.map((service) => (
+                    <SortableServiceCard key={service.id} service={service} />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function Settings() {
   const { toast } = useToast();
   const [location] = useLocation();
@@ -4751,6 +4918,8 @@ export default function Settings() {
         return <PriorityDistributionTab />;
       case "email-preferences":
         return <AdminEmailPreferencesTab />;
+      case "services-sorting":
+        return <ServicesSortingTab />;
       case "input-fields":
         return (
           <>

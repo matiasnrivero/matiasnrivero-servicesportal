@@ -390,6 +390,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/services/sort-order", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const { order } = req.body;
+      if (!Array.isArray(order)) {
+        return res.status(400).json({ error: "order must be an array of { id, displayOrder }" });
+      }
+      for (const item of order) {
+        if (!item.id || typeof item.id !== "string" || typeof item.displayOrder !== "number" || !Number.isInteger(item.displayOrder) || item.displayOrder < 0) {
+          return res.status(400).json({ error: "Each item must have a string id and a non-negative integer displayOrder" });
+        }
+      }
+      for (const item of order) {
+        await storage.updateService(item.id, { displayOrder: item.displayOrder });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating service sort order:", error);
+      res.status(500).json({ error: "Failed to update sort order" });
+    }
+  });
+
   app.patch("/api/services/:id", async (req, res) => {
     try {
       const sessionUserId = req.session.userId;
