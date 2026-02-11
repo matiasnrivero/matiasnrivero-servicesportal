@@ -79,6 +79,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { User, BundleLineItem, Bundle, BundleItem, Service, ServicePack, ServicePackItem, InputField, ServiceField, BundleField, ServicePricingTier, LineItemField } from "@shared/schema";
 import { insertBundleLineItemSchema, inputFieldTypes, valueModes, pricingStructures, assignToModes, inputForTypes } from "@shared/schema";
 
@@ -4606,7 +4607,129 @@ function SortableServiceCard({ service }: { service: Service }) {
   );
 }
 
-function ServicesSortingTab() {
+interface BundleWithItems extends Bundle {
+  items: (BundleItem & { service: Service | null; lineItem: BundleLineItem | null })[];
+}
+
+interface PackWithItems extends ServicePack {
+  items: (ServicePackItem & { service: Service | null })[];
+}
+
+function SortableBundleCard({ bundle }: { bundle: BundleWithItems }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: bundle.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, zIndex: isDragging ? 50 : undefined };
+
+  const bundlePrice = parseFloat(bundle.finalPrice || "0");
+  const fullPrice = bundle.items.reduce((sum, item) => {
+    let price = 0;
+    if (item.service) price = parseFloat(item.service.basePrice || "0");
+    else if (item.lineItem) price = parseFloat(item.lineItem.price || "0");
+    return sum + (price * item.quantity);
+  }, 0);
+  const savings = fullPrice - bundlePrice;
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} data-testid={`drag-bundle-${bundle.id}`}>
+      <Card className="border border-[#f0f0f5] rounded-2xl bg-white cursor-grab active:cursor-grabbing h-full" data-testid={`card-sortable-bundle-${bundle.id}`}>
+        <CardContent className="p-6">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-2 flex-1">
+                <GripVertical className="w-4 h-4 text-muted-foreground shrink-0" />
+                <h3 className="font-semibold text-dark-blue-night" data-testid={`text-bundle-title-${bundle.id}`}>{bundle.name}</h3>
+              </div>
+              {bundlePrice > 0 && (
+                <span className="font-semibold text-sky-blue-accent whitespace-nowrap" data-testid={`text-bundle-price-${bundle.id}`}>
+                  ${bundlePrice.toFixed(2)}
+                </span>
+              )}
+            </div>
+            {bundle.description && (
+              <p className="text-sm text-dark-gray pl-6">{bundle.description}</p>
+            )}
+            <div className="flex flex-col gap-2 pl-6">
+              <p className="text-xs font-medium text-muted-foreground uppercase">Includes:</p>
+              <div className="flex flex-wrap gap-1">
+                {bundle.items.map((item) => (
+                  <Badge key={item.id} variant="secondary" className="text-xs">
+                    {item.service?.title || item.lineItem?.name || "Item"} x{item.quantity}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+            {savings > 0 && (
+              <div className="pl-6">
+                <Badge variant="outline" className="text-green-600 border-green-600">
+                  Bundle Savings ${savings.toFixed(2)}
+                </Badge>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SortablePackCard({ pack }: { pack: PackWithItems }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: pack.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, zIndex: isDragging ? 50 : undefined };
+
+  const packPrice = parseFloat(pack.price || "0");
+  const fullPrice = pack.items.reduce((sum, item) => {
+    const price = parseFloat(item.service?.basePrice || "0");
+    return sum + (price * item.quantity);
+  }, 0);
+  const savings = fullPrice - packPrice;
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} data-testid={`drag-pack-${pack.id}`}>
+      <Card className="border border-[#f0f0f5] rounded-2xl bg-white cursor-grab active:cursor-grabbing h-full" data-testid={`card-sortable-pack-${pack.id}`}>
+        <CardContent className="p-6">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-2 flex-1">
+                <GripVertical className="w-4 h-4 text-muted-foreground shrink-0" />
+                <h3 className="font-semibold text-dark-blue-night" data-testid={`text-pack-title-${pack.id}`}>{pack.name}</h3>
+              </div>
+              {packPrice > 0 && (
+                <div className="flex flex-col items-end">
+                  <span className="font-semibold text-sky-blue-accent whitespace-nowrap" data-testid={`text-pack-price-${pack.id}`}>
+                    ${packPrice.toFixed(2)}/mo
+                  </span>
+                  {fullPrice > packPrice && (
+                    <span className="text-xs text-muted-foreground line-through">
+                      ${fullPrice.toFixed(2)}/mo
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-2 pl-6">
+              <p className="text-xs font-medium text-muted-foreground uppercase">Monthly Allowance:</p>
+              <div className="flex flex-wrap gap-1">
+                {pack.items.map((item) => (
+                  <Badge key={item.id} variant="secondary" className="text-xs">
+                    {item.service?.title || "Service"} x{item.quantity}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+            {savings > 0 && (
+              <div className="pl-6">
+                <Badge variant="outline" className="text-green-600 border-green-600">
+                  Save ${savings.toFixed(2)}/mo
+                </Badge>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function AdHocServicesSortingContent() {
   const { toast } = useToast();
 
   const { data: allServices = [], isLoading } = useQuery<Service[]>({
@@ -4639,7 +4762,7 @@ function ServicesSortingTab() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const saveSortOrderMutation = useMutation({
+  const saveMutation = useMutation({
     mutationFn: async (services: Service[]) => {
       const order = services.map((s, idx) => ({ id: s.id, displayOrder: idx + 1 }));
       return apiRequest("PUT", "/api/services/sort-order", { order });
@@ -4657,26 +4780,198 @@ function ServicesSortingTab() {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-
     const oldIndex = localOrder.findIndex((s) => s.id === active.id);
     const newIndex = localOrder.findIndex((s) => s.id === over.id);
     const reordered = arrayMove(localOrder, oldIndex, newIndex);
     setLocalOrder(reordered);
-    saveSortOrderMutation.mutate(reordered);
+    saveMutation.mutate(reordered);
   };
 
   const displayServices = localOrder.length > 0 ? localOrder : activeServices;
 
   if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
-        </CardContent>
-      </Card>
-    );
+    return <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" /></div>;
   }
 
+  if (displayServices.length === 0) {
+    return <p className="text-muted-foreground text-center py-8">No active services found.</p>;
+  }
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={displayServices.map((s) => s.id)} strategy={rectSortingStrategy}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="grid-sorting-services">
+          {displayServices.map((service) => (
+            <SortableServiceCard key={service.id} service={service} />
+          ))}
+        </div>
+      </SortableContext>
+    </DndContext>
+  );
+}
+
+function BundlesSortingContent() {
+  const { toast } = useToast();
+
+  const { data: allBundles = [], isLoading } = useQuery<BundleWithItems[]>({
+    queryKey: ["/api/public/bundles", "sorting"],
+    queryFn: async () => {
+      const res = await fetch("/api/public/bundles");
+      if (!res.ok) throw new Error("Failed to fetch bundles");
+      return res.json();
+    },
+  });
+
+  const activeBundles = useMemo(
+    () =>
+      [...allBundles]
+        .filter((b) => b.isActive === true)
+        .sort((a, b) => (a.displayOrder || 999) - (b.displayOrder || 999)),
+    [allBundles]
+  );
+
+  const [localOrder, setLocalOrder] = useState<BundleWithItems[]>([]);
+
+  useEffect(() => {
+    if (activeBundles.length > 0 && localOrder.length === 0) {
+      setLocalOrder(activeBundles);
+    }
+  }, [activeBundles, localOrder.length]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const saveMutation = useMutation({
+    mutationFn: async (items: BundleWithItems[]) => {
+      const order = items.map((b, idx) => ({ id: b.id, displayOrder: idx + 1 }));
+      return apiRequest("PUT", "/api/bundles/sort-order", { order });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/public/bundles"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/public/bundles", "sorting"] });
+      toast({ title: "Bundle order saved" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = localOrder.findIndex((b) => b.id === active.id);
+    const newIndex = localOrder.findIndex((b) => b.id === over.id);
+    const reordered = arrayMove(localOrder, oldIndex, newIndex);
+    setLocalOrder(reordered);
+    saveMutation.mutate(reordered);
+  };
+
+  const displayBundles = localOrder.length > 0 ? localOrder : activeBundles;
+
+  if (isLoading) {
+    return <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" /></div>;
+  }
+
+  if (displayBundles.length === 0) {
+    return <p className="text-muted-foreground text-center py-8">No active bundles found.</p>;
+  }
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={displayBundles.map((b) => b.id)} strategy={rectSortingStrategy}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="grid-sorting-bundles">
+          {displayBundles.map((bundle) => (
+            <SortableBundleCard key={bundle.id} bundle={bundle} />
+          ))}
+        </div>
+      </SortableContext>
+    </DndContext>
+  );
+}
+
+function PacksSortingContent() {
+  const { toast } = useToast();
+
+  const { data: allPacks = [], isLoading } = useQuery<PackWithItems[]>({
+    queryKey: ["/api/public/service-packs", "sorting"],
+    queryFn: async () => {
+      const res = await fetch("/api/public/service-packs");
+      if (!res.ok) throw new Error("Failed to fetch service packs");
+      return res.json();
+    },
+  });
+
+  const activePacks = useMemo(
+    () =>
+      [...allPacks]
+        .sort((a, b) => (a.displayOrder || 999) - (b.displayOrder || 999)),
+    [allPacks]
+  );
+
+  const [localOrder, setLocalOrder] = useState<PackWithItems[]>([]);
+
+  useEffect(() => {
+    if (activePacks.length > 0 && localOrder.length === 0) {
+      setLocalOrder(activePacks);
+    }
+  }, [activePacks, localOrder.length]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const saveMutation = useMutation({
+    mutationFn: async (items: PackWithItems[]) => {
+      const order = items.map((p, idx) => ({ id: p.id, displayOrder: idx + 1 }));
+      return apiRequest("PUT", "/api/service-packs/sort-order", { order });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/public/service-packs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/public/service-packs", "sorting"] });
+      toast({ title: "Pack order saved" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = localOrder.findIndex((p) => p.id === active.id);
+    const newIndex = localOrder.findIndex((p) => p.id === over.id);
+    const reordered = arrayMove(localOrder, oldIndex, newIndex);
+    setLocalOrder(reordered);
+    saveMutation.mutate(reordered);
+  };
+
+  const displayPacks = localOrder.length > 0 ? localOrder : activePacks;
+
+  if (isLoading) {
+    return <div className="py-12 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" /></div>;
+  }
+
+  if (displayPacks.length === 0) {
+    return <p className="text-muted-foreground text-center py-8">No active monthly packs found.</p>;
+  }
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={displayPacks.map((p) => p.id)} strategy={rectSortingStrategy}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="grid-sorting-packs">
+          {displayPacks.map((pack) => (
+            <SortablePackCard key={pack.id} pack={pack} />
+          ))}
+        </div>
+      </SortableContext>
+    </DndContext>
+  );
+}
+
+function ServicesSortingTab() {
   return (
     <div className="space-y-4">
       <Card>
@@ -4686,30 +4981,44 @@ function ServicesSortingTab() {
             Services Sorting
           </CardTitle>
           <CardDescription>
-            Drag and drop service cards to set the order clients see on the Services Selection screen. Changes save automatically.
+            Drag and drop cards to set the order clients see on the Services Selection screen. Changes save automatically.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {displayServices.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">No active services found.</p>
-          ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={displayServices.map((s) => s.id)}
-                strategy={rectSortingStrategy}
+          <Tabs defaultValue="adhoc" className="w-full">
+            <TabsList className="mb-6 bg-transparent border-b border-border rounded-none h-auto p-0 gap-6" data-testid="tabs-sorting">
+              <TabsTrigger
+                value="adhoc"
+                data-testid="tab-sorting-adhoc"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-dark-blue-night data-[state=active]:bg-transparent data-[state=active]:shadow-none pb-3 px-1 text-base font-medium text-muted-foreground data-[state=active]:text-dark-blue-night"
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {displayServices.map((service) => (
-                    <SortableServiceCard key={service.id} service={service} />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
-          )}
+                Ad-hoc Services
+              </TabsTrigger>
+              <TabsTrigger
+                value="bundles"
+                data-testid="tab-sorting-bundles"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-dark-blue-night data-[state=active]:bg-transparent data-[state=active]:shadow-none pb-3 px-1 text-base font-medium text-muted-foreground data-[state=active]:text-dark-blue-night"
+              >
+                Bundles
+              </TabsTrigger>
+              <TabsTrigger
+                value="packs"
+                data-testid="tab-sorting-packs"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-dark-blue-night data-[state=active]:bg-transparent data-[state=active]:shadow-none pb-3 px-1 text-base font-medium text-muted-foreground data-[state=active]:text-dark-blue-night"
+              >
+                Monthly Packs
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="adhoc">
+              <AdHocServicesSortingContent />
+            </TabsContent>
+            <TabsContent value="bundles">
+              <BundlesSortingContent />
+            </TabsContent>
+            <TabsContent value="packs">
+              <PacksSortingContent />
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>

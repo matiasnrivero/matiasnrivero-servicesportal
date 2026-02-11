@@ -122,7 +122,9 @@ function BundlesTab(): JSX.Element {
   const discountTier = billingInfo?.tripodDiscountTier || "none";
   const hasDiscount = discountTier !== "none";
   const showPricing = currentUser && (currentUser.role === "client" || currentUser.role === "admin");
-  const activeBundles = bundles.filter((b: BundleWithItems) => b.isActive === true);
+  const activeBundles = bundles
+    .filter((b: BundleWithItems) => b.isActive === true)
+    .sort((a: BundleWithItems, b: BundleWithItems) => (a.displayOrder || 999) - (b.displayOrder || 999));
 
   if (isLoading) {
     return (
@@ -330,7 +332,7 @@ function PacksTab(): JSX.Element {
   };
 
   const showPricing = currentUser && (currentUser.role === "client" || currentUser.role === "admin");
-  const activePacks = packs;
+  const activePacks = [...packs].sort((a: PackWithItems, b: PackWithItems) => (a.displayOrder || 999) - (b.displayOrder || 999));
 
   if (isLoading) {
     return (

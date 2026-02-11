@@ -303,6 +303,7 @@ export const bundles = pgTable("bundles", {
   discountPercent: decimal("discount_percent", { precision: 5, scale: 2 }).default("0"),
   finalPrice: decimal("final_price", { precision: 10, scale: 2 }),
   isActive: boolean("is_active").notNull().default(true),
+  displayOrder: integer("display_order").notNull().default(999),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -366,11 +367,12 @@ export const servicePacks = pgTable("service_packs", {
   name: text("name").notNull(),
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  serviceId: varchar("service_id").references(() => services.id), // Single service per pack (new single-service enforcement)
-  quantity: integer("quantity"), // Quantity of the single service included
-  stripeProductId: text("stripe_product_id"), // Stripe product ID for this pack
-  stripePriceId: text("stripe_price_id"), // Stripe price ID for monthly subscription
+  serviceId: varchar("service_id").references(() => services.id),
+  quantity: integer("quantity"),
+  stripeProductId: text("stripe_product_id"),
+  stripePriceId: text("stripe_price_id"),
   isActive: boolean("is_active").notNull().default(true),
+  displayOrder: integer("display_order").notNull().default(999),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
