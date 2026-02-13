@@ -47,5 +47,5 @@ integrations = ["javascript_object_storage:1.0.0"]
 SENDGRID_SENDER_EMAIL = "services@tri-pod.com"
 SENDGRID_SENDER_NAME = "Tri-POD Services"
 SUPPORT_EMAIL = "services@tri-pod.com"
-PLATFORM_URL = "https://services.tri-pod.com"
-APP_ENVIRONMENT = "development"
+PLATFORM_URL = "services-staging.tri-pod.com"
+APP_ENVIRONMENT = "staging"
