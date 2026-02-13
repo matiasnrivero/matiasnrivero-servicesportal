@@ -2975,8 +2975,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             email: existingUser.email,
             phone: existingUser.phone,
             clientProfileId: existingUser.clientProfileId,
+            clientCompanyId: existingUser.clientCompanyId,
             vendorId: existingUser.vendorId,
             avatarUrl: existingUser.avatarUrl,
+            onboardingCompleted: existingUser.onboardingCompleted,
             authMode,
           };
           // Include impersonation info if applicable
@@ -3008,7 +3010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.session.userId = user.id;
         req.session.userRole = user.role;
         
-        res.json({ userId: user.id, role: user.role, username: user.username, email: user.email, phone: user.phone, clientProfileId: user.clientProfileId, vendorId: user.vendorId, avatarUrl: user.avatarUrl, authMode });
+        res.json({ userId: user.id, role: user.role, username: user.username, email: user.email, phone: user.phone, clientProfileId: user.clientProfileId, clientCompanyId: user.clientCompanyId, vendorId: user.vendorId, avatarUrl: user.avatarUrl, onboardingCompleted: user.onboardingCompleted, authMode });
       } else {
         return res.json({ authMode, user: null });
       }
@@ -4514,6 +4516,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/client-companies/onboarding", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(sessionUserId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (user.role !== "client") {
+        return res.status(403).json({ error: "Only clients can complete onboarding" });
+      }
+
+      const { companyName, website, phone, industry, address, asiNumber, ppaiNumber, tripodWorkspaceUrl } = req.body;
+
+      if (!companyName || !companyName.trim()) {
+        return res.status(400).json({ error: "Company name is required" });
+      }
+
+      const newCompany = await storage.createClientCompany({
+        name: companyName.trim(),
+        website: website?.trim() || null,
+        email: user.email || null,
+        phone: phone?.trim() || null,
+        industry: industry?.trim() || null,
+        address: address?.trim() || null,
+        asiNumber: asiNumber?.trim() || null,
+        ppaiNumber: ppaiNumber?.trim() || null,
+        tripodWorkspaceUrl: tripodWorkspaceUrl?.trim() || null,
+        primaryContactId: user.id,
+        paymentConfiguration: "pay_as_you_go",
+        tripodDiscountTier: "none",
+      });
+
+      await storage.updateUser(user.id, {
+        clientCompanyId: newCompany.id,
+        onboardingCompleted: true,
+      } as any);
+
+      res.status(201).json(newCompany);
+    } catch (error) {
+      console.error("Error completing client onboarding:", error);
+      res.status(500).json({ error: "Failed to complete onboarding" });
+    }
+  });
+
   // ======= CLIENTS (Client Profiles) =======
   // Endpoints for client company management using existing clientProfiles table
   
@@ -4596,6 +4647,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         id: profile.id,
         name: profile.companyName,
+        companyName: profile.companyName,
         industry: profile.industry,
         website: profile.website,
         email: profile.email,
@@ -4603,6 +4655,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         address: profile.address,
         paymentConfiguration: profile.paymentConfiguration,
         tripodDiscountTier: profile.tripodDiscountTier,
+        asiNumber: profile.asiNumber,
+        ppaiNumber: profile.ppaiNumber,
+        tripodWorkspaceUrl: profile.tripodWorkspaceUrl,
         stripeCustomerId: profile.stripeCustomerId,
         isActive: profile.deletedAt ? 0 : 1,
         createdAt: profile.createdAt,
@@ -4701,6 +4756,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.paymentConfiguration !== undefined) updateData.paymentConfiguration = req.body.paymentConfiguration;
       if (req.body.primaryContactId !== undefined) updateData.primaryUserId = req.body.primaryContactId;
       if (req.body.tripodDiscountTier !== undefined) updateData.tripodDiscountTier = req.body.tripodDiscountTier;
+      if (req.body.asiNumber !== undefined) updateData.asiNumber = req.body.asiNumber;
+      if (req.body.ppaiNumber !== undefined) updateData.ppaiNumber = req.body.ppaiNumber;
+      if (req.body.tripodWorkspaceUrl !== undefined) updateData.tripodWorkspaceUrl = req.body.tripodWorkspaceUrl;
 
       const updated = await storage.updateClientProfile(req.params.id, updateData);
       if (!updated) {
@@ -4717,6 +4775,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         address: updated.address,
         paymentConfiguration: updated.paymentConfiguration,
         tripodDiscountTier: updated.tripodDiscountTier,
+        asiNumber: updated.asiNumber,
+        ppaiNumber: updated.ppaiNumber,
+        tripodWorkspaceUrl: updated.tripodWorkspaceUrl,
         isActive: updated.deletedAt ? 0 : 1,
         createdAt: updated.createdAt,
         updatedAt: updated.updatedAt,

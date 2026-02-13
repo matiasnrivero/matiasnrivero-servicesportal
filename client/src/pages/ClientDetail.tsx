@@ -54,6 +54,9 @@ interface ClientProfile {
   address: string | null;
   paymentConfiguration: string;
   tripodDiscountTier?: string;
+  asiNumber?: string | null;
+  ppaiNumber?: string | null;
+  tripodWorkspaceUrl?: string | null;
   stripeCustomerId?: string | null;
   isActive: number;
   createdAt: Date | string;
@@ -97,6 +100,9 @@ export default function ClientDetail() {
     address: "",
     paymentConfiguration: "pay_as_you_go",
     tripodDiscountTier: "none",
+    asiNumber: "",
+    ppaiNumber: "",
+    tripodWorkspaceUrl: "",
   });
   
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -151,6 +157,9 @@ export default function ClientDetail() {
         address: clientData.address || "",
         paymentConfiguration: clientData.paymentConfiguration || "pay_as_you_go",
         tripodDiscountTier: clientData.tripodDiscountTier || "none",
+        asiNumber: clientData.asiNumber || "",
+        ppaiNumber: clientData.ppaiNumber || "",
+        tripodWorkspaceUrl: clientData.tripodWorkspaceUrl || "",
       });
     }
   }, [clientData]);
@@ -166,6 +175,9 @@ export default function ClientDetail() {
         address: data.address,
         paymentConfiguration: data.paymentConfiguration,
         tripodDiscountTier: data.tripodDiscountTier,
+        asiNumber: data.asiNumber || null,
+        ppaiNumber: data.ppaiNumber || null,
+        tripodWorkspaceUrl: data.tripodWorkspaceUrl || null,
       });
     },
     onSuccess: () => {
@@ -457,6 +469,46 @@ export default function ClientDetail() {
                           data-testid="input-address"
                         />
                       </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="asiNumber">ASI#</Label>
+                        <Input
+                          id="asiNumber"
+                          value={profileForm.asiNumber}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, "");
+                            setProfileForm({ ...profileForm, asiNumber: val });
+                          }}
+                          placeholder="Numeric ASI number"
+                          inputMode="numeric"
+                          data-testid="input-asi-number"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ppaiNumber">PPAI#</Label>
+                        <Input
+                          id="ppaiNumber"
+                          value={profileForm.ppaiNumber}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, "");
+                            setProfileForm({ ...profileForm, ppaiNumber: val });
+                          }}
+                          placeholder="Numeric PPAI number"
+                          inputMode="numeric"
+                          data-testid="input-ppai-number"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="tripodWorkspaceUrl">Tri-POD Workspace URL</Label>
+                      <Input
+                        id="tripodWorkspaceUrl"
+                        value={profileForm.tripodWorkspaceUrl}
+                        onChange={(e) => setProfileForm({ ...profileForm, tripodWorkspaceUrl: e.target.value })}
+                        placeholder="https://your-workspace.tri-pod.com"
+                        data-testid="input-tripod-workspace-url"
+                      />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">

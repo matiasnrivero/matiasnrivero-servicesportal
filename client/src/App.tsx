@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
+import ClientOnboardingModal from "@/components/ClientOnboardingModal";
 
 import { ServicesRequestAd } from "@/pages/ServicesRequestAd";
 import ServiceRequestForm from "@/pages/ServiceRequestForm";
@@ -98,12 +100,38 @@ function Router() {
   );
 }
 
+function OnboardingGate() {
+  const [dismissed, setDismissed] = useState(false);
+
+  const { data: currentUser } = useQuery<any>({
+    queryKey: ["/api/default-user"],
+  });
+
+  const needsOnboarding =
+    !dismissed &&
+    currentUser?.authMode === "auth" &&
+    currentUser?.userId &&
+    currentUser?.role === "client" &&
+    !currentUser?.onboardingCompleted &&
+    !currentUser?.clientCompanyId &&
+    !currentUser?.clientProfileId;
+
+  return (
+    <>
+      <Router />
+      {needsOnboarding && (
+        <ClientOnboardingModal onComplete={() => setDismissed(true)} />
+      )}
+    </>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Router />
+        <OnboardingGate />
       </TooltipProvider>
     </QueryClientProvider>
   );

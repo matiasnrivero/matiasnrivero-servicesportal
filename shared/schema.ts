@@ -53,6 +53,7 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash"),
   passwordResetToken: text("password_reset_token"),
   passwordResetExpires: timestamp("password_reset_expires"),
+  onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
 });
 
 // Vendor profiles with pricing agreements and SLAs
@@ -114,6 +115,10 @@ export const clientProfiles = pgTable("client_profiles", {
   billingAddress: jsonb("billing_address"),
   // Tri-POD product discount tier: none (default), power_level (10%), oms_subscription (15%), enterprise (20%)
   tripodDiscountTier: text("tripod_discount_tier").notNull().default("none"),
+  // Industry-specific identifiers
+  asiNumber: text("asi_number"),
+  ppaiNumber: text("ppai_number"),
+  tripodWorkspaceUrl: text("tripod_workspace_url"),
   // Payment overdue tracking for Monthly Payment clients
   paymentOverdue: boolean("payment_overdue").notNull().default(false),
   paymentRetryCount: integer("payment_retry_count").notNull().default(0),
@@ -146,6 +151,10 @@ export const clientCompanies = pgTable("client_companies", {
   billingAddress: jsonb("billing_address"),
   // Tri-POD discount tier for company-wide pricing
   tripodDiscountTier: text("tripod_discount_tier").notNull().default("none"),
+  // Industry-specific identifiers
+  asiNumber: text("asi_number"),
+  ppaiNumber: text("ppai_number"),
+  tripodWorkspaceUrl: text("tripod_workspace_url"),
   // Notes for admin
   notes: text("notes"),
   isActive: integer("is_active").notNull().default(1),
