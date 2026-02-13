@@ -38,6 +38,11 @@ import ClientInvoicingReport from "@/pages/ClientInvoicingReport";
 import ClientInvoiceView from "@/pages/ClientInvoiceView";
 import VendorSlaReport from "@/pages/VendorSlaReport";
 import VendorTeam from "@/pages/VendorTeam";
+import LoginPage from "@/pages/LoginPage";
+import RegisterPage from "@/pages/RegisterPage";
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import ProfilePage from "@/pages/ProfilePage";
 
 function Router() {
   return (
@@ -82,6 +87,11 @@ function Router() {
       <Route path="/pack-assignment" component={PackAssignment} />
       <Route path="/org-companies" component={OrgCompanies} />
       <Route path="/org-companies/:id" component={ClientDetail} />
+      <Route path="/login" component={LoginPage} />
+      <Route path="/register" component={RegisterPage} />
+      <Route path="/forgot-password" component={ForgotPasswordPage} />
+      <Route path="/reset-password" component={ResetPasswordPage} />
+      <Route path="/profile" component={ProfilePage} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>

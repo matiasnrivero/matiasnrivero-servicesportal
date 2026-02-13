@@ -55,7 +55,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap, Percent, Users, UserCheck, Building2, AlertTriangle, GripVertical, ArrowLeft, Mail } from "lucide-react";
+import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap, Percent, Users, UserCheck, Building2, AlertTriangle, GripVertical, ArrowLeft, Mail, Cog } from "lucide-react";
 import { format } from "date-fns";
 import { AutomationSettingsTab } from "@/components/AutomationSettings";
 import { DiscountCouponsTab } from "@/components/DiscountCouponsTab";
@@ -174,6 +174,13 @@ const settingsCards: SettingsCard[] = [
     title: "Services Sorting",
     description: "Drag and drop services to set their display order for clients",
     icon: List,
+    roles: ["admin"],
+  },
+  {
+    id: "general-settings",
+    title: "General Settings",
+    description: "Configure platform-wide settings like authentication mode",
+    icon: Cog,
     roles: ["admin"],
   },
   {
@@ -5191,6 +5198,94 @@ export default function Settings() {
     );
   }
 
+  function GeneralSettingsTab() {
+    const { toast } = useToast();
+    
+    const { data: authSetting, isLoading } = useQuery<{ value: string }>({
+      queryKey: ["/api/system-settings/auth-login-type"],
+    });
+
+    const updateMutation = useMutation({
+      mutationFn: async (value: string) => {
+        await apiRequest("PUT", "/api/system-settings/auth-login-type", { value });
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/system-settings/auth-login-type"] });
+        toast({ title: "Settings updated", description: "Authentication mode has been saved." });
+      },
+      onError: () => {
+        toast({ title: "Error", description: "Failed to update setting.", variant: "destructive" });
+      },
+    });
+
+    const currentValue = authSetting?.value || "role";
+
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Cog className="w-5 h-5" />
+              Authentication Settings
+            </CardTitle>
+            <CardDescription>
+              Configure how users access the platform
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Auth Login Type</Label>
+              <div className="space-y-3">
+                <label
+                  className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer transition-colors ${currentValue === "auth" ? "border-sky-blue-accent bg-sky-blue-accent/5" : "border-border"}`}
+                  data-testid="radio-auth-system"
+                >
+                  <input
+                    type="radio"
+                    name="authLoginType"
+                    value="auth"
+                    checked={currentValue === "auth"}
+                    onChange={() => updateMutation.mutate("auth")}
+                    className="accent-sky-blue-accent"
+                    disabled={updateMutation.isPending}
+                  />
+                  <div>
+                    <div className="font-medium text-sm">Use User Authentication System</div>
+                    <div className="text-xs text-muted-foreground">Users must log in with email/password or Google to access the platform</div>
+                  </div>
+                </label>
+                <label
+                  className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer transition-colors ${currentValue === "role" ? "border-sky-blue-accent bg-sky-blue-accent/5" : "border-border"}`}
+                  data-testid="radio-role-system"
+                >
+                  <input
+                    type="radio"
+                    name="authLoginType"
+                    value="role"
+                    checked={currentValue === "role"}
+                    onChange={() => updateMutation.mutate("role")}
+                    className="accent-sky-blue-accent"
+                    disabled={updateMutation.isPending}
+                  />
+                  <div>
+                    <div className="font-medium text-sm">Use User Role System</div>
+                    <div className="text-xs text-muted-foreground">Switch between user roles via dropdown for development and testing</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+            {updateMutation.isPending && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Saving...
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const renderSelectedContent = () => {
     if (!selectedCard) return null;
 
@@ -5229,6 +5324,8 @@ export default function Settings() {
         return <AdminEmailPreferencesTab />;
       case "services-sorting":
         return <ServicesSortingTab />;
+      case "general-settings":
+        return <GeneralSettingsTab />;
       case "input-fields":
         return (
           <>

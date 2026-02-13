@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { createHash } from "crypto";
 import { storage } from "./storage";
+import { setupAuth } from "./auth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { automationEngine } from "./services/automationEngine";
 import { stripeService } from "./services/stripeService";
@@ -243,6 +244,8 @@ function computeRequestHash(userId: string, endpoint: string, body: Record<strin
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  setupAuth(app, storage);
+
   // Users routes
   app.get("/api/users", async (req, res) => {
     try {
@@ -2956,6 +2959,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
       res.set('Pragma', 'no-cache');
       res.set('Expires', '0');
+
+      // Check auth mode
+      const authSetting = await storage.getSystemSetting("auth_login_type");
+      const authMode = (authSetting?.settingValue as string) || "role";
       
       // If user already in session, return that user
       if (req.session.userId) {
@@ -2968,7 +2975,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             email: existingUser.email,
             phone: existingUser.phone,
             clientProfileId: existingUser.clientProfileId,
-            vendorId: existingUser.vendorId
+            vendorId: existingUser.vendorId,
+            avatarUrl: existingUser.avatarUrl,
+            authMode,
           };
           // Include impersonation info if applicable
           if (req.session.impersonatorId) {
@@ -2979,26 +2988,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Default user is Ross Adams (Client 1 - Fusion Brands)
-      let user = await storage.getUserByUsername("Ross Adams");
-      if (!user) {
-        // Fallback to default-user for backwards compatibility
-        user = await storage.getUserByUsername("default-user");
+      if (authMode === "role") {
+        // Default user is Ross Adams (Client 1 - Fusion Brands)
+        let user = await storage.getUserByUsername("Ross Adams");
+        if (!user) {
+          // Fallback to default-user for backwards compatibility
+          user = await storage.getUserByUsername("default-user");
+        }
+        if (!user) {
+          user = await storage.createUser({
+            username: "default-user",
+            password: "not-used",
+            email: "default@example.com",
+            role: "client",
+          });
+        }
+        
+        // Store in session
+        req.session.userId = user.id;
+        req.session.userRole = user.role;
+        
+        res.json({ userId: user.id, role: user.role, username: user.username, email: user.email, phone: user.phone, clientProfileId: user.clientProfileId, vendorId: user.vendorId, avatarUrl: user.avatarUrl, authMode });
+      } else {
+        return res.json({ authMode, user: null });
       }
-      if (!user) {
-        user = await storage.createUser({
-          username: "default-user",
-          password: "not-used",
-          email: "default@example.com",
-          role: "client",
-        });
-      }
-      
-      // Store in session
-      req.session.userId = user.id;
-      req.session.userRole = user.role;
-      
-      res.json({ userId: user.id, role: user.role, username: user.username, email: user.email, phone: user.phone, clientProfileId: user.clientProfileId, vendorId: user.vendorId });
     } catch (error) {
       console.error("Error getting default user:", error);
       res.status(500).json({ error: "Failed to get default user" });
@@ -4868,6 +4881,155 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating pricing settings:", error);
       res.status(500).json({ error: "Failed to update pricing settings" });
+    }
+  });
+
+  app.get("/api/system-settings/auth-login-type", async (req, res) => {
+    try {
+      const setting = await storage.getSystemSetting("auth_login_type");
+      res.json({ value: setting?.settingValue || "role" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch auth login type setting" });
+    }
+  });
+
+  app.put("/api/system-settings/auth-login-type", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const user = await storage.getUser(sessionUserId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ error: "Only admins can change this setting" });
+      }
+      const { value } = req.body;
+      if (!["auth", "role"].includes(value)) {
+        return res.status(400).json({ error: "Invalid value. Must be 'auth' or 'role'" });
+      }
+      await storage.setSystemSetting("auth_login_type", value);
+      res.json({ success: true, value });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update auth login type setting" });
+    }
+  });
+
+  app.get("/api/auth/profile", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        avatarUrl: user.avatarUrl,
+        phone: user.phone,
+        googleId: user.googleId ? true : false,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch profile" });
+    }
+  });
+
+  app.put("/api/auth/profile", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const { username, email, phone } = req.body;
+      const updateData: any = {};
+      if (username !== undefined) updateData.username = username;
+      if (email !== undefined) updateData.email = email;
+      if (phone !== undefined) updateData.phone = phone;
+
+      const updated = await storage.updateUser(req.session.userId, updateData);
+      if (!updated) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json({
+        id: updated.id,
+        username: updated.username,
+        email: updated.email,
+        role: updated.role,
+        avatarUrl: updated.avatarUrl,
+        phone: updated.phone,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
+  app.put("/api/auth/change-password", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const { currentPassword, newPassword } = req.body;
+      if (!newPassword || newPassword.length < 8) {
+        return res.status(400).json({ error: "New password must be at least 8 characters" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (user.passwordHash && currentPassword) {
+        const bcrypt = await import("bcryptjs");
+        const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+        if (!isMatch) {
+          return res.status(400).json({ error: "Current password is incorrect" });
+        }
+      }
+
+      const bcrypt = await import("bcryptjs");
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash(newPassword, salt);
+
+      await storage.updateUser(req.session.userId, { passwordHash } as any);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to change password" });
+    }
+  });
+
+  app.post("/api/auth/avatar-upload-url", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error("Error getting avatar upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
+  app.put("/api/auth/avatar", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const { avatarUrl } = req.body;
+      if (!avatarUrl) {
+        return res.status(400).json({ error: "Avatar URL is required" });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      const normalizedPath = objectStorageService.normalizeObjectEntityPath(avatarUrl);
+
+      await storage.updateUser(req.session.userId, { avatarUrl: normalizedPath } as any);
+      res.json({ success: true, avatarUrl: normalizedPath });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update avatar" });
     }
   });
 

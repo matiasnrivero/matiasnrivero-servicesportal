@@ -112,6 +112,8 @@ import {
   type Notification,
   type InsertNotification,
   type AdminEmailPreference,
+  type PasswordResetToken,
+  type InsertPasswordResetToken,
   users,
   services,
   servicePricingTiers,
@@ -158,6 +160,7 @@ import {
   adminNotifications,
   notifications,
   adminEmailPreferences,
+  passwordResetTokens,
 } from "@shared/schema";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -167,6 +170,8 @@ export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByGoogleId(googleId: string): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
   getUsersByRole(role: string): Promise<User[]>;
   getUsersByVendor(vendorId: string): Promise<User[]>;
@@ -509,6 +514,10 @@ export interface IStorage {
   getAdminEmailPreferences(): Promise<AdminEmailPreference[]>;
   upsertAdminEmailPreference(adminId: string, emailType: string, enabled: boolean): Promise<AdminEmailPreference>;
   getAdminEmailPreferencesForType(emailType: string): Promise<AdminEmailPreference[]>;
+
+  createPasswordResetToken(data: InsertPasswordResetToken): Promise<PasswordResetToken>;
+  getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
+  markPasswordResetTokenUsed(id: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -520,6 +529,16 @@ export class DbStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
+    return result[0];
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    return result[0];
+  }
+
+  async getUserByGoogleId(googleId: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.googleId, googleId)).limit(1);
     return result[0];
   }
 
@@ -2360,6 +2379,24 @@ export class DbStorage implements IStorage {
   async getAdminEmailPreferencesForType(emailType: string): Promise<AdminEmailPreference[]> {
     return await db.select().from(adminEmailPreferences)
       .where(eq(adminEmailPreferences.emailType, emailType));
+  }
+
+  async createPasswordResetToken(data: InsertPasswordResetToken): Promise<PasswordResetToken> {
+    const result = await db.insert(passwordResetTokens).values(data).returning();
+    return result[0];
+  }
+
+  async getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
+    const result = await db.select().from(passwordResetTokens)
+      .where(and(eq(passwordResetTokens.token, token), eq(passwordResetTokens.used, false)))
+      .limit(1);
+    return result[0];
+  }
+
+  async markPasswordResetTokenUsed(id: string): Promise<void> {
+    await db.update(passwordResetTokens)
+      .set({ used: true })
+      .where(eq(passwordResetTokens.id, id));
   }
 }
 

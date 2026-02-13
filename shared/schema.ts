@@ -48,6 +48,11 @@ export const users = pgTable("users", {
   invitedBy: varchar("invited_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   lastLoginAt: timestamp("last_login_at"),
+  avatarUrl: text("avatar_url"),
+  googleId: text("google_id"),
+  passwordHash: text("password_hash"),
+  passwordResetToken: text("password_reset_token"),
+  passwordResetExpires: timestamp("password_reset_expires"),
 });
 
 // Vendor profiles with pricing agreements and SLAs
@@ -281,6 +286,15 @@ export const systemSettings = pgTable("system_settings", {
   settingKey: text("setting_key").notNull().unique(),
   settingValue: jsonb("setting_value"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // ==================== PHASE 2: BUNDLES & SERVICE PACKS ====================
@@ -1324,6 +1338,9 @@ export type InsertAttachment = z.infer<typeof insertAttachmentSchema>;
 export type Comment = typeof comments.$inferSelect;
 export type InsertComment = z.infer<typeof insertCommentSchema>;
 export type SystemSetting = typeof systemSettings.$inferSelect;
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type InsertPasswordResetToken = typeof passwordResetTokens.$inferInsert;
 
 // Phase 2: Bundle & Pack types
 export type BundleLineItem = typeof bundleLineItems.$inferSelect;

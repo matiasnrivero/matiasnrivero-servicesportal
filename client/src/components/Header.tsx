@@ -1,6 +1,6 @@
 import { Link, useLocation, useRoute } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,16 +15,34 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Search, Loader2, FileText, Package } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Search, Loader2, FileText, Package, User as UserIcon, LogOut } from "lucide-react";
 import type { User } from "@shared/schema";
 import { useState, useEffect, useRef } from "react";
 import { NotificationBell } from "@/components/NotificationBell";
 import logoImg from "@assets/left_alligned_Services_1770755353119.png";
 
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+}
+
 type UserSession = {
   userId: string;
   role: string;
   username: string;
+  avatarUrl?: string | null;
+  authMode?: string;
   impersonating?: boolean;
   impersonatorId?: string;
 };
@@ -32,7 +50,11 @@ type UserSession = {
 async function getDefaultUser(): Promise<UserSession | null> {
   const res = await fetch("/api/default-user");
   if (!res.ok) return null;
-  return res.json();
+  const data = await res.json();
+  if (data && data.user === null) {
+    return { authMode: data.authMode } as any;
+  }
+  return data;
 }
 
 type SearchResult = {
@@ -54,6 +76,9 @@ export function Header() {
     queryKey: ["/api/default-user"],
     queryFn: getDefaultUser,
   });
+
+  const isAuthMode = currentUser?.authMode === "auth";
+  const isLoggedIn = !!currentUser?.userId;
 
   useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -212,15 +237,17 @@ export function Header() {
               </Button>
             </Link>
           )}
-          <Link href="/service-requests">
-            <Button
-              variant={location.startsWith("/service-requests") && location !== "/service-requests/new" ? "default" : "ghost"}
-              className={location.startsWith("/service-requests") && location !== "/service-requests/new" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
-              data-testid="nav-requests"
-            >
-              Requests
-            </Button>
-          </Link>
+          {isLoggedIn && (
+            <Link href="/service-requests">
+              <Button
+                variant={location.startsWith("/service-requests") && location !== "/service-requests/new" ? "default" : "ghost"}
+                className={location.startsWith("/service-requests") && location !== "/service-requests/new" ? "bg-sky-blue-accent hover:bg-sky-blue-accent/90" : ""}
+                data-testid="nav-requests"
+              >
+                Requests
+              </Button>
+            </Link>
+          )}
           {isVendor && (
             <Link href="/vendor-team">
               <Button
@@ -321,7 +348,7 @@ export function Header() {
             </Link>
           )}
       </nav>
-      {currentUser && !currentUser.impersonating && (
+      {isLoggedIn && !currentUser?.impersonating && (
         <div className="flex items-center gap-2 flex-shrink-0">
           <Popover open={searchOpen} onOpenChange={setSearchOpen}>
             <PopoverTrigger asChild>
@@ -381,10 +408,51 @@ export function Header() {
             </PopoverContent>
           </Popover>
           <NotificationBell />
+          {currentUser.authMode === "auth" ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 rounded-md p-1 hover-elevate" data-testid="button-user-menu">
+                  <Avatar className="h-8 w-8">
+                    {currentUser.avatarUrl && (
+                      <AvatarImage src={currentUser.avatarUrl} alt={currentUser.username} />
+                    )}
+                    <AvatarFallback className="text-xs bg-sky-blue-accent text-white">
+                      {getInitials(currentUser.username || "U")}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm font-medium max-w-24 truncate hidden sm:inline">{currentUser.username}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem
+                  onClick={() => setLocation("/profile")}
+                  data-testid="menu-item-profile"
+                >
+                  <UserIcon className="mr-2 h-4 w-4" />
+                  My Profile
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={async () => {
+                    try {
+                      await apiRequest("POST", "/api/auth/logout");
+                      queryClient.clear();
+                      setLocation("/login");
+                    } catch (e) {
+                      console.error("Logout failed:", e);
+                    }
+                  }}
+                  data-testid="menu-item-logout"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
           <div className="flex items-center gap-1">
             <Select
               value={(() => {
-                // Map username to switcher value for all roles
                 const usernameToValue: Record<string, string> = {
                   "Matias Rivero": "admin",
                   "Federico Chami": "internal_designer",
@@ -428,6 +496,16 @@ export function Header() {
               </SelectContent>
             </Select>
           </div>
+          )}
+        </div>
+      )}
+      {!isLoggedIn && isAuthMode && (
+        <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+          <Link href="/login">
+            <Button variant="default" className="bg-sky-blue-accent" data-testid="button-sign-in">
+              Sign In
+            </Button>
+          </Link>
         </div>
       )}
     </header>
