@@ -5,14 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import logoImg from "@assets/left_alligned_Services_1770755353119.png";
+import defaultLogoImg from "@assets/left_alligned_Services_1770755353119.png";
 
 export default function ForgotPasswordPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const { data: logoSetting } = useQuery<{ value: string | null }>({
+    queryKey: ["/api/system-settings/platform-logo"],
+  });
+  const logoSrc = logoSetting?.value || defaultLogoImg;
   const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -44,7 +50,7 @@ export default function ForgotPasswordPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30">
       <div className="flex flex-col items-center gap-6 max-w-md w-full px-4">
-        <img src={logoImg} alt="Tri-POD Services" className="h-12" data-testid="img-logo" />
+        <img src={logoSrc} alt="Tri-POD Services" className="h-12" data-testid="img-logo" />
         <Card className="w-full">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl" data-testid="text-forgot-password-heading">Reset Password</CardTitle>

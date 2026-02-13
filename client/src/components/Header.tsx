@@ -27,7 +27,7 @@ import { Search, Loader2, FileText, Package, User as UserIcon, LogOut } from "lu
 import type { User } from "@shared/schema";
 import { useState, useEffect, useRef } from "react";
 import { NotificationBell } from "@/components/NotificationBell";
-import logoImg from "@assets/left_alligned_Services_1770755353119.png";
+import defaultLogoImg from "@assets/left_alligned_Services_1770755353119.png";
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -77,8 +77,13 @@ export function Header() {
     queryFn: getDefaultUser,
   });
 
+  const { data: logoSetting } = useQuery<{ value: string | null }>({
+    queryKey: ["/api/system-settings/platform-logo"],
+  });
+
   const isAuthMode = currentUser?.authMode === "auth";
   const isLoggedIn = !!currentUser?.userId;
+  const logoSrc = logoSetting?.value || defaultLogoImg;
 
   useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -212,7 +217,7 @@ export function Header() {
       )}
     <header className="flex w-full items-center gap-3 px-3 py-2 bg-white shadow-shadow-top-bar">
       <Link href={isAdmin ? "/dashboard" : "/"} className="flex-shrink-0 mr-3">
-        <img src={logoImg} alt="Tri-Pod Services" className="h-8 cursor-pointer" data-testid="link-services-portal" />
+        <img src={logoSrc} alt="Tri-Pod Services" className="h-8 cursor-pointer" data-testid="link-services-portal" />
       </Link>
       <nav className="flex flex-1 items-center gap-3">
           {(isAdmin || isInternalDesigner || isVendor || isVendorDesigner) && (

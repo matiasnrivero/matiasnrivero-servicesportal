@@ -4914,6 +4914,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/system-settings/platform-logo", async (req, res) => {
+    try {
+      const setting = await storage.getSystemSetting("platform_logo");
+      res.json({ value: setting?.settingValue || null });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch platform logo setting" });
+    }
+  });
+
+  app.put("/api/system-settings/platform-logo", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const user = await storage.getUser(sessionUserId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ error: "Only admins can change platform logo" });
+      }
+      const { value } = req.body;
+      if (value) {
+        const objectStorageService = new ObjectStorageService();
+        const normalizedPath = objectStorageService.normalizeObjectEntityPath(value);
+        await storage.setSystemSetting("platform_logo", normalizedPath);
+        res.json({ success: true, value: normalizedPath });
+      } else {
+        await storage.setSystemSetting("platform_logo", null);
+        res.json({ success: true, value: null });
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update platform logo setting" });
+    }
+  });
+
+  app.post("/api/system-settings/platform-logo-upload-url", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const user = await storage.getUser(sessionUserId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ error: "Only admins can upload platform logo" });
+      }
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error("Error getting platform logo upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
   app.get("/api/auth/profile", async (req, res) => {
     try {
       if (!req.session.userId) {

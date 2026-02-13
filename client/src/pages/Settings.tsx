@@ -55,7 +55,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap, Percent, Users, UserCheck, Building2, AlertTriangle, GripVertical, ArrowLeft, Mail, Cog } from "lucide-react";
+import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap, Percent, Users, UserCheck, Building2, AlertTriangle, GripVertical, ArrowLeft, Mail, Cog, Upload, ImageIcon } from "lucide-react";
 import { format } from "date-fns";
 import { AutomationSettingsTab } from "@/components/AutomationSettings";
 import { DiscountCouponsTab } from "@/components/DiscountCouponsTab";
@@ -5200,9 +5200,17 @@ export default function Settings() {
 
   function GeneralSettingsTab() {
     const { toast } = useToast();
+    const [logoUploading, setLogoUploading] = useState(false);
+    const logoInputRef = useCallback((node: HTMLInputElement | null) => {
+      if (node) node.value = "";
+    }, []);
     
     const { data: authSetting, isLoading } = useQuery<{ value: string }>({
       queryKey: ["/api/system-settings/auth-login-type"],
+    });
+
+    const { data: logoSetting } = useQuery<{ value: string | null }>({
+      queryKey: ["/api/system-settings/platform-logo"],
     });
 
     const updateMutation = useMutation({
@@ -5218,7 +5226,62 @@ export default function Settings() {
       },
     });
 
+    const updateLogoMutation = useMutation({
+      mutationFn: async (value: string | null) => {
+        await apiRequest("PUT", "/api/system-settings/platform-logo", { value });
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/system-settings/platform-logo"] });
+        toast({ title: "Logo updated", description: "Platform logo has been saved." });
+      },
+      onError: () => {
+        toast({ title: "Error", description: "Failed to update logo.", variant: "destructive" });
+      },
+    });
+
+    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (!file.type.startsWith("image/")) {
+        toast({ title: "Invalid file", description: "Please upload an image file (PNG, JPG, SVG, etc.)", variant: "destructive" });
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ title: "File too large", description: "Logo file must be under 5MB.", variant: "destructive" });
+        return;
+      }
+
+      setLogoUploading(true);
+      try {
+        const urlRes = await apiRequest("POST", "/api/system-settings/platform-logo-upload-url");
+        const { uploadURL } = await urlRes.json();
+
+        const uploadRes = await fetch(uploadURL, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type },
+        });
+
+        if (!uploadRes.ok) {
+          throw new Error("Upload failed");
+        }
+
+        await updateLogoMutation.mutateAsync(uploadURL);
+      } catch (error) {
+        toast({ title: "Upload failed", description: "Failed to upload logo. Please try again.", variant: "destructive" });
+      } finally {
+        setLogoUploading(false);
+      }
+    };
+
+    const handleRemoveLogo = () => {
+      updateLogoMutation.mutate(null);
+    };
+
     const currentValue = authSetting?.value || "role";
+    const currentLogo = logoSetting?.value || null;
 
     return (
       <div className="space-y-6">
@@ -5280,6 +5343,123 @@ export default function Settings() {
                 Saving...
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ImageIcon className="w-5 h-5" />
+              Platform Logo
+            </CardTitle>
+            <CardDescription>
+              Replace the logo shown on the Sign-in page and the top-left corner of the navigation bar
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Platform Logo</Label>
+              <p className="text-xs text-muted-foreground">
+                Recommended size: 1000x200px (5:1 aspect ratio). Use a horizontal/landscape logo for best results. Supported formats: PNG, JPG, SVG. Max file size: 5MB.
+              </p>
+
+              {currentLogo ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-4 p-4 border rounded-md bg-muted/30">
+                    <img
+                      src={currentLogo}
+                      alt="Platform logo"
+                      className="h-10 max-w-[250px] object-contain"
+                      data-testid="img-platform-logo-preview"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleLogoUpload}
+                        disabled={logoUploading}
+                        ref={logoInputRef}
+                        data-testid="input-logo-upload"
+                      />
+                      <Button
+                        variant="outline"
+                        disabled={logoUploading}
+                        onClick={(e) => {
+                          const input = (e.currentTarget.parentElement as HTMLLabelElement).querySelector('input[type="file"]') as HTMLInputElement;
+                          input?.click();
+                        }}
+                        data-testid="button-replace-logo"
+                      >
+                        {logoUploading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="mr-2 h-4 w-4" />
+                            Replace Logo
+                          </>
+                        )}
+                      </Button>
+                    </label>
+                    <Button
+                      variant="outline"
+                      onClick={handleRemoveLogo}
+                      disabled={updateLogoMutation.isPending}
+                      data-testid="button-remove-logo"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Remove Logo
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-center p-6 border-2 border-dashed rounded-md bg-muted/20">
+                    <div className="text-center space-y-2">
+                      <ImageIcon className="mx-auto h-8 w-8 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">No custom logo uploaded. Default logo is being used.</p>
+                    </div>
+                  </div>
+                  <label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleLogoUpload}
+                      disabled={logoUploading}
+                      ref={logoInputRef}
+                      data-testid="input-logo-upload"
+                    />
+                    <Button
+                      variant="outline"
+                      disabled={logoUploading}
+                      onClick={(e) => {
+                        const input = (e.currentTarget.parentElement as HTMLLabelElement).querySelector('input[type="file"]') as HTMLInputElement;
+                        input?.click();
+                      }}
+                      data-testid="button-upload-logo"
+                    >
+                      {logoUploading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="mr-2 h-4 w-4" />
+                          Upload Logo
+                        </>
+                      )}
+                    </Button>
+                  </label>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
