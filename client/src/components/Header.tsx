@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Search, Loader2, FileText, Package, User as UserIcon, LogOut } from "lucide-react";
 import type { User } from "@shared/schema";
 import { useState, useEffect, useRef } from "react";
@@ -43,6 +44,7 @@ type UserSession = {
   username: string;
   avatarUrl?: string | null;
   authMode?: string;
+  appEnvironment?: string;
   impersonating?: boolean;
   impersonatorId?: string;
 };
@@ -52,7 +54,7 @@ async function getDefaultUser(): Promise<UserSession | null> {
   if (!res.ok) return null;
   const data = await res.json();
   if (data && data.user === null) {
-    return { authMode: data.authMode } as any;
+    return { authMode: data.authMode, appEnvironment: data.appEnvironment } as any;
   }
   return data;
 }
@@ -141,9 +143,10 @@ export function Header() {
       return res.json() as Promise<{ role: string; user: User }>;
     },
     onSuccess: (data) => {
-      // Optimistically update user data immediately for instant UI response
+      // Optimistically update user data immediately, preserving appEnvironment from existing cache
       if (data.user) {
-        queryClient.setQueryData(["/api/default-user"], data.user);
+        const existing = queryClient.getQueryData(["/api/default-user"]) as any;
+        queryClient.setQueryData(["/api/default-user"], { ...data.user, appEnvironment: existing?.appEnvironment });
       }
       // Fire invalidations in background without awaiting - UI unlocks immediately
       queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
@@ -167,9 +170,10 @@ export function Header() {
       return res.json() as Promise<{ user: User }>;
     },
     onSuccess: (data) => {
-      // Optimistically update user data immediately for instant UI response
+      // Optimistically update user data immediately, preserving appEnvironment from existing cache
       if (data.user) {
-        queryClient.setQueryData(["/api/default-user"], data.user);
+        const existing = queryClient.getQueryData(["/api/default-user"]) as any;
+        queryClient.setQueryData(["/api/default-user"], { ...data.user, appEnvironment: existing?.appEnvironment });
       }
       // Fire invalidations in background without awaiting
       queryClient.invalidateQueries({ queryKey: ["/api/service-requests"] });
@@ -219,6 +223,19 @@ export function Header() {
       <Link href={isAdmin ? "/dashboard" : "/"} className="flex-shrink-0 mr-3">
         <img src={logoSrc} alt="Tri-Pod Services" className="h-8 cursor-pointer" data-testid="link-services-portal" />
       </Link>
+      {currentUser?.appEnvironment && currentUser.appEnvironment !== "production" && (
+        <Badge
+          variant="outline"
+          className={`text-[10px] font-semibold uppercase tracking-wider flex-shrink-0 no-default-hover-elevate no-default-active-elevate ${
+            currentUser.appEnvironment === "development"
+              ? "border-amber-400 text-amber-600 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-600"
+              : "border-blue-400 text-blue-600 bg-blue-50 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-600"
+          }`}
+          data-testid="badge-environment"
+        >
+          {currentUser.appEnvironment === "development" ? "DEV" : "STAGING"}
+        </Badge>
+      )}
       <nav className="flex flex-1 items-center gap-3">
           {(isAdmin || isInternalDesigner || isVendor || isVendorDesigner) && (
             <Link href="/dashboard">

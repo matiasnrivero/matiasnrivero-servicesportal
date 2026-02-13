@@ -2963,6 +2963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check auth mode
       const authSetting = await storage.getSystemSetting("auth_login_type");
       const authMode = (authSetting?.settingValue as string) || "role";
+      const appEnvironment = process.env.APP_ENVIRONMENT || "development";
       
       // If user already in session, return that user
       if (req.session.userId) {
@@ -2980,6 +2981,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             avatarUrl: existingUser.avatarUrl,
             onboardingCompleted: existingUser.onboardingCompleted,
             authMode,
+            appEnvironment,
           };
           // Include impersonation info if applicable
           if (req.session.impersonatorId) {
@@ -3010,9 +3012,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.session.userId = user.id;
         req.session.userRole = user.role;
         
-        res.json({ userId: user.id, role: user.role, username: user.username, email: user.email, phone: user.phone, clientProfileId: user.clientProfileId, clientCompanyId: user.clientCompanyId, vendorId: user.vendorId, avatarUrl: user.avatarUrl, onboardingCompleted: user.onboardingCompleted, authMode });
+        res.json({ userId: user.id, role: user.role, username: user.username, email: user.email, phone: user.phone, clientProfileId: user.clientProfileId, clientCompanyId: user.clientCompanyId, vendorId: user.vendorId, avatarUrl: user.avatarUrl, onboardingCompleted: user.onboardingCompleted, authMode, appEnvironment });
       } else {
-        return res.json({ authMode, user: null });
+        return res.json({ authMode, appEnvironment, user: null });
       }
     } catch (error) {
       console.error("Error getting default user:", error);

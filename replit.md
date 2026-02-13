@@ -71,3 +71,4 @@ The application uses a monorepo structure comprising a React frontend with TypeS
 -   **SENDGRID_SENDER_NAME**: Display name for the sender.
 -   **SUPPORT_EMAIL**: Email for customer support.
 -   **PLATFORM_URL**: Base URL of the application for generating links in emails.
+-   **APP_ENVIRONMENT**: Current environment (`development`, `staging`, or `production`). Controls the environment badge in the header (hidden in production). Each Repl fork should set this appropriately.
