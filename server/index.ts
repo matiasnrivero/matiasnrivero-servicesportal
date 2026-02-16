@@ -315,7 +315,19 @@ app.use((req, res, next) => {
     port,
     host: "0.0.0.0",
     reusePort: true,
-  }, () => {
+  }, async () => {
     log(`serving on port ${port}`);
+
+    // TEMPORARY: One-time fix to switch auth_login_type to "role" on staging
+    try {
+      const { storage } = await import("./storage");
+      const authSetting = await storage.getSystemSetting("auth_login_type");
+      if (authSetting?.settingValue === "auth") {
+        await storage.setSystemSetting("auth_login_type", "role");
+        log(`[STARTUP FIX] Switched auth_login_type from "auth" to "role"`);
+      }
+    } catch (e) {
+      log(`[STARTUP FIX] Failed to update auth setting: ${e}`);
+    }
   });
 })();
