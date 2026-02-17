@@ -40,7 +40,9 @@ export function setupAuth(app: Express, storage: IStorage) {
     passport.use(new GoogleStrategy({
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: '/api/auth/google/callback',
+      callbackURL: process.env.PLATFORM_URL 
+        ? `https://${process.env.PLATFORM_URL}/api/auth/google/callback`
+        : '/api/auth/google/callback',
       scope: ['profile', 'email'],
     }, async (accessToken: string, refreshToken: string, profile: any, done: any) => {
       try {
