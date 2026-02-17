@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -55,7 +55,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap, Percent, Users, UserCheck, Building2, AlertTriangle, GripVertical, ArrowLeft, Mail, Cog, Upload, ImageIcon } from "lucide-react";
+import { Settings as SettingsIcon, DollarSign, Save, Package, Plus, Pencil, Boxes, CalendarRange, Trash2, FormInput, Loader2, Layers, X, List, Zap, Percent, Users, UserCheck, Building2, AlertTriangle, GripVertical, ArrowLeft, Mail, Cog, Upload, Download, ImageIcon } from "lucide-react";
 import { format } from "date-fns";
 import { AutomationSettingsTab } from "@/components/AutomationSettings";
 import { DiscountCouponsTab } from "@/components/DiscountCouponsTab";
@@ -1556,6 +1556,51 @@ function InputFieldsTabContent() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingField, setEditingField] = useState<InputField | null>(null);
   const [seedLoading, setSeedLoading] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExportConfig = async () => {
+    try {
+      const response = await fetch("/api/admin/export-config", { credentials: "include" });
+      if (!response.ok) throw new Error("Export failed");
+      const data = await response.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `config-export-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "Configuration exported successfully" });
+    } catch (error: any) {
+      toast({ title: "Export failed", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleImportConfig = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setIsImporting(true);
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const response = await apiRequest("POST", "/api/admin/import-config", data);
+      const result = await response.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/input-fields"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      toast({ 
+        title: "Import completed", 
+        description: `Created: ${result.results.inputFieldsCreated} fields, ${result.results.serviceFieldsCreated} service assignments, ${result.results.bundleFieldsCreated} bundle assignments. Updated: ${result.results.inputFieldsUpdated} fields.${result.results.errors?.length ? ` Warnings: ${result.results.errors.length}` : ""}`,
+      });
+    } catch (error: any) {
+      toast({ title: "Import failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const { data: inputFieldsList = [], isLoading } = useQuery<InputField[]>({
     queryKey: ["/api/input-fields"],
@@ -1745,7 +1790,16 @@ function InputFieldsTabContent() {
           <CardTitle>Input Fields Library</CardTitle>
           <CardDescription>Manage configurable input fields that can be assigned to different services</CardDescription>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={handleExportConfig} data-testid="button-export-config">
+            <Download className="h-4 w-4 mr-2" />
+            Export Config
+          </Button>
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isImporting} data-testid="button-import-config">
+            {isImporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+            Import Config
+          </Button>
+          <input ref={fileInputRef} type="file" accept=".json" onChange={handleImportConfig} className="hidden" />
           {inputFieldsList.length === 0 && (
             <Button 
               variant="outline" 

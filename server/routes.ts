@@ -8547,6 +8547,331 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== CONFIGURATION EXPORT/IMPORT ROUTES ====================
+
+  app.get("/api/admin/export-config", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) return res.status(401).json({ error: "Not authenticated" });
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") return res.status(403).json({ error: "Admin access required" });
+
+      const inputFieldsList = await storage.getAllInputFields();
+      const allServices = await storage.getAllServices();
+      const allBundles = await storage.getAllBundles();
+      const allLineItems = await storage.getAllBundleLineItems();
+
+      const serviceFieldsExport: any[] = [];
+      for (const service of allServices) {
+        const fields = await storage.getServiceFields(service.id);
+        for (const sf of fields) {
+          const inputField = inputFieldsList.find(f => f.id === sf.inputFieldId);
+          if (!inputField) continue;
+          serviceFieldsExport.push({
+            serviceName: service.title,
+            fieldKey: inputField.fieldKey,
+            required: sf.required,
+            displayLabelOverride: sf.displayLabelOverride,
+            helpTextOverride: sf.helpTextOverride,
+            placeholderOverride: sf.placeholderOverride,
+            valueModeOverride: sf.valueModeOverride,
+            optionsJson: sf.optionsJson,
+            defaultValue: sf.defaultValue,
+            uiGroup: sf.uiGroup,
+            sortOrder: sf.sortOrder,
+            isActive: sf.isActive,
+          });
+        }
+      }
+
+      const lineItemFieldsExport: any[] = [];
+      for (const lineItem of allLineItems) {
+        const fields = await storage.getLineItemFields(lineItem.id);
+        for (const lif of fields) {
+          const inputField = inputFieldsList.find(f => f.id === lif.inputFieldId);
+          if (!inputField) continue;
+          lineItemFieldsExport.push({
+            lineItemName: lineItem.name,
+            fieldKey: inputField.fieldKey,
+            required: lif.required,
+            displayLabelOverride: lif.displayLabelOverride,
+            helpTextOverride: lif.helpTextOverride,
+            placeholderOverride: lif.placeholderOverride,
+            valueModeOverride: lif.valueModeOverride,
+            optionsJson: lif.optionsJson,
+            defaultValue: lif.defaultValue,
+            uiGroup: lif.uiGroup,
+            sortOrder: lif.sortOrder,
+            isActive: lif.isActive,
+          });
+        }
+      }
+
+      const bundleFieldsExport: any[] = [];
+      for (const bundle of allBundles) {
+        const fields = await storage.getBundleFields(bundle.id);
+        for (const bf of fields) {
+          const inputField = inputFieldsList.find(f => f.id === bf.inputFieldId);
+          if (!inputField) continue;
+          bundleFieldsExport.push({
+            bundleName: bundle.name,
+            fieldKey: inputField.fieldKey,
+            required: bf.required,
+            displayLabelOverride: bf.displayLabelOverride,
+            helpTextOverride: bf.helpTextOverride,
+            placeholderOverride: bf.placeholderOverride,
+            valueModeOverride: bf.valueModeOverride,
+            optionsJson: bf.optionsJson,
+            defaultValue: bf.defaultValue,
+            uiGroup: bf.uiGroup,
+            sortOrder: bf.sortOrder,
+            isActive: bf.isActive,
+          });
+        }
+      }
+
+      const exportData = {
+        exportedAt: new Date().toISOString(),
+        version: "1.0",
+        inputFields: inputFieldsList.map(f => ({
+          fieldKey: f.fieldKey,
+          label: f.label,
+          description: f.description,
+          inputType: f.inputType,
+          valueMode: f.valueMode,
+          assignTo: f.assignTo,
+          inputFor: f.inputFor,
+          showOnBundleForm: f.showOnBundleForm,
+          validation: f.validation,
+          globalDefaultValue: f.globalDefaultValue,
+          isActive: f.isActive,
+          sortOrder: f.sortOrder,
+        })),
+        serviceFields: serviceFieldsExport,
+        lineItemFields: lineItemFieldsExport,
+        bundleFields: bundleFieldsExport,
+      };
+
+      res.json(exportData);
+    } catch (error) {
+      console.error("Error exporting config:", error);
+      res.status(500).json({ error: "Failed to export configuration" });
+    }
+  });
+
+  app.post("/api/admin/import-config", async (req, res) => {
+    try {
+      const sessionUserId = req.session.userId;
+      if (!sessionUserId) return res.status(401).json({ error: "Not authenticated" });
+      const sessionUser = await storage.getUser(sessionUserId);
+      if (!sessionUser || sessionUser.role !== "admin") return res.status(403).json({ error: "Admin access required" });
+
+      const { inputFields: importedFields, serviceFields: importedServiceFields, lineItemFields: importedLineItemFields, bundleFields: importedBundleFields } = req.body;
+      if (!importedFields || !Array.isArray(importedFields)) {
+        return res.status(400).json({ error: "Invalid import data: inputFields array required" });
+      }
+
+      const results = {
+        inputFieldsCreated: 0,
+        inputFieldsUpdated: 0,
+        inputFieldsSkipped: 0,
+        serviceFieldsCreated: 0,
+        serviceFieldsSkipped: 0,
+        lineItemFieldsCreated: 0,
+        lineItemFieldsSkipped: 0,
+        bundleFieldsCreated: 0,
+        bundleFieldsSkipped: 0,
+        errors: [] as string[],
+      };
+
+      const existingFields = await storage.getAllInputFields();
+      const fieldKeyToId: Record<string, string> = {};
+
+      for (const fieldData of importedFields) {
+        try {
+          const existing = existingFields.find(f => f.fieldKey === fieldData.fieldKey);
+          if (existing) {
+            await storage.updateInputField(existing.id, {
+              label: fieldData.label,
+              description: fieldData.description,
+              inputType: fieldData.inputType,
+              valueMode: fieldData.valueMode,
+              assignTo: fieldData.assignTo,
+              inputFor: fieldData.inputFor,
+              showOnBundleForm: fieldData.showOnBundleForm,
+              validation: fieldData.validation,
+              globalDefaultValue: fieldData.globalDefaultValue,
+              isActive: fieldData.isActive,
+              sortOrder: fieldData.sortOrder,
+            });
+            fieldKeyToId[fieldData.fieldKey] = existing.id;
+            results.inputFieldsUpdated++;
+          } else {
+            const created = await storage.createInputField({
+              fieldKey: fieldData.fieldKey,
+              label: fieldData.label,
+              description: fieldData.description,
+              inputType: fieldData.inputType,
+              valueMode: fieldData.valueMode,
+              assignTo: fieldData.assignTo,
+              inputFor: fieldData.inputFor,
+              showOnBundleForm: fieldData.showOnBundleForm,
+              validation: fieldData.validation,
+              globalDefaultValue: fieldData.globalDefaultValue,
+              isActive: fieldData.isActive,
+              sortOrder: fieldData.sortOrder,
+            });
+            fieldKeyToId[fieldData.fieldKey] = created.id;
+            results.inputFieldsCreated++;
+          }
+        } catch (err: any) {
+          results.errors.push(`Input field "${fieldData.fieldKey}": ${err.message}`);
+          results.inputFieldsSkipped++;
+        }
+      }
+
+      if (importedServiceFields && Array.isArray(importedServiceFields)) {
+        const allServices = await storage.getAllServices();
+        for (const sfData of importedServiceFields) {
+          try {
+            const service = allServices.find(s => s.title === sfData.serviceName);
+            if (!service) {
+              results.errors.push(`Service "${sfData.serviceName}" not found - skipping field "${sfData.fieldKey}"`);
+              results.serviceFieldsSkipped++;
+              continue;
+            }
+            const inputFieldId = fieldKeyToId[sfData.fieldKey];
+            if (!inputFieldId) {
+              results.errors.push(`Input field "${sfData.fieldKey}" not found - skipping service field for "${sfData.serviceName}"`);
+              results.serviceFieldsSkipped++;
+              continue;
+            }
+            const existingServiceFields = await storage.getServiceFields(service.id);
+            const existingSf = existingServiceFields.find(f => f.inputFieldId === inputFieldId);
+            if (existingSf) {
+              results.serviceFieldsSkipped++;
+              continue;
+            }
+            await storage.createServiceField({
+              serviceId: service.id,
+              inputFieldId,
+              required: sfData.required,
+              displayLabelOverride: sfData.displayLabelOverride,
+              helpTextOverride: sfData.helpTextOverride,
+              placeholderOverride: sfData.placeholderOverride,
+              valueModeOverride: sfData.valueModeOverride,
+              optionsJson: sfData.optionsJson,
+              defaultValue: sfData.defaultValue,
+              uiGroup: sfData.uiGroup,
+              sortOrder: sfData.sortOrder,
+              isActive: sfData.isActive,
+            });
+            results.serviceFieldsCreated++;
+          } catch (err: any) {
+            results.errors.push(`Service field "${sfData.serviceName}/${sfData.fieldKey}": ${err.message}`);
+            results.serviceFieldsSkipped++;
+          }
+        }
+      }
+
+      if (importedLineItemFields && Array.isArray(importedLineItemFields)) {
+        const allLineItems = await storage.getAllBundleLineItems();
+        for (const lifData of importedLineItemFields) {
+          try {
+            const lineItem = allLineItems.find(li => li.name === lifData.lineItemName);
+            if (!lineItem) {
+              results.errors.push(`Line item "${lifData.lineItemName}" not found - skipping field "${lifData.fieldKey}"`);
+              results.lineItemFieldsSkipped++;
+              continue;
+            }
+            const inputFieldId = fieldKeyToId[lifData.fieldKey];
+            if (!inputFieldId) {
+              results.errors.push(`Input field "${lifData.fieldKey}" not found - skipping line item field for "${lifData.lineItemName}"`);
+              results.lineItemFieldsSkipped++;
+              continue;
+            }
+            const existingLiFields = await storage.getLineItemFields(lineItem.id);
+            const existingLif = existingLiFields.find(f => f.inputFieldId === inputFieldId);
+            if (existingLif) {
+              results.lineItemFieldsSkipped++;
+              continue;
+            }
+            await storage.createLineItemField({
+              lineItemId: lineItem.id,
+              inputFieldId,
+              required: lifData.required,
+              displayLabelOverride: lifData.displayLabelOverride,
+              helpTextOverride: lifData.helpTextOverride,
+              placeholderOverride: lifData.placeholderOverride,
+              valueModeOverride: lifData.valueModeOverride,
+              optionsJson: lifData.optionsJson,
+              defaultValue: lifData.defaultValue,
+              uiGroup: lifData.uiGroup,
+              sortOrder: lifData.sortOrder,
+              isActive: lifData.isActive,
+            });
+            results.lineItemFieldsCreated++;
+          } catch (err: any) {
+            results.errors.push(`Line item field "${lifData.lineItemName}/${lifData.fieldKey}": ${err.message}`);
+            results.lineItemFieldsSkipped++;
+          }
+        }
+      }
+
+      if (importedBundleFields && Array.isArray(importedBundleFields)) {
+        const allBundles = await storage.getAllBundles();
+        for (const bfData of importedBundleFields) {
+          try {
+            const bundle = allBundles.find(b => b.name === bfData.bundleName);
+            if (!bundle) {
+              results.errors.push(`Bundle "${bfData.bundleName}" not found - skipping field "${bfData.fieldKey}"`);
+              results.bundleFieldsSkipped++;
+              continue;
+            }
+            const inputFieldId = fieldKeyToId[bfData.fieldKey];
+            if (!inputFieldId) {
+              results.errors.push(`Input field "${bfData.fieldKey}" not found - skipping bundle field for "${bfData.bundleName}"`);
+              results.bundleFieldsSkipped++;
+              continue;
+            }
+            const existingBundleFields = await storage.getBundleFields(bundle.id);
+            const existingBf = existingBundleFields.find(f => f.inputFieldId === inputFieldId);
+            if (existingBf) {
+              results.bundleFieldsSkipped++;
+              continue;
+            }
+            await storage.createBundleField({
+              bundleId: bundle.id,
+              inputFieldId,
+              required: bfData.required,
+              displayLabelOverride: bfData.displayLabelOverride,
+              helpTextOverride: bfData.helpTextOverride,
+              placeholderOverride: bfData.placeholderOverride,
+              valueModeOverride: bfData.valueModeOverride,
+              optionsJson: bfData.optionsJson,
+              defaultValue: bfData.defaultValue,
+              uiGroup: bfData.uiGroup,
+              sortOrder: bfData.sortOrder,
+              isActive: bfData.isActive,
+            });
+            results.bundleFieldsCreated++;
+          } catch (err: any) {
+            results.errors.push(`Bundle field "${bfData.bundleName}/${bfData.fieldKey}": ${err.message}`);
+            results.bundleFieldsSkipped++;
+          }
+        }
+      }
+
+      res.json({
+        message: "Import completed",
+        results,
+      });
+    } catch (error) {
+      console.error("Error importing config:", error);
+      res.status(500).json({ error: "Failed to import configuration" });
+    }
+  });
+
   // ==================== VENDOR SERVICE CAPACITY ROUTES ====================
 
   // Get all vendor service capacities (admin/internal_designer only)
