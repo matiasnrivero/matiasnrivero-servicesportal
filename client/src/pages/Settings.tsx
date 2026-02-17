@@ -1557,6 +1557,8 @@ function InputFieldsTabContent() {
   const [editingField, setEditingField] = useState<InputField | null>(null);
   const [seedLoading, setSeedLoading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [importWarnings, setImportWarnings] = useState<string[]>([]);
+  const [showWarningsDialog, setShowWarningsDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExportConfig = async () => {
@@ -1590,10 +1592,16 @@ function InputFieldsTabContent() {
       const result = await response.json();
       queryClient.invalidateQueries({ queryKey: ["/api/input-fields"] });
       queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      const warnings = result.results.errors || [];
+      const lineItemInfo = result.results.lineItemFieldsCreated > 0 ? `, ${result.results.lineItemFieldsCreated} line item assignments` : "";
       toast({ 
         title: "Import completed", 
-        description: `Created: ${result.results.inputFieldsCreated} fields, ${result.results.serviceFieldsCreated} service assignments, ${result.results.bundleFieldsCreated} bundle assignments. Updated: ${result.results.inputFieldsUpdated} fields.${result.results.errors?.length ? ` Warnings: ${result.results.errors.length}` : ""}`,
+        description: `Created: ${result.results.inputFieldsCreated} fields, ${result.results.serviceFieldsCreated} service assignments${lineItemInfo}, ${result.results.bundleFieldsCreated} bundle assignments. Updated: ${result.results.inputFieldsUpdated} fields.${warnings.length ? ` Warnings: ${warnings.length}` : ""}`,
       });
+      if (warnings.length > 0) {
+        setImportWarnings(warnings);
+        setShowWarningsDialog(true);
+      }
     } catch (error: any) {
       toast({ title: "Import failed", description: error.message, variant: "destructive" });
     } finally {
@@ -1778,6 +1786,21 @@ function InputFieldsTabContent() {
             Import Config
           </Button>
           <input ref={fileInputRef} type="file" accept=".json" onChange={handleImportConfig} className="hidden" />
+          <Dialog open={showWarningsDialog} onOpenChange={setShowWarningsDialog}>
+            <DialogContent className="max-w-2xl max-h-[80vh]" data-testid="dialog-import-warnings">
+              <DialogHeader>
+                <DialogTitle data-testid="text-import-warnings-title">Import Warnings ({importWarnings.length})</DialogTitle>
+                <DialogDescription data-testid="text-import-warnings-description">The following items could not be matched during import. This usually means the service, bundle, or line item names in the target environment don't match the source environment exactly.</DialogDescription>
+              </DialogHeader>
+              <div className="overflow-y-auto max-h-[50vh] space-y-1 text-sm" data-testid="list-import-warnings">
+                {importWarnings.map((warning, i) => (
+                  <div key={i} className="p-2 rounded-md bg-muted text-muted-foreground" data-testid={`text-import-warning-${i}`}>
+                    {warning}
+                  </div>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button data-testid="button-add-input-field">
