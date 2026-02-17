@@ -1,5 +1,5 @@
-import { drizzle } from "drizzle-orm/neon-http";
-import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/node-postgres";
+import pg from "pg";
 import { eq, desc, and, or, isNull, inArray, gte } from "drizzle-orm";
 import {
   type User,
@@ -163,8 +163,10 @@ import {
   passwordResetTokens,
 } from "@shared/schema";
 
-const sql = neon(process.env.DATABASE_URL!);
-const db = drizzle(sql);
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL!,
+});
+const db = drizzle(pool);
 
 export interface IStorage {
   // User methods
