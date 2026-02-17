@@ -1655,20 +1655,6 @@ function InputFieldsTabContent() {
     },
   });
 
-  const seedFieldsMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/admin/seed-input-fields");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/input-fields"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
-      toast({ title: "Input fields seeded successfully" });
-    },
-    onError: (error: any) => {
-      toast({ title: "Failed to seed input fields", description: error.message, variant: "destructive" });
-    },
-  });
-
   const toggleFieldStatusMutation = useMutation({
     mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
       return apiRequest("PATCH", `/api/input-fields/${id}`, { isActive });
@@ -1739,14 +1725,6 @@ function InputFieldsTabContent() {
     updateFieldMutation.mutate({ id: editingField.id, data });
   };
 
-  const handleSeedFields = async () => {
-    if (inputFieldsList.length > 0) {
-      toast({ title: "Cannot seed", description: "Input fields already exist. Clear them first.", variant: "destructive" });
-      return;
-    }
-    seedFieldsMutation.mutate();
-  };
-
   const getInputTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
       text: "Text",
@@ -1790,7 +1768,7 @@ function InputFieldsTabContent() {
           <CardTitle>Input Fields Library</CardTitle>
           <CardDescription>Manage configurable input fields that can be assigned to different services</CardDescription>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" onClick={handleExportConfig} data-testid="button-export-config">
             <Download className="h-4 w-4 mr-2" />
             Export Config
@@ -1800,17 +1778,6 @@ function InputFieldsTabContent() {
             Import Config
           </Button>
           <input ref={fileInputRef} type="file" accept=".json" onChange={handleImportConfig} className="hidden" />
-          {inputFieldsList.length === 0 && (
-            <Button 
-              variant="outline" 
-              onClick={handleSeedFields} 
-              disabled={seedFieldsMutation.isPending}
-              data-testid="button-seed-fields"
-            >
-              {seedFieldsMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              Seed Default Fields
-            </Button>
-          )}
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button data-testid="button-add-input-field">
@@ -2032,7 +1999,7 @@ function InputFieldsTabContent() {
           <div className="text-center py-8 text-muted-foreground">
             <FormInput className="h-12 w-12 mx-auto mb-2 opacity-50" />
             <p>No input fields configured yet.</p>
-            <p className="text-sm">Click "Seed Default Fields" to populate from existing service forms, or add fields manually.</p>
+            <p className="text-sm">Use "Import Config" to import fields from another environment, or click "Add Field" to create them manually.</p>
           </div>
         ) : (
           <Table>
